@@ -18,6 +18,19 @@ LOG=/srv/objektakte/deploy/remote.log
 mkdir -p "$(dirname "$LOG")"
 read -r ACTION BRANCH ARG _ <<<"${SSH_ORIGINAL_COMMAND:-}"
 envval() { grep -E "^$1=" .env 2>/dev/null | head -1 | cut -d= -f2- | awk '{print $1}'; }
+# Host-Key von GitHub fuer den Deploy-Nutzer, geprueft gegen den von GitHub veroeffentlichten Fingerabdruck.
+# Ohne diesen Eintrag scheitert git fetch mit "Host key verification failed", weil der Aufruf kein Terminal hat.
+GITHUB_ED25519_FP="SHA256:+DiY3wvvV6TuJJhbpZisF/zLDA0zPMSvHdkr4UvCOqU"
+ensure_github_hostkey() {
+  mkdir -p ~/.ssh && chmod 700 ~/.ssh && touch ~/.ssh/known_hosts && chmod 600 ~/.ssh/known_hosts
+  if ssh-keygen -F github.com -f ~/.ssh/known_hosts >/dev/null 2>&1; then return 0; fi
+  local scan; scan="$(ssh-keyscan -t ed25519 github.com 2>/dev/null)"
+  [ -n "$scan" ] || { echo "Host-Key von github.com nicht abrufbar"; return 1; }
+  local fp; fp="$(printf '%s\n' "$scan" | ssh-keygen -lf - | awk '{print $2}')"
+  [ "$fp" = "$GITHUB_ED25519_FP" ] || { echo "Host-Key von github.com weicht ab ($fp), nichts eingetragen"; return 1; }
+  printf '%s\n' "$scan" >> ~/.ssh/known_hosts
+  echo "Host-Key von github.com eingetragen ($fp)"
+}
 ensure_network() {
   # Traefik laeuft im Host-Netz (Serverbefund); das Proxy-Netz wird mit festem Subnetz angelegt, damit
   # TRUSTED_PROXY_CIDR stimmt. Vorhandenes Netz bleibt unveraendert.
@@ -34,8 +47,8 @@ case "$BRANCH" in *[!A-Za-z0-9._/-]*|*..*|"") case "$ACTION" in rollback|check) 
 case "${ARG:-}" in *[!A-Za-z0-9@._+-]*) echo "Argument unzulaessig"; exit 2 ;; esac
 echo "$(date -Is) $ACTION ${BRANCH:-} ${ARG:-} von ${SSH_CLIENT:-unbekannt}" >> "$LOG"
 case "$ACTION" in
-  deploy)    ensure_network; exec scripts/deploy.sh "$BRANCH" ;;
-  first-run) ensure_network; exec scripts/deploy.sh --first-run "$BRANCH" ;;
+  deploy)    ensure_github_hostkey; ensure_network; exec scripts/deploy.sh "$BRANCH" ;;
+  first-run) ensure_github_hostkey; ensure_network; exec scripts/deploy.sh --first-run "$BRANCH" ;;
   rollback)  exec scripts/rollback.sh ;;
   check)
     echo "Verbindung ok: $(hostname) als $(whoami), Checkout $(git rev-parse --abbrev-ref HEAD) $(git rev-parse --short=12 HEAD)"
@@ -43,6 +56,7 @@ case "$ACTION" in
     docker compose version 2>/dev/null | head -1 || echo "docker compose nicht verfuegbar"
     ;;
   pull)
+    ensure_github_hostkey
     git fetch --tags origin
     git checkout "$BRANCH" && git pull --ff-only origin "$BRANCH"
     echo "Checkout jetzt: $(git log -1 --format='%h %s')"

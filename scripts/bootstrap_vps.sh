@@ -88,6 +88,20 @@ fi
 if [ ! -f "$DH/.ssh/github_deploy" ]; then
   sudo -u "$DEPLOY_USER" ssh-keygen -q -t ed25519 -N "" -C "objektakte-vps-deploy-key" -f "$DH/.ssh/github_deploy"
 fi
+# Host-Key von GitHub fuer deploy, gegen den veroeffentlichten Fingerabdruck geprueft; sonst scheitert
+# jeder git fetch ohne Terminal mit "Host key verification failed".
+GITHUB_ED25519_FP="SHA256:+DiY3wvvV6TuJJhbpZisF/zLDA0zPMSvHdkr4UvCOqU"
+if ! sudo -u "$DEPLOY_USER" ssh-keygen -F github.com -f "$DH/.ssh/known_hosts" >/dev/null 2>&1; then
+  SCAN="$(ssh-keyscan -t ed25519 github.com 2>/dev/null)"
+  FP="$(printf '%s\n' "$SCAN" | ssh-keygen -lf - 2>/dev/null | awk '{print $2}')"
+  if [ -n "$SCAN" ] && [ "$FP" = "$GITHUB_ED25519_FP" ]; then
+    printf '%s\n' "$SCAN" >> "$DH/.ssh/known_hosts"
+    chown "$DEPLOY_USER:$DEPLOY_USER" "$DH/.ssh/known_hosts"; chmod 600 "$DH/.ssh/known_hosts"
+    echo "   Host-Key von github.com fuer $DEPLOY_USER eingetragen."
+  else
+    echo "   Warnung: Host-Key von github.com nicht eingetragen (nicht abrufbar oder abweichender Fingerabdruck ${FP:-keiner})."
+  fi
+fi
 if ! grep -q "IdentityFile ~/.ssh/github_deploy" "$DH/.ssh/config" 2>/dev/null; then
   printf 'Host github.com\n  IdentityFile ~/.ssh/github_deploy\n  IdentitiesOnly yes\n' >> "$DH/.ssh/config"
   chown "$DEPLOY_USER:$DEPLOY_USER" "$DH/.ssh/config"; chmod 600 "$DH/.ssh/config"
