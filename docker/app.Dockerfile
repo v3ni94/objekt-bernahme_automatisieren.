@@ -36,8 +36,11 @@ RUN chmod +x /usr/local/bin/entrypoint.sh
 # ---------------------------------------------------------------- Ziel web
 FROM runtime-base AS web
 COPY --from=builder /opt/venv-web /opt/venv
-# Statische Dateien zur Bauzeit sammeln; die Bauzeit-Settings brauchen keine Geheimnisse und keine Datenbank
-RUN DJANGO_SETTINGS_MODULE=objektakte.settings.build python manage.py collectstatic --noinput \
+# Statische Dateien zur Bauzeit sammeln; die Bauzeit-Settings brauchen keine Geheimnisse und keine Datenbank.
+# manage.py check laedt die URL-Konfiguration und damit alle Ansichten: ein Paket, das im Web-Venv fehlt,
+# bricht den Build ab und nicht erst die erste Anfrage im Betrieb.
+RUN DJANGO_SETTINGS_MODULE=objektakte.settings.build python manage.py check \
+ && DJANGO_SETTINGS_MODULE=objektakte.settings.build python manage.py collectstatic --noinput \
  && chown -R app:app /app/staticfiles
 USER app
 EXPOSE 8000

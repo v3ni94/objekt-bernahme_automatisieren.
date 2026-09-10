@@ -23,6 +23,20 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+web = [
+  # Reine Python-Bibliotheken, die der Web-Prozess selbst ausfuehrt (Nachforderung PDF und DOCX bei Freigabe,
+  # Listenmodule beim App-Start, Importzuordnung und Suche, KI-Antwortschema, OAuth-Rueckruf und Drive-Verwaltungsseite,
+  # Protokollexport); keine OCR-Binaerdateien und keine ML-Bibliotheken (B-44)
+  "rapidfuzz>=3.9",
+  "openpyxl>=3.1",
+  "reportlab>=4.2",
+  "python-docx>=1.1",
+  "pydantic>=2.8",
+  "Pillow>=10.4",
+  "requests>=2.32",
+  "google-api-python-client>=2.140",
+  "google-auth>=2.34",
+]
 worker = [
   # OCR und Dokumentverarbeitung (Ziel worker, docs/architektur.md 4.1); Tesseract und Ghostscript kommen aus dem Betriebssystem
   "ocrmypdf>=16.0",

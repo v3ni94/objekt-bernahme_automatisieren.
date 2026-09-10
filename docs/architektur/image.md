@@ -10,11 +10,13 @@ Je Image genau ein Python-Interpreter mit einem Lockfile. Eine Mischung aus pip-
 
 | Datei | Inhalt | Verwendet von |
 |---|---|---|
-| `requirements-web.lock.txt` | Django, allauth mit MFA, gunicorn, whitenoise, mysqlclient, Celery mit Redis, cryptography, jsonschema, argon2 | Ziel `web` (web, beat) |
-| `requirements-worker.lock.txt` | zusätzlich ocrmypdf, pikepdf, pypdfium2, pdfplumber, img2pdf, Pillow, rapidfuzz, scikit-learn, spaCy, openpyxl, reportlab, python-docx, Google-Drive-Client, OpenAI- und Anthropic-SDK, tenacity | Ziel `worker` (worker, worker-nlp, worker-io, classifier) |
+| `requirements-web.lock.txt` | Django, allauth mit MFA, gunicorn, whitenoise, mysqlclient, Celery mit Redis, cryptography, jsonschema, argon2; dazu die reinen Python-Bibliotheken, die der Web-Prozess selbst ausführt (Extra `web`): rapidfuzz (Importzuordnung, Suche), openpyxl (Protokollexport, Listenmodule), reportlab und python-docx (Nachforderung bei Freigabe), pydantic (KI-Antwortschema), Pillow (Logo im Briefbogen), requests und Google-Drive-Client (OAuth-Rückruf, Drive-Verwaltungsseite, Abgleich über `manage.py`) | Ziel `web` (web, beat) |
+| `requirements-worker.lock.txt` | zusätzlich (Extras `web` und `worker`) ocrmypdf, pikepdf, pypdfium2, pdfplumber, img2pdf, Pillow, rapidfuzz, scikit-learn, spaCy, openpyxl, reportlab, python-docx, Google-Drive-Client, OpenAI- und Anthropic-SDK, tenacity | Ziel `worker` (worker, worker-nlp, worker-io, classifier) |
 | `requirements-dev.lock.txt` | alles plus pytest, pytest-django, factory-boy, freezegun, hypothesis, ruff, mypy | Entwicklung, CI |
 
-Erzeugung: `uv pip compile pyproject.toml [--extra worker] [--extra dev] -o <datei>`; Anhebung geplant quartalsweise mit Testsuite (docs/umsetzungsplan.md R-19).
+Erzeugung: `uv pip compile pyproject.toml --extra web [--extra worker] [--extra dev] -o <datei>` (die Kopfzeile jedes Lockfiles nennt den Befehl); Anhebung geplant quartalsweise mit Testsuite (docs/umsetzungsplan.md R-19).
+
+Prüfung der Trennung: Im Ziel `web` läuft zur Bauzeit `manage.py check`; das lädt die URL-Konfiguration und damit alle Ansichten. Ein Paket, das der Web-Prozess importiert, aber im Web-Lockfile fehlt, bricht den Image-Build ab (Ursache des CI-Fehlers nach M11: openpyxl fehlte im Web-Venv, die Listenmodule wurden beim App-Start geladen). Module, die nur der Worker ausführt (OCR, Vorschaubilder, Training, KI-Anbieter), importieren ihre Bibliotheken innerhalb der Funktion; Module, die auch der Web-Prozess ausführt, stehen im Extra `web`.
 
 ## Ziel web
 
@@ -22,7 +24,7 @@ Erzeugung: `uv pip compile pyproject.toml [--extra worker] [--extra dev] -o <dat
 - Systempakete: `libmariadb3`, `ca-certificates`, `tzdata`.
 - Kein Tesseract, kein Ghostscript, kein Compiler im Laufzeit-Image (Build-Stage getrennt).
 - Nutzer `app` mit `APP_UID` (Standard 10001, ANNAHME AB1), `read_only: true` mit tmpfs in Compose.
-- Statische Dateien werden zur Bauzeit gesammelt (`objektakte.settings.build`, keine Geheimnisse, keine Datenbank).
+- Statische Dateien werden zur Bauzeit gesammelt (`objektakte.settings.build`, keine Geheimnisse, keine Datenbank); davor läuft `manage.py check` als Importprüfung aller Ansichten.
 
 ## Ziel worker
 
