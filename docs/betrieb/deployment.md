@@ -6,7 +6,7 @@ Verbindliche Beschreibung in docs/betrieb.md Abschnitt 4. Hier die Befehlsfolge.
 
 1. Serverbefund (`scripts/measure_server.sh`) und OCR-Probelauf (`scripts/perf_probe.sh`) nach docs/betrieb/m0-anleitung.md.
 2. Host-Härtung nach docs/betrieb.md Abschnitt 2, DNS-Eintrag vorhanden (V-04).
-3. Verzeichnisse (docs/betrieb.md 3.3) und Secrets (3.8) anlegen; `.env` aus `.env.example` mit den Werten des Ergebnisblatts.
+3. Verzeichnisse (docs/betrieb.md 3.3), Secrets (3.8), Deploy-Nutzer und GitHub-Schlüssel in einem Lauf: `sudo bash scripts/bootstrap_vps.sh` (docs/betrieb/github-deploy.md); `.env` aus `.env.example` mit den Werten des Ergebnisblatts.
 4. Checkout: `sudo mkdir -p /opt/objektakte && sudo chown deploy:deploy /opt/objektakte && git clone [REPO_URL] /opt/objektakte && cd /opt/objektakte`
 5. `scripts/deploy.sh --first-run main` (baut Images, startet db, redis, backup, migriert, lädt Seeds, setzt Tabellenrechte, startet alle Dienste, Smoke-Test).
 6. Ersten Admin anlegen: `docker compose exec web app-create-admin --email [ADMIN_ADRESSE]`; TOTP beim ersten Login einrichten. Zweiten Admin anlegen.

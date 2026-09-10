@@ -11,6 +11,10 @@ Stand: 10.09.2026. Zwei getrennte Schlüsselpaare, zwei Richtungen. SFTP wird ni
 
 Der Aktionsschlüssel kann auf dem Server ausschließlich `deploy <branch>` oder `rollback` auslösen (erzwungenes Kommando, kein Terminal, keine Weiterleitungen). Ein kompromittierter Schlüssel erlaubt damit kein Arbeiten auf dem Server.
 
+## Kurzweg: `scripts/bootstrap_vps.sh`
+
+Die Schritte 1 bis 3 auf dem Server (Deploy-Nutzer, Verzeichnisse nach docs/betrieb.md 3.3, Secrets nach 3.8, beide Schlüsselpaare, Werte für GitHub) erledigt `sudo bash scripts/bootstrap_vps.sh` in einem Lauf; das Skript ist idempotent und überschreibt nichts Vorhandenes. Es schreibt die drei Werte für GitHub nach `/home/deploy/github-werte.txt` (nur für `deploy` lesbar); die Datei wird nach dem Eintragen mit `shred -u` gelöscht. SSH-Härtung und Firewall bleiben bewusst manuelle Schritte (docs/betrieb.md 2.1), damit der Schlüssel-Login vorher geprüft wird. Die Einzelschritte darunter erklären, was das Skript tut.
+
 ## Schritt 1: Deploy Key (VPS liest von GitHub)
 
 ```bash
