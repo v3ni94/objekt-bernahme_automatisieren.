@@ -3,7 +3,16 @@
 from __future__ import annotations
 
 import pytest
+from django.core.cache import cache
 from django.core.management import call_command
+
+
+@pytest.fixture(autouse=True)
+def _leerer_cache():
+    """Locmem-Cache je Test leeren, damit Circuit Breaker und Debounce-Schluessel nicht zwischen Tests wandern."""
+    cache.clear()
+    yield
+    cache.clear()
 
 
 @pytest.fixture

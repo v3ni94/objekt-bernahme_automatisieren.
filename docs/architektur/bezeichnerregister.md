@@ -1448,8 +1448,10 @@ Celery-Queues aus den Settings: `ai`, `classify`, `io`, `lists`, `ocr`
 | ai.chars_per_token | ai | decimal | `3.5` |
 | ai.max_input_tokens | ai | integer | `3000` |
 | ai.monthly_budget_eur | ai | object | `{"openai": null, "anthropic": null}` |
+| ai.price_list | ai | object | `{"version": "nicht-festgelegt", "models": {}}` |
 | ai.provider_order | ai | list | `["openai", "anthropic"]` |
 | ai.providers | ai | object | `{"openai": {"enabled": false, "model": null, "endpoint": null, "region": null, "timeout...` |
+| ai.reclassify_enabled | ai | boolean | `false` |
 | ai.store_masked_prompts | ai | boolean | `false` |
 | ai.wall_budget_s | ai | integer | `120` |
 | classification.ai_sample_pct | classification | integer | `10` |

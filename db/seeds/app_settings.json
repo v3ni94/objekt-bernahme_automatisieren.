@@ -569,5 +569,10 @@
     "gesamtwirtschaftsplan",
     "versammlungsprotokoll"
   ],
-  "classification.segments_require_review": true
+  "classification.segments_require_review": true,
+  "ai.price_list": {
+    "version": "nicht-festgelegt",
+    "models": {}
+  },
+  "ai.reclassify_enabled": false
 }

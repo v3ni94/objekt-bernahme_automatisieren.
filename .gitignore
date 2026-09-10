@@ -46,3 +46,6 @@ serverbefund-*.md
 .static_test/
 staticfiles/
 .venv/
+
+# Redis-Dump der Entwicklungsumgebung
+dump.rdb

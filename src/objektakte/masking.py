@@ -36,7 +36,7 @@ _KONTO = re.compile(
     re.IGNORECASE,
 )
 _AUSWEIS = re.compile(
-    r"\b(Personalausweis(?:nummer|-?Nr\.?)?|Reisepass(?:nummer|-?Nr\.?)?|Ausweis(?:nummer|-?Nr\.?|-?ID)?|"
+    r"\b(Personalausweis(?:nummer|\s?-?Nr\.?)?|Reisepass(?:nummer|\s?-?Nr\.?)?|Ausweis(?:nummer|\s?-?Nr\.?|-?ID)?|"
     r"Pass-?Nr\.?|Ausweiskopie)\s*[:.]?\s*([A-Z0-9]{9,10})\b"
 )
 

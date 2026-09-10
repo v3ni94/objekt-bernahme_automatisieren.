@@ -70,6 +70,7 @@ class CasePlan:
     page_from: int | None = None
     page_to: int | None = None
     priority: int = 100
+    informational: bool = False  # Fall haelt die Ablage nicht auf (Stichprobe einer KI-Entscheidung, F17)
 
 
 @dataclass
@@ -94,10 +95,11 @@ class Decision:
     kpi_misc: bool = False
     kpi_misc_adjusted: bool = False
     candidates_top: list[dict] = field(default_factory=list)
+    stage3_provider: str | None = None  # Anbieter, wenn Stufe 3 entschieden hat (finale Zeile, E 7.2)
 
     @property
     def review_required(self) -> bool:
-        return bool(self.cases)
+        return any(not c.informational for c in self.cases)
 
     def plan_text(self) -> str:
         parts = [f"{self.physical_category or self.category or '06'}"]
@@ -406,7 +408,52 @@ def _segment_entities(ctx: DocContext, page_from: int, page_to: int, key: str) -
 
 # ---------------------------------------------------------------- Entscheidung
 def decide(
-    ctx: DocContext, s1: Stage1Result, s2: Stage2Result | None, doc: Document, *, stage3_enabled: bool = False
+    ctx: DocContext,
+    s1: Stage1Result,
+    s2: Stage2Result | None,
+    doc: Document,
+    *,
+    stage3_enabled: bool = False,
+    s3=None,
+) -> Decision:
+    decision = _decide_core(ctx, s1, s2, doc, stage3_enabled=stage3_enabled, s3=s3)
+    if (
+        s3 is not None
+        and decision.decided_by == "stage3"
+        and decision.category not in (None, "06")
+        and not decision.cases
+    ):
+        from apps.ai import services as ai_services
+
+        if ai_services.sample_for_review():
+            # Stichprobe einer KI-Entscheidung (F17, E 7.2): Ablage erfolgt, ein Sachbearbeiter prueft nachtraeglich
+            decision.cases.append(
+                CasePlan(
+                    CaseType.MOVE_PROPOSAL,
+                    "ai_sample",
+                    decision.candidates_top,
+                    _proposal(decision),
+                    {
+                        "reason": "Stichprobe einer KI-Entscheidung (F17)",
+                        "stage3_status": s3.status,
+                        "stage3_reason": None,
+                        "provider": s3.provider,
+                    },
+                    priority=60,
+                    informational=True,
+                )
+            )
+    return decision
+
+
+def _decide_core(
+    ctx: DocContext,
+    s1: Stage1Result,
+    s2: Stage2Result | None,
+    doc: Document,
+    *,
+    stage3_enabled: bool = False,
+    s3=None,
 ) -> Decision:
     obj = doc.object
     t = thresholds()
@@ -429,10 +476,67 @@ def decide(
     if combined.stage3_required and stage3_enabled:
         base.stage3_required = True
         return base
+    ai_decided = False
+    if s3 is not None:
+        from apps.ai.services import combine_after_stage3
+
+        combined, ai_decided = combine_after_stage3(combined, s3)
+        if ai_decided:
+            base.stage3_provider = s3.provider
+        base.category = combined.category
+        base.confidence = combined.confidence
+        base.reason = combined.reason
+        base.decided_by = combined.decided_by
+        if ai_decided:
+            base.subfolder, base.document_type = s3.subfolder, s3.document_type
+            base.scope = {"05": "owner", "04": "tenant", "03": "accounting", "06": "unclear"}.get(
+                s3.category, "object"
+            )
+            if period.year is None and s3.period_year:
+                period.year = s3.period_year
+                period.source = "stage3"
+        elif base.category == s3.category and base.subfolder is None:
+            base.subfolder, base.document_type = s3.subfolder, s3.document_type
+        base.candidates_top = (base.candidates_top or []) + (
+            [
+                {
+                    "stage": 3,
+                    "category": s3.category,
+                    "subfolder": s3.subfolder,
+                    "document_type": s3.document_type,
+                    "confidence": s3.confidence,
+                    "provider": s3.provider,
+                }
+            ]
+            if s3.status == "ok"
+            else []
+        )
     existing = doc.source == "drive_existing"
     # Schritt 5: keine Kategorie erreicht die Schwelle -> 06/01_Unklar mit Fall
     if base.category is None or base.confidence < t["threshold_auto_file"]:
         base.physical_category, base.physical_subfolder = "06", "01"
+        stage3_reason = None
+        if s3 is not None and s3.status in (
+            "provider_error",
+            "budget_blocked",
+            "disabled",
+            "blocked_by_mask_check",
+            "skipped",
+        ):
+            stage3_reason = {
+                "provider_error": "KI nicht verfügbar",
+                "budget_blocked": "Kostenlimit erreicht",
+                "disabled": "Stufe 3 nicht freigegeben",
+                "blocked_by_mask_check": "Maskierungsprüfung hat den Aufruf gesperrt",
+                "skipped": s3.message or "Stufe 3 übersprungen",
+            }[s3.status]
+            base.reason = f"{combined.reason}; {stage3_reason}"
+        case_context = {
+            "reason": base.reason,
+            "confidence": base.confidence,
+            "stage3_status": s3.status if s3 is not None else None,
+            "stage3_reason": stage3_reason,
+        }
         if existing:
             base.move_allowed = False
             base.cases.append(
@@ -441,20 +545,13 @@ def decide(
                     "below_threshold",
                     top,
                     _proposal(base),
-                    {"reason": combined.reason, "confidence": base.confidence},
+                    case_context,
                     misc_subfolder="01",
                 )
             )
         else:
             base.cases.append(
-                CasePlan(
-                    CaseType.UNCLEAR,
-                    "below_threshold",
-                    top,
-                    None,
-                    {"reason": combined.reason, "confidence": base.confidence},
-                    misc_subfolder="01",
-                )
+                CasePlan(CaseType.UNCLEAR, "below_threshold", top, None, case_context, misc_subfolder="01")
             )
         base.kpi_misc = True
         base.kpi_misc_adjusted = True
@@ -692,9 +789,11 @@ def persist(
     dry_run: bool = False,
 ) -> DocumentClassification:
     obj = doc.object
-    provider_final = {"stage1": "rules", "stage2": "local_model", "stage3": None}.get(
-        decision.decided_by
-    ) or "rules"
+    provider_final = {
+        "stage1": "rules",
+        "stage2": "local_model",
+        "stage3": decision.stage3_provider,
+    }.get(decision.decided_by) or "rules"
     with transaction.atomic():
         doc = Document.objects.select_for_update().get(pk=doc.pk)
         if not dry_run:
@@ -733,7 +832,7 @@ def persist(
             )
         final = DocumentClassification(
             document=doc,
-            stage=1 if decision.decided_by == "stage1" else 2,
+            stage={"stage1": 1, "stage2": 2, "stage3": 3}.get(decision.decided_by, 2),
             provider=provider_final,
             model=s2.model_version if s2 is not None and decision.decided_by == "stage2" else None,
             category_id=decision.category,
@@ -867,7 +966,7 @@ def persist(
                 tenant_id=tenant_id,
                 unit_id=ctx.unit_ids[0] if ctx.unit_ids else None,
                 confidence=decision.confidence,
-                status="confirmed" if not decision.cases else "suggested",
+                status="confirmed" if not decision.review_required else "suggested",
                 classification=final,
             )
         if decision.physical_category == "06":

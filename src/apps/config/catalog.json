@@ -1499,6 +1499,55 @@
       "schema": {
         "type": "boolean"
       }
+    },
+    {
+      "key": "ai.price_list",
+      "category": "ai",
+      "value_type": "object",
+      "description": "Versionierte Preisliste je Modell in EUR je 1.000 Token (input_per_1k, output_per_1k), vom Auftraggeber freigegeben; Grundlage von ai_calls.cost_eur",
+      "source": "E 4.2, B-07",
+      "schema": {
+        "type": "object",
+        "required": [
+          "version",
+          "models"
+        ],
+        "properties": {
+          "version": {
+            "type": "string"
+          },
+          "models": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "required": [
+                "input_per_1k",
+                "output_per_1k"
+              ],
+              "properties": {
+                "input_per_1k": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "output_per_1k": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "key": "ai.reclassify_enabled",
+      "category": "ai",
+      "value_type": "boolean",
+      "description": "Nachklassifikationslauf für Dokumente in 06/01_Unklar mit Grund KI nicht verfügbar oder Kostenlimit (manuell über Kommando ai_reclassify, zeitgesteuert nach F17)",
+      "source": "E 4.2, F17",
+      "schema": {
+        "type": "boolean"
+      }
     }
   ]
 }

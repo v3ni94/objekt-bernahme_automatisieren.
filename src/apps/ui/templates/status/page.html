@@ -1,4 +1,4 @@
-{% extends "base.html" %}{% block title %}Status · {{ APP_NAME }}{% endblock %}
+{% extends "base.html" %}{% load perms %}{% block title %}Status · {{ APP_NAME }}{% endblock %}
 {% block content %}
 <h1>Status {% if ok %}<span class="ampel gruen">bereit</span>{% else %}<span class="ampel rot">gestört</span>{% endif %}</h1>
 <div class="raster">
@@ -24,6 +24,13 @@
 <section class="karte"><h2>Klassifikator (Stufe 2)</h2>
 {% if processing.classifier.cold_start %}<p><span class="ampel grau">Kaltstartphase</span> Stufe 2 trägt nur Erkennung und Abgleich; Regeln und Stufe 3 entscheiden (B-27).</p>{% else %}<p><span class="ampel gruen">aktiv</span> Modell {{ processing.classifier.active_version }}, Makro-F1 {{ processing.classifier.macro_f1|default:"unbekannt" }}</p>{% endif %}
 <p class="klein">Gewichtete Beispiele je Klasse (Schwelle {{ processing.classifier.minimum_per_class }}): {% for k, v in processing.classifier.weighted_samples.items %}{{ k }} {{ v }}{% if not forloop.last %}, {% endif %}{% empty %}keine{% endfor %}</p>
+</section>
+<section class="karte"><h2>Stufe 3 (externe KI)</h2>
+<table><tr><th>Anbieter</th><th>Status</th><th>Modell</th><th>Region</th><th>Kosten Monat</th><th>Alarmschwelle</th></tr>
+{% for name, p in processing.ai.providers.items %}<tr><td>{{ name }}{% if name == processing.ai.order.0 %} <span class="klein">primär</span>{% endif %}</td><td>{% if p.enabled %}<span class="ampel gruen">freigegeben</span>{% else %}<span class="ampel grau">deaktiviert (F17, AVV)</span>{% endif %}</td><td class="mono">{{ p.model|default:"" }}</td><td>{{ p.region|default:"" }}</td><td>{{ processing.ai.month_costs|get_item:name|default:"0" }} EUR</td><td>{{ processing.ai.budget|get_item:name|default:"" }}</td></tr>{% endfor %}
+</table>
+{% if processing.ai.object_costs %}<p class="klein">Kosten je Objekt: {% for r in processing.ai.object_costs %}{{ r.object__object_number }} {{ r.provider }} {{ r.cost|default:"0" }} EUR ({{ r.calls }} Aufrufe){% if not forloop.last %}, {% endif %}{% endfor %}</p>{% endif %}
+{% if processing.ai.errors %}<p class="klein">Letzte Fehler: {% for e in processing.ai.errors %}{{ e.requested_at|date:"d.m. H:i" }} {{ e.provider }} {{ e.status }}{% if not forloop.last %}, {% endif %}{% endfor %}</p>{% endif %}
 </section>
 <section class="karte"><h2>Läufe</h2>
 <table><tr><th>Objekt</th><th>Art</th><th>Status</th><th>Position</th></tr>

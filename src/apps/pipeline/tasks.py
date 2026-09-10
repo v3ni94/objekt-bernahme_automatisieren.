@@ -552,7 +552,8 @@ def classify(job: ProcessingJob) -> dict:
     s1 = rules_mod.evaluate(ctx)
     s2 = stage2.predict(ctx)
     combined = combine(s1, s2, ner_support=bool(ctx.owner_ids or ctx.unit_ids))
-    stage3 = stage2.stage3_enabled() and combined.stage3_required and not ctx.id_document_found
+    # Sperren (Ausweiskopie, Kategorie 01) prueft classify_ai ueber stage3_allowed und protokolliert den Grund im Fall
+    stage3 = stage2.stage3_enabled() and combined.stage3_required
     payload = {
         "stage1": {
             "category": s1.category,
@@ -597,6 +598,14 @@ def classify(job: ProcessingJob) -> dict:
     return {"stage1": s1.category, "stage2": s2.top, "confidence": combined.confidence, "next": next_type}
 
 
+def _stage3_result(payload: dict | None):
+    if not payload:
+        return None
+    from apps.ai.services import Stage3Outcome
+
+    return Stage3Outcome(**{k: v for k, v in payload.items() if k in Stage3Outcome.__dataclass_fields__})
+
+
 def _stage_results(payload: dict):
     from apps.classification.confidence import Stage1Result, Stage2Result
 
@@ -613,6 +622,49 @@ def _stage_results(payload: dict):
     return s1, s2
 
 
+@job_task(JobType.CLASSIFY_AI)
+def classify_ai(job: ProcessingJob) -> dict:
+    """Stufe 3 ueber die Provider-Schnittstelle (docs/architektur.md 6.1 Nr. 8, 6.7); Ergebnis in ai_calls und
+    document_classifications, danach decide mit dem Stufe-3-Ergebnis im Payload."""
+    from apps.ai import services as ai_services
+    from apps.classification.context import build_context
+
+    doc = job.document
+    if doc is None or doc.status not in ("ocr_done", "classified", "review") or not doc.sha256:
+        raise SkipJob("not_ready")
+    payload = dict(job.payload or {})
+    ctx = build_context(doc)
+    outcome = ai_services.run_stage3(doc, ctx, s1_payload=payload.get("stage1"), run=job.run, job=job)
+    payload["stage3"] = {
+        "status": outcome.status,
+        "category": outcome.category,
+        "subfolder": outcome.subfolder,
+        "document_type": outcome.document_type,
+        "confidence": outcome.confidence,
+        "object_related": outcome.object_related,
+        "period_year": outcome.period_year,
+        "provider": outcome.provider,
+        "fallback_used": outcome.fallback_used,
+        "message": outcome.message,
+        "call_id": outcome.call_id,
+        "reasoning": outcome.reasoning,
+    }
+    enqueue(
+        JobType.DECIDE,
+        job.object,
+        key=idempotency_key(JobType.DECIDE, job.object_id, doc.sha256),
+        document=doc,
+        run=job.run,
+        payload=payload,
+    )
+    return {
+        "stage3": outcome.status,
+        "provider": outcome.provider,
+        "confidence": outcome.confidence,
+        "next": JobType.DECIDE,
+    }
+
+
 @job_task(JobType.DECIDE)
 def decide_task(job: ProcessingJob) -> dict:
     """Entscheidungsalgorithmus und Fallbildung (docs/architektur.md 6.4, 6.5, 6.9); Dry-Run schreibt nur den Plan."""
@@ -624,8 +676,9 @@ def decide_task(job: ProcessingJob) -> dict:
         raise SkipJob("not_ready")
     ctx = build_context(doc)
     s1, s2 = _stage_results(job.payload or {})
+    s3 = _stage3_result((job.payload or {}).get("stage3"))
     dry_run = bool(job.run and job.run.dry_run)
-    decision = decide_mod.decide(ctx, s1, s2, doc)
+    decision = decide_mod.decide(ctx, s1, s2, doc, s3=s3)
     final = decide_mod.persist(doc, ctx, s1, s2, decision, run=job.run, dry_run=dry_run)
     result = {
         "category": decision.category,

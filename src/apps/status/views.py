@@ -12,6 +12,7 @@ from django.views.decorators.http import require_POST
 
 from apps.accounts.permissions import permission_required, user_has_permission
 from apps.audit.services import record
+from apps.config import store
 
 from . import checks
 
@@ -34,10 +35,22 @@ def processing_overview() -> dict:
     runs = ProcessingRun.objects.filter(status__in=[RunStatus.PENDING, RunStatus.RUNNING]).select_related(
         "object"
     )
+    from apps.ai.provider import ProviderConfig
+    from apps.ai.router import month_costs
+    from apps.ai.services import object_costs, recent_errors
     from apps.classification.training import cold_start_status
 
+    providers = {name: ProviderConfig.from_settings(name) for name in ("openai", "anthropic")}
     return {
         "classifier": cold_start_status(),
+        "ai": {
+            "providers": providers,
+            "order": store.get("ai.provider_order", []),
+            "month_costs": month_costs(),
+            "object_costs": object_costs(),
+            "errors": recent_errors(),
+            "budget": store.get("ai.monthly_budget_eur", {}) or {},
+        },
         "progress": ObjectProgress.objects.select_related("object", "last_run").order_by(
             "object__object_number"
         ),
