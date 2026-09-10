@@ -34,6 +34,10 @@ class RequestTextBlock(TimestampedModel):
     text = models.TextField()
     sort_order = models.PositiveSmallIntegerField(default=100)
     is_active = models.BooleanField(default=True)
+    version = models.PositiveSmallIntegerField(default=1)
+    updated_by = models.ForeignKey(
+        USER, null=True, blank=True, on_delete=models.SET_NULL, db_column="updated_by", related_name="+"
+    )
 
     class Meta:
         db_table = "request_text_blocks"
@@ -54,6 +58,12 @@ class CompletenessCheck(TimestampedModel):
     period_based = models.BooleanField(default=False)
     evidence_document_types = models.JSONField(
         null=True, blank=True, help_text="Codes aus document_types, die den Punkt belegen"
+    )
+    category = models.CharField(
+        max_length=48, null=True, blank=True, help_text="Gruppe im Nachforderungsschreiben (H 4.2 Nr. 6)"
+    )
+    blocking = models.BooleanField(
+        default=False, help_text="Fehlen verhindert die Einstufung weitgehend vollständig"
     )
     request_text_block = models.ForeignKey(
         RequestTextBlock,
@@ -96,11 +106,13 @@ class CompletenessFinding(TimestampedModel):
     )
     period_year = models.PositiveSmallIntegerField(null=True, blank=True)
     status = models.CharField(max_length=16, choices=FindingStatus.choices)
+    # Nachweise sind abgeleitete Verweise: verschwindet ein vorgeschlagener Link oder ein Dokument, bleibt das Finding
+    # und wird beim naechsten Lauf neu bewertet (kein Schutz, der Review oder Loeschlauf blockieren wuerde)
     evidence_document = models.ForeignKey(
         "documents.Document",
         null=True,
         blank=True,
-        on_delete=models.PROTECT,
+        on_delete=models.SET_NULL,
         db_column="evidence_document_id",
         related_name="+",
     )
@@ -108,7 +120,7 @@ class CompletenessFinding(TimestampedModel):
         "documents.DocumentOwnerLink",
         null=True,
         blank=True,
-        on_delete=models.PROTECT,
+        on_delete=models.SET_NULL,
         db_column="evidence_link_id",
         related_name="+",
     )
@@ -156,8 +168,9 @@ class CompletenessFinding(TimestampedModel):
 
 class RequestStatus(models.TextChoices):
     DRAFT = "draft", "Entwurf"
+    REVIEWED = "reviewed", "geprüft"
     APPROVED = "approved", "freigegeben"
-    SENT = "sent", "versendet (manuell)"
+    SENT = "sent", "als versendet vermerkt"
     WITHDRAWN = "withdrawn", "zurückgezogen"
 
 
@@ -182,6 +195,24 @@ class DocumentRequest(TimestampedModel):
     body = models.TextField()
     finding_ids = models.JSONField(null=True, blank=True)
     file_path = models.CharField(max_length=255, null=True, blank=True)
+    version = models.PositiveSmallIntegerField(default=1)
+    deadline_date = models.DateField(null=True, blank=True)
+    findings_snapshot = models.JSONField(
+        null=True, blank=True, help_text="Positionen zum Erzeugungszeitpunkt (H 4.1)"
+    )
+    custom_text_blocks = models.JSONField(null=True, blank=True)
+    text_block_versions = models.JSONField(null=True, blank=True)
+    pdf_path = models.CharField(max_length=255, null=True, blank=True)
+    docx_path = models.CharField(max_length=255, null=True, blank=True)
+    content_hash = models.CharField(max_length=64, null=True, blank=True)
+    reviewed_by = models.ForeignKey(
+        USER, null=True, blank=True, on_delete=models.SET_NULL, db_column="reviewed_by", related_name="+"
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    marked_sent_by = models.ForeignKey(
+        USER, null=True, blank=True, on_delete=models.SET_NULL, db_column="marked_sent_by", related_name="+"
+    )
+    sent_channel_note = models.CharField(max_length=200, null=True, blank=True)
     created_by = models.ForeignKey(
         USER, null=True, blank=True, on_delete=models.SET_NULL, db_column="created_by", related_name="+"
     )

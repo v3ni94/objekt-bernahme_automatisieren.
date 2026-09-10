@@ -248,11 +248,19 @@ CELERY_BEAT_SCHEDULE: dict = {
         "schedule": crontab(hour=3, minute=15),
         "options": {"queue": "io"},
     },
+    # Vollstaendigkeitspruefung fuer Objekte in Uebernahme (H 3.5), naechtlich 02:30 Serverzeit (ANNAHME, F27)
+    "requirements-evaluate-nightly": {
+        "task": "requirements.evaluate_nightly",
+        "schedule": crontab(hour=2, minute=30),
+        "options": {"queue": "io"},
+    },
 }
 
 # --- Anwendungsweite Startparameter -------------------------------------------------------------
 OBJEKTAKTE = {
     "SERVICE_NAME": env_str("SERVICE_NAME", "web"),
+    # Unterschriftsbild der Geschaeftsfuehrung nur aus dem Betrieb (Docker Secret oder Volume), nie im Repository
+    "HVM_SIGNATURE_PATH": env_str("HVM_SIGNATURE_PATH", "/run/secrets/hvm_signature"),
     "DATA_DIR": Path(env_str("DATA_DIR", "/data")),
     "DISK_RESERVE_GB": env_int("DISK_RESERVE_GB", 10),
     "HEARTBEAT_FILE": env_str("HEARTBEAT_FILE", "/tmp/heartbeat"),

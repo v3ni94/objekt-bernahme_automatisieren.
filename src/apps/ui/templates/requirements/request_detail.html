@@ -1,0 +1,33 @@
+{% extends "base.html" %}{% load perms %}{% block title %}Nachforderung {{ object.object_number }} v{{ req.version }} · {{ APP_NAME }}{% endblock %}
+{% block content %}<h1>Nachforderung Objekt {{ object.object_number }}, Version {{ req.version }} <span class="ampel {% if req.status == 'approved' or req.status == 'sent' %}gruen{% elif req.status == 'withdrawn' %}grau{% else %}gelb{% endif %}">{{ req.get_status_display }}</span></h1>
+<p><a href="{% url 'request_list' object.pk %}">Alle Nachforderungen</a> · <a href="{% url 'completeness' object.pk %}">Vollständigkeit</a></p>
+{% if req.status == "draft" or req.status == "reviewed" %}<p class="hinweis">Entwurf. Die Freigabe erfolgt durch die Geschäftsführung (Recht demands.approve, erneute Anmeldung). Die Anwendung versendet nichts; der Versand wird nach der Freigabe nur vermerkt.</p>{% endif %}
+<div class="raster">
+<div class="karte"><h2>Empfänger und Frist</h2>
+{% if editable %}<form method="post">{% csrf_token %}<input type="hidden" name="action" value="update">
+<p><label>Vorverwaltung <input type="text" name="recipient_name" value="{{ req.recipient_name }}" required></label></p>
+<p><label>Ansprechpartner <input type="text" name="recipient_contact_person" value="{{ req.recipient_contact_person|default:'' }}"></label></p>
+<p><label>Straße <input type="text" name="recipient_street" value="{{ req.recipient_street|default:'' }}"></label> <label>Nr. <input type="text" name="recipient_house_number" value="{{ req.recipient_house_number|default:'' }}" style="width:70px"></label></p>
+<p><label>PLZ <input type="text" name="recipient_postal_code" value="{{ req.recipient_postal_code|default:'' }}" style="width:90px"></label> <label>Ort <input type="text" name="recipient_city" value="{{ req.recipient_city|default:'' }}"></label></p>
+<p><label>Ihr Zeichen <input type="text" name="reference" value="{{ req.reference|default:'' }}"></label></p>
+<p><label>Frist <input type="date" name="deadline" value="{{ req.deadline_date|date:'Y-m-d' }}"></label> <span class="klein">ohne Frist bleibt der Platzhalter [FRIST] und das Wasserzeichen ENTWURF</span></p>
+<p><button type="submit">Entwurf speichern</button></p></form>
+{% else %}<table><tr><td>Vorverwaltung</td><td>{{ req.recipient_name }}{% if req.recipient_contact_person %}, {{ req.recipient_contact_person }}{% endif %}</td></tr><tr><td>Anschrift</td><td>{{ req.recipient_street|default:"" }} {{ req.recipient_house_number|default:"" }}, {{ req.recipient_postal_code|default:"" }} {{ req.recipient_city|default:"" }}</td></tr><tr><td>Frist</td><td>{{ req.deadline_date|date:"d.m.Y"|default:"offen" }}</td></tr></table>{% endif %}
+</div>
+<div class="karte"><h2>Status und Aktionen</h2>
+<table><tr><td>Erstellt</td><td>{{ req.created_at|date:"d.m.Y H:i" }} {{ req.created_by.display_name|default:"" }}</td></tr>
+<tr><td>Geprüft</td><td>{% if req.reviewed_at %}{{ req.reviewed_at|date:"d.m.Y H:i" }} {{ req.reviewed_by.display_name|default:"" }}{% endif %}</td></tr>
+<tr><td>Freigegeben</td><td>{% if req.approved_at %}{{ req.approved_at|date:"d.m.Y H:i" }} {{ req.approved_by.display_name|default:"" }}{% endif %}</td></tr>
+<tr><td>Versand vermerkt</td><td>{% if req.sent_at %}{{ req.sent_at|date:"d.m.Y H:i" }} {{ req.sent_channel_note|default:"" }}{% endif %}</td></tr>
+<tr><td>Prüfsumme</td><td class="mono klein">{{ req.content_hash|default:"" }}</td></tr></table>
+<p>{% if req.pdf_path %}<a class="knopf" href="{% url 'request_file' req.pk 'pdf' %}">PDF</a>{% endif %} {% if req.docx_path %}<a class="knopf" href="{% url 'request_file' req.pk 'docx' %}">DOCX</a>{% endif %}</p>
+{% if req.status == "draft" %}<form method="post" class="inline">{% csrf_token %}<input type="hidden" name="action" value="review"><button type="submit" {% if not req.deadline_date or not recipient_complete %}disabled title="Frist und Anschrift erforderlich"{% endif %}>Als geprüft kennzeichnen</button></form>{% endif %}
+{% if req.status == "reviewed" and can_approve %}<form method="post" action="{% url 'request_approve' req.pk %}" class="inline">{% csrf_token %}<button type="submit">Freigeben (Geschäftsführung, erneute Anmeldung)</button></form>{% endif %}
+{% if req.status == "approved" %}<form method="post" class="inline">{% csrf_token %}<input type="hidden" name="action" value="mark_sent"><input type="text" name="note" placeholder="Kanal und Datum (Freitext)" style="width:240px"> <button type="submit">Als versendet vermerken</button></form>{% endif %}
+{% if req.status != "withdrawn" and can_approve %}<form method="post" class="inline">{% csrf_token %}<input type="hidden" name="action" value="withdraw"><input type="text" name="reason" placeholder="Grund (Pflicht)" style="width:200px" required> <button type="submit">Zurückziehen</button></form>{% endif %}
+</div></div>
+<div class="karte"><h2>Betreff und Text</h2><p><strong>{{ req.subject }}</strong></p><pre class="klein" style="white-space:pre-wrap">{{ req.body }}</pre></div>
+<div class="karte"><h2>Positionen ({{ positions|length }})</h2>
+<table class="voll"><thead><tr><th>Gruppe</th><th>Einheit</th><th>Eigentümer</th><th>Unterlage</th><th>Jahr</th><th>Status</th></tr></thead><tbody>
+{% for p in positions %}<tr><td>{{ p.group }}</td><td class="mono">{{ p.unit_label }}</td><td>{{ p.owner }}</td><td>{{ p.line }}</td><td>{{ p.period_year|default:"" }}</td><td>{{ p.status }}</td></tr>{% endfor %}</tbody></table></div>
+{% endblock %}

@@ -1,0 +1,28 @@
+{% extends "base.html" %}{% load perms %}{% block title %}Vollständigkeit {{ object.object_number }} · {{ APP_NAME }}{% endblock %}
+{% block content %}<h1>Vollständigkeit Objekt {{ object.object_number }} {{ object.name|default:"" }}</h1>
+<p><a href="{% url 'object_detail' object.pk %}">Objekt</a> · <a href="{% url 'request_list' object.pk %}">Nachforderungen</a></p>
+<div class="raster">
+<div class="karte"><h2>Bewertung</h2>
+<table><tr><td>Status</td><td>{% if summary.status == "complete" %}<span class="ampel gruen">vollständig</span>{% elif summary.status == "mostly_complete" %}<span class="ampel gelb">weitgehend vollständig</span>{% elif summary.status == "incomplete" %}<span class="ampel rot">unvollständig</span>{% else %}<span class="ampel grau">noch nicht bewertet</span>{% endif %}</td></tr>
+<tr><td>Erfüllungsgrad</td><td>{% if summary.ratio is not None %}{% widthratio summary.ratio 1 100 %} %{% else %}–{% endif %}</td></tr>
+<tr><td>Positionen</td><td>{% if summary.counts %}erfüllt {{ summary.counts.fulfilled }}, teilweise {{ summary.counts.partial }}, fehlt {{ summary.counts.missing }}, nicht anwendbar {{ summary.counts.not_applicable }}{% endif %}</td></tr>
+<tr><td>Einheiten</td><td>{% if summary.unit_counts %}vollständig {{ summary.unit_counts.complete }}, teilweise {{ summary.unit_counts.partial }}, unvollständig {{ summary.unit_counts.incomplete }}, nicht bewertbar {{ summary.unit_counts.not_evaluable }}{% endif %}</td></tr>
+<tr><td>Übernahmezeitraum</td><td>{{ period.start|date:"d.m.Y" }} bis {{ period.end|date:"d.m.Y" }}, Wirtschaftsjahre {{ period.years|join:", " }}{% if period.provisional %} <span class="ampel grau">vorläufig, Stichtag in der Zukunft</span>{% endif %}</td></tr>
+<tr><td>Letzte Bewertung</td><td>{{ summary.last_evaluated_at|date:"d.m.Y H:i"|default:"noch keine" }}</td></tr></table>
+{% for h in period.hints %}<p class="klein">{{ h }}</p>{% endfor %}
+<form method="post" class="inline">{% csrf_token %}<input type="hidden" name="action" value="evaluate"><button type="submit">Jetzt bewerten</button></form></div>
+<div class="karte"><h2>Einheiten</h2>
+<table class="voll"><thead><tr><th>Einheit</th><th>Status</th><th>fehlt</th><th>teilweise</th></tr></thead><tbody>
+{% for u in unit_rows %}<tr><td class="mono">{{ u.label }}</td><td>{{ u.status }}</td><td>{{ u.missing }}</td><td>{{ u.partial }}</td></tr>{% empty %}<tr><td colspan="4">Keine Einheitenbewertung.</td></tr>{% endfor %}</tbody></table></div>
+</div>
+<div class="karte"><h2>Offene Punkte ({{ open_items|length }})</h2>
+<p class="klein">Grundlage für Blatt 3 der Listen und die Nachforderung (H 3.4). Objektpunkte stehen vor den Einheiten. Fehlende Negativerklärungen der Vorverwaltung werden manuell geschlossen (Grund Pflicht, Protokoll).</p>
+<table class="voll"><thead><tr><th>Einheit</th><th>Eigentümer</th><th>Prüfpunkt</th><th>Jahr</th><th>Status</th><th>Hinweis</th><th>Nachweis</th><th>in Nachforderung</th><th>Übersteuerung</th></tr></thead><tbody>
+{% for i in open_items %}<tr><td class="mono">{{ i.unit_label }}</td><td>{{ i.owner }}</td><td>{{ i.check_name }}</td><td>{{ i.period_year|default:"" }}</td><td>{% if i.status == "missing" %}<span class="ampel rot">fehlt</span>{% else %}<span class="ampel gelb">teilweise</span>{% endif %}</td><td class="klein">{{ i.hint }}{% if i.requested_deadline %} · angefordert bis {{ i.requested_deadline }}{% endif %}</td><td class="klein">{{ i.evidence }}</td><td>{% if i.include_in_request %}ja{% else %}nein{% endif %}</td>
+<td>{% if can_write %}<form method="post" action="{% url 'finding_override' i.finding_id %}" class="inline">{% csrf_token %}<select name="manual_status"><option value="">keine</option>{% for s in statuses %}<option value="{{ s }}">{{ s }}</option>{% endfor %}</select> <input type="text" name="reason" placeholder="Grund" style="width:150px"> <label><input type="checkbox" name="include_in_request" value="1" {% if i.include_in_request %}checked{% endif %} style="width:auto"> Nachforderung</label> <button type="submit">Speichern</button></form>{% endif %}</td></tr>
+{% empty %}<tr><td colspan="9">Keine offenen Punkte.</td></tr>{% endfor %}</tbody></table></div>
+<div class="karte"><h2>Alle Prüfpositionen ({{ rows|length }})</h2>
+<table class="voll"><thead><tr><th>Ebene</th><th>Einheit</th><th>Eigentümer</th><th>Prüfpunkt</th><th>Jahr</th><th>Status</th><th>wirksam</th><th>Hinweis</th><th>Übersteuert von</th></tr></thead><tbody>
+{% for r in rows %}<tr{% if r.consequential %} class="klein"{% endif %}><td>{{ r.f.get_scope_type_display }}</td><td class="mono">{{ r.f.unit.unit_label|default:"" }}</td><td>{{ r.owner }}</td><td>{{ r.name }}</td><td>{{ r.f.period_year|default:"" }}</td><td>{{ r.f.get_status_display }}</td><td>{{ r.effective }}</td><td class="klein">{{ r.hint }}{% if r.consequential %} (Folgefehler, nicht gezählt){% endif %}</td><td class="klein">{% if r.f.manual_status %}{{ r.f.manual_by.display_name|default:"" }}: {{ r.f.manual_reason }}{% endif %}</td></tr>
+{% empty %}<tr><td colspan="9">Noch keine Bewertung.</td></tr>{% endfor %}</tbody></table></div>
+{% endblock %}

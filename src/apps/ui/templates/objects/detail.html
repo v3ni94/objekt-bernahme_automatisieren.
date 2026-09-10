@@ -7,7 +7,7 @@
 <tr><td>Wirtschaftsjahr ab Monat</td><td>{{ object.fiscal_year_start_month|default:"–" }}</td></tr><tr><td>Sollzahl Einheiten</td><td>{{ object.expected_unit_count|default:"–" }}</td></tr>
 <tr><td>Vorverwaltung</td><td>{{ object.previous_manager_name|default:"–" }}{% if object.previous_manager_city %}, {{ object.previous_manager_postal_code|default:"" }} {{ object.previous_manager_city }}{% endif %}</td></tr>
 <tr><td>Drive-Ordner</td><td class="mono">{{ object.drive_root_folder_name|default:"noch nicht zugeordnet" }}{% if object.drive_root_folder_id %} <span class="klein">{{ object.drive_root_folder_id }}</span>{% endif %}</td></tr></table>
-<p><a href="{% url 'sync_run_list' object.pk %}">Ordnerabgleiche</a> · <a href="{% url 'document_list' object.pk %}">Dokumente und Verarbeitung</a></p>
+<p><a href="{% url 'sync_run_list' object.pk %}">Ordnerabgleiche</a> · <a href="{% url 'document_list' object.pk %}">Dokumente und Verarbeitung</a> · <a href="{% url 'completeness' object.pk %}">Vollständigkeit</a> · <a href="{% url 'request_list' object.pk %}">Nachforderungen</a></p>
 {% if can_write %}<p><a class="knopf" href="{% url 'object_edit' object.pk %}">Bearbeiten</a></p>{% endif %}</div>
 <div class="karte"><h2>Wer war Eigentümer am Stichtag</h2>
 <form method="get" class="filter inline"><input type="date" name="stichtag" value="{{ reference|date:'Y-m-d' }}"><button type="submit">Anzeigen</button></form>

@@ -57,6 +57,12 @@ AUDIT_ACTIONS: dict[str, str] = {
     "deletion.execute": "Löschung ausgeführt",
     "list.generate": "Liste erzeugt",
     "list.export": "Liste heruntergeladen",
+    "request.create": "Nachforderung als Entwurf erzeugt",
+    "request.update": "Nachforderungsentwurf geändert",
+    "request.review": "Nachforderung geprüft",
     "request.approve": "Nachforderung freigegeben",
+    "request.mark_sent": "Nachforderung als versendet vermerkt",
     "request.withdraw": "Nachforderung zurückgezogen",
+    "completeness.evaluate": "Vollständigkeit bewertet (manuell)",
+    "completeness.override": "Prüfposition manuell übersteuert",
 }

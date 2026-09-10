@@ -1021,6 +1021,7 @@ Dateien unter `/srv/objektakte/secrets/`, je eine Zeile ohne Zeilenumbruch (`pri
 | `totp_key` | AES-256-Schlüssel TOTP-Geheimnisse | `openssl rand -base64 32` | `web` |
 | `google_client_secret` | OAuth-Client-Secret | Google Cloud Console (Abschnitt 7.5) | `web`, `worker-io`, `beat` |
 | `openai_api_key`, `anthropic_api_key` | API-Schlüssel | Anbieterkonsolen (V-13) | `worker-io` |
+| `hvm_signature.jpg` | Unterschriftsbild der Geschäftsführung (JPEG 247 x 64 aus der CI) für freigegebene Nachforderungen; fehlt die Datei, bleibt der Platz frei | vom Auftraggeber übergeben, nie im Repository | `web`, `worker-io` (Pfad `HVM_SIGNATURE_PATH`) |
 | `smtp_password` | SMTP-Passwort für Alarmierung (leer, wenn deaktiviert) | Mailanbieter (V-23) | `beat`, `web` |
 | `readyz_token` | Bearer-Token für `/readyz/` und Smoke-Test | `openssl rand -hex 32` | `web`, `deploy.sh` |
 | `backup_age_recipient` | Öffentlicher age-Schlüssel für die Backup-Verschlüsselung; privater Schlüssel nur beim Auftraggeber | `age-keygen` auf dem Rechner des Auftraggebers, nur der öffentliche Teil auf den Server | `backup` |
@@ -1035,7 +1036,7 @@ done
 [ -f app_secret_key ] || printf '%s' "$(openssl rand -base64 48)" | sudo tee app_secret_key >/dev/null
 [ -f readyz_token ]   || printf '%s' "$(openssl rand -hex 32)"    | sudo tee readyz_token >/dev/null
 # Platzhalter fuer optionale Secrets, damit Compose die Dateien findet
-for n in google_client_secret openai_api_key anthropic_api_key smtp_password backup_age_recipient rclone.conf; do
+for n in google_client_secret openai_api_key anthropic_api_key smtp_password backup_age_recipient rclone.conf hvm_signature.jpg; do
   [ -f "$n" ] || sudo touch "$n"
 done
 sudo chmod 600 /srv/objektakte/secrets/*; sudo chown root:root /srv/objektakte/secrets/*

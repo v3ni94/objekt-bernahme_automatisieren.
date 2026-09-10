@@ -51,6 +51,7 @@ class Command(BaseCommand):
             self.seed_roles(seed_dir)
             self.seed_catalog(seed_dir)
             self.seed_rules()
+            self.seed_requirements(seed_dir)
         created, updated = store.seed_missing(force=options["force"])
         self.stdout.write(
             f"app_settings: {created} angelegt, {updated} aktualisiert, {len(store.catalog())} im Katalog"
@@ -62,6 +63,57 @@ class Command(BaseCommand):
         created, updated, unchanged = sync_rules_to_db(load_seed_rules())
         self.stdout.write(
             f"classification_rules: {created} angelegt, {updated} aktualisiert, {unchanged} unverändert"
+        )
+
+    def seed_requirements(self, seed_dir: Path) -> None:
+        """Pruefkatalog (CR 12 wortgetreu, Mietkatalog als Vorschlag) und Textbausteine (Vorschlaege, Freigabe F23)."""
+        from apps.requirements.models import CompletenessCheck, RequestTextBlock
+
+        counts = {"created": 0, "updated": 0, "unchanged": 0}
+        for b in _load(seed_dir, "request_text_blocks.json"):
+            existing = RequestTextBlock.objects.filter(code=b["code"]).first()
+            if existing is not None and existing.version > 1:
+                counts["unchanged"] += 1  # im Admin geaenderte Bausteine werden nicht ueberschrieben
+                continue
+            counts[
+                _upsert(
+                    RequestTextBlock,
+                    {"code": b["code"]},
+                    {
+                        "title": b["title"],
+                        "text": b["text"],
+                        "sort_order": b.get("sort_order", 100),
+                        "is_active": True,
+                    },
+                )
+            ] += 1
+        self.stdout.write(
+            f"request_text_blocks: {counts['created']} angelegt, {counts['updated']} aktualisiert, {counts['unchanged']} unverändert"
+        )
+        blocks = {b.code: b for b in RequestTextBlock.objects.all()}
+        counts = {"created": 0, "updated": 0, "unchanged": 0}
+        for c in _load(seed_dir, "completeness_checks.json"):
+            counts[
+                _upsert(
+                    CompletenessCheck,
+                    {"code": c["code"]},
+                    {
+                        "name": c["name"],
+                        "description": c.get("description"),
+                        "scope_type": c["scope_type"],
+                        "management_types": c.get("management_types"),
+                        "period_based": bool(c.get("period_based")),
+                        "evidence_document_types": c.get("evidence_document_types") or [],
+                        "category": c.get("category"),
+                        "blocking": bool(c.get("blocking")),
+                        "request_text_block": blocks.get(c.get("request_text_block") or ""),
+                        "sort_order": c.get("sort_order", 100),
+                        "is_active": True,
+                    },
+                )
+            ] += 1
+        self.stdout.write(
+            f"completeness_checks: {counts['created']} angelegt, {counts['updated']} aktualisiert, {counts['unchanged']} unverändert"
         )
 
     def seed_roles(self, seed_dir: Path) -> None:

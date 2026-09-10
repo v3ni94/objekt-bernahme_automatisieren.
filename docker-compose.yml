@@ -24,6 +24,7 @@ x-app-env: &app-env
   GOOGLE_CLIENT_SECRET_FILE: /run/secrets/google_client_secret
   OPENAI_API_KEY_FILE: /run/secrets/openai_api_key
   ANTHROPIC_API_KEY_FILE: /run/secrets/anthropic_api_key
+  HVM_SIGNATURE_PATH: /run/secrets/hvm_signature
   SMTP_PASSWORD_FILE: /run/secrets/smtp_password
   READYZ_TOKEN_FILE: /run/secrets/readyz_token
   HEARTBEAT_FILE: /tmp/heartbeat
@@ -86,6 +87,7 @@ x-worker-secrets: &worker-secrets
   - google_client_secret
   - openai_api_key
   - anthropic_api_key
+  - hvm_signature
   - smtp_password
   - readyz_token
 
@@ -147,6 +149,7 @@ services:
       - google_client_secret
       - openai_api_key
       - anthropic_api_key
+      - hvm_signature
       - smtp_password
       - readyz_token
     labels:
@@ -328,6 +331,7 @@ services:
       - google_client_secret
       - openai_api_key
       - anthropic_api_key
+      - hvm_signature
       - smtp_password
       - readyz_token
     healthcheck:
@@ -559,6 +563,7 @@ secrets:
   google_client_secret:    { file: /srv/objektakte/secrets/google_client_secret }
   openai_api_key:          { file: /srv/objektakte/secrets/openai_api_key }
   anthropic_api_key:       { file: /srv/objektakte/secrets/anthropic_api_key }
+  hvm_signature:           { file: /srv/objektakte/secrets/hvm_signature.jpg }
   smtp_password:           { file: /srv/objektakte/secrets/smtp_password }
   readyz_token:            { file: /srv/objektakte/secrets/readyz_token }
   backup_age_recipient:    { file: /srv/objektakte/secrets/backup_age_recipient }

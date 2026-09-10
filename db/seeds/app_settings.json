@@ -574,5 +574,6 @@
     "version": "nicht-festgelegt",
     "models": {}
   },
-  "ai.reclassify_enabled": false
+  "ai.reclassify_enabled": false,
+  "requests.attachment_threshold": 25
 }

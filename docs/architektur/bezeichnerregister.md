@@ -1248,6 +1248,8 @@ Modell `requirements.CompletenessCheck`. completeness checks.
 | management_types | json | ja |  |
 | period_based | tinyint(1) | nein |  |
 | evidence_document_types | json | ja |  |
+| category | varchar(48) | ja |  |
+| blocking | tinyint(1) | nein |  |
 | request_text_block_id | bigint | ja | → request_text_blocks.id |
 | sort_order | smallint UNSIGNED | nein |  |
 | is_active | tinyint(1) | nein |  |
@@ -1293,7 +1295,7 @@ Modell `requirements.DocumentRequest`. document requests.
 | created_at | datetime(6) | nein |  |
 | updated_at | datetime(6) | nein |  |
 | object_id | bigint | nein | → objects.id |
-| status | varchar(16) | nein | draft, approved, sent, withdrawn |
+| status | varchar(16) | nein | draft, reviewed, approved, sent, withdrawn |
 | recipient_name | varchar(160) | nein |  |
 | recipient_street | varchar(120) | ja |  |
 | recipient_house_number | varchar(20) | ja |  |
@@ -1305,6 +1307,18 @@ Modell `requirements.DocumentRequest`. document requests.
 | body | longtext | nein |  |
 | finding_ids | json | ja |  |
 | file_path | varchar(255) | ja |  |
+| version | smallint UNSIGNED | nein |  |
+| deadline_date | date | ja |  |
+| findings_snapshot | json | ja |  |
+| custom_text_blocks | json | ja |  |
+| text_block_versions | json | ja |  |
+| pdf_path | varchar(255) | ja |  |
+| docx_path | varchar(255) | ja |  |
+| content_hash | varchar(64) | ja |  |
+| reviewed_by | bigint | ja | → users.id |
+| reviewed_at | datetime(6) | ja |  |
+| marked_sent_by | bigint | ja | → users.id |
+| sent_channel_note | varchar(200) | ja |  |
 | created_by | bigint | ja | → users.id |
 | approved_by | bigint | ja | → users.id |
 | approved_at | datetime(6) | ja |  |
@@ -1328,6 +1342,8 @@ Modell `requirements.RequestTextBlock`. request text blocks.
 | text | longtext | nein |  |
 | sort_order | smallint UNSIGNED | nein |  |
 | is_active | tinyint(1) | nein |  |
+| version | smallint UNSIGNED | nein |  |
+| updated_by | bigint | ja | → users.id |
 
 ### review_cases
 
@@ -1550,6 +1566,7 @@ Celery-Queues aus den Settings: `ai`, `classify`, `io`, `lists`, `ocr`
 | processing.work_orphan_hours | processing | integer | `48` |
 | reports.misc_share_target_pct | reports | integer | `5` |
 | reports.review_age_warning_days | reports | integer | `10` |
+| requests.attachment_threshold | completeness | integer | `25` |
 | retention.hint | retention | string | `"durch Geschäftsführung und Steuerberater festzulegen"` |
 | review.bulk_max_cases | review | integer | `500` |
 | review.list_page_size | review | integer | `50` |
@@ -1621,8 +1638,14 @@ Celery-Queues aus den Settings: `ai`, `classify`, `io`, `lists`, `ocr`
 | deletion.execute | Löschung ausgeführt |
 | list.generate | Liste erzeugt |
 | list.export | Liste heruntergeladen |
+| request.create | Nachforderung als Entwurf erzeugt |
+| request.update | Nachforderungsentwurf geändert |
+| request.review | Nachforderung geprüft |
 | request.approve | Nachforderung freigegeben |
+| request.mark_sent | Nachforderung als versendet vermerkt |
 | request.withdraw | Nachforderung zurückgezogen |
+| completeness.evaluate | Vollständigkeit bewertet (manuell) |
+| completeness.override | Prüfposition manuell übersteuert |
 
 ## Startparameter (.env)
 

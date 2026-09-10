@@ -184,5 +184,8 @@ def maybe_finish_run(run: ProcessingRun) -> bool:
         run.finished_at = timezone.now()
         run.save()
     logger.info("Lauf %s Objekt %s abgeschlossen: %s", run.pk, run.object_id, run.status)
+    from apps.requirements.tasks import trigger_evaluation
+
+    trigger_evaluation(run.object_id, "run")  # H 3.5: Bewertung nach jedem Verarbeitungslauf
     schedule_runs()
     return True

@@ -1292,5 +1292,8 @@ def status_sum_matches(batch: ImportBatch) -> bool:
 
 
 def after_commit_hooks(batch: ImportBatch) -> None:
-    """Listen und Vollstaendigkeit neu erzeugen (H 6.7); Anbindung in M11 und M12."""
-    logger.info("Import %s uebernommen; Listen und Vollstaendigkeit folgen in M11 und M12", batch.pk)
+    """Nach Uebernahme: Vollstaendigkeit des Objekts neu bewerten (H 6.7, H 3.5); Listen folgen in M11."""
+    from apps.requirements.tasks import trigger_evaluation
+
+    logger.info("Import %s uebernommen; Vollstaendigkeit wird neu bewertet, Listen folgen in M11", batch.pk)
+    trigger_evaluation(batch.object_id, "import_commit")

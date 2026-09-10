@@ -78,6 +78,9 @@ def object_edit(request, pk: int):
                 before=b,
                 after=a,
             )
+        from apps.requirements.tasks import trigger_evaluation
+
+        trigger_evaluation(obj.pk, "object_update")  # H 3.5: Stammdatenaenderung
         messages.success(request, f"Objekt {obj.object_number} gespeichert.")
         return redirect("object_detail", pk=obj.pk)
     return render(

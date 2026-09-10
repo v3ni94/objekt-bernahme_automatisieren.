@@ -1,0 +1,11 @@
+{% extends "base.html" %}{% load perms %}{% block title %}Nachforderungen {{ object.object_number }} · {{ APP_NAME }}{% endblock %}
+{% block content %}<h1>Nachforderungen Objekt {{ object.object_number }} {{ object.name|default:"" }}</h1>
+<p><a href="{% url 'object_detail' object.pk %}">Objekt</a> · <a href="{% url 'completeness' object.pk %}">Vollständigkeit</a></p>
+<div class="karte"><h2>Neuer Entwurf</h2>
+<p class="klein">Aus den offenen Punkten mit Kennzeichen „in Nachforderung“ ({{ open_count }} Positionen). Das Schreiben entsteht immer als Entwurf mit Wasserzeichen; die Freigabe erfolgt durch die Geschäftsführung, der Versand außerhalb der Anwendung.</p>
+<form method="post" class="inline">{% csrf_token %}<label>Frist <input type="date" name="deadline"></label> <label><input type="checkbox" name="reminder" value="1" style="width:auto"> Erinnerung (Bezug auf frühere Nachforderung)</label> <button type="submit" {% if not open_count %}disabled{% endif %}>Entwurf erzeugen</button></form></div>
+<div class="karte"><h2>Schreiben</h2>
+<table class="voll"><thead><tr><th>Version</th><th>Status</th><th>Empfänger</th><th>Frist</th><th>Positionen</th><th>Erstellt</th><th>Freigegeben</th><th>Versendet</th></tr></thead><tbody>
+{% for r in requests %}<tr><td><a href="{% url 'request_detail' r.pk %}">Version {{ r.version }}</a></td><td>{{ r.get_status_display }}</td><td>{{ r.recipient_name|default:"offen" }}</td><td>{{ r.deadline_date|date:"d.m.Y"|default:"offen" }}</td><td>{{ r.findings_snapshot|length }}</td><td>{{ r.created_at|date:"d.m.Y" }} {{ r.created_by.display_name|default:"" }}</td><td>{% if r.approved_at %}{{ r.approved_at|date:"d.m.Y" }} {{ r.approved_by.display_name|default:"" }}{% endif %}</td><td>{% if r.sent_at %}{{ r.sent_at|date:"d.m.Y" }}{% endif %}</td></tr>
+{% empty %}<tr><td colspan="8">Noch keine Nachforderung.</td></tr>{% endfor %}</tbody></table></div>
+{% endblock %}
