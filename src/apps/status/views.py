@@ -84,7 +84,15 @@ def readyz(request):
 
 @permission_required("status.read")
 def status_page(request):
+    from apps.documents.models import RetentionPolicy
+    from apps.reporting.services import review_queue_kpis
+    from apps.status import alerts
+
     ok, report = checks.readiness()
+    thresholds = {
+        k: store.get(f"classification.{k}")
+        for k in ("threshold_auto_file", "threshold_stage3_call", "threshold_stage3_override")
+    }
     return render(
         request,
         "status/page.html",
@@ -93,7 +101,15 @@ def status_page(request):
             "report": report,
             "heartbeats": checks.heartbeats(),
             "backup": checks.backup_status(),
+            "oauth": report.get("oauth", {}),
+            "storage": checks.storage_usage(),
+            "review": review_queue_kpis(),
+            "alerts": alerts.evaluate(check_certificate=False),
+            "alerts_enabled": alerts.enabled(),
+            "retention_missing": RetentionPolicy.objects.filter(retention_years__isnull=True).count(),
+            "thresholds": thresholds,
             "can_operate": user_has_permission(request.user, "status.operate"),
+            "can_connect": user_has_permission(request.user, "drive.connect"),
             "image_tag": settings.OBJEKTAKTE.get("IMAGE_TAG", ""),
             "processing": processing_overview(),
         },

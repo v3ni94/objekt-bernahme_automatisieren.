@@ -1,0 +1,25 @@
+{% extends "base.html" %}{% load perms %}{% block title %}Suche · {{ APP_NAME }}{% endblock %}
+{% block content %}<h1>Suche</h1>
+<form method="get" class="filter">
+<input type="text" name="text" value="{{ filters.text }}" placeholder="Volltext (maskierter Seitentext)" style="width:260px">
+<input type="text" name="eigentuemer" value="{{ filters.owner }}" placeholder="Eigentümer" style="width:160px">
+<input type="text" name="mieter" value="{{ filters.tenant }}" placeholder="Mieter" style="width:140px">
+<input type="text" name="einheit" value="{{ filters.unit }}" placeholder="Einheit (WE 14)" style="width:120px">
+<input type="text" name="objekt" value="{{ filters.object_number }}" placeholder="Objekt" style="width:120px">
+<input type="number" name="jahr" value="{{ filters.year|default:'' }}" placeholder="Jahr" style="width:80px">
+<input type="date" name="von" value="{{ params.von }}"> <input type="date" name="bis" value="{{ params.bis }}">
+<select name="kategorie"><option value="">Hauptordner</option>{% for c in categories %}<option value="{{ c.code }}" {% if c.code == filters.category %}selected{% endif %}>{{ c.folder_name }}</option>{% endfor %}</select>
+<select name="unterart"><option value="">Dokumentunterart</option>{% for t in document_types %}<option value="{{ t.code }}" {% if t.code == filters.document_type %}selected{% endif %}>{{ t.category_id }}{% if t.subfolder %}/{{ t.subfolder.code }}{% endif %} {{ t.name }}</option>{% endfor %}</select>
+<select name="status"><option value="">Status</option><option value="final" {% if filters.status == "final" %}selected{% endif %}>final klassifiziert</option><option value="review" {% if filters.status == "review" %}selected{% endif %}>in Prüfung</option></select>
+<select name="verwaltungsart"><option value="">Verwaltungsart</option>{% for code, name in management_types %}<option value="{{ code }}" {% if code == filters.management_type %}selected{% endif %}>{{ name }}</option>{% endfor %}</select>
+<button type="submit">Suchen</button></form>
+{% if not filters.is_empty %}<p class="klein">{{ result.total }} Treffer in {{ result.elapsed_ms }} ms{% if result.truncated %}, Dokumentliste gekürzt, bitte Filter verfeinern{% endif %}. Volltext: Suchwörter ab {{ result.min_token_len }} Zeichen (Serverparameter){% if result.short_words %}; zu kurz: {{ result.short_words|join:", " }}{% endif %}.</p>{% endif %}
+{% if result.objects %}<div class="karte"><h2>Objekte ({{ result.objects|length }})</h2><ul>{% for h in result.objects %}<li><a href="{{ h.url }}">{{ h.title }}</a> <span class="klein">{{ h.subtitle }}</span></li>{% endfor %}</ul></div>{% endif %}
+{% if result.units %}<div class="karte"><h2>Einheiten ({{ result.units|length }})</h2><table class="voll"><thead><tr><th>Einheit</th><th>Objekt</th><th>Eigentümer heute</th></tr></thead><tbody>{% for h in result.units %}<tr><td class="mono">{{ h.title }}</td><td><a href="{{ h.url }}">{{ h.subtitle }}</a></td><td>{{ h.extra.owners|join:", " }}</td></tr>{% endfor %}</tbody></table></div>{% endif %}
+{% if result.owners %}<div class="karte"><h2>Eigentümer ({{ result.owners|length }})</h2><table class="voll"><thead><tr><th>Name</th><th>Zuordnungen</th></tr></thead><tbody>{% for h in result.owners %}<tr><td><a href="{{ h.url }}">{{ h.title }}</a></td><td class="klein">{% for a in h.extra.assignments %}{{ a }}<br>{% empty %}ohne Zuordnung{% endfor %}</td></tr>{% endfor %}</tbody></table></div>{% endif %}
+{% if result.tenants %}<div class="karte"><h2>Mieter ({{ result.tenants|length }})</h2><table class="voll"><thead><tr><th>Name</th><th>Zuordnungen</th></tr></thead><tbody>{% for h in result.tenants %}<tr><td>{{ h.title }}</td><td class="klein">{{ h.subtitle }}</td></tr>{% endfor %}</tbody></table></div>{% endif %}
+{% if result.documents %}<div class="karte"><h2>Dokumente ({{ result.documents|length }})</h2>
+<table class="voll"><thead><tr><th>Objekt</th><th>Dokument</th><th>Ablage</th><th>Akte</th><th>Seitenbereich</th><th>Jahr</th><th>Status</th><th>Volltext</th><th>Drive</th></tr></thead><tbody>
+{% for h in result.documents %}<tr><td>{{ h.object_number }}</td><td><a href="{{ h.url }}">{{ h.title }}</a>{% if h.extra.review_open %} <span class="ampel gelb">Fall offen</span>{% endif %}</td><td class="klein">{{ h.subtitle }}</td><td class="klein">{{ h.extra.akten|join:", " }}</td><td class="klein">{{ h.extra.spans|join:", " }}</td><td>{{ h.extra.period_year|default:"" }}</td><td>{{ h.extra.status }}</td><td class="klein">{% if h.page_no %}S. {{ h.page_no }}: {{ h.snippet }}{% endif %}</td><td>{% if h.extra.drive_url %}<a href="{{ h.extra.drive_url }}" target="_blank" rel="noopener">Datei</a>{% endif %}</td></tr>{% endfor %}</tbody></table></div>{% endif %}
+{% if not filters.is_empty and not result.total %}<p>Keine Treffer.</p>{% endif %}
+{% endblock %}

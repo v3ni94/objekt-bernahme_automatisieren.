@@ -61,6 +61,8 @@ INSTALLED_APPS = [
     "apps.imports",
     "apps.requirements",
     "apps.lists",
+    "apps.search",
+    "apps.reporting",
     "apps.ai",
 ]
 
@@ -254,6 +256,12 @@ CELERY_BEAT_SCHEDULE: dict = {
         "schedule": crontab(hour=2, minute=30),
         "options": {"queue": "io"},
     },
+    # Alarmierung per E-Mail (G 9.5), alle fuenf Minuten; sendet nur bei ALERTS_ENABLED und SMTP-Zugang (F27)
+    "status-check-alerts": {
+        "task": "status.check_alerts",
+        "schedule": crontab(minute="*/5"),
+        "options": {"queue": "io"},
+    },
 }
 
 # --- Anwendungsweite Startparameter -------------------------------------------------------------
@@ -263,6 +271,10 @@ OBJEKTAKTE = {
     "HVM_SIGNATURE_PATH": env_str("HVM_SIGNATURE_PATH", "/run/secrets/hvm_signature"),
     # Automatische Listenerzeugung nach Lauf, Review, Import und Stammdatenaenderung (CR 12a); in Tests aus
     "LISTS_AUTO_GENERATE": env_str("LISTS_AUTO_GENERATE", "true").lower() in ("1", "true", "yes"),
+    # Alarmierung (G 9.5, optional): nur mit SMTP-Zugang und Empfaenger (F27)
+    "ALERTS_ENABLED": env_str("ALERTS_ENABLED", "false").lower() in ("1", "true", "yes"),
+    "ALERT_EMAIL_TO": env_str("ALERT_EMAIL_TO", ""),
+    "BACKUP_MAX_AGE_HOURS": env_int("BACKUP_MAX_AGE_HOURS", 26),
     "DATA_DIR": Path(env_str("DATA_DIR", "/data")),
     "DISK_RESERVE_GB": env_int("DISK_RESERVE_GB", 10),
     "HEARTBEAT_FILE": env_str("HEARTBEAT_FILE", "/tmp/heartbeat"),
@@ -309,3 +321,13 @@ LOGGING = {
         "celery": {"level": LOG_LEVEL, "propagate": True},
     },
 }
+
+# --- E-Mail (nur Alarmierung, G 9.5) -----------------------------------------------------------
+EMAIL_HOST = env_str("SMTP_HOST", "")
+EMAIL_PORT = env_int("SMTP_PORT", 587)
+EMAIL_HOST_USER = env_str("SMTP_USER", "")
+EMAIL_HOST_PASSWORD = read_secret("SMTP_PASSWORD", default="")
+EMAIL_USE_TLS = EMAIL_PORT != 465
+EMAIL_USE_SSL = EMAIL_PORT == 465
+DEFAULT_FROM_EMAIL = env_str("SMTP_FROM", "") or None
+EMAIL_TIMEOUT = 15

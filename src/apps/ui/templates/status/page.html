@@ -32,12 +32,34 @@
 {% if processing.ai.object_costs %}<p class="klein">Kosten je Objekt: {% for r in processing.ai.object_costs %}{{ r.object__object_number }} {{ r.provider }} {{ r.cost|default:"0" }} EUR ({{ r.calls }} Aufrufe){% if not forloop.last %}, {% endif %}{% endfor %}</p>{% endif %}
 {% if processing.ai.errors %}<p class="klein">Letzte Fehler: {% for e in processing.ai.errors %}{{ e.requested_at|date:"d.m. H:i" }} {{ e.provider }} {{ e.status }}{% if not forloop.last %}, {% endif %}{% endfor %}</p>{% endif %}
 </section>
+<section class="karte"><h2>Review</h2>
+<p>{{ review.open }} offene Fälle, davon {{ review.older_7d }} älter als 7 Tage, {{ review.with_candidates }} mit Kandidatenliste. <a href="{% url 'review_list' %}">Review Center</a></p>
+<p class="klein">{% for nr, n in review.by_object.items %}{{ nr }}: {{ n }}{% if not forloop.last %}, {% endif %}{% empty %}keine offenen Fälle{% endfor %}</p>
+</section>
+<section class="karte"><h2>Google Drive</h2>
+<p>Token {% if oauth.ok %}<span class="ampel gruen">{{ oauth.status }}</span>{% elif oauth.ok is None %}<span class="ampel grau">{{ oauth.status }}</span>{% else %}<span class="ampel rot">{{ oauth.status }}</span>{% endif %}{% if oauth.last_refresh_at %} · letzter Refresh {{ oauth.last_refresh_at }}{% endif %}{% if oauth.days_since_authorization %} · autorisiert seit {{ oauth.days_since_authorization }} Tagen{% endif %}</p>
+{% if can_connect %}<p><a class="knopf" href="{% url 'drive_admin' %}">Google-Verbindung verwalten</a></p>{% endif %}
+</section>
+<section class="karte"><h2>Speicher</h2>
+<p>Frei {{ report.disk.free_gb }} GB (Reserve {{ report.disk.reserve_gb }} GB) unter {{ report.disk.path }}</p>
+<table><tr><th>Bereich</th><th>Belegung</th></tr>{% for name, mb in storage.items %}<tr><td class="mono">{{ name }}</td><td>{{ mb }} MB</td></tr>{% endfor %}</table>
+</section>
+<section class="karte"><h2>Konfiguration</h2>
+<p class="klein">Schwellen: Ablage ab {{ thresholds.threshold_auto_file }}, Stufe 3 unter {{ thresholds.threshold_stage3_call }}, Übernahme durch Stufe 3 ab {{ thresholds.threshold_stage3_override }}. Anbieter: {{ processing.ai.order|join:", " }}.</p>
+{% if retention_missing %}<p class="hinweis">{{ retention_missing }} Aufbewahrungsfristen ohne Wert: durch Geschäftsführung und Steuerberater festzulegen (F31).</p>{% endif %}
+<p><a href="{% url 'settings_list' %}">Konfiguration</a> · <a href="{% url 'report_overview' %}">Berichte</a></p>
+</section>
+<section class="karte"><h2>Alarmbedingungen</h2>
+<p class="klein">E-Mail-Alarmierung {% if alerts_enabled %}<span class="ampel gruen">aktiv</span>{% else %}<span class="ampel grau">aus (ALERTS_ENABLED, SMTP, F27)</span>{% endif %}; Prüfung alle fünf Minuten, Zertifikat täglich.</p>
+<table><tr><th>Bedingung</th><th>Stand</th></tr>{% for a in alerts %}<tr><td>{{ a.key }}</td><td>{% if a.active %}<span class="ampel rot">aktiv</span>{% else %}<span class="ampel gruen">ok</span>{% endif %} <span class="klein">{{ a.message }}</span></td></tr>{% endfor %}</table>
+</section>
 <section class="karte"><h2>Läufe</h2>
 <table><tr><th>Objekt</th><th>Art</th><th>Status</th><th>Position</th></tr>
 {% for r, pos in processing.runs %}<tr><td><a href="{% url 'document_list' r.object.pk %}">{{ r.object.object_number }}</a></td><td>{{ r.get_run_type_display }}</td><td>{% if r.status == "running" %}<span class="ampel gruen">läuft</span>{% else %}<span class="ampel grau">wartet</span>{% endif %}</td><td>{% if pos %}{{ pos }}{% endif %}</td></tr>{% empty %}<tr><td colspan="4">Kein offener Lauf.</td></tr>{% endfor %}
 </table></section>
 </div>
 <section class="karte"><h2>Verarbeitung je Objekt</h2>
+<p class="klein">Anteil 06_Sonstiges je Objekt aus documents_misc und klassifizierten Dokumenten; Listen je Objekt über die Objektansicht (Listen jetzt erzeugen).</p>
 <table class="voll"><thead><tr><th>Objekt</th><th>Dokumente</th><th>Hash</th><th>Text</th><th>Klassifiziert</th><th>Abgelegt</th><th>Prüfung</th><th>Dubletten</th><th>Fehler</th><th>Seiten</th><th>Review offen</th><th>Stand</th></tr></thead><tbody>
 {% for p in processing.progress %}<tr><td><a href="{% url 'document_list' p.object.pk %}">{{ p.object.object_number }}</a></td><td>{{ p.documents_total }}</td><td>{{ p.documents_hashed }}</td><td>{{ p.documents_ocr_done }}</td><td>{{ p.documents_classified }}</td><td>{{ p.documents_filed }}</td><td>{{ p.documents_review }}</td><td>{{ p.documents_duplicate }}</td><td>{% if p.documents_error %}<span class="ampel rot">{{ p.documents_error }}</span>{% else %}0{% endif %}</td><td>{{ p.pages_done }} / {{ p.pages_total }}</td><td>{{ p.review_open }}</td><td>{{ p.updated_at|date:"d.m.Y H:i" }}</td></tr>{% empty %}<tr><td colspan="12">Noch keine Verarbeitung.</td></tr>{% endfor %}</tbody></table></section>
 {% endblock %}

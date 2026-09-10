@@ -109,3 +109,27 @@ def readiness() -> tuple[bool, dict]:
     }
     ok = all(v["ok"] for k, v in report.items() if k != "oauth")
     return ok, report
+
+
+def storage_usage() -> dict:
+    """Belegung der Arbeitsverzeichnisse transit, ocr-cache, work, previews, lists in MB (G 9.3), fuenf Minuten im Cache."""
+    from django.core.cache import cache
+
+    cached = cache.get("status:storage_usage")
+    if cached is not None:
+        return cached
+    data_dir: Path = settings.OBJEKTAKTE["DATA_DIR"]
+    out: dict[str, float] = {}
+    for name in ("transit", "ocr-cache", "work", "previews", "lists", "requests"):
+        root = data_dir / name
+        total = 0
+        if root.exists():
+            for p in root.rglob("*"):
+                try:
+                    if p.is_file():
+                        total += p.stat().st_size
+                except OSError:
+                    continue
+        out[name] = round(total / 1024**2, 1)
+    cache.set("status:storage_usage", out, timeout=300)
+    return out
