@@ -12,11 +12,11 @@ on:
         required: true
         default: "main"
       action:
-        description: "deploy oder rollback"
+        description: "check (Verbindungsprobe ohne Schreibwirkung), deploy oder rollback"
         required: true
-        default: "deploy"
+        default: "check"
         type: choice
-        options: ["deploy", "rollback"]
+        options: ["check", "deploy", "rollback"]
 
 concurrency:
   group: deploy-vps

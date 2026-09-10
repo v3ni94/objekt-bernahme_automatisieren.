@@ -9,7 +9,7 @@ Stand: 10.09.2026. Zwei getrennte Schlüsselpaare, zwei Richtungen. SFTP wird ni
 | VPS holt Code von GitHub | Deploy Key (nur Lesen) | privater Teil unter `~deploy/.ssh/github_deploy`, öffentlicher Teil im Repository unter Settings, Deploy keys | `git fetch` und `git pull` in `scripts/deploy.sh` |
 | GitHub Actions löst Deployment aus | Aktionsschlüssel | privater Teil als Repository-Secret `DEPLOY_SSH_KEY`, öffentlicher Teil in `~deploy/.ssh/authorized_keys` mit `command=`-Einschränkung | Workflow `.github/workflows/deploy.yml` ruft `scripts/deploy_remote.sh` auf |
 
-Der Aktionsschlüssel kann auf dem Server ausschließlich `deploy <branch>` oder `rollback` auslösen (erzwungenes Kommando, kein Terminal, keine Weiterleitungen). Ein kompromittierter Schlüssel erlaubt damit kein Arbeiten auf dem Server.
+Der Aktionsschlüssel kann auf dem Server ausschließlich `deploy <branch>`, `rollback` oder `check` auslösen (erzwungenes Kommando, kein Terminal, keine Weiterleitungen). Ein kompromittierter Schlüssel erlaubt damit kein Arbeiten auf dem Server.
 
 ## Kurzweg: `scripts/bootstrap_vps.sh`
 
@@ -66,6 +66,7 @@ Für die Umgebung `production` empfiehlt sich in GitHub die Freigabepflicht durc
 
 ## Schritt 4: Probelauf
 
+0. Verbindungsprobe ohne Schreibwirkung: Actions, Workflow `Deploy`, Run workflow, Aktion `check`. Das Log zeigt Hostname, Nutzer, ausgecheckten Branch und ob `.env` vorhanden ist. Damit sind Secrets, Host-Key und das erzwungene Kommando geprüft, bevor ein Deployment läuft.
 1. Actions, Workflow `Deploy`, Run workflow, Branch `main`, Aktion `deploy`.
 2. Erwartung: Das Log zeigt die Schritte von `scripts/deploy.sh` (Dump, Migration, Containerwechsel, Smoke-Test). Auf dem Server steht der Aufruf in `/srv/objektakte/deploy/remote.log`.
 3. Rollback-Probe: Aktion `rollback` (ein Befehl, docs/betrieb.md 4.3).
@@ -84,5 +85,5 @@ Der Workflow läuft ausschließlich manuell. Ein automatisches Deployment bei je
 |---|---|---|
 | `Host key verification failed` | `DEPLOY_KNOWN_HOSTS` fehlt oder passt nicht zum Host | `ssh-keyscan -t ed25519 <host>` erneut ausführen, Secret ersetzen |
 | `Permission denied (publickey)` | öffentlicher Teil nicht in `authorized_keys` oder Datei mit falschen Rechten | Zeile prüfen, `chmod 700 ~/.ssh && chmod 600 ~/.ssh/authorized_keys` |
-| `Nur 'deploy <branch>' oder 'rollback' erlaubt` | erzwungenes Kommando greift, Eingabe unbekannt | Workflow-Eingaben prüfen; direkter Shell-Zugang mit diesem Schlüssel ist nicht vorgesehen |
+| `Nur 'deploy <branch>', 'rollback' oder 'check' erlaubt` | erzwungenes Kommando greift, Eingabe unbekannt | Workflow-Eingaben prüfen; direkter Shell-Zugang mit diesem Schlüssel ist nicht vorgesehen |
 | `git fetch` schlägt fehl (`Repository not found`) | Deploy Key nicht eingetragen oder `remote` zeigt auf HTTPS | Schritt 1 wiederholen, `git remote -v` prüfen |
