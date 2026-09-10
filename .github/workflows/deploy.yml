@@ -39,8 +39,11 @@ jobs:
           test -n "$DEPLOY_SSH_KEY" || { echo "Secret DEPLOY_SSH_KEY fehlt"; exit 1; }
           test -n "$DEPLOY_KNOWN_HOSTS" || { echo "Secret DEPLOY_KNOWN_HOSTS fehlt"; exit 1; }
           mkdir -p ~/.ssh && chmod 700 ~/.ssh
-          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/id_deploy && chmod 600 ~/.ssh/id_deploy
-          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts && chmod 644 ~/.ssh/known_hosts
+          printf '%s\n' "$DEPLOY_SSH_KEY" | tr -d '\r' > ~/.ssh/id_deploy && chmod 600 ~/.ssh/id_deploy
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" | tr -d '\r' > ~/.ssh/known_hosts && chmod 644 ~/.ssh/known_hosts
+          # Diagnose ohne Geheimnis: Fingerabdruck des Aktionsschluessels (muss zu authorized_keys auf dem Server passen)
+          ssh-keygen -lf ~/.ssh/id_deploy || echo "Aktionsschluessel nicht lesbar: DEPLOY_SSH_KEY unvollstaendig oder umgebrochen"
+          echo "Bekannte Hosts: $(awk '{print $1, $2}' ~/.ssh/known_hosts | tr '\n' ' ')"
       - name: Deployment auf dem Server ausfuehren
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
@@ -54,4 +57,4 @@ jobs:
           case "$BRANCH" in *[!A-Za-z0-9._/-]*) echo "unzulaessiger Branchname"; exit 1;; esac
           case "$ARGUMENT" in *[!A-Za-z0-9@._+-]*) echo "unzulaessiges Argument"; exit 1;; esac
           ssh -i ~/.ssh/id_deploy -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o BatchMode=yes \
-            -o ServerAliveInterval=30 "$DEPLOY_USER@$DEPLOY_HOST" "$ACTION $BRANCH $ARGUMENT"
+            -o ServerAliveInterval=30 -o LogLevel=VERBOSE "$DEPLOY_USER@$DEPLOY_HOST" "$ACTION $BRANCH $ARGUMENT"
