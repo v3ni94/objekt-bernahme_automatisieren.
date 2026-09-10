@@ -1,0 +1,4 @@
+{% extends "base.html" %}{% block title %}Zuordnung beenden · {{ APP_NAME }}{% endblock %}
+{% block content %}<div class="karte schmal"><h1>Zuordnung beenden</h1><p>{{ assignment.owner }} an {{ assignment.unit.unit_label }} (Beginn {% if assignment.valid_from %}{{ assignment.valid_from|date:"d.m.Y" }}{% else %}unbekannt{% endif %})</p>
+<form method="post">{% csrf_token %}{{ form.as_p }}<button type="submit">Beenden</button> <a href="{% url 'object_detail' assignment.unit.object_id %}">Abbrechen</a></form>
+<p class="hinweis">Die Akte des bisherigen Eigentümers bleibt bestehen; für den neuen Eigentümer wird eine neue Zuordnung und eine neue Akte angelegt (CR 4).</p></div>{% endblock %}

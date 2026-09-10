@@ -26,6 +26,7 @@ Verbindliche Beschreibung in docs/betrieb.md Abschnitt 4. Hier die Befehlsfolge.
 |---|---|
 | `app-migrate [--check]` | Migrationen mit dem DDL-Konto `app_migrate` |
 | `app-migrate --down <app> <migration>` | genau auf eine frühere Migration zurück |
-| `app-seed [--force]` | Rollen und `app_settings` aus `db/seeds/` |
+| `app-seed [--force]` | Rollen, Dokumentkatalog (Kategorien, Unterordner, Unterarten), Aufbewahrungszeilen und `app_settings` aus `db/seeds/`; idempotent |
 | `app-create-admin --email ...` | Admin anlegen |
 | `app-grants-sql` | Tabellenrechte als SQL ausgeben (docs/architektur.md 9.4) |
+| `manage.py bezeichnerregister --write` | Bezeichnerregister aus dem Code erzeugen (Entwicklung, vor jedem Commit mit Schemaänderung) |

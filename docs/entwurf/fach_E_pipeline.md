@@ -681,3 +681,31 @@ Damit ist nach jedem Abbruch eindeutig, ob die Datei schon verschoben wurde: Der
 | A19 | RAM je OCR-Prozess 0,8 GB | `docker stats`, cgroup `memory.peak` |
 | A20 | `tessdata_fast` etwa Faktor 2 | Benchmark 9.3 Schritt 2 |
 | A21 | visibility_timeout 1 Stunde; Sweeper-Fristen 10 / 3 / 5 min; max_attempts 3 | Laufzeitverteilung der Jobs aus `jobs` |
+
+## Anhang: Bezeichner E zu D (Beschluss B-01, M2)
+
+Dieses Arbeitspapier verwendet an einigen Stellen eigene Bezeichner. Verbindlich sind die Bezeichner aus Fachentwurf D mit Ergänzungsmigration (docs/architektur/bezeichnerregister.md). Zuordnung:
+
+| Bezeichner in E | Verbindlich (D, Register) |
+|---|---|
+| `jobs` | `processing_jobs` |
+| `ocr_chunks` | `processing_jobs` mit `job_type = ocr_chunk`, Blocknummer in `payload.chunk_no` |
+| `document_segments` | `document_owner_links` mit `link_kind = page_range` (analog `document_tenant_links`) |
+| `document_decisions` | `document_classifications` (`is_final = 1` fuer die Entscheidung) |
+| `document_pages.text_masked` | `document_pages.text_content` (immer maskiert) |
+| `ocr_mean_confidence` | `document_pages.ocr_confidence` |
+| `documents.target_folder_id` | `documents.target_drive_node_id` |
+| `access_log` | `audit_events` (document.view, document.download) und `iban_access_log` |
+| `iban_masked` | `iban_last4` plus `iban_hash`; Anzeigeform wird gebildet |
+| `ai_calls.latency_ms` | `ai_calls.duration_ms` |
+| `ai_calls.masked_prompt_sha256` | `ai_calls.prompt_hash` |
+| `prompt_tokens`, `completion_tokens` | `tokens_in`, `tokens_out` |
+| `response_json` | `response_summary` |
+| `payload_json` | `processing_jobs.payload` |
+| Zustandsautomat NEW bis DONE | `documents.status` (registered, hashed, ocr_done, classified, filed, review, duplicate, moved_out, error) und `processing_jobs.status` (pending, running, done, failed, skipped) |
+| `threshold_ai_call` | `classification.threshold_stage3_call` |
+| `WORKER_OCR_PROCESSES` | `OCR_PROCESSES` |
+| `WORKER_MEM_LIMIT` | `WORKER_MEM` |
+| `classification_rules`, `classifier_models`, `training_samples` | gleichnamige Tabellen der Ergaenzungsmigration (docs/architektur/datenmodell.md Abschnitt 2) |
+| Queues `cpu`, `drive-io` | `ocr`, `classify`, `ai`, `io`, `lists` (B-13) |
+| Ordnernamen in Regeln | Codes `category_code`, `subfolder_code`, `document_type_code` (B-12) |

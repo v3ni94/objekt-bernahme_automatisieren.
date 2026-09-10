@@ -1,6 +1,7 @@
 # Fachentwurf G: Betrieb, Deployment und Sicherheit (CR-05, Abschnitte 0.1, 10, 14, 15)
 
 > Arbeitspapier der Entwurfsphase vom 10.09.2026, nicht verbindlich. Bei Abweichungen gelten docs/architektur.md, docs/betrieb.md und docs/umsetzungsplan.md (Lesehinweise in docs/entwurf/README.md).
+> Bezeichner (Tabellen, Spalten, Statuswerte, Konfigurationsschlüssel, Queues, Secrets) gelten in der Fassung des Bezeichnerregisters docs/architektur/bezeichnerregister.md (Beschluss B-01, M2); abweichende Schreibweisen in diesem Papier sind historisch.
 
 Stand: 10.09.2026. Faktenbasis: CR-05 (docs/anforderungen/CR-05_Eigentuemerakte_Sonstiges.md) und Befundakte (docs/entwurf/befundakte.md). Alles, was nicht aus diesen beiden Quellen stammt, ist als Vorschlag oder als ANNAHME gekennzeichnet. Bezeichner von Tabellen, Diensten und Variablen sind mit den Nachbarentwürfen abgestimmt (Datenmodell D: `oauth_tokens`, `audit_events`, `iban_access_log`, `app_settings`, `processing_jobs`, `review_cases`; Pipeline E: Verzeichnisse `transit`, `work`, `ocr-cache`, `models`; Stack A: Dienste `web`, `worker`, `worker-io`, `beat`).
 

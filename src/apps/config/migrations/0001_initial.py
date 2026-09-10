@@ -6,7 +6,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
     dependencies = [
@@ -58,9 +57,7 @@ class Migration(migrations.Migration):
             options={
                 "db_table": "app_settings",
                 "ordering": ["category", "key"],
-                "indexes": [
-                    models.Index(fields=["category"], name="ix_settings_category")
-                ],
+                "indexes": [models.Index(fields=["category"], name="ix_settings_category")],
             },
         ),
     ]

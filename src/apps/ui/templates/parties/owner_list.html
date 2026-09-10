@@ -1,0 +1,6 @@
+{% extends "base.html" %}{% block title %}Eigentümer · {{ APP_NAME }}{% endblock %}
+{% block content %}<h1>Eigentümer</h1>
+<div class="karte"><form method="get" class="filter inline"><input type="search" name="q" value="{{ q }}" placeholder="Name, E-Mail"><button type="submit">Suchen</button></form>{% if can_master %} <a class="knopf" href="{% url 'owner_create' %}">Eigentümer anlegen</a>{% endif %}</div>
+<table class="voll"><thead><tr><th>Name</th><th>Art</th><th>Anschrift</th><th>E-Mail</th><th>IBAN</th><th>SEPA</th><th>Datenstatus</th><th></th></tr></thead><tbody>
+{% for o in owners %}<tr><td>{{ o }}</td><td>{{ o.get_type_display }}</td><td>{{ o.correspondence_street|default:"" }} {{ o.correspondence_house_number|default:"" }}{% if o.correspondence_city %}, {{ o.correspondence_postal_code|default:"" }} {{ o.correspondence_city }}{% endif %}</td><td>{{ o.email|default:"" }}</td><td class="mono">{{ o.iban_masked }}</td><td>{% if o.sepa_mandate_present is None %}unbekannt{% elif o.sepa_mandate_present %}ja{% else %}nein{% endif %}</td><td>{{ o.get_data_status_display }}</td><td>{% if can_master %}<a href="{% url 'owner_edit' o.pk %}">Bearbeiten</a>{% endif %}</td></tr>
+{% empty %}<tr><td colspan="8">Keine Eigentümer.</td></tr>{% endfor %}</tbody></table>{% endblock %}

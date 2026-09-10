@@ -1,6 +1,7 @@
 # Fachentwurf F: Google-Drive-Adapter und Ordnerabgleich (CR-05, Abschnitte 2, 4, 9, 12a, 13, 14)
 
 > Arbeitspapier der Entwurfsphase vom 10.09.2026, nicht verbindlich. Bei Abweichungen gelten docs/architektur.md, docs/betrieb.md und docs/umsetzungsplan.md (Lesehinweise in docs/entwurf/README.md).
+> Bezeichner (Tabellen, Spalten, Statuswerte, Konfigurationsschlüssel, Queues, Secrets) gelten in der Fassung des Bezeichnerregisters docs/architektur/bezeichnerregister.md (Beschluss B-01, M2); abweichende Schreibweisen in diesem Papier sind historisch.
 
 Stand: 10.09.2026. Faktenbasis: CR-05 (docs/anforderungen/CR-05_Eigentuemerakte_Sonstiges.md) und Befundakte (docs/entwurf/befundakte.md). Tabellen- und Feldnamen folgen dem Fachentwurf D (Datenmodell), Konfigurationsschlüssel der dortigen Tabelle `app_settings`. Bibliotheken werden benannt, Versionsnummern sind zum Umsetzungszeitpunkt zu prüfen (aktuelle LTS bzw. stabile Version). Alle Beispiele sind synthetisch.
 

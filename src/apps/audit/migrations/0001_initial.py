@@ -4,7 +4,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
     dependencies = []
@@ -58,21 +57,13 @@ class Migration(migrations.Migration):
                         fields=["entity_type", "entity_id", "occurred_at"],
                         name="ix_audit_entity",
                     ),
-                    models.Index(
-                        fields=["user_id", "occurred_at"], name="ix_audit_user"
-                    ),
-                    models.Index(
-                        fields=["object_id", "occurred_at"], name="ix_audit_object"
-                    ),
-                    models.Index(
-                        fields=["action", "occurred_at"], name="ix_audit_action"
-                    ),
+                    models.Index(fields=["user_id", "occurred_at"], name="ix_audit_user"),
+                    models.Index(fields=["object_id", "occurred_at"], name="ix_audit_object"),
+                    models.Index(fields=["action", "occurred_at"], name="ix_audit_action"),
                 ],
                 "constraints": [
                     models.CheckConstraint(
-                        condition=models.Q(
-                            ("actor_type__in", ["user", "system", "worker"])
-                        ),
+                        condition=models.Q(("actor_type__in", ["user", "system", "worker"])),
                         name="ck_audit_actor",
                     )
                 ],
@@ -110,9 +101,7 @@ class Migration(migrations.Migration):
                         fields=["entity_type", "entity_id", "accessed_at"],
                         name="ix_iban_log_entity",
                     ),
-                    models.Index(
-                        fields=["user_id", "accessed_at"], name="ix_iban_log_user"
-                    ),
+                    models.Index(fields=["user_id", "accessed_at"], name="ix_iban_log_user"),
                 ],
                 "constraints": [
                     models.CheckConstraint(
@@ -124,9 +113,7 @@ class Migration(migrations.Migration):
                         name="ck_iban_log_entity",
                     ),
                     models.CheckConstraint(
-                        condition=models.Q(
-                            ("purpose__in", ["edit", "export", "rekey"])
-                        ),
+                        condition=models.Q(("purpose__in", ["edit", "export", "rekey"])),
                         name="ck_iban_log_purpose",
                     ),
                 ],

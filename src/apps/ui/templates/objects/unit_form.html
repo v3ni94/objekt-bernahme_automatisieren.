@@ -1,0 +1,3 @@
+{% extends "base.html" %}{% block title %}{{ title }} · {{ APP_NAME }}{% endblock %}
+{% block content %}<div class="karte schmal"><h1>{{ title }}</h1><p class="klein">Objekt {{ object.object_number }} {{ object.name|default:"" }}</p><form method="post">{% csrf_token %}{{ form.as_p }}<button type="submit">Speichern</button> <a href="{% url 'object_detail' object.pk %}">Abbrechen</a></form>
+<p class="hinweis">Bezeichnung wie in der Quelle (WE 14 und WE14 sind dieselbe Einheit). Typ wird aus dem Präfix abgeleitet (Konfiguration units.type_prefix_mapping), wenn leer.</p></div>{% endblock %}

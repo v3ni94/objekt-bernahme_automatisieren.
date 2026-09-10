@@ -1,0 +1,29 @@
+{% extends "base.html" %}{% load perms %}{% block title %}Objekt {{ object.object_number }} · {{ APP_NAME }}{% endblock %}
+{% block content %}<h1>Objekt {{ object.object_number }} {{ object.name|default:"" }}{% if object.is_test %} <span class="ampel grau">Test</span>{% endif %}</h1>
+<div class="raster">
+<div class="karte"><h2>Stammdaten</h2>
+<table><tr><td>Adresse</td><td>{{ object.address|default:"–" }}</td></tr><tr><td>Verwaltungsart</td><td>{{ object.get_management_type_display }}</td></tr><tr><td>Status</td><td>{{ object.get_status_display }}</td></tr>
+<tr><td>Übernahmezeitraum</td><td>{% if object.takeover_from %}{{ object.takeover_from|date:"d.m.Y" }}{% endif %}{% if object.takeover_to %} bis {{ object.takeover_to|date:"d.m.Y" }}{% endif %}</td></tr>
+<tr><td>Wirtschaftsjahr ab Monat</td><td>{{ object.fiscal_year_start_month|default:"–" }}</td></tr><tr><td>Sollzahl Einheiten</td><td>{{ object.expected_unit_count|default:"–" }}</td></tr>
+<tr><td>Vorverwaltung</td><td>{{ object.previous_manager_name|default:"–" }}{% if object.previous_manager_city %}, {{ object.previous_manager_postal_code|default:"" }} {{ object.previous_manager_city }}{% endif %}</td></tr>
+<tr><td>Drive-Ordner</td><td class="mono">{{ object.drive_root_folder_name|default:"noch nicht zugeordnet (Ordnerabgleich M4)" }}</td></tr></table>
+{% if can_write %}<p><a class="knopf" href="{% url 'object_edit' object.pk %}">Bearbeiten</a></p>{% endif %}</div>
+<div class="karte"><h2>Wer war Eigentümer am Stichtag</h2>
+<form method="get" class="filter inline"><input type="date" name="stichtag" value="{{ reference|date:'Y-m-d' }}"><button type="submit">Anzeigen</button></form>
+<p class="klein">Stichtag {{ reference|date:"d.m.Y" }}{% if not stichtag %} (heute){% endif %}. Grenzen einschließlich, unbekannter Beginn zählt als unbegrenzt.</p>
+<table><thead><tr><th>Einheit</th><th>Eigentümer am Stichtag</th></tr></thead><tbody>
+{% for u in units %}<tr><td class="mono">{{ u.unit_label }}</td><td>{% for a in current|get_item:u.pk %}{{ a.owner }}{% if a.share %} ({{ a.share }}){% endif %}{% if not forloop.last %}, {% endif %}{% empty %}<span class="klein">keine Zuordnung</span>{% endfor %}</td></tr>{% empty %}<tr><td colspan="2">Keine Einheiten.</td></tr>{% endfor %}</tbody></table></div>
+</div>
+<div class="karte"><h2>Einheiten ({{ units|length }})</h2>
+{% if can_master %}<p><a class="knopf" href="{% url 'unit_create' object.pk %}">Einheit anlegen</a> <a class="knopf" href="{% url 'assignment_create' object.pk %}">Zuordnung anlegen</a> <a class="knopf" href="{% url 'owner_create' %}?next={% url 'object_detail' object.pk %}">Eigentümer anlegen</a></p>{% endif %}
+<table class="voll"><thead><tr><th>Bezeichnung</th><th>Typ</th><th>Nummer</th><th>MEA</th><th>Lage</th><th>Fremdkennung</th><th>Hausgeld</th><th>Status</th><th>Datenstatus</th><th></th></tr></thead><tbody>
+{% for u in units %}<tr><td class="mono">{{ u.unit_label }}</td><td>{{ u.get_unit_type_display }}</td><td>{{ u.unit_number|default:"" }}</td><td>{% if u.co_ownership_share %}{{ u.co_ownership_share }}{% if u.co_ownership_share_base %}/{{ u.co_ownership_share_base }}{% endif %}{% endif %}</td><td>{{ u.location|default:"" }}</td><td>{{ u.external_ref|default:"" }}</td><td>{% if u.house_fee_monthly %}{{ u.house_fee_monthly }} EUR{% endif %}</td><td>{{ u.status }}</td><td>{{ u.get_data_status_display }}</td><td>{% if can_master %}<a href="{% url 'unit_edit' u.pk %}">Bearbeiten</a>{% endif %}</td></tr>
+{% empty %}<tr><td colspan="10">Noch keine Einheiten.</td></tr>{% endfor %}</tbody></table></div>
+<div class="karte"><h2>Zuordnungen Eigentümer zu Einheit</h2>
+<table class="voll"><thead><tr><th>Einheit</th><th>Eigentümer</th><th>Von</th><th>Bis</th><th>Anteil</th><th>Datenstatus</th><th></th></tr></thead><tbody>
+{% for a in assignments %}<tr><td class="mono">{{ a.unit.unit_label }}</td><td>{{ a.owner }}</td><td>{% if a.valid_from %}{{ a.valid_from|date:"d.m.Y" }}{% else %}<span class="klein">unbekannt</span>{% endif %}</td><td>{% if a.valid_to %}{{ a.valid_to|date:"d.m.Y" }}{% else %}<span class="ampel gruen">aktuell</span>{% endif %}</td><td>{{ a.share|default:"" }}</td><td>{{ a.get_data_status_display }}</td><td>{% if can_master and not a.valid_to %}<a href="{% url 'assignment_end' a.pk %}">Beenden (Eigentümerwechsel)</a>{% endif %}</td></tr>
+{% empty %}<tr><td colspan="7">Noch keine Zuordnungen.</td></tr>{% endfor %}</tbody></table></div>
+<div class="karte"><h2>Eigentümerakten ({{ owner_files|length }})</h2><p class="klein">Akten entstehen mit der ersten Ablage oder auf Anforderung (owner_file.create_folders_eagerly), Drive-Ordner ab M4.</p>
+<table class="voll"><thead><tr><th>Ordnername</th><th>Art</th><th>Einheit</th><th>Status</th></tr></thead><tbody>
+{% for f in owner_files %}<tr><td class="mono">{{ f.folder_name }}</td><td>{{ f.get_file_kind_display }}</td><td>{{ f.unit.unit_label|default:"" }}</td><td>{{ f.status }}</td></tr>{% empty %}<tr><td colspan="4">Noch keine Akten.</td></tr>{% endfor %}</tbody></table></div>
+{% endblock %}

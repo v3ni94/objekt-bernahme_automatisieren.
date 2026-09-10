@@ -28,6 +28,4 @@ DROP TRIGGER IF EXISTS trg_{table}_no_delete;
 class Migration(migrations.Migration):
     dependencies = [("audit", "0001_initial")]
 
-    operations = [
-        migrations.RunSQL(sql=_create(table), reverse_sql=_drop(table)) for table in TABLES
-    ]
+    operations = [migrations.RunSQL(sql=_create(table), reverse_sql=_drop(table)) for table in TABLES]

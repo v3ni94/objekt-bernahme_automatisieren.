@@ -1,6 +1,7 @@
 # Fachentwurf H: Review Center, Listen, Vollständigkeitsprüfung, Nachforderung und Import-Parser (CR-05, Abschnitte 11, 12, 12a, 13, 15)
 
 > Arbeitspapier der Entwurfsphase vom 10.09.2026, nicht verbindlich. Bei Abweichungen gelten docs/architektur.md, docs/betrieb.md und docs/umsetzungsplan.md (Lesehinweise in docs/entwurf/README.md).
+> Bezeichner (Tabellen, Spalten, Statuswerte, Konfigurationsschlüssel, Queues, Secrets) gelten in der Fassung des Bezeichnerregisters docs/architektur/bezeichnerregister.md (Beschluss B-01, M2); abweichende Schreibweisen in diesem Papier sind historisch.
 
 Stand: 10.09.2026. Faktenbasis sind ausschließlich der CR-05 (docs/anforderungen/CR-05_Eigentuemerakte_Sonstiges.md) und die Befundakte (docs/entwurf/befundakte.md). Tabellen- und Feldnamen folgen dem Fachentwurf D (Datenmodell), die Pipeline-Begriffe dem Fachentwurf E, die Drive-Mechanik dem Fachentwurf F. Diese Schwesterentwürfe sind Entwürfe derselben Phase, keine Fakten; wo dieser Entwurf etwas braucht, das dort fehlt, ist es als Vorschlag zur Ergänzung gekennzeichnet. Planungsgrößen, die nicht aus CR oder Befund stammen, tragen das Präfix ANNAHME und nennen die Verifikation. Bibliotheken werden ohne Versionsnummer genannt; es gilt jeweils: aktuelle LTS bzw. stabile Version zum Umsetzungszeitpunkt prüfen und im Lockfile festschreiben.
 

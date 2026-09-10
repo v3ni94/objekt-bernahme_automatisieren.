@@ -1,0 +1,44 @@
+[
+  {
+    "code": "01",
+    "folder_name": "01_Legitimationsunterlagen",
+    "display_name": "Legitimationsunterlagen",
+    "scope": "object",
+    "sort_order": 1
+  },
+  {
+    "code": "02",
+    "folder_name": "02_Stammakte",
+    "display_name": "Stammakte",
+    "scope": "object",
+    "sort_order": 2
+  },
+  {
+    "code": "03",
+    "folder_name": "03_Buchhaltung",
+    "display_name": "Buchhaltung",
+    "scope": "object",
+    "sort_order": 3
+  },
+  {
+    "code": "04",
+    "folder_name": "04_Mieterakte",
+    "display_name": "Mieterakte",
+    "scope": "tenant",
+    "sort_order": 4
+  },
+  {
+    "code": "05",
+    "folder_name": "05_Eigentümerakte",
+    "display_name": "Eigentümerakte",
+    "scope": "owner",
+    "sort_order": 5
+  },
+  {
+    "code": "06",
+    "folder_name": "06_Sonstiges",
+    "display_name": "Sonstiges (Auffangbereich)",
+    "scope": "misc",
+    "sort_order": 6
+  }
+]

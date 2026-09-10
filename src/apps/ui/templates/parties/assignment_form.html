@@ -1,0 +1,4 @@
+{% extends "base.html" %}{% block title %}Zuordnung anlegen · {{ APP_NAME }}{% endblock %}
+{% block content %}<div class="karte schmal"><h1>Zuordnung Eigentümer zu Einheit</h1><p class="klein">Objekt {{ object.object_number }} {{ object.name|default:"" }}</p>
+<form method="post">{% csrf_token %}{{ form.non_field_errors }}{{ form.as_p }}<button type="submit">Speichern</button> <a href="{% url 'object_detail' object.pk %}">Abbrechen</a></form>
+<p class="hinweis">Eigentümerwechsel ist eine neue Zuordnung, nie eine Änderung des Eigentümers: Alte Zuordnung mit Eigentumsende beenden (letzter Tag, z. B. 30.06.2026), neue mit Eigentumsbeginn (01.07.2026) anlegen. Zeiträume derselben Person auf derselben Einheit dürfen sich nicht überschneiden; Mehrfacheigentum verschiedener Personen ist zulässig.</p></div>{% endblock %}

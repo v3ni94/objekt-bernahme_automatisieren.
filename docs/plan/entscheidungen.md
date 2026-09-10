@@ -22,3 +22,14 @@ Die folgenden Fragen werden mit dem Vorschlagswert gebaut und lassen sich späte
 - F16 IBAN nur als letzte vier Stellen und Hash
 - F17 Externe KI bis zur AVV-Freigabe deaktiviert
 - F18 Entscheidung nach dem OCR-Probelauf in M0
+
+## Ergänzungen aus der Umsetzung (Vorschläge des Umsetzers, gelten bis zu einer abweichenden Entscheidung)
+
+| Datum | Meilenstein | Ergänzung | Begründung und Wirkung |
+|---|---|---|---|
+| 10.09.2026 | M2 | `review_cases.case_type` um `data_consistency` (Untertyp `assignment_overlap`) | Der nächtliche Konsistenzlauf meldet überlappende Zuordnungen derselben Person auf derselben Einheit; nach B-09 wäre `unclear` falsch, weil ein fachlicher Grund vorliegt. Rückbau: Wert aus CHECK und Task entfernen. |
+| 10.09.2026 | M2 | Audit-Aktion `assignment.end` | Beendigung einer Zuordnung (Eigentümerwechsel) wird getrennt vom Anlegen protokolliert. |
+| 10.09.2026 | M2 | Codes der 57 Dokumentunterarten (`db/seeds/document_types.json`) | CR 5 und 6 nennen Namen, keine Codes; die Codes sind ab jetzt stabil, weil Regeln, Klassifikator und KI-Schema darauf verweisen (B-12, B-21). Namen folgen dem CR-Wortlaut. Zusätzlich `sonstiges_eigentuemer` als Sammelunterart der Eigentümerakte. |
+| 10.09.2026 | M2 | Vergleichsschlüssel der Einheiten ohne führende Nullen (`units.normalize_strip_leading_zeros = true`) | Vorschlag H 6.5; WE01 und WE 1 gelten als dieselbe Einheit. Abschaltbar per Konfiguration, falls eine Vorverwaltung beide Schreibweisen als verschiedene Einheiten führt. |
+| 10.09.2026 | M2 | Konsistenzlauf täglich 03:15 Serverzeit (ANNAHME) | Zeitfenster außerhalb der Verarbeitung; endgültige Uhrzeit mit Antwort F27. |
+| 10.09.2026 | M2 | Technische Abweichungen von der DDL in D (Typen, Primärschlüssel, CHECK mit AUTO_INCREMENT, FULLTEXT als eigene Migration) | Begründung je Punkt in docs/architektur/datenmodell.md Abschnitt 3; fachlich ohne Wirkung. |

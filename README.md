@@ -8,7 +8,9 @@ Die Anwendung unterstützt die Übernahme von Verwaltungsobjekten (WEG und Miete
 
 ## Status
 
-Entwurfsphase, Umsetzung wartet auf Freigabe (siehe [docs/umsetzungsplan.md](docs/umsetzungsplan.md)). Es gibt keinen Code und keine Bestandsdaten; das Repository enthält den Change Request und die Planungsdokumente. Empfohlener Stack laut Gutachtergremium: Python-Monolith mit Django, HTMX, Celery, Redis und MariaDB. Die Freigabe des Stacks, des Datenmodells und der Meilensteinreihenfolge steht aus (Umsetzungsplan, Abschnitt 1.3).
+Umsetzung nach Freigabe FG-1 bis FG-3 vom 10.09.2026 (docs/plan/entscheidungen.md). Stand: M1 (Gerüst, Betrieb, Sicherheit) und M2 (Datenmodell, Objektverwaltung) im Repository; Fortschritt in docs/plan/status.md. Stack laut Gutachtergremium: Python-Monolith mit Django, HTMX, Celery, Redis und MariaDB (docs/architektur.md 3). Serverseitige Schritte (Serverbefund M0, Verzeichnisse, Secrets, Härtung, Deployment-Tests) warten auf den SSH-Zugang zum VPS (V-01).
+
+Entwicklung lokal: MariaDB und Redis starten, `.venv` mit `requirements-dev.lock.txt`, dann `make test` (Details in docs/betrieb/deployment.md und Makefile). Verbindliche Bezeichner: docs/architektur/bezeichnerregister.md; Datenmodell: docs/architektur/datenmodell.md.
 
 ## Dokumente
 
@@ -18,6 +20,7 @@ Entwurfsphase, Umsetzung wartet auf Freigabe (siehe [docs/umsetzungsplan.md](doc
 | [docs/architektur.md](docs/architektur.md) | Stack-Entscheidung mit Begründung, Container, Datenmodell, Klassifikationspipeline, Drive-Anbindung, Review Center, Sicherheit, Repository-Struktur, Performance-Modell | Entwicklung, Abnahme |
 | [docs/umsetzungsplan.md](docs/umsetzungsplan.md) | Meilensteine, Prüfpunkte, Risiken, gebündelte offene Fragen mit Vorschlagswerten, Voraussetzungen des Auftraggebers, Freigabevorbehalt | Geschäftsführung, Entwicklung |
 | [docs/betrieb.md](docs/betrieb.md) | Serverbefund, Host-Härtung, Compose und Konfiguration, Secrets, Backup und Wiederherstellung, Deployment und Rollback, Google-OAuth-Anleitung, Runbook, Testplan | Betrieb, Auftraggeber (Vorleistungen) |
+| [docs/architektur/bezeichnerregister.md](docs/architektur/bezeichnerregister.md), [docs/architektur/datenmodell.md](docs/architektur/datenmodell.md) | Verbindliche Bezeichner (aus dem Code erzeugt) und Umsetzung des Datenmodells mit Abweichungen zu Fachentwurf D | Entwicklung |
 | [docs/entwurf/](docs/entwurf/README.md) | Historische Arbeitspapiere der Entwurfsphase: Befundakte, drei Stack-Vorschläge, drei Gutachten, fünf Fachentwürfe, vier Kritiken. Nur zur Nachvollziehbarkeit; bei Abweichungen gelten Architektur, Betrieb und Umsetzungsplan. | Entwicklung |
 
 Lesereihenfolge für die Freigabe: Umsetzungsplan Abschnitt 1 (Kurzfassung und Freigabevorbehalt), danach Abschnitt 4 (offene Fragen), bei Bedarf die Architektur.

@@ -1,0 +1,38 @@
+[
+  {
+    "category_code": "01",
+    "retention_years": null,
+    "retention_basis": null,
+    "trigger_event": null
+  },
+  {
+    "category_code": "02",
+    "retention_years": null,
+    "retention_basis": null,
+    "trigger_event": null
+  },
+  {
+    "category_code": "03",
+    "retention_years": null,
+    "retention_basis": null,
+    "trigger_event": null
+  },
+  {
+    "category_code": "04",
+    "retention_years": null,
+    "retention_basis": null,
+    "trigger_event": null
+  },
+  {
+    "category_code": "05",
+    "retention_years": null,
+    "retention_basis": null,
+    "trigger_event": null
+  },
+  {
+    "category_code": "06",
+    "retention_years": null,
+    "retention_basis": null,
+    "trigger_event": null
+  }
+]

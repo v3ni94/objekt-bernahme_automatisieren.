@@ -9,6 +9,8 @@ from __future__ import annotations
 from pathlib import Path
 from urllib.parse import quote
 
+from celery.schedules import crontab
+
 from objektakte.secrets import env_bool, env_int, env_list, env_str, read_secret
 
 SRC_DIR = Path(__file__).resolve().parents[2]
@@ -49,6 +51,16 @@ INSTALLED_APPS = [
     "apps.config",
     "apps.status",
     "apps.ui",
+    "apps.objects",
+    "apps.parties",
+    "apps.documents",
+    "apps.drive",
+    "apps.pipeline",
+    "apps.review",
+    "apps.imports",
+    "apps.requirements",
+    "apps.lists",
+    "apps.ai",
 ]
 
 MIDDLEWARE = [
@@ -209,7 +221,14 @@ CELERY_TASK_QUEUES = {
 }
 CELERY_BROKER_TRANSPORT_OPTIONS = {"visibility_timeout": env_int("JOBS_VISIBILITY_TIMEOUT_S", 3600)}
 CELERY_TIMEZONE = TIME_ZONE
-CELERY_BEAT_SCHEDULE: dict = {}
+# Zeitplan (Serverzeit TZ). Uhrzeit des Konsistenzlaufs ist ANNAHME (nachts, ausserhalb der Verarbeitung), Frage F27.
+CELERY_BEAT_SCHEDULE: dict = {
+    "parties-check-assignment-consistency": {
+        "task": "parties.check_assignment_consistency",
+        "schedule": crontab(hour=3, minute=15),
+        "options": {"queue": "io"},
+    },
+}
 
 # --- Anwendungsweite Startparameter -------------------------------------------------------------
 OBJEKTAKTE = {

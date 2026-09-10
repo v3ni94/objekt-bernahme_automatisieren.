@@ -1,0 +1,107 @@
+[
+  {
+    "category_code": "05",
+    "code": "01",
+    "folder_name": "01_Stammdaten",
+    "display_name": "Stammdaten",
+    "sort_order": 1
+  },
+  {
+    "category_code": "05",
+    "code": "02",
+    "folder_name": "02_Eigentumsnachweise",
+    "display_name": "Eigentumsnachweise",
+    "sort_order": 2
+  },
+  {
+    "category_code": "05",
+    "code": "03",
+    "folder_name": "03_SEPA",
+    "display_name": "SEPA",
+    "sort_order": 3
+  },
+  {
+    "category_code": "05",
+    "code": "04",
+    "folder_name": "04_Hausgeld",
+    "display_name": "Hausgeld",
+    "sort_order": 4
+  },
+  {
+    "category_code": "05",
+    "code": "05",
+    "folder_name": "05_Abrechnungen",
+    "display_name": "Abrechnungen",
+    "sort_order": 5
+  },
+  {
+    "category_code": "05",
+    "code": "06",
+    "folder_name": "06_Wirtschaftsplaene",
+    "display_name": "Wirtschaftsplaene",
+    "sort_order": 6
+  },
+  {
+    "category_code": "05",
+    "code": "07",
+    "folder_name": "07_Beschluesse",
+    "display_name": "Beschluesse",
+    "sort_order": 7
+  },
+  {
+    "category_code": "05",
+    "code": "08",
+    "folder_name": "08_Korrespondenz",
+    "display_name": "Korrespondenz",
+    "sort_order": 8
+  },
+  {
+    "category_code": "05",
+    "code": "09",
+    "folder_name": "09_Mahnwesen",
+    "display_name": "Mahnwesen",
+    "sort_order": 9
+  },
+  {
+    "category_code": "05",
+    "code": "10",
+    "folder_name": "10_Vollmachten",
+    "display_name": "Vollmachten",
+    "sort_order": 10
+  },
+  {
+    "category_code": "05",
+    "code": "11",
+    "folder_name": "11_Sonstiges",
+    "display_name": "Sonstiges",
+    "sort_order": 11
+  },
+  {
+    "category_code": "06",
+    "code": "01",
+    "folder_name": "01_Unklar",
+    "display_name": "Unklar",
+    "sort_order": 1
+  },
+  {
+    "category_code": "06",
+    "code": "02",
+    "folder_name": "02_Manuelle_Pruefung",
+    "display_name": "Manuelle Pruefung",
+    "sort_order": 2
+  },
+  {
+    "category_code": "06",
+    "code": "03",
+    "folder_name": "03_Dubletten",
+    "display_name": "Dubletten",
+    "sort_order": 3
+  },
+  {
+    "category_code": "06",
+    "code": "04",
+    "folder_name": "04_Nicht_objektbezogen",
+    "display_name": "Nicht objektbezogen",
+    "sort_order": 4
+  }
+]

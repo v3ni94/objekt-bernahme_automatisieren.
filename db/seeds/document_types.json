@@ -1,0 +1,735 @@
+[
+  {
+    "code": "verwaltervollmacht",
+    "category_code": "01",
+    "subfolder_code": null,
+    "name": "Verwaltervollmacht",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Verwaltervollmacht",
+      "Vollmacht Verwalter"
+    ]
+  },
+  {
+    "code": "teilungserklaerung",
+    "category_code": "02",
+    "subfolder_code": null,
+    "name": "Teilungserklärung",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Teilungserklärung",
+      "Teilungserklaerung"
+    ]
+  },
+  {
+    "code": "gemeinschaftsordnung",
+    "category_code": "02",
+    "subfolder_code": null,
+    "name": "Gemeinschaftsordnung",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Gemeinschaftsordnung"
+    ]
+  },
+  {
+    "code": "eigentuemerliste",
+    "category_code": "02",
+    "subfolder_code": null,
+    "name": "Vollständige Eigentümerliste",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Eigentümerliste",
+      "Eigentuemerliste"
+    ]
+  },
+  {
+    "code": "beschlusssammlung",
+    "category_code": "02",
+    "subfolder_code": null,
+    "name": "Beschlusssammlung",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Beschlusssammlung"
+    ]
+  },
+  {
+    "code": "versammlungsprotokoll",
+    "category_code": "02",
+    "subfolder_code": null,
+    "name": "Versammlungsprotokoll",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Versammlungsprotokoll",
+      "Protokoll der Eigentümerversammlung",
+      "Niederschrift"
+    ]
+  },
+  {
+    "code": "gebaeudeversicherung",
+    "category_code": "02",
+    "subfolder_code": null,
+    "name": "Gebäudeversicherung",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Gebäudeversicherung",
+      "Gebaeudeversicherung",
+      "Versicherungsschein"
+    ]
+  },
+  {
+    "code": "energieausweis",
+    "category_code": "02",
+    "subfolder_code": null,
+    "name": "Energieausweis",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Energieausweis"
+    ]
+  },
+  {
+    "code": "dienstleistervertrag",
+    "category_code": "02",
+    "subfolder_code": null,
+    "name": "Dienstleistervertrag",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Dienstleistervertrag",
+      "Wartungsvertrag",
+      "Hausmeistervertrag",
+      "Reinigungsvertrag"
+    ]
+  },
+  {
+    "code": "gesamtjahresabrechnung",
+    "category_code": "03",
+    "subfolder_code": null,
+    "name": "Gesamtjahresabrechnung",
+    "requires_period": true,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Gesamtabrechnung",
+      "Jahresabrechnung",
+      "Gesamtjahresabrechnung"
+    ]
+  },
+  {
+    "code": "gesamtwirtschaftsplan",
+    "category_code": "03",
+    "subfolder_code": null,
+    "name": "Gesamtwirtschaftsplan",
+    "requires_period": true,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Gesamtwirtschaftsplan",
+      "Wirtschaftsplan"
+    ]
+  },
+  {
+    "code": "kontoauszug",
+    "category_code": "03",
+    "subfolder_code": null,
+    "name": "Kontoauszug",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Kontoauszug",
+      "Kontoauszüge"
+    ]
+  },
+  {
+    "code": "beleg",
+    "category_code": "03",
+    "subfolder_code": null,
+    "name": "Beleg",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Beleg",
+      "Rechnung",
+      "Quittung"
+    ]
+  },
+  {
+    "code": "eigentuemerstammdaten",
+    "category_code": "05",
+    "subfolder_code": "01",
+    "name": "Eigentümerstammdaten",
+    "requires_period": false,
+    "requires_owner": true,
+    "requires_tenant": false,
+    "keywords": [
+      "Eigentümerstammdaten",
+      "Stammdatenblatt"
+    ]
+  },
+  {
+    "code": "datenblatt",
+    "category_code": "05",
+    "subfolder_code": "01",
+    "name": "Datenblatt",
+    "requires_period": false,
+    "requires_owner": true,
+    "requires_tenant": false,
+    "keywords": [
+      "Datenblatt"
+    ]
+  },
+  {
+    "code": "kontaktdaten",
+    "category_code": "05",
+    "subfolder_code": "01",
+    "name": "Kontaktdaten",
+    "requires_period": false,
+    "requires_owner": true,
+    "requires_tenant": false,
+    "keywords": [
+      "Kontaktdaten"
+    ]
+  },
+  {
+    "code": "adressmitteilung",
+    "category_code": "05",
+    "subfolder_code": "01",
+    "name": "Korrespondenz- und Zustelladresse",
+    "requires_period": false,
+    "requires_owner": true,
+    "requires_tenant": false,
+    "keywords": [
+      "Adressänderung",
+      "Zustelladresse",
+      "Korrespondenzadresse"
+    ]
+  },
+  {
+    "code": "bankverbindungsmitteilung",
+    "category_code": "05",
+    "subfolder_code": "01",
+    "name": "Bankverbindungsmitteilung",
+    "requires_period": false,
+    "requires_owner": true,
+    "requires_tenant": false,
+    "keywords": [
+      "Bankverbindung",
+      "Änderung der Bankverbindung"
+    ]
+  },
+  {
+    "code": "grundbuchauszug",
+    "category_code": "05",
+    "subfolder_code": "02",
+    "name": "Grundbuchauszug",
+    "requires_period": false,
+    "requires_owner": true,
+    "requires_tenant": false,
+    "keywords": [
+      "Grundbuchauszug",
+      "Grundbuch"
+    ]
+  },
+  {
+    "code": "kaufvertrag",
+    "category_code": "05",
+    "subfolder_code": "02",
+    "name": "Kaufvertrag",
+    "requires_period": false,
+    "requires_owner": true,
+    "requires_tenant": false,
+    "keywords": [
+      "Kaufvertrag",
+      "notarieller Kaufvertrag"
+    ]
+  },
+  {
+    "code": "veraeusserungsanzeige",
+    "category_code": "05",
+    "subfolder_code": "02",
+    "name": "Veräußerungsanzeige",
+    "requires_period": false,
+    "requires_owner": true,
+    "requires_tenant": false,
+    "keywords": [
+      "Veräußerungsanzeige",
+      "Veraeusserungsanzeige"
+    ]
+  },
+  {
+    "code": "mitteilung_eigentumswechsel",
+    "category_code": "05",
+    "subfolder_code": "02",
+    "name": "Mitteilung Eigentumswechsel",
+    "requires_period": false,
+    "requires_owner": true,
+    "requires_tenant": false,
+    "keywords": [
+      "Eigentumswechsel",
+      "Eigentümerwechsel"
+    ]
+  },
+  {
+    "code": "uebergang_nutzen_lasten",
+    "category_code": "05",
+    "subfolder_code": "02",
+    "name": "Übergang Nutzen und Lasten",
+    "requires_period": false,
+    "requires_owner": true,
+    "requires_tenant": false,
+    "keywords": [
+      "Nutzen und Lasten",
+      "Besitzübergang"
+    ]
+  },
+  {
+    "code": "verwalterzustimmung",
+    "category_code": "05",
+    "subfolder_code": "02",
+    "name": "Verwalterzustimmung",
+    "requires_period": false,
+    "requires_owner": true,
+    "requires_tenant": false,
+    "keywords": [
+      "Verwalterzustimmung",
+      "Zustimmung des Verwalters"
+    ]
+  },
+  {
+    "code": "veraeusserungszustimmung",
+    "category_code": "05",
+    "subfolder_code": "02",
+    "name": "Veräußerungszustimmung",
+    "requires_period": false,
+    "requires_owner": true,
+    "requires_tenant": false,
+    "keywords": [
+      "Veräußerungszustimmung"
+    ]
+  },
+  {
+    "code": "sepa_mandat",
+    "category_code": "05",
+    "subfolder_code": "03",
+    "name": "Lastschriftmandat",
+    "requires_period": false,
+    "requires_owner": true,
+    "requires_tenant": false,
+    "keywords": [
+      "SEPA-Lastschriftmandat",
+      "Lastschriftmandat",
+      "Einzugsermächtigung"
+    ]
+  },
+  {
+    "code": "sepa_aenderung",
+    "category_code": "05",
+    "subfolder_code": "03",
+    "name": "Änderung Lastschriftmandat",
+    "requires_period": false,
+    "requires_owner": true,
+    "requires_tenant": false,
+    "keywords": [
+      "Mandatsänderung"
+    ]
+  },
+  {
+    "code": "sepa_widerruf",
+    "category_code": "05",
+    "subfolder_code": "03",
+    "name": "Widerruf Lastschriftmandat",
+    "requires_period": false,
+    "requires_owner": true,
+    "requires_tenant": false,
+    "keywords": [
+      "Widerruf Lastschrift",
+      "Mandat widerrufen"
+    ]
+  },
+  {
+    "code": "sollstellung",
+    "category_code": "05",
+    "subfolder_code": "04",
+    "name": "Sollstellung",
+    "requires_period": false,
+    "requires_owner": true,
+    "requires_tenant": false,
+    "keywords": [
+      "Sollstellung"
+    ]
+  },
+  {
+    "code": "hausgeldanpassung",
+    "category_code": "05",
+    "subfolder_code": "04",
+    "name": "Hausgeldanpassung",
+    "requires_period": false,
+    "requires_owner": true,
+    "requires_tenant": false,
+    "keywords": [
+      "Hausgeldanpassung",
+      "Anpassung Hausgeld"
+    ]
+  },
+  {
+    "code": "zahlungsvereinbarung",
+    "category_code": "05",
+    "subfolder_code": "04",
+    "name": "Zahlungsvereinbarung",
+    "requires_period": false,
+    "requires_owner": true,
+    "requires_tenant": false,
+    "keywords": [
+      "Zahlungsvereinbarung",
+      "Ratenzahlung"
+    ]
+  },
+  {
+    "code": "eigentuemerkonto",
+    "category_code": "05",
+    "subfolder_code": "04",
+    "name": "Eigentümerkonto",
+    "requires_period": false,
+    "requires_owner": true,
+    "requires_tenant": false,
+    "keywords": [
+      "Eigentümerkonto",
+      "Kontoblatt"
+    ]
+  },
+  {
+    "code": "rueckstandsaufstellung",
+    "category_code": "05",
+    "subfolder_code": "04",
+    "name": "Rückstandsaufstellung",
+    "requires_period": false,
+    "requires_owner": true,
+    "requires_tenant": false,
+    "keywords": [
+      "Rückstandsaufstellung",
+      "Rückstand"
+    ]
+  },
+  {
+    "code": "guthabenaufstellung",
+    "category_code": "05",
+    "subfolder_code": "04",
+    "name": "Guthabenaufstellung",
+    "requires_period": false,
+    "requires_owner": true,
+    "requires_tenant": false,
+    "keywords": [
+      "Guthabenaufstellung",
+      "Guthaben"
+    ]
+  },
+  {
+    "code": "sonderumlage_einzel",
+    "category_code": "05",
+    "subfolder_code": "04",
+    "name": "Sonderumlage (Einzelanforderung)",
+    "requires_period": false,
+    "requires_owner": true,
+    "requires_tenant": false,
+    "keywords": [
+      "Sonderumlage"
+    ]
+  },
+  {
+    "code": "einzelabrechnung",
+    "category_code": "05",
+    "subfolder_code": "05",
+    "name": "Einzelabrechnung",
+    "requires_period": true,
+    "requires_owner": true,
+    "requires_tenant": false,
+    "keywords": [
+      "Einzelabrechnung",
+      "Einzelabrechnungen",
+      "Hausgeldabrechnung"
+    ]
+  },
+  {
+    "code": "abrechnungsspitze",
+    "category_code": "05",
+    "subfolder_code": "05",
+    "name": "Abrechnungsspitze",
+    "requires_period": true,
+    "requires_owner": true,
+    "requires_tenant": false,
+    "keywords": [
+      "Abrechnungsspitze"
+    ]
+  },
+  {
+    "code": "korrekturabrechnung",
+    "category_code": "05",
+    "subfolder_code": "05",
+    "name": "Korrekturabrechnung",
+    "requires_period": true,
+    "requires_owner": true,
+    "requires_tenant": false,
+    "keywords": [
+      "Korrekturabrechnung",
+      "korrigierte Abrechnung"
+    ]
+  },
+  {
+    "code": "einzelwirtschaftsplan",
+    "category_code": "05",
+    "subfolder_code": "06",
+    "name": "Einzelwirtschaftsplan",
+    "requires_period": true,
+    "requires_owner": true,
+    "requires_tenant": false,
+    "keywords": [
+      "Einzelwirtschaftsplan"
+    ]
+  },
+  {
+    "code": "hausgeldvorschuss",
+    "category_code": "05",
+    "subfolder_code": "06",
+    "name": "Hausgeldvorschuss",
+    "requires_period": true,
+    "requires_owner": true,
+    "requires_tenant": false,
+    "keywords": [
+      "Hausgeldvorschuss",
+      "Vorschuss"
+    ]
+  },
+  {
+    "code": "beschluss_eigentuemerbezug",
+    "category_code": "05",
+    "subfolder_code": "07",
+    "name": "Beschluss mit Eigentümer- oder Einheitenbezug",
+    "requires_period": false,
+    "requires_owner": true,
+    "requires_tenant": false,
+    "keywords": [
+      "Beschluss",
+      "Beschlussauszug"
+    ]
+  },
+  {
+    "code": "schriftverkehr",
+    "category_code": "05",
+    "subfolder_code": "08",
+    "name": "Schriftverkehr",
+    "requires_period": false,
+    "requires_owner": true,
+    "requires_tenant": false,
+    "keywords": [
+      "Schreiben",
+      "Schriftverkehr"
+    ]
+  },
+  {
+    "code": "beschwerde",
+    "category_code": "05",
+    "subfolder_code": "08",
+    "name": "Beschwerde",
+    "requires_period": false,
+    "requires_owner": true,
+    "requires_tenant": false,
+    "keywords": [
+      "Beschwerde"
+    ]
+  },
+  {
+    "code": "anfrage",
+    "category_code": "05",
+    "subfolder_code": "08",
+    "name": "Anfrage",
+    "requires_period": false,
+    "requires_owner": true,
+    "requires_tenant": false,
+    "keywords": [
+      "Anfrage"
+    ]
+  },
+  {
+    "code": "einwendung_abrechnung",
+    "category_code": "05",
+    "subfolder_code": "08",
+    "name": "Einwendung gegen Abrechnung",
+    "requires_period": false,
+    "requires_owner": true,
+    "requires_tenant": false,
+    "keywords": [
+      "Einwendung",
+      "Widerspruch Abrechnung"
+    ]
+  },
+  {
+    "code": "kommunikation_baumassnahme",
+    "category_code": "05",
+    "subfolder_code": "08",
+    "name": "Kommunikation zu Baumaßnahmen",
+    "requires_period": false,
+    "requires_owner": true,
+    "requires_tenant": false,
+    "keywords": [
+      "Baumaßnahme",
+      "Sanierung"
+    ]
+  },
+  {
+    "code": "beirat_kommunikation",
+    "category_code": "05",
+    "subfolder_code": "08",
+    "name": "Kommunikation Beirat",
+    "requires_period": false,
+    "requires_owner": true,
+    "requires_tenant": false,
+    "keywords": [
+      "Beirat",
+      "Verwaltungsbeirat"
+    ]
+  },
+  {
+    "code": "zahlungserinnerung",
+    "category_code": "05",
+    "subfolder_code": "09",
+    "name": "Zahlungserinnerung",
+    "requires_period": false,
+    "requires_owner": true,
+    "requires_tenant": false,
+    "keywords": [
+      "Zahlungserinnerung"
+    ]
+  },
+  {
+    "code": "mahnung",
+    "category_code": "05",
+    "subfolder_code": "09",
+    "name": "Mahnung",
+    "requires_period": false,
+    "requires_owner": true,
+    "requires_tenant": false,
+    "keywords": [
+      "Mahnung",
+      "Mahnschreiben"
+    ]
+  },
+  {
+    "code": "forderungsaufstellung",
+    "category_code": "05",
+    "subfolder_code": "09",
+    "name": "Forderungsaufstellung",
+    "requires_period": false,
+    "requires_owner": true,
+    "requires_tenant": false,
+    "keywords": [
+      "Forderungsaufstellung"
+    ]
+  },
+  {
+    "code": "anwaltsschreiben",
+    "category_code": "05",
+    "subfolder_code": "09",
+    "name": "Anwaltliches Schreiben",
+    "requires_period": false,
+    "requires_owner": true,
+    "requires_tenant": false,
+    "keywords": [
+      "Rechtsanwalt",
+      "anwaltliches Schreiben"
+    ]
+  },
+  {
+    "code": "mahnverfahren",
+    "category_code": "05",
+    "subfolder_code": "09",
+    "name": "Mahnverfahren",
+    "requires_period": false,
+    "requires_owner": true,
+    "requires_tenant": false,
+    "keywords": [
+      "Mahnbescheid",
+      "Mahnverfahren",
+      "Vollstreckungsbescheid"
+    ]
+  },
+  {
+    "code": "klageunterlagen",
+    "category_code": "05",
+    "subfolder_code": "09",
+    "name": "Klageunterlagen mit Eigentümerbezug",
+    "requires_period": false,
+    "requires_owner": true,
+    "requires_tenant": false,
+    "keywords": [
+      "Klage",
+      "Klageschrift"
+    ]
+  },
+  {
+    "code": "vertretungsvollmacht",
+    "category_code": "05",
+    "subfolder_code": "10",
+    "name": "Vertretungsvollmacht",
+    "requires_period": false,
+    "requires_owner": true,
+    "requires_tenant": false,
+    "keywords": [
+      "Vertretungsvollmacht"
+    ]
+  },
+  {
+    "code": "versammlungsvollmacht",
+    "category_code": "05",
+    "subfolder_code": "10",
+    "name": "Versammlungsvollmacht",
+    "requires_period": false,
+    "requires_owner": true,
+    "requires_tenant": false,
+    "keywords": [
+      "Versammlungsvollmacht",
+      "Stimmrechtsvollmacht"
+    ]
+  },
+  {
+    "code": "zustellvollmacht",
+    "category_code": "05",
+    "subfolder_code": "10",
+    "name": "Zustellvollmacht",
+    "requires_period": false,
+    "requires_owner": true,
+    "requires_tenant": false,
+    "keywords": [
+      "Zustellvollmacht"
+    ]
+  },
+  {
+    "code": "sonstiges_eigentuemer",
+    "category_code": "05",
+    "subfolder_code": "11",
+    "name": "Sonstiges mit Eigentümerbezug",
+    "requires_period": false,
+    "requires_owner": true,
+    "requires_tenant": false,
+    "keywords": [
+      "Sonstiges mit Eigentümerbezug"
+    ]
+  }
+]

@@ -12,6 +12,8 @@
   <div class="marke"><strong>{{ APP_NAME }}</strong> <span class="sub">{{ APP_OWNER }}</span></div>
   {% if user.is_authenticated %}
   <nav>
+    <a href="{% url 'object_list' %}">Objekte</a>
+    <a href="{% url 'owner_list' %}">Eigentümer</a>
     <a href="{% url 'status_page' %}">Status</a>
     {% if user|has_perm:"audit.read_own" or user|has_perm:"audit.read_all" %}<a href="{% url 'audit_list' %}">Protokoll</a>{% endif %}
     <a href="{% url 'settings_list' %}">Konfiguration</a>

@@ -11,3 +11,11 @@ def has_perm(user, code: str) -> bool:
         return user_has_permission(user, code)
     except ValueError:
         return False
+
+
+@register.filter
+def get_item(mapping, key):
+    try:
+        return mapping.get(key, [])
+    except AttributeError:
+        return []
