@@ -57,11 +57,24 @@ def document_list(request, pk: int):
         .annotate(c=Count("id"))
         .order_by("job_type")
     )
+    from apps.documents.models import DocumentClassification
+
+    plans = {
+        c.document_id: c
+        for c in DocumentClassification.objects.filter(document__object=obj)
+        .order_by("document_id", "-id")
+        .select_related("category", "subfolder", "document_type")
+    }
+    for c in DocumentClassification.objects.filter(document__object=obj, is_final=True).select_related(
+        "category", "subfolder", "document_type"
+    ):
+        plans[c.document_id] = c
     return render(
         request,
         "documents/list.html",
         {
             "object": obj,
+            "plans": plans,
             "documents": docs[:500],
             "counts": counts,
             "status_filter": status_filter,
@@ -111,6 +124,7 @@ def processing_start(request, pk: int):
     run_type = request.POST.get("run_type", RunType.INCREMENTAL)
     if run_type not in (RunType.FULL, RunType.INCREMENTAL):
         run_type = RunType.INCREMENTAL
+    dry_run = request.POST.get("dry_run") == "1"
     existing = ProcessingRun.objects.filter(
         object=obj,
         status__in=[RunStatus.PENDING, RunStatus.RUNNING],
@@ -121,14 +135,14 @@ def processing_start(request, pk: int):
             request, f"Für dieses Objekt ist bereits Lauf {existing.pk} {existing.get_status_display()}."
         )
         return redirect("document_list", pk=obj.pk)
-    run = start_run(obj, run_type=run_type, user=request.user)
+    run = start_run(obj, run_type=run_type, dry_run=dry_run, user=request.user)
     record(
         "processing.start",
         entity_type="processing_run",
         entity_id=run.pk,
         object_id=obj.pk,
         request=request,
-        after={"run_type": run_type, "status": run.status},
+        after={"run_type": run_type, "status": run.status, "dry_run": dry_run},
     )
     pos = queue_position(run)
     if run.status == RunStatus.RUNNING:
@@ -164,6 +178,20 @@ def document_detail(request, pk: int):
     )
     jobs = ProcessingJob.objects.filter(document=doc).order_by("id")
     previews = {p.page_no: preview_path(doc.pk, p.page_no).exists() for p in pages}
+    from apps.documents.models import DocumentClassification, DocumentOwnerLink, DocumentTenantLink
+
+    classifications = (
+        DocumentClassification.objects.filter(document=doc)
+        .select_related("category", "subfolder", "document_type")
+        .order_by("-id")[:12]
+    )
+    owner_links = DocumentOwnerLink.objects.filter(document=doc, deleted_at__isnull=True).select_related(
+        "owner", "unit", "owner_file", "subfolder"
+    )
+    tenant_links = DocumentTenantLink.objects.filter(document=doc, deleted_at__isnull=True).select_related(
+        "tenant"
+    )
+    cases = doc.review_cases.all().order_by("-id")
     return render(
         request,
         "documents/detail.html",
@@ -174,6 +202,10 @@ def document_detail(request, pk: int):
             "entities": entities,
             "jobs": jobs,
             "previews": previews,
+            "classifications": classifications,
+            "owner_links": owner_links,
+            "tenant_links": tenant_links,
+            "cases": cases,
         },
     )
 

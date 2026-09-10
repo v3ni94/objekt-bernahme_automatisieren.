@@ -1,0 +1,996 @@
+{
+ "objects": [
+  {
+   "object_number": "623",
+   "city": "Düsseldorf",
+   "street": "Joachimstraße",
+   "house_number": "49",
+   "management_type": "weg_with_se",
+   "name": "Düsseldorf, Joachimstraße 49",
+   "units": [
+    {
+     "label": "WE01",
+     "type": "apartment"
+    },
+    {
+     "label": "WE02",
+     "type": "apartment"
+    },
+    {
+     "label": "WE03",
+     "type": "apartment"
+    },
+    {
+     "label": "WE04",
+     "type": "apartment"
+    },
+    {
+     "label": "WE05",
+     "type": "apartment",
+     "number": "5"
+    },
+    {
+     "label": "WE06",
+     "type": "apartment"
+    },
+    {
+     "label": "WE07",
+     "type": "apartment"
+    },
+    {
+     "label": "WE08",
+     "type": "apartment"
+    },
+    {
+     "label": "WE09",
+     "type": "apartment"
+    },
+    {
+     "label": "WE10",
+     "type": "apartment"
+    },
+    {
+     "label": "WE11",
+     "type": "apartment"
+    },
+    {
+     "label": "WE12",
+     "type": "apartment"
+    },
+    {
+     "label": "ST02",
+     "type": "parking"
+    }
+   ],
+   "owners": [
+    {
+     "key": "mustermann",
+     "first": "Max",
+     "last": "Mustermann",
+     "units": [
+      [
+       "WE03",
+       "2015-01-01",
+       null
+      ]
+     ]
+    },
+    {
+     "key": "altmann",
+     "first": "Peter",
+     "last": "Altmann",
+     "units": [
+      [
+       "WE05",
+       "2010-03-01",
+       "2026-06-30"
+      ]
+     ]
+    },
+    {
+     "key": "neumann",
+     "first": "Nina",
+     "last": "Neumann",
+     "units": [
+      [
+       "WE05",
+       "2026-07-01",
+       null
+      ]
+     ]
+    },
+    {
+     "key": "beispiel",
+     "first": "Anna",
+     "last": "Beispiel",
+     "units": [
+      [
+       "WE07",
+       "2018-05-01",
+       null
+      ],
+      [
+       "ST02",
+       "2018-05-01",
+       null
+      ]
+     ],
+     "iban": "DE89 3704 0044 0532 0130 00"
+    },
+    {
+     "key": "sonder",
+     "first": "Sven",
+     "last": "Sonder",
+     "units": [
+      [
+       "WE02",
+       "2012-01-01",
+       null
+      ]
+     ]
+    },
+    {
+     "key": "erstmuster",
+     "first": "Erika",
+     "last": "Erstmuster",
+     "units": [
+      [
+       "WE01",
+       "2011-01-01",
+       null
+      ]
+     ]
+    },
+    {
+     "key": "vierte",
+     "first": "Vera",
+     "last": "Vierte Beispiel",
+     "units": [
+      [
+       "WE04",
+       "2011-01-01",
+       null
+      ]
+     ]
+    },
+    {
+     "key": "sechste",
+     "first": "Sara",
+     "last": "Sechste Probe",
+     "units": [
+      [
+       "WE06",
+       "2011-01-01",
+       null
+      ]
+     ]
+    },
+    {
+     "key": "achte",
+     "first": "Achim",
+     "last": "Achte Muster",
+     "units": [
+      [
+       "WE08",
+       "2011-01-01",
+       null
+      ]
+     ]
+    },
+    {
+     "key": "neunte",
+     "first": "Nora",
+     "last": "Neunte Probe",
+     "units": [
+      [
+       "WE09",
+       "2011-01-01",
+       null
+      ]
+     ]
+    },
+    {
+     "key": "zehnte",
+     "first": "Zoe",
+     "last": "Zehnte Muster",
+     "units": [
+      [
+       "WE10",
+       "2011-01-01",
+       null
+      ]
+     ]
+    },
+    {
+     "key": "elfte",
+     "first": "Elias",
+     "last": "Elfte Probe",
+     "units": [
+      [
+       "WE11",
+       "2011-01-01",
+       null
+      ]
+     ]
+    },
+    {
+     "key": "zwoelfte",
+     "first": "Zita",
+     "last": "Zwölfte Muster",
+     "units": [
+      [
+       "WE12",
+       "2011-01-01",
+       null
+      ]
+     ]
+    }
+   ],
+   "tenants": [
+    {
+     "first": "Mia",
+     "last": "Mieterling",
+     "unit": "WE02"
+    }
+   ]
+  },
+  {
+   "object_number": "624",
+   "city": "Musterstadt",
+   "street": "Musterweg",
+   "house_number": "1",
+   "management_type": "weg",
+   "name": "Musterstadt, Musterweg 1",
+   "units": [
+    {
+     "label": "WE01",
+     "type": "apartment"
+    },
+    {
+     "label": "WE02",
+     "type": "apartment"
+    }
+   ],
+   "owners": [
+    {
+     "key": "erste",
+     "first": "Emil",
+     "last": "Erste",
+     "units": [
+      [
+       "WE01",
+       "2015-01-01",
+       null
+      ]
+     ]
+    },
+    {
+     "key": "zweite",
+     "first": "Zora",
+     "last": "Zweite",
+     "units": [
+      [
+       "WE02",
+       "2015-01-01",
+       null
+      ]
+     ]
+    }
+   ],
+   "tenants": []
+  },
+  {
+   "object_number": "625",
+   "city": "Musterstadt",
+   "street": "Mietstraße",
+   "house_number": "5",
+   "management_type": "rental",
+   "name": "Musterstadt, Mietstraße 5",
+   "units": [
+    {
+     "label": "Wohnung 4",
+     "type": "apartment"
+    }
+   ],
+   "owners": [
+    {
+     "key": "auftraggeber",
+     "company": "Auftraggeber GmbH",
+     "units": [
+      [
+       "Wohnung 4",
+       "2010-01-01",
+       null
+      ]
+     ]
+    }
+   ],
+   "tenants": [
+    {
+     "first": "Milo",
+     "last": "Mieterling-Zwei",
+     "unit": "Wohnung 4"
+    }
+   ]
+  },
+  {
+   "object_number": "631",
+   "city": "Musterstadt",
+   "street": "Beispielweg",
+   "house_number": "2",
+   "management_type": "weg",
+   "name": "Musterstadt, Beispielweg 2",
+   "units": [],
+   "owners": [],
+   "tenants": []
+  }
+ ],
+ "contract_partners": [
+  "Musterversicherung AG",
+  "Hausmeisterdienst Sauber GmbH"
+ ],
+ "documents": [
+  {
+   "id": "T01",
+   "filename": "Teilungserklaerung_1998.pdf",
+   "object": "623",
+   "pages": [
+    "Objekt 623 Düsseldorf, Joachimstraße 49\nWohnungseigentümergemeinschaft Joachimstraße 49, 40xxx Düsseldorf\nNotarielle Teilungserklärung mit Gemeinschaftsordnung vom 12.03.1998\nAufteilung des Grundstücks in Wohnungseigentum. Einheit WE01 mit 250/10.000 Miteigentumsanteilen, WE02 mit 240/10.000, WE03 mit 350/10.000, WE05 mit 300/10.000.",
+    "Objekt 623 Düsseldorf, Joachimstraße 49\nWohnungseigentümergemeinschaft Joachimstraße 49, 40xxx Düsseldorf\nGemeinschaftsordnung: Regelungen zur Verwaltung, Kostenverteilung und Versammlung."
+   ],
+   "expected": {
+    "category": "02",
+    "subfolder": null,
+    "document_type": "teilungserklaerung",
+    "case_type": null,
+    "period_year": null,
+    "physical_category": "02"
+   }
+  },
+  {
+   "id": "T02",
+   "filename": "Protokoll_ETV_2025.pdf",
+   "object": "623",
+   "pages": [
+    "Objekt 623 Düsseldorf, Joachimstraße 49\nWohnungseigentümergemeinschaft Joachimstraße 49, 40xxx Düsseldorf\nProtokoll der Eigentümerversammlung vom 20.05.2025\nTOP 1 Jahresabrechnung 2024: Die Gesamtabrechnung und die Einzelabrechnungen werden beschlossen.\nTOP 2 Wirtschaftsplan 2025: einstimmig beschlossen.\nTOP 3 Entlastung der Verwaltung.",
+    "Objekt 623 Düsseldorf, Joachimstraße 49\nWohnungseigentümergemeinschaft Joachimstraße 49, 40xxx Düsseldorf\nTOP 4 Instandhaltung Treppenhaus. TOP 5 Verschiedenes. TOP 6 Termin der nächsten Versammlung.\nEnde der Versammlung 20:15 Uhr."
+   ],
+   "expected": {
+    "category": "02",
+    "subfolder": null,
+    "document_type": "versammlungsprotokoll",
+    "case_type": null,
+    "period_year": null,
+    "physical_category": "02",
+    "segments": []
+   }
+  },
+  {
+   "id": "T03",
+   "filename": "Protokoll_ETV_2026.pdf",
+   "object": "623",
+   "pages": [
+    "Objekt 623 Düsseldorf, Joachimstraße 49\nWohnungseigentümergemeinschaft Joachimstraße 49, 40xxx Düsseldorf\nProtokoll der Eigentümerversammlung vom 20.05.2026\nTOP 1 Jahresabrechnung 2025: beschlossen.",
+    "Objekt 623 Düsseldorf, Joachimstraße 49\nWohnungseigentümergemeinschaft Joachimstraße 49, 40xxx Düsseldorf\nTOP 2 Wirtschaftsplan 2026: einstimmig beschlossen.",
+    "Objekt 623 Düsseldorf, Joachimstraße 49\nWohnungseigentümergemeinschaft Joachimstraße 49, 40xxx Düsseldorf\nTOP 3 Entlastung der Verwaltung. TOP 4 Instandhaltung.",
+    "Objekt 623 Düsseldorf, Joachimstraße 49\nWohnungseigentümergemeinschaft Joachimstraße 49, 40xxx Düsseldorf\nTOP 5 Verschiedenes. TOP 6 Beiratswahl.",
+    "Objekt 623 Düsseldorf, Joachimstraße 49\nWohnungseigentümergemeinschaft Joachimstraße 49, 40xxx Düsseldorf\nTOP 7 Genehmigung bauliche Veränderung WE03, Antragsteller Herr Mustermann\nDer Antrag des Eigentümers Mustermann (Einheit WE03) auf Einbau einer Klimaanlage wird mit 14 Ja-Stimmen angenommen.",
+    "Objekt 623 Düsseldorf, Joachimstraße 49\nWohnungseigentümergemeinschaft Joachimstraße 49, 40xxx Düsseldorf\nFortsetzung TOP 7: Auflagen für die bauliche Veränderung der Einheit WE03. Herr Mustermann trägt die Kosten.\nEnde der Versammlung 20:30 Uhr."
+   ],
+   "expected": {
+    "category": "02",
+    "subfolder": null,
+    "document_type": "versammlungsprotokoll",
+    "case_type": null,
+    "period_year": null,
+    "physical_category": "02",
+    "segments": [
+     {
+      "page_from": 5,
+      "page_to": 6,
+      "owner": "mustermann",
+      "subfolder": "07"
+     }
+    ]
+   }
+  },
+  {
+   "id": "T04",
+   "filename": "Beschlusssammlung_Stand_2026.pdf",
+   "object": "623",
+   "pages": [
+    "Objekt 623 Düsseldorf, Joachimstraße 49\nWohnungseigentümergemeinschaft Joachimstraße 49, 40xxx Düsseldorf\nBeschlusssammlung der Wohnungseigentümergemeinschaft, Stand 01.06.2026\nBeschluss 2024/3: Genehmigung Markise WE07. Beschluss 2025/1: Jahresabrechnung 2024. Beschluss 2025/4: Sonderumlage Dach, Einheit WE05 zahlt 1.200,00 EUR."
+   ],
+   "expected": {
+    "category": "02",
+    "subfolder": null,
+    "document_type": "beschlusssammlung",
+    "case_type": null,
+    "period_year": null,
+    "physical_category": "02"
+   }
+  },
+  {
+   "id": "T05",
+   "filename": "Police_Gebaeudeversicherung.pdf",
+   "object": "623",
+   "pages": [
+    "Objekt 623 Düsseldorf, Joachimstraße 49\nWohnungseigentümergemeinschaft Joachimstraße 49, 40xxx Düsseldorf\nVersicherungsschein Wohngebäudeversicherung\nVersicherer: Musterversicherung AG. Versicherungsnehmer: Wohnungseigentümergemeinschaft Joachimstraße 49. Jahresbeitrag 6.200,00 EUR."
+   ],
+   "expected": {
+    "category": "02",
+    "subfolder": null,
+    "document_type": "gebaeudeversicherung",
+    "case_type": null,
+    "period_year": null,
+    "physical_category": "02"
+   }
+  },
+  {
+   "id": "T06",
+   "filename": "Energieausweis_2024.pdf",
+   "object": "623",
+   "pages": [
+    "Objekt 623 Düsseldorf, Joachimstraße 49\nWohnungseigentümergemeinschaft Joachimstraße 49, 40xxx Düsseldorf\nEnergieausweis für Wohngebäude\nGebäude Joachimstraße 49, Baujahr 1998, Endenergiebedarf 112 kWh/(m²a). Ausgestellt am 03.04.2024."
+   ],
+   "expected": {
+    "category": "02",
+    "subfolder": null,
+    "document_type": "energieausweis",
+    "case_type": null,
+    "period_year": null,
+    "physical_category": "02"
+   }
+  },
+  {
+   "id": "T07",
+   "filename": "Hausmeistervertrag.pdf",
+   "object": "623",
+   "pages": [
+    "Objekt 623 Düsseldorf, Joachimstraße 49\nWohnungseigentümergemeinschaft Joachimstraße 49, 40xxx Düsseldorf\nHausmeistervertrag\nzwischen der Wohnungseigentümergemeinschaft Joachimstraße 49 und dem Hausmeisterdienst Sauber GmbH. Leistungen: Reinigung, Winterdienst, Gartenpflege. Vergütung 820,00 EUR monatlich."
+   ],
+   "expected": {
+    "category": "02",
+    "subfolder": null,
+    "document_type": "dienstleistervertrag",
+    "case_type": null,
+    "period_year": null,
+    "physical_category": "02"
+   }
+  },
+  {
+   "id": "T09",
+   "filename": "Gesamtabrechnung_2025.pdf",
+   "object": "623",
+   "pages": [
+    "Objekt 623 Düsseldorf, Joachimstraße 49\nWohnungseigentümergemeinschaft Joachimstraße 49, 40xxx Düsseldorf\nGesamtabrechnung 2025 der Wohnungseigentümergemeinschaft Joachimstraße 49\nAbrechnungsjahr 2025, Abrechnungszeitraum 01.01.2025 bis 31.12.2025. Gesamtkosten 148.230,55 EUR.",
+    "Objekt 623 Düsseldorf, Joachimstraße 49\nWohnungseigentümergemeinschaft Joachimstraße 49, 40xxx Düsseldorf\nKostenverteilung nach Miteigentumsanteilen. Heizkosten 42.100,00 EUR. Rücklage 18.000,00 EUR."
+   ],
+   "expected": {
+    "category": "03",
+    "subfolder": null,
+    "document_type": "gesamtjahresabrechnung",
+    "case_type": null,
+    "period_year": 2025,
+    "physical_category": "03"
+   }
+  },
+  {
+   "id": "T10",
+   "filename": "Jahresabrechnung_2025_komplett.pdf",
+   "object": "623",
+   "pages": [
+    "Objekt 623 Düsseldorf, Joachimstraße 49\nWohnungseigentümergemeinschaft Joachimstraße 49, 40xxx Düsseldorf\nGesamtabrechnung 2025 der Wohnungseigentümergemeinschaft Joachimstraße 49\nAbrechnungszeitraum 01.01.2025 bis 31.12.2025. Abrechnungsjahr 2025. Anzahl Einheiten: 12.\nGesamtkosten der Gemeinschaft: 148.230,55 EUR.\nDie Einzelabrechnungen folgen auf den nächsten Seiten.\nSeite 1 von 14",
+    "Objekt 623 Düsseldorf, Joachimstraße 49\nWohnungseigentümergemeinschaft Joachimstraße 49, 40xxx Düsseldorf\nGesamtabrechnung 2025, Fortsetzung: Kostenverteilung nach Miteigentumsanteilen\nHeizkosten 42.100,00 EUR, Wasser 12.300,00 EUR, Hausmeister 9.800,00 EUR, Versicherung 6.200,00 EUR.\nSeite 2 von 14",
+    "Objekt 623 Düsseldorf, Joachimstraße 49\nWohnungseigentümergemeinschaft Joachimstraße 49, 40xxx Düsseldorf\nEinzelabrechnung 2025 für Einheit WE01 (Anlage zur Gesamtabrechnung)\nEigentümer: Erika Erstmuster, Einheit WE01, Miteigentumsanteil 350/10.000.\nAnteil an den Gesamtkosten: 2.345,10 EUR. Geleistete Vorauszahlungen: 2.100,00 EUR.\nAbrechnungsergebnis: Nachzahlung 245,10 EUR.\nSeite 3 von 14",
+    "Objekt 623 Düsseldorf, Joachimstraße 49\nWohnungseigentümergemeinschaft Joachimstraße 49, 40xxx Düsseldorf\nEinzelabrechnung 2025 für Einheit WE02 (Anlage zur Gesamtabrechnung)\nEigentümer: Sonder, Einheit WE02, Miteigentumsanteil 350/10.000.\nAnteil an den Gesamtkosten: 2.345,10 EUR. Geleistete Vorauszahlungen: 2.100,00 EUR.\nAbrechnungsergebnis: Nachzahlung 245,10 EUR.\nSeite 4 von 14",
+    "Objekt 623 Düsseldorf, Joachimstraße 49\nWohnungseigentümergemeinschaft Joachimstraße 49, 40xxx Düsseldorf\nEinzelabrechnung 2025 für Einheit WE03 (Anlage zur Gesamtabrechnung)\nEigentümer: Max Mustermann, Einheit WE03, Miteigentumsanteil 350/10.000.\nAnteil an den Gesamtkosten: 2.345,10 EUR. Geleistete Vorauszahlungen: 2.100,00 EUR.\nAbrechnungsergebnis: Nachzahlung 245,10 EUR.\nSeite 5 von 14",
+    "Objekt 623 Düsseldorf, Joachimstraße 49\nWohnungseigentümergemeinschaft Joachimstraße 49, 40xxx Düsseldorf\nEinzelabrechnung 2025 für Einheit WE04 (Anlage zur Gesamtabrechnung)\nEigentümer: Vierte Beispiel, Einheit WE04, Miteigentumsanteil 350/10.000.\nAnteil an den Gesamtkosten: 2.345,10 EUR. Geleistete Vorauszahlungen: 2.100,00 EUR.\nAbrechnungsergebnis: Nachzahlung 245,10 EUR.\nSeite 6 von 14",
+    "Objekt 623 Düsseldorf, Joachimstraße 49\nWohnungseigentümergemeinschaft Joachimstraße 49, 40xxx Düsseldorf\nEinzelabrechnung 2025 für Einheit WE05 (Anlage zur Gesamtabrechnung)\nEigentümer: Peter Altmann, Einheit WE05, Miteigentumsanteil 350/10.000.\nAnteil an den Gesamtkosten: 2.345,10 EUR. Geleistete Vorauszahlungen: 2.100,00 EUR.\nAbrechnungsergebnis: Nachzahlung 245,10 EUR.\nSeite 7 von 14",
+    "Objekt 623 Düsseldorf, Joachimstraße 49\nWohnungseigentümergemeinschaft Joachimstraße 49, 40xxx Düsseldorf\nEinzelabrechnung 2025 für Einheit WE06 (Anlage zur Gesamtabrechnung)\nEigentümer: Sechste Probe, Einheit WE06, Miteigentumsanteil 350/10.000.\nAnteil an den Gesamtkosten: 2.345,10 EUR. Geleistete Vorauszahlungen: 2.100,00 EUR.\nAbrechnungsergebnis: Nachzahlung 245,10 EUR.\nSeite 8 von 14",
+    "Objekt 623 Düsseldorf, Joachimstraße 49\nWohnungseigentümergemeinschaft Joachimstraße 49, 40xxx Düsseldorf\nEinzelabrechnung 2025 für Einheit WE07 (Anlage zur Gesamtabrechnung)\nEigentümer: Anna Beispiel, Einheit WE07, Miteigentumsanteil 350/10.000.\nAnteil an den Gesamtkosten: 2.345,10 EUR. Geleistete Vorauszahlungen: 2.100,00 EUR.\nAbrechnungsergebnis: Nachzahlung 245,10 EUR.\nSeite 9 von 14",
+    "Objekt 623 Düsseldorf, Joachimstraße 49\nWohnungseigentümergemeinschaft Joachimstraße 49, 40xxx Düsseldorf\nEinzelabrechnung 2025 für Einheit WE08 (Anlage zur Gesamtabrechnung)\nEigentümer: Achte Muster, Einheit WE08, Miteigentumsanteil 350/10.000.\nAnteil an den Gesamtkosten: 2.345,10 EUR. Geleistete Vorauszahlungen: 2.100,00 EUR.\nAbrechnungsergebnis: Nachzahlung 245,10 EUR.\nSeite 10 von 14",
+    "Objekt 623 Düsseldorf, Joachimstraße 49\nWohnungseigentümergemeinschaft Joachimstraße 49, 40xxx Düsseldorf\nEinzelabrechnung 2025 für Einheit WE09 (Anlage zur Gesamtabrechnung)\nEigentümer: Neunte Probe, Einheit WE09, Miteigentumsanteil 350/10.000.\nAnteil an den Gesamtkosten: 2.345,10 EUR. Geleistete Vorauszahlungen: 2.100,00 EUR.\nAbrechnungsergebnis: Nachzahlung 245,10 EUR.\nSeite 11 von 14",
+    "Objekt 623 Düsseldorf, Joachimstraße 49\nWohnungseigentümergemeinschaft Joachimstraße 49, 40xxx Düsseldorf\nEinzelabrechnung 2025 für Einheit WE10 (Anlage zur Gesamtabrechnung)\nEigentümer: Zehnte Muster, Einheit WE10, Miteigentumsanteil 350/10.000.\nAnteil an den Gesamtkosten: 2.345,10 EUR. Geleistete Vorauszahlungen: 2.100,00 EUR.\nAbrechnungsergebnis: Nachzahlung 245,10 EUR.\nSeite 12 von 14",
+    "Objekt 623 Düsseldorf, Joachimstraße 49\nWohnungseigentümergemeinschaft Joachimstraße 49, 40xxx Düsseldorf\nEinzelabrechnung 2025 für Einheit WE11 (Anlage zur Gesamtabrechnung)\nEigentümer: Elfte Probe, Einheit WE11, Miteigentumsanteil 350/10.000.\nAnteil an den Gesamtkosten: 2.345,10 EUR. Geleistete Vorauszahlungen: 2.100,00 EUR.\nAbrechnungsergebnis: Nachzahlung 245,10 EUR.\nSeite 13 von 14",
+    "Objekt 623 Düsseldorf, Joachimstraße 49\nWohnungseigentümergemeinschaft Joachimstraße 49, 40xxx Düsseldorf\nEinzelabrechnung 2025 für Einheit WE12 (Anlage zur Gesamtabrechnung)\nEigentümer: Zwölfte Muster, Einheit WE12, Miteigentumsanteil 350/10.000.\nAnteil an den Gesamtkosten: 2.345,10 EUR. Geleistete Vorauszahlungen: 2.100,00 EUR.\nAbrechnungsergebnis: Nachzahlung 245,10 EUR.\nSeite 14 von 14"
+   ],
+   "expected": {
+    "category": "03",
+    "subfolder": null,
+    "document_type": "gesamtjahresabrechnung",
+    "case_type": null,
+    "period_year": 2025,
+    "physical_category": "03",
+    "segments": [
+     {
+      "page_from": 3,
+      "page_to": 3,
+      "owner": "erstmuster",
+      "subfolder": "05"
+     },
+     {
+      "page_from": 4,
+      "page_to": 4,
+      "owner": "sonder",
+      "subfolder": "05"
+     },
+     {
+      "page_from": 5,
+      "page_to": 5,
+      "owner": "mustermann",
+      "subfolder": "05"
+     },
+     {
+      "page_from": 6,
+      "page_to": 6,
+      "owner": "vierte",
+      "subfolder": "05"
+     },
+     {
+      "page_from": 7,
+      "page_to": 7,
+      "owner": "altmann",
+      "subfolder": "05"
+     },
+     {
+      "page_from": 8,
+      "page_to": 8,
+      "owner": "sechste",
+      "subfolder": "05"
+     },
+     {
+      "page_from": 9,
+      "page_to": 9,
+      "owner": "beispiel",
+      "subfolder": "05"
+     },
+     {
+      "page_from": 10,
+      "page_to": 10,
+      "owner": "achte",
+      "subfolder": "05"
+     },
+     {
+      "page_from": 11,
+      "page_to": 11,
+      "owner": "neunte",
+      "subfolder": "05"
+     },
+     {
+      "page_from": 12,
+      "page_to": 12,
+      "owner": "zehnte",
+      "subfolder": "05"
+     },
+     {
+      "page_from": 13,
+      "page_to": 13,
+      "owner": "elfte",
+      "subfolder": "05"
+     },
+     {
+      "page_from": 14,
+      "page_to": 14,
+      "owner": "zwoelfte",
+      "subfolder": "05"
+     }
+    ]
+   }
+  },
+  {
+   "id": "T11",
+   "filename": "Einzelabrechnung_2025_WE03.pdf",
+   "object": "623",
+   "pages": [
+    "Objekt 623 Düsseldorf, Joachimstraße 49\nWohnungseigentümergemeinschaft Joachimstraße 49, 40xxx Düsseldorf\nEinzelabrechnung 2025 für Einheit WE03\nEigentümer: Max Mustermann, Einheit WE03, Miteigentumsanteil 350/10.000. Abrechnungsjahr 2025.\nGeleistete Hausgeldvorauszahlungen: 3.600,00 EUR. Abrechnungsergebnis: Nachzahlung 312,40 EUR."
+   ],
+   "expected": {
+    "category": "05",
+    "subfolder": "05",
+    "document_type": "einzelabrechnung",
+    "case_type": null,
+    "period_year": 2025,
+    "physical_category": "05",
+    "owner_files": [
+     "mustermann"
+    ]
+   }
+  },
+  {
+   "id": "T12",
+   "filename": "Einzelwirtschaftsplan_2026_WE07.pdf",
+   "object": "623",
+   "pages": [
+    "Objekt 623 Düsseldorf, Joachimstraße 49\nWohnungseigentümergemeinschaft Joachimstraße 49, 40xxx Düsseldorf\nEinzelwirtschaftsplan 2026 für Einheit WE07\nEigentümerin: Anna Beispiel. Wirtschaftsjahr 2026. Monatliches Hausgeld ab 01.01.2026: 245,00 EUR."
+   ],
+   "expected": {
+    "category": "05",
+    "subfolder": "06",
+    "document_type": "einzelwirtschaftsplan",
+    "case_type": null,
+    "period_year": 2026,
+    "physical_category": "05",
+    "owner_files": [
+     "beispiel"
+    ]
+   }
+  },
+  {
+   "id": "T13",
+   "filename": "Gesamtwirtschaftsplan_2026.pdf",
+   "object": "623",
+   "pages": [
+    "Objekt 623 Düsseldorf, Joachimstraße 49\nWohnungseigentümergemeinschaft Joachimstraße 49, 40xxx Düsseldorf\nGesamtwirtschaftsplan 2026 der Wohnungseigentümergemeinschaft Joachimstraße 49\nWirtschaftsjahr 2026. Verteilerschlüssel Miteigentumsanteile, alle Einheiten. Gesamtkosten 152.000,00 EUR."
+   ],
+   "expected": {
+    "category": "03",
+    "subfolder": null,
+    "document_type": "gesamtwirtschaftsplan",
+    "case_type": null,
+    "period_year": 2026,
+    "physical_category": "03"
+   }
+  },
+  {
+   "id": "T14",
+   "filename": "Kontoauszug_Gemeinschaftskonto_2026-03.pdf",
+   "object": "623",
+   "pages": [
+    "Objekt 623 Düsseldorf, Joachimstraße 49\nWohnungseigentümergemeinschaft Joachimstraße 49, 40xxx Düsseldorf\nKontoauszug Gemeinschaftskonto WEG Joachimstraße 49, Nr. 3/2026\nIBAN DE89 3704 0044 0532 0130 00\n01.03.2026 Hausgeld Mustermann WE03 320,00 EUR\n02.03.2026 Hausgeld Beispiel WE07 245,00 EUR\n05.03.2026 Hausmeisterdienst Sauber GmbH -820,00 EUR"
+   ],
+   "expected": {
+    "category": "03",
+    "subfolder": null,
+    "document_type": "kontoauszug",
+    "case_type": null,
+    "period_year": null,
+    "physical_category": "03"
+   }
+  },
+  {
+   "id": "T15",
+   "filename": "SEPA_Mandat_Mustermann.pdf",
+   "object": "623",
+   "pages": [
+    "Objekt 623 Düsseldorf, Joachimstraße 49\nWohnungseigentümergemeinschaft Joachimstraße 49, 40xxx Düsseldorf\nSEPA-Lastschriftmandat\nZahlungsempfänger: Wohnungseigentümergemeinschaft Joachimstraße 49. Zahlungspflichtiger: Max Mustermann, Einheit WE03.\nIBAN: DE89 3704 0044 0532 0130 00 Mandatsreferenz WEG623-003-2026.\nIch ermächtige den Zahlungsempfänger, Zahlungen von meinem Konto mittels Lastschrift einzuziehen."
+   ],
+   "expected": {
+    "category": "05",
+    "subfolder": "03",
+    "document_type": "sepa_mandat",
+    "case_type": null,
+    "period_year": null,
+    "physical_category": "05",
+    "owner_files": [
+     "mustermann"
+    ]
+   }
+  },
+  {
+   "id": "T16",
+   "filename": "Bankverbindung_neu_Beispiel.pdf",
+   "object": "623",
+   "pages": [
+    "Objekt 623 Düsseldorf, Joachimstraße 49\nWohnungseigentümergemeinschaft Joachimstraße 49, 40xxx Düsseldorf\nMitteilung neue Bankverbindung ab dem 01.10.2026\nSehr geehrte Damen und Herren, für meine Einheit WE07 gilt ab dem 01.10.2026 die neue Bankverbindung IBAN DE89370400440532013000.\nMit freundlichen Grüßen Anna Beispiel"
+   ],
+   "expected": {
+    "category": "05",
+    "subfolder": "01",
+    "document_type": "bankverbindungsmitteilung",
+    "case_type": null,
+    "period_year": null,
+    "physical_category": "05",
+    "owner_files": [
+     "beispiel"
+    ]
+   }
+  },
+  {
+   "id": "T17",
+   "filename": "Grundbuchauszug_WE05_2026-08.pdf",
+   "object": "623",
+   "pages": [
+    "Objekt 623 Düsseldorf, Joachimstraße 49\nWohnungseigentümergemeinschaft Joachimstraße 49, 40xxx Düsseldorf\nGrundbuchauszug vom 12.08.2026\nWohnungsgrundbuch Blatt 4711, Sondereigentum Nr. 5. Eigentümerin: Nina Neumann, eingetragen am 10.08.2026."
+   ],
+   "expected": {
+    "category": "05",
+    "subfolder": "02",
+    "document_type": "grundbuchauszug",
+    "case_type": null,
+    "period_year": null,
+    "physical_category": "05",
+    "owner_files": [
+     "neumann"
+    ]
+   }
+  },
+  {
+   "id": "T18",
+   "filename": "Kaufvertrag_WE05.pdf",
+   "object": "623",
+   "pages": [
+    "Objekt 623 Düsseldorf, Joachimstraße 49\nWohnungseigentümergemeinschaft Joachimstraße 49, 40xxx Düsseldorf\nNotarieller Kaufvertrag vom 05.05.2026\nVerkäufer: Peter Altmann. Käufer: Nina Neumann. Kaufgegenstand: Wohnungseigentum WE05, Joachimstraße 49.\nÜbergang von Nutzen und Lasten zum 01.07.2026. Kaufpreis 285.000,00 EUR."
+   ],
+   "expected": {
+    "category": "05",
+    "subfolder": "02",
+    "document_type": "kaufvertrag",
+    "case_type": null,
+    "period_year": null,
+    "physical_category": "05",
+    "owner_files": [
+     "altmann",
+     "neumann"
+    ]
+   }
+  },
+  {
+   "id": "T19",
+   "filename": "Veraeusserungsanzeige_WE05.pdf",
+   "object": "623",
+   "pages": [
+    "Objekt 623 Düsseldorf, Joachimstraße 49\nWohnungseigentümergemeinschaft Joachimstraße 49, 40xxx Düsseldorf\nVeräußerungsanzeige des Notars\nMitteilung über den Eigentumswechsel der Einheit WE05 zum 01.07.2026 von Peter Altmann auf Nina Neumann."
+   ],
+   "expected": {
+    "category": "05",
+    "subfolder": "02",
+    "document_type": "veraeusserungsanzeige",
+    "case_type": null,
+    "period_year": null,
+    "physical_category": "05",
+    "owner_files": [
+     "altmann",
+     "neumann"
+    ]
+   }
+  },
+  {
+   "id": "T20",
+   "filename": "Mahnung_Hausgeld_2025-03_WE05.pdf",
+   "object": "623",
+   "pages": [
+    "Objekt 623 Düsseldorf, Joachimstraße 49\nWohnungseigentümergemeinschaft Joachimstraße 49, 40xxx Düsseldorf\nZahlungserinnerung vom 15.04.2025\nFür die Einheit WE05 ist das Hausgeld 03/2025 in Höhe von 245,00 EUR bisher nicht eingegangen. Rückstand 245,00 EUR."
+   ],
+   "expected": {
+    "category": "05",
+    "subfolder": "09",
+    "document_type": "zahlungserinnerung",
+    "case_type": null,
+    "period_year": null,
+    "physical_category": "05",
+    "owner_files": [
+     "altmann"
+    ]
+   },
+   "note": "T20 Pflichtfall: Dokument 03/2025 bei Wechsel 01.07.2026 gehoert zum Alteigentuemer"
+  },
+  {
+   "id": "T21",
+   "filename": "Anwaltsschreiben_Hausgeld_2025.pdf",
+   "object": "623",
+   "pages": [
+    "Objekt 623 Düsseldorf, Joachimstraße 49\nWohnungseigentümergemeinschaft Joachimstraße 49, 40xxx Düsseldorf\nKanzlei Musterrecht Rechtsanwälte, Schreiben vom 03.09.2026\nIn Sachen WEG Joachimstraße 49 gegen Altmann, Einheit WE05: Hausgeldrückstände 2025 in Höhe von 1.470,00 EUR. Wir fordern Sie zur Zahlung auf."
+   ],
+   "expected": {
+    "category": "05",
+    "subfolder": "09",
+    "document_type": "anwaltsschreiben",
+    "case_type": null,
+    "period_year": null,
+    "physical_category": "05",
+    "owner_files": [
+     "altmann"
+    ]
+   }
+  },
+  {
+   "id": "T22",
+   "filename": "Ratenzahlung_WE05.pdf",
+   "object": "623",
+   "pages": [
+    "Objekt 623 Düsseldorf, Joachimstraße 49\nWohnungseigentümergemeinschaft Joachimstraße 49, 40xxx Düsseldorf\nZahlungsvereinbarung vom 15.08.2026\nFrau Nina Neumann, Einheit WE05, zahlt die Sonderumlage Dach in Höhe von 1.200,00 EUR in sechs Raten ab 01.09.2026."
+   ],
+   "expected": {
+    "category": "05",
+    "subfolder": "04",
+    "document_type": "zahlungsvereinbarung",
+    "case_type": null,
+    "period_year": null,
+    "physical_category": "05",
+    "owner_files": [
+     "neumann"
+    ]
+   }
+  },
+  {
+   "id": "T23",
+   "filename": "Eigentuemerkonto_WE05.pdf",
+   "object": "623",
+   "pages": [
+    "Objekt 623 Düsseldorf, Joachimstraße 49\nWohnungseigentümergemeinschaft Joachimstraße 49, 40xxx Düsseldorf\nKontoauszug Eigentümerkonto WE05\nBuchungen: Hausgeld, Sonderumlage, Zahlungseingang. Saldo 0,00 EUR. Name: [unleserlich, Stempel]"
+   ],
+   "expected": {
+    "category": "05",
+    "subfolder": "04",
+    "document_type": "eigentuemerkonto",
+    "case_type": "owner_candidates",
+    "period_year": null,
+    "physical_category": "06"
+   },
+   "note": "kein Zeitbezug, zwei historische Eigentuemer"
+  },
+  {
+   "id": "T24",
+   "filename": "Vollmacht_Verwaltung.pdf",
+   "object": "623",
+   "pages": [
+    "Objekt 623 Düsseldorf, Joachimstraße 49\nWohnungseigentümergemeinschaft Joachimstraße 49, 40xxx Düsseldorf\nVollmacht\nDie Wohnungseigentümergemeinschaft Joachimstraße 49 bevollmächtigt die Hausverwaltung Müller GmbH zur Vertretung gegenüber Dritten, Behörden und Gerichten."
+   ],
+   "expected": {
+    "category": "01",
+    "subfolder": null,
+    "document_type": "verwaltervollmacht",
+    "case_type": null,
+    "period_year": null,
+    "physical_category": "01"
+   }
+  },
+  {
+   "id": "T25",
+   "filename": "Vollmacht_ETV_2026_Mustermann.pdf",
+   "object": "623",
+   "pages": [
+    "Objekt 623 Düsseldorf, Joachimstraße 49\nWohnungseigentümergemeinschaft Joachimstraße 49, 40xxx Düsseldorf\nVollmacht zur Eigentümerversammlung am 20.05.2026\nHiermit bevollmächtige ich, Max Mustermann, Eigentümer der Einheit WE03, Frau Anna Beispiel, mich in der Eigentümerversammlung zu vertreten und abzustimmen."
+   ],
+   "expected": {
+    "category": "05",
+    "subfolder": "10",
+    "document_type": "versammlungsvollmacht",
+    "case_type": null,
+    "period_year": null,
+    "physical_category": "05",
+    "owner_files": [
+     "mustermann"
+    ]
+   },
+   "note": "Vollmachtgeber fuehrt"
+  },
+  {
+   "id": "T26",
+   "filename": "Einwendung_Abrechnung_2024_Mustermann.pdf",
+   "object": "623",
+   "pages": [
+    "Objekt 623 Düsseldorf, Joachimstraße 49\nWohnungseigentümergemeinschaft Joachimstraße 49, 40xxx Düsseldorf\nEinwendungen gegen die Einzelabrechnung 2024\nSehr geehrte Damen und Herren, gegen die Einzelabrechnung 2024 für meine Einheit WE03 erhebe ich Einwendungen: Die Heizkosten sind falsch verteilt.\nMax Mustermann, 12.06.2025"
+   ],
+   "expected": {
+    "category": "05",
+    "subfolder": "08",
+    "document_type": "einwendung_abrechnung",
+    "case_type": null,
+    "period_year": null,
+    "physical_category": "05",
+    "owner_files": [
+     "mustermann"
+    ]
+   }
+  },
+  {
+   "id": "T27",
+   "filename": "Mietvertrag_WE02_Mieterling.pdf",
+   "object": "623",
+   "pages": [
+    "Objekt 623 Düsseldorf, Joachimstraße 49\nWohnungseigentümergemeinschaft Joachimstraße 49, 40xxx Düsseldorf\nMietvertrag\nüber die Wohnung WE02, Joachimstraße 49. Vermieter: Sven Sonder. Mieter: Mia Mieterling. Mietbeginn 01.02.2026, Kaltmiete 780,00 EUR."
+   ],
+   "expected": {
+    "category": "04",
+    "subfolder": null,
+    "document_type": "mietvertrag",
+    "case_type": null,
+    "period_year": null,
+    "physical_category": "04"
+   }
+  },
+  {
+   "id": "T28",
+   "filename": "Mietvertrag_Unbekannt.pdf",
+   "object": "624",
+   "pages": [
+    "Objekt 624 Musterstadt, Musterweg 1\nWohnungseigentümergemeinschaft Musterweg 1, Musterstadt\nMietvertrag\nüber die Wohnung WE01, Musterweg 1, Musterstadt. Vermieter: Emil Erste. Mieter: [unbekannt]. Kaltmiete 650,00 EUR."
+   ],
+   "expected": {
+    "category": "06",
+    "subfolder": "02",
+    "document_type": null,
+    "case_type": "unclear",
+    "period_year": null,
+    "physical_category": "06"
+   },
+   "note": "Regel E 2.4: Mieterdokument in reiner WEG-Verwaltung"
+  },
+  {
+   "id": "T30",
+   "filename": "Rechnung_Dachdecker.pdf",
+   "object": "623",
+   "pages": [
+    "Dachdeckerei Muster GmbH\nRechnung Nr. 2026-0815 vom 15.05.2026\nObjekt: Beispielweg 2, Musterstadt. Reparatur Dachrinne. Betrag 1.845,20 EUR."
+   ],
+   "expected": {
+    "category": "06",
+    "subfolder": "04",
+    "document_type": null,
+    "case_type": "unclear",
+    "period_year": null,
+    "physical_category": "06"
+   },
+   "note": "Fremdobjekt 631"
+  },
+  {
+   "id": "T31",
+   "filename": "Scan_Werbeprospekt.pdf",
+   "object": "623",
+   "pages": [
+    "Baumarkt Musterbau: Angebote der Woche\nGartenmöbel 30 Prozent reduziert. Grills ab 99,00 EUR. Nur solange der Vorrat reicht."
+   ],
+   "expected": {
+    "category": "06",
+    "subfolder": "01",
+    "document_type": null,
+    "case_type": "unclear",
+    "period_year": null,
+    "physical_category": "06"
+   },
+   "note": "ohne KI 01_Unklar"
+  },
+  {
+   "id": "T32",
+   "filename": "Notiz_handschriftlich.pdf",
+   "object": "623",
+   "pages": [
+    "xx ll iii  .. ~~ ~~ l1l  ..  --  o0o"
+   ],
+   "expected": {
+    "category": "06",
+    "subfolder": "01",
+    "document_type": null,
+    "case_type": "unclear",
+    "period_year": null,
+    "physical_category": "06"
+   },
+   "note": "unlesbar"
+  },
+  {
+   "id": "T33",
+   "filename": "Betriebskostenabrechnung_2025_Whg4.pdf",
+   "object": "625",
+   "pages": [
+    "Objekt 625 Musterstadt, Mietstraße 5\nMietverwaltung Mietstraße 5, Musterstadt\nBetriebskostenabrechnung 2025 für Wohnung 4\nMieter: Milo Mieterling-Zwei. Abrechnungszeitraum 01.01.2025 bis 31.12.2025. Nachzahlung 184,30 EUR."
+   ],
+   "expected": {
+    "category": "04",
+    "subfolder": null,
+    "document_type": "betriebskostenabrechnung",
+    "case_type": null,
+    "period_year": 2025,
+    "physical_category": "04"
+   }
+  },
+  {
+   "id": "T34",
+   "filename": "Hausgeld_Sollstellung_2026.pdf",
+   "object": "625",
+   "pages": [
+    "Objekt 625 Musterstadt, Mietstraße 5\nMietverwaltung Mietstraße 5, Musterstadt\nSollstellung Hausgeld 2026 für Wohnung 4\nMonatliches Hausgeld ab 01.01.2026: 210,00 EUR."
+   ],
+   "expected": {
+    "category": "06",
+    "subfolder": "02",
+    "document_type": null,
+    "case_type": "unclear",
+    "period_year": null,
+    "physical_category": "06"
+   },
+   "note": "Hausgeld in Mietverwaltung"
+  }
+ ]
+}

@@ -148,3 +148,61 @@ def ensure_owner_folder(owner_file: OwnerFile, *, drive: DriveAdapter, user=None
 
 def invalidate_owner_folder_cache(owner_file_id: int) -> None:
     cache.delete(f"drive:node:{owner_file_id}")
+
+
+def ensure_category_folder(
+    obj, category_code: str, subfolder_code: str | None, *, drive: DriveAdapter, user=None
+) -> DriveNodeRow:
+    """Hauptordner 01 bis 06 und Unterordner von 06 als drive_nodes; setzt den Objektordner aus dem Abgleich voraus."""
+    from apps.documents.models import DocumentCategory
+    from apps.drive.reconcile import _register_node
+
+    root = DriveNodeRow.objects.filter(
+        object=obj, node_kind=NodeKind.OBJECT_ROOT, status=NodeStatus.ACTIVE
+    ).first()
+    if root is None:
+        raise FolderError("Objektordner unbekannt: Ordnerabgleich zuerst ausführen (CR 9)")
+    category = DocumentCategory.objects.get(code=category_code)
+    main = DriveNodeRow.objects.filter(
+        object=obj, node_kind=NodeKind.MAIN_FOLDER, category=category, status=NodeStatus.ACTIVE
+    ).first()
+    if main is None:
+        node, created = _find_or_create(
+            drive, root.drive_file_id, category.folder_name, object_id=obj.pk, user=user
+        )
+        main = _register_node(
+            obj,
+            node,
+            node_kind=NodeKind.MAIN_FOLDER,
+            category_code=category_code,
+            subfolder_id=None,
+            expected_name=category.folder_name,
+            parent_row=root,
+            created=created,
+        )
+    if not subfolder_code:
+        return main
+    sub = DocumentSubfolder.objects.get(category=category, code=subfolder_code)
+    row = DriveNodeRow.objects.filter(
+        object=obj,
+        node_kind=NodeKind.SUBFOLDER,
+        subfolder=sub,
+        owner_file__isnull=True,
+        tenant_file__isnull=True,
+        status=NodeStatus.ACTIVE,
+    ).first()
+    if row is None:
+        node, created = _find_or_create(
+            drive, main.drive_file_id, sub.folder_name, object_id=obj.pk, user=user
+        )
+        row = _register_node(
+            obj,
+            node,
+            node_kind=NodeKind.SUBFOLDER,
+            category_code=category_code,
+            subfolder_id=sub.pk,
+            expected_name=sub.folder_name,
+            parent_row=main,
+            created=created,
+        )
+    return row

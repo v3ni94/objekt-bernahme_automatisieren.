@@ -731,5 +731,82 @@
     "keywords": [
       "Sonstiges mit Eigentümerbezug"
     ]
+  },
+  {
+    "code": "verwaltervertrag",
+    "category_code": "01",
+    "subfolder_code": null,
+    "name": "Verwaltervertrag",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Verwaltervertrag",
+      "Verwaltungsvertrag"
+    ]
+  },
+  {
+    "code": "verwalterbestellung",
+    "category_code": "01",
+    "subfolder_code": null,
+    "name": "Verwalterbestellung",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Bestellung des Verwalters",
+      "Verwalterbestellung"
+    ]
+  },
+  {
+    "code": "mietvertrag",
+    "category_code": "04",
+    "subfolder_code": null,
+    "name": "Mietvertrag",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": true,
+    "keywords": [
+      "Mietvertrag"
+    ]
+  },
+  {
+    "code": "kaution",
+    "category_code": "04",
+    "subfolder_code": null,
+    "name": "Kaution",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": true,
+    "keywords": [
+      "Kaution",
+      "Mietkaution"
+    ]
+  },
+  {
+    "code": "betriebskostenabrechnung",
+    "category_code": "04",
+    "subfolder_code": null,
+    "name": "Betriebskostenabrechnung",
+    "requires_period": true,
+    "requires_owner": false,
+    "requires_tenant": true,
+    "keywords": [
+      "Betriebskostenabrechnung",
+      "Nebenkostenabrechnung"
+    ]
+  },
+  {
+    "code": "mieterkorrespondenz",
+    "category_code": "04",
+    "subfolder_code": null,
+    "name": "Mieterkorrespondenz",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": true,
+    "keywords": [
+      "Mieter",
+      "Schreiben"
+    ]
   }
 ]

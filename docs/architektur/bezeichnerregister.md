@@ -210,7 +210,7 @@ Modell `documents.ClassificationRule`. classification rules.
 | updated_at | datetime(6) | nein |  |
 | code | varchar(48) | nein |  |
 | name | varchar(120) | nein |  |
-| rule_kind | varchar(24) | nein | filename, folder, keyword, entity, period |
+| rule_kind | varchar(24) | nein | filename, folder, keyword, entity, period, composite |
 | pattern | longtext | nein |  |
 | target_category_code | varchar(2) | ja | → document_categories.code |
 | target_subfolder_id | bigint | ja | → document_subfolders.id |
@@ -221,6 +221,8 @@ Modell `documents.ClassificationRule`. classification rules.
 | management_types | json | ja |  |
 | sort_order | smallint UNSIGNED | nein |  |
 | is_active | tinyint(1) | nein |  |
+| version | smallint UNSIGNED | nein |  |
+| definition | json | ja |  |
 
 Constraints und Indizes: `ck_rules_kind`, `ck_rules_weight`
 
@@ -1217,6 +1219,7 @@ Modell `pipeline.ProcessingRun`. processing runs.
 | pages_done | integer UNSIGNED | ja |  |
 | documents_misc | integer UNSIGNED | ja |  |
 | misc_share_pct | numeric(5, 2) | ja |  |
+| misc_share_adjusted_pct | numeric(5, 2) | ja |  |
 | pages_per_minute | numeric(10, 2) | ja |  |
 | ram_peak_mb | integer UNSIGNED | ja |  |
 | ai_calls_count | integer UNSIGNED | ja |  |
@@ -1451,18 +1454,24 @@ Celery-Queues aus den Settings: `ai`, `classify`, `io`, `lists`, `ocr`
 | ai.wall_budget_s | ai | integer | `120` |
 | classification.ai_sample_pct | classification | integer | `10` |
 | classification.bonus_agree | classification | decimal | `0.05` |
+| classification.contract_partners | classification | list | `[]` |
 | classification.embedding_switch_macro_f1 | classification | decimal | `0.85` |
+| classification.first_pages | classification | integer | `3` |
 | classification.fuzzy_auto | classification | integer | `90` |
 | classification.fuzzy_candidate_min | classification | integer | `78` |
 | classification.gap_factor | classification | decimal | `0.5` |
 | classification.label_weights | classification | object | `{"rule": 0.6, "synthetic": 0.3, "ai": 0.5, "review": 1.0}` |
 | classification.malus_disagree | classification | decimal | `0.25` |
 | classification.mask_id_documents_block_stage3 | classification | boolean | `true` |
+| classification.ner_support_bonus | classification | decimal | `0.05` |
+| classification.own_company_names | classification | list | `["Hausverwaltung Müller GmbH", "Müller Holding AG"]` |
 | classification.retrain_after_new_labels | classification | integer | `50` |
 | classification.retrain_f1_tolerance | classification | decimal | `0.01` |
+| classification.segment_types | classification | list | `["gesamtjahresabrechnung", "gesamtwirtschaftsplan", "versammlungsprotokoll"]` |
 | classification.stage2_conflict_p | classification | decimal | `0.9` |
 | classification.stage2_min_samples_per_class | classification | integer | `15` |
 | classification.stage3_max_tokens | classification | integer | `3000` |
+| classification.text_max_chars | classification | integer | `4000` |
 | classification.threshold_auto_file | classification | decimal | `0.9` |
 | classification.threshold_stage3_call | classification | decimal | `0.9` |
 | classification.threshold_stage3_override | classification | decimal | `0.9` |

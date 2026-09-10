@@ -781,6 +781,7 @@ class RuleKind(models.TextChoices):
     KEYWORD = "keyword", "Stichwort im Text"
     ENTITY = "entity", "erkannte Entität"
     PERIOD = "period", "Zeitbezug"
+    COMPOSITE = "composite", "zusammengesetzte Regel (Definition nach E 2.2)"
 
 
 class ClassificationRule(TimestampedModel):
@@ -822,6 +823,12 @@ class ClassificationRule(TimestampedModel):
     )
     sort_order = models.PositiveSmallIntegerField(default=100)
     is_active = models.BooleanField(default=True)
+    version = models.PositiveSmallIntegerField(default=1, help_text="Version aus der Regeldatei (E 2.2)")
+    definition = models.JSONField(
+        null=True,
+        blank=True,
+        help_text="vollständige Regel (scope, when, then, examples) nach E 2.2; Ziele als Codes (B-12)",
+    )
 
     class Meta:
         db_table = "classification_rules"

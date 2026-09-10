@@ -21,7 +21,9 @@ AMOUNT = re.compile(r"(?<![\d.])(\d{1,3}(?:\.\d{3})*,\d{2})\s?(?:EUR|€|Euro)",
 DATE = re.compile(r"\b(\d{1,2})\.(\d{1,2})\.(\d{4})\b")
 MONTH_YEAR = re.compile(r"\b(0?[1-9]|1[0-2])/(20\d{2})\b")
 PERIOD_YEAR = re.compile(
-    r"(?i)\b(Abrechnungsjahr|Wirtschaftsjahr|Abrechnungszeitraum|Wirtschaftsperiode|Jahresabrechnung|Wirtschaftsplan|Hausgeld|Einzelabrechnung|Gesamtabrechnung)\b[^\n\d]{0,40}?(20\d{2})\b"
+    r"(?i)\b(?P<ctx>Abrechnungsjahr|Wirtschaftsjahr|Abrechnungszeitraum|Wirtschaftsperiode|Jahresabrechnung|"
+    r"Wirtschaftsplan|Hausgeld\w*|Einzelabrechnung|Gesamtabrechnung|Betriebskostenabrechnung|Nebenkostenabrechnung|"
+    r"R(?:ü|ue)ckst(?:ä|ae)nde?|Forderung(?:en)?|Sonderumlage|Sollstellung)\w*[^\n\d]{0,40}?(?P<year>20\d{2})\b"
 )
 PERIOD_RANGE = re.compile(r"(\d{1,2}\.\d{1,2}\.(20\d{2}))\s*(?:bis|-|–)\s*(\d{1,2}\.\d{1,2}\.(20\d{2}))")
 AMOUNT_CONTEXT = (
@@ -228,11 +230,11 @@ def extract_page(
                 "period",
                 page_no,
                 m.group(0),
-                m.group(2),
+                m.group("year"),
                 m.start(),
                 m.end(),
                 0.9,
-                extra={"kind": "year", "context": m.group(1)},
+                extra={"kind": "year", "context": m.group("ctx")},
             )
         )
     # Objektmarker

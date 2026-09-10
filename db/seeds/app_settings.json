@@ -555,5 +555,18 @@
   "processing.work_orphan_hours": 48,
   "processing.heartbeat_seconds": 30,
   "ocr.language": "deu",
-  "ocr.image_cover_ratio": 0.9
+  "ocr.image_cover_ratio": 0.9,
+  "classification.own_company_names": [
+    "Hausverwaltung Müller GmbH",
+    "Müller Holding AG"
+  ],
+  "classification.contract_partners": [],
+  "classification.first_pages": 3,
+  "classification.text_max_chars": 4000,
+  "classification.ner_support_bonus": 0.05,
+  "classification.segment_types": [
+    "gesamtjahresabrechnung",
+    "gesamtwirtschaftsplan",
+    "versammlungsprotokoll"
+  ]
 }

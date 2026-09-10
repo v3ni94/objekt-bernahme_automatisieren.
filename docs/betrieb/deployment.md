@@ -31,5 +31,6 @@ Verbindliche Beschreibung in docs/betrieb.md Abschnitt 4. Hier die Befehlsfolge.
 | `app-grants-sql` | Tabellenrechte als SQL ausgeben (docs/architektur.md 9.4) |
 | `manage.py drive_reconcile --all --dry-run` | Sammellauf des Ordnerabgleichs als Probelauf (Definition of Done), weitere Befehle in docs/betrieb/google-oauth.md |
 | `manage.py bezeichnerregister --write` | Bezeichnerregister aus dem Code erzeugen (Entwicklung, vor jedem Commit mit Schemaänderung) |
+| `manage.py classifier status|list|train [--force]|rollback <version>` | Lokaler Klassifikator: Kaltstartphase, Training mit Kreuzvalidierung, Aktivierung nach Toleranzregel, Rollback (E 3.4, 3.5) |
 | `manage.py perf_run --corpus <verzeichnis> [--local]` | Messlauf der Pipeline mit synthetischem Korpus (`tests/performance/corpus_generator.py`); Messprotokoll als JSON (Seiten je Minute je Schritt, Platte, RAM im lokalen Modus) |
 | Statusseite, „Sweeper jetzt ausführen“ | Sweeper sofort (Jobs mit veraltetem Heartbeat zurücksetzen, wartende Läufe starten); sonst Beat jede Minute |

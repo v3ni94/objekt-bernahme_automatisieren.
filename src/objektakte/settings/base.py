@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     "apps.documents",
     "apps.drive",
     "apps.pipeline",
+    "apps.classification",
     "apps.review",
     "apps.imports",
     "apps.requirements",
@@ -223,6 +224,12 @@ CELERY_BROKER_TRANSPORT_OPTIONS = {"visibility_timeout": env_int("JOBS_VISIBILIT
 CELERY_TIMEZONE = TIME_ZONE
 # Zeitplan (Serverzeit TZ). Uhrzeit des Konsistenzlaufs ist ANNAHME (nachts, ausserhalb der Verarbeitung), Frage F27.
 CELERY_BEAT_SCHEDULE: dict = {
+    # Nachtraining des lokalen Klassifikators (E 3.5), naechtlich 01:30 Serverzeit (ANNAHME), nie waehrend eines Objektlaufs
+    "classifier-retrain-nightly": {
+        "task": "classification.retrain",
+        "schedule": crontab(hour=1, minute=30),
+        "options": {"queue": "classify"},
+    },
     # Drive-Ueberwachung (B-16, G 10): stuendlicher Lesetest, taeglicher erzwungener Refresh fuer den 8-Tage-Nachweis (T9)
     "drive-hourly-read-test": {
         "task": "drive.hourly_read_test",

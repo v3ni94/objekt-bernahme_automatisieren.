@@ -1,0 +1,1933 @@
+[
+ {
+  "id": "R-01-VERTRAG-001",
+  "name": "Verwaltervertrag",
+  "version": 1,
+  "priority": 200,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)verwalt(er|ungs)vertrag"
+   ],
+   "entity_required": [
+    "own_company_as_agent"
+   ],
+   "not_text_regex": [
+    "(?i)k(ue|ü)ndigung des verwaltervertrag"
+   ]
+  },
+  "then": {
+   "category": "01",
+   "confidence": 0.95,
+   "hard": false,
+   "document_type": "verwaltervertrag",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Verwaltervertrag zwischen der WEG und der Hausverwaltung Müller GmbH"
+   ],
+   "negative": [
+    "Mietvertrag über die Wohnung"
+   ]
+  }
+ },
+ {
+  "id": "R-01-BESTELL-001",
+  "name": "Verwalterbestellung",
+  "version": 1,
+  "priority": 200,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)bestellung (des|zum|zur) verwalt",
+    "(?i)verwalterbestellung"
+   ]
+  },
+  "then": {
+   "category": "01",
+   "confidence": 0.9,
+   "hard": false,
+   "document_type": "verwalterbestellung",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Beschluss über die Bestellung des Verwalters"
+   ],
+   "negative": [
+    "Bestellung von Streusalz"
+   ]
+  }
+ },
+ {
+  "id": "R-01-VOLLM-001",
+  "name": "Verwaltervollmacht",
+  "version": 1,
+  "priority": 190,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)vollmacht"
+   ],
+   "entity_required": [
+    "own_company_as_agent"
+   ],
+   "not_text_regex": [
+    "(?i)eigent(ue|ü)merversammlung.{0,60}vertret",
+    "(?i)bevollm(ae|ä)chtig\\w* .{0,40}(herr|frau)",
+    "(?i)vertret\\w*.{0,60}eigent(ue|ü)merversammlung"
+   ]
+  },
+  "then": {
+   "category": "01",
+   "confidence": 0.9,
+   "hard": false,
+   "document_type": "verwaltervollmacht",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Vollmacht der Gemeinschaft an die Hausverwaltung Müller GmbH zur Vertretung gegenüber Dritten"
+   ],
+   "negative": [
+    "Vollmacht zur Vertretung in der Eigentümerversammlung"
+   ]
+  }
+ },
+ {
+  "id": "R-02-TE-001",
+  "name": "Teilungserklärung",
+  "version": 1,
+  "priority": 200,
+  "scope": {},
+  "when": {
+   "any_of": {
+    "text_regex": [
+     "(?i)teilungserkl(ae|ä)rung",
+     "(?i)gemeinschaftsordnung"
+    ]
+   },
+   "not_text_regex": [
+    "(?i)auszug aus der teilungserkl(ae|ä)rung.{0,40}(WE|einheit)\\s*\\d",
+    "(?i)protokoll der eigent"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 1.0,
+   "hard": true,
+   "document_type": "teilungserklaerung",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Notarielle Teilungserklärung mit Gemeinschaftsordnung"
+   ],
+   "negative": [
+    "Auszug aus der Teilungserklärung für Einheit WE 3"
+   ]
+  }
+ },
+ {
+  "id": "R-02-EIGLISTE-001",
+  "name": "Eigentümerliste",
+  "version": 1,
+  "priority": 180,
+  "scope": {},
+  "when": {
+   "any_of": {
+    "text_regex": [
+     "(?i)eigent(ue|ü)merliste",
+     "(?i)liste der (wohnungs)?eigent(ue|ü)mer",
+     "(?i)eigent(ue|ü)mer(ver)?zeichnis"
+    ],
+    "filename_regex": [
+     "(?i)eigent(ue|ü)mer.?liste"
+    ]
+   }
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.9,
+   "hard": false,
+   "document_type": "eigentuemerliste",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Eigentümerliste Stand 01.01.2026 mit Einheit, Name, Anschrift"
+   ],
+   "negative": [
+    "Einzelabrechnung 2025"
+   ]
+  }
+ },
+ {
+  "id": "R-02-BESCHLSAMM-001",
+  "name": "Beschlusssammlung",
+  "version": 1,
+  "priority": 200,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)beschluss-?sammlung"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 1.0,
+   "hard": true,
+   "document_type": "beschlusssammlung",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Beschlusssammlung der WEG, fortlaufend geführt"
+   ],
+   "negative": [
+    "Beschluss über die Jahresabrechnung"
+   ]
+  }
+ },
+ {
+  "id": "R-02-PROTOKOLL-001",
+  "name": "Versammlungsprotokoll",
+  "version": 1,
+  "priority": 200,
+  "scope": {},
+  "when": {
+   "any_of": {
+    "text_regex": [
+     "(?i)protokoll der (ordentlichen |außerordentlichen |ausserordentlichen )?(wohnungs)?eigent(ue|ü)merversammlung",
+     "(?i)versammlungsprotokoll",
+     "(?i)niederschrift (ue|ü)ber die eigent(ue|ü)merversammlung"
+    ]
+   }
+  },
+  "then": {
+   "category": "02",
+   "confidence": 1.0,
+   "hard": true,
+   "document_type": "versammlungsprotokoll",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Protokoll der Eigentümerversammlung vom 20.05.2026"
+   ],
+   "negative": [
+    "Vollmacht zur Vertretung in der Eigentümerversammlung"
+   ]
+  }
+ },
+ {
+  "id": "R-02-VERS-001",
+  "name": "Gebäudeversicherung",
+  "version": 1,
+  "priority": 180,
+  "scope": {},
+  "when": {
+   "any_of": {
+    "text_regex": [
+     "(?i)(wohn)?geb(ae|ä)udeversicherung",
+     "(?i)versicherungsschein",
+     "(?i)versicherungspolice"
+    ]
+   },
+   "not_entity": [
+    "foreign_object_marker"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.9,
+   "hard": false,
+   "document_type": "gebaeudeversicherung",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Versicherungsschein Wohngebäudeversicherung"
+   ],
+   "negative": [
+    "Rechnung Dachdecker"
+   ]
+  }
+ },
+ {
+  "id": "R-02-ENERGIE-001",
+  "name": "Energieausweis",
+  "version": 1,
+  "priority": 200,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)energieausweis"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 1.0,
+   "hard": true,
+   "document_type": "energieausweis",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Energieausweis für Wohngebäude"
+   ],
+   "negative": [
+    "Energiekosten in der Jahresabrechnung"
+   ]
+  }
+ },
+ {
+  "id": "R-02-DIENSTL-001",
+  "name": "Dienstleistervertrag",
+  "version": 1,
+  "priority": 170,
+  "scope": {},
+  "when": {
+   "any_of": {
+    "text_regex": [
+     "(?i)(hausmeister|reinigungs|winterdienst|wartungs|aufzugs|garten(pflege)?|hausbetreuungs)(dienst)?vertrag",
+     "(?i)dienstleistungsvertrag",
+     "(?i)wartungsvertrag"
+    ]
+   },
+   "not_entity": [
+    "foreign_object_marker"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.9,
+   "hard": false,
+   "document_type": "dienstleistervertrag",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Hausmeistervertrag zwischen der WEG und dem Hausmeisterdienst"
+   ],
+   "negative": [
+    "Mietvertrag"
+   ]
+  }
+ },
+ {
+  "id": "R-03-GESAMTABR-001",
+  "name": "Gesamtjahresabrechnung",
+  "version": 1,
+  "priority": 200,
+  "scope": {},
+  "when": {
+   "any_of": {
+    "head_regex": [
+     "(?im)^\\s*gesamt(jahres)?abrechnung",
+     "(?im)^\\s*jahresabrechnung\\s+20\\d{2}\\s+der\\s+(weg|wohnungseigent(ue|ü)mergemeinschaft)"
+    ],
+    "filename_regex": [
+     "(?i)gesamt(jahres)?abrechnung",
+     "(?i)jahresabrechnung.{0,10}komplett"
+    ]
+   },
+   "not_text_regex": [
+    "(?i)protokoll der",
+    "(?i)einwendung"
+   ]
+  },
+  "then": {
+   "category": "03",
+   "confidence": 1.0,
+   "hard": true,
+   "document_type": "gesamtjahresabrechnung",
+   "scope": "accounting",
+   "metadata": {
+    "period_year": "{period_year}"
+   }
+  },
+  "examples": {
+   "positive": [
+    "Gesamtabrechnung 2025 der WEG Musterstadt, Abrechnungsjahr 2025"
+   ],
+   "negative": [
+    "Einzelabrechnung 2025 für Einheit WE03"
+   ]
+  }
+ },
+ {
+  "id": "R-03-GESAMTWP-001",
+  "name": "Gesamtwirtschaftsplan",
+  "version": 1,
+  "priority": 200,
+  "scope": {},
+  "when": {
+   "any_of": {
+    "head_regex": [
+     "(?im)^\\s*gesamtwirtschaftsplan",
+     "(?i)wirtschaftsplan.{0,80}(alle einheiten|verteilerschl(ue|ü)ssel|gesamtkosten)"
+    ],
+    "filename_regex": [
+     "(?i)gesamtwirtschaftsplan"
+    ]
+   },
+   "not_text_regex": [
+    "(?i)protokoll der",
+    "(?i)einzelwirtschaftsplan"
+   ]
+  },
+  "then": {
+   "category": "03",
+   "confidence": 1.0,
+   "hard": true,
+   "document_type": "gesamtwirtschaftsplan",
+   "scope": "accounting",
+   "metadata": {
+    "period_year": "{period_year}"
+   }
+  },
+  "examples": {
+   "positive": [
+    "Gesamtwirtschaftsplan 2026 mit Verteilerschlüssel für alle Einheiten"
+   ],
+   "negative": [
+    "Einzelwirtschaftsplan 2026 für Einheit WE07"
+   ]
+  }
+ },
+ {
+  "id": "R-03-KONTO-001",
+  "name": "Kontoauszug Gemeinschaftskonto",
+  "version": 1,
+  "priority": 190,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)kontoauszug"
+   ],
+   "any_of": {
+    "text_regex": [
+     "(?i)gemeinschaftskonto",
+     "(?i)hausgeldkonto",
+     "(?i)verwaltungskonto",
+     "(?i)r(ue|ü)cklagenkonto"
+    ]
+   },
+   "not_text_regex": [
+    "(?i)eigent(ue|ü)merkonto"
+   ]
+  },
+  "then": {
+   "category": "03",
+   "confidence": 0.95,
+   "hard": false,
+   "document_type": "kontoauszug",
+   "scope": "accounting"
+  },
+  "examples": {
+   "positive": [
+    "Kontoauszug Gemeinschaftskonto WEG Musterstadt"
+   ],
+   "negative": [
+    "Kontoauszug Eigentümerkonto WE05"
+   ]
+  }
+ },
+ {
+  "id": "R-03-BELEG-001",
+  "name": "Beleg oder Rechnung mit Vertragspartner",
+  "version": 1,
+  "priority": 120,
+  "scope": {},
+  "when": {
+   "any_of": {
+    "text_regex": [
+     "(?i)rechnungs-?(nr|nummer)",
+     "(?i)\\brechnung\\b",
+     "(?i)\\bbeleg\\b"
+    ]
+   },
+   "entity_required": [
+    "contract_partner"
+   ],
+   "not_entity": [
+    "foreign_object_marker"
+   ],
+   "not_text_regex": [
+    "(?i)abrechnung"
+   ]
+  },
+  "then": {
+   "category": "03",
+   "confidence": 0.85,
+   "hard": false,
+   "document_type": "beleg",
+   "scope": "accounting"
+  },
+  "examples": {
+   "positive": [
+    "Rechnung Nr. 4711 des Hausmeisterdienstes"
+   ],
+   "negative": [
+    "Einzelabrechnung 2025"
+   ]
+  }
+ },
+ {
+  "id": "R-04-MIETV-001",
+  "name": "Mietvertrag",
+  "version": 1,
+  "priority": 180,
+  "scope": {
+   "management_types": [
+    "rental",
+    "weg_with_se"
+   ]
+  },
+  "when": {
+   "text_regex": [
+    "(?i)mietvertrag"
+   ]
+  },
+  "then": {
+   "category": "04",
+   "confidence": 0.95,
+   "hard": false,
+   "document_type": "mietvertrag",
+   "scope": "tenant"
+  },
+  "examples": {
+   "positive": [
+    "Mietvertrag über die Wohnung WE02, Mieter Mieterling"
+   ],
+   "negative": [
+    "Verwaltervertrag"
+   ]
+  }
+ },
+ {
+  "id": "R-04-BKA-001",
+  "name": "Betriebskostenabrechnung Mieter",
+  "version": 1,
+  "priority": 180,
+  "scope": {
+   "management_types": [
+    "rental",
+    "weg_with_se"
+   ]
+  },
+  "when": {
+   "any_of": {
+    "text_regex": [
+     "(?i)betriebskostenabrechnung",
+     "(?i)nebenkostenabrechnung"
+    ]
+   }
+  },
+  "then": {
+   "category": "04",
+   "confidence": 0.95,
+   "hard": false,
+   "document_type": "betriebskostenabrechnung",
+   "scope": "tenant",
+   "metadata": {
+    "period_year": "{period_year}"
+   }
+  },
+  "examples": {
+   "positive": [
+    "Betriebskostenabrechnung 2025 für Wohnung 4"
+   ],
+   "negative": [
+    "Einzelabrechnung 2025 Hausgeld"
+   ]
+  }
+ },
+ {
+  "id": "R-04-KAUTION-001",
+  "name": "Kaution",
+  "version": 1,
+  "priority": 170,
+  "scope": {
+   "management_types": [
+    "rental",
+    "weg_with_se"
+   ]
+  },
+  "when": {
+   "text_regex": [
+    "(?i)(miet)?kaution"
+   ]
+  },
+  "then": {
+   "category": "04",
+   "confidence": 0.9,
+   "hard": false,
+   "document_type": "kaution",
+   "scope": "tenant"
+  },
+  "examples": {
+   "positive": [
+    "Kautionsabrechnung Mieter Mieterling"
+   ],
+   "negative": [
+    "Hausgeldvorschuss"
+   ]
+  }
+ },
+ {
+  "id": "R-04-MIETV-WEG-001",
+  "name": "Mieterdokument in reiner WEG-Verwaltung",
+  "version": 1,
+  "priority": 180,
+  "scope": {
+   "management_types": [
+    "weg"
+   ]
+  },
+  "when": {
+   "any_of": {
+    "text_regex": [
+     "(?i)mietvertrag",
+     "(?i)betriebskostenabrechnung",
+     "(?i)\\bmieter(in)?\\b.{0,40}\\bvermieter"
+    ]
+   }
+  },
+  "then": {
+   "category": "06",
+   "confidence": 0.9,
+   "hard": false,
+   "subfolder": "02",
+   "scope": "unclear",
+   "subtype": "tenant_document_in_weg",
+   "proposal": "Zuordnung zur Eigentümerakte des Sondereigentümers unter 08_Korrespondenz (Vorschlag E 2.4, F9)"
+  },
+  "examples": {
+   "positive": [
+    "Mietvertrag über WE01 in Objekt 624, Mieter unbekannt"
+   ],
+   "negative": [
+    "Einzelabrechnung 2025"
+   ]
+  }
+ },
+ {
+  "id": "R-05-BANK-001",
+  "name": "Bankverbindungsmitteilung",
+  "version": 1,
+  "priority": 180,
+  "scope": {},
+  "when": {
+   "any_of": {
+    "text_regex": [
+     "(?i)(neue|ge(ae|ä)nderte|aktuelle) bankverbindung",
+     "(?i)bankverbindung.{0,60}(ab dem|ab \\d)",
+     "(?i)kontowechsel",
+     "(?i)(ae|ä)nderung (der|meiner) bankverbindung"
+    ]
+   },
+   "entity_required": [
+    "iban"
+   ],
+   "not_text_regex": [
+    "(?i)lastschriftmandat",
+    "(?i)kontoauszug"
+   ]
+  },
+  "then": {
+   "category": "05",
+   "confidence": 0.9,
+   "hard": false,
+   "subfolder": "01",
+   "document_type": "bankverbindungsmitteilung",
+   "scope": "owner"
+  },
+  "examples": {
+   "positive": [
+    "Neue Bankverbindung ab 01.10.2026, IBAN [IBAN]"
+   ],
+   "negative": [
+    "SEPA-Lastschriftmandat"
+   ]
+  }
+ },
+ {
+  "id": "R-05-STAMM-001",
+  "name": "Eigentümerstammdaten",
+  "version": 1,
+  "priority": 160,
+  "scope": {},
+  "when": {
+   "any_of": {
+    "text_regex": [
+     "(?i)stammdaten(blatt)?",
+     "(?i)datenblatt",
+     "(?i)kontaktdaten(blatt)?"
+    ]
+   },
+   "entity_required": [
+    "owner_candidate"
+   ]
+  },
+  "then": {
+   "category": "05",
+   "confidence": 0.85,
+   "hard": false,
+   "subfolder": "01",
+   "document_type": "eigentuemerstammdaten",
+   "scope": "owner"
+  },
+  "examples": {
+   "positive": [
+    "Stammdatenblatt Eigentümer Mustermann"
+   ],
+   "negative": [
+    "Gesamtabrechnung 2025"
+   ]
+  }
+ },
+ {
+  "id": "R-05-ADRESSE-001",
+  "name": "Adressmitteilung",
+  "version": 1,
+  "priority": 160,
+  "scope": {},
+  "when": {
+   "any_of": {
+    "text_regex": [
+     "(?i)(neue|ge(ae|ä)nderte) (anschrift|adresse|zustelladresse|korrespondenzadresse)",
+     "(?i)adress(ae|ä)nderung",
+     "(?i)umzug"
+    ]
+   },
+   "entity_required": [
+    "owner_candidate"
+   ]
+  },
+  "then": {
+   "category": "05",
+   "confidence": 0.85,
+   "hard": false,
+   "subfolder": "01",
+   "document_type": "adressmitteilung",
+   "scope": "owner"
+  },
+  "examples": {
+   "positive": [
+    "Mitteilung neue Anschrift des Eigentümers Beispiel"
+   ],
+   "negative": [
+    "Kontoauszug"
+   ]
+  }
+ },
+ {
+  "id": "R-05-GRUNDBUCH-001",
+  "name": "Grundbuchauszug",
+  "version": 1,
+  "priority": 190,
+  "scope": {},
+  "when": {
+   "any_of": {
+    "text_regex": [
+     "(?i)grundbuch(auszug|blatt)",
+     "(?i)bestandsverzeichnis",
+     "(?i)wohnungsgrundbuch"
+    ]
+   }
+  },
+  "then": {
+   "category": "05",
+   "confidence": 0.9,
+   "hard": false,
+   "subfolder": "02",
+   "document_type": "grundbuchauszug",
+   "scope": "owner"
+  },
+  "examples": {
+   "positive": [
+    "Grundbuchauszug vom 12.08.2026, Wohnungsgrundbuch Blatt 1234"
+   ],
+   "negative": [
+    "Kaufvertrag"
+   ]
+  }
+ },
+ {
+  "id": "R-05-KAUFV-001",
+  "name": "Kaufvertrag",
+  "version": 1,
+  "priority": 190,
+  "scope": {},
+  "when": {
+   "any_of": {
+    "text_regex": [
+     "(?i)kaufvertrag",
+     "(?i)verk(ae|ä)ufer.{0,120}k(ae|ä)ufer"
+    ]
+   }
+  },
+  "then": {
+   "category": "05",
+   "confidence": 0.9,
+   "hard": false,
+   "subfolder": "02",
+   "document_type": "kaufvertrag",
+   "scope": "owner"
+  },
+  "examples": {
+   "positive": [
+    "Notarieller Kaufvertrag, Verkäufer Altmann, Käufer Neumann"
+   ],
+   "negative": [
+    "Grundbuchauszug"
+   ]
+  }
+ },
+ {
+  "id": "R-05-VERAEUSS-001",
+  "name": "Veräußerungsanzeige",
+  "version": 1,
+  "priority": 185,
+  "scope": {},
+  "when": {
+   "any_of": {
+    "text_regex": [
+     "(?i)ver(ae|ä)u(ss|ß)erungsanzeige",
+     "(?i)ver(ae|ä)u(ss|ß)erungsmitteilung"
+    ]
+   }
+  },
+  "then": {
+   "category": "05",
+   "confidence": 0.9,
+   "hard": false,
+   "subfolder": "02",
+   "document_type": "veraeusserungsanzeige",
+   "scope": "owner"
+  },
+  "examples": {
+   "positive": [
+    "Veräußerungsanzeige des Notars zum Eigentumswechsel WE05"
+   ],
+   "negative": [
+    "Kaufvertrag"
+   ]
+  }
+ },
+ {
+  "id": "R-05-WECHSEL-001",
+  "name": "Mitteilung Eigentumswechsel",
+  "version": 1,
+  "priority": 180,
+  "scope": {},
+  "when": {
+   "any_of": {
+    "text_regex": [
+     "(?i)mitteilung (ue|ü)ber den eigentumswechsel",
+     "(?i)eigent(ue|ü)merwechsel",
+     "(?i)eigentumswechsel"
+    ]
+   },
+   "not_text_regex": [
+    "(?i)kaufvertrag",
+    "(?i)ver(ae|ä)u(ss|ß)erungsanzeige"
+   ]
+  },
+  "then": {
+   "category": "05",
+   "confidence": 0.9,
+   "hard": false,
+   "subfolder": "02",
+   "document_type": "mitteilung_eigentumswechsel",
+   "scope": "owner"
+  },
+  "examples": {
+   "positive": [
+    "Mitteilung über den Eigentumswechsel Einheit WE05 zum 01.07.2026"
+   ],
+   "negative": [
+    "Kaufvertrag vom 05.05.2026"
+   ]
+  }
+ },
+ {
+  "id": "R-05-NUTZEN-001",
+  "name": "Übergang Nutzen und Lasten",
+  "version": 1,
+  "priority": 170,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)(ue|ü)bergang von nutzen und lasten"
+   ],
+   "not_text_regex": [
+    "(?i)kaufvertrag",
+    "(?i)ver(ae|ä)u(ss|ß)erungsanzeige",
+    "(?i)eigentumswechsel"
+   ]
+  },
+  "then": {
+   "category": "05",
+   "confidence": 0.85,
+   "hard": false,
+   "subfolder": "02",
+   "document_type": "uebergang_nutzen_lasten",
+   "scope": "owner"
+  },
+  "examples": {
+   "positive": [
+    "Bestätigung über den Übergang von Nutzen und Lasten zum 01.07.2026"
+   ],
+   "negative": [
+    "Kaufvertrag mit Übergang von Nutzen und Lasten"
+   ]
+  }
+ },
+ {
+  "id": "R-05-SEPA-001",
+  "name": "Lastschriftmandat",
+  "version": 1,
+  "priority": 190,
+  "scope": {},
+  "when": {
+   "any_of": {
+    "text_regex": [
+     "(?i)(sepa[- ]?)?lastschriftmandat",
+     "(?i)einzugserm(ae|ä)chtigung",
+     "(?i)lastschriftverfahren.{0,60}erm(ae|ä)chtig"
+    ]
+   },
+   "not_text_regex": [
+    "(?i)widerruf",
+    "(?i)(ae|ä)nderung des mandats"
+   ]
+  },
+  "then": {
+   "category": "05",
+   "confidence": 0.9,
+   "hard": false,
+   "subfolder": "03",
+   "document_type": "sepa_mandat",
+   "scope": "owner"
+  },
+  "examples": {
+   "positive": [
+    "SEPA-Lastschriftmandat, Zahlungspflichtiger Mustermann"
+   ],
+   "negative": [
+    "Widerruf des SEPA-Lastschriftmandats"
+   ]
+  }
+ },
+ {
+  "id": "R-05-SEPA-002",
+  "name": "Widerruf Lastschriftmandat",
+  "version": 1,
+  "priority": 195,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)widerruf.{0,40}(lastschrift|mandat)",
+    "(?i)(lastschrift|mandat).{0,40}widerruf"
+   ]
+  },
+  "then": {
+   "category": "05",
+   "confidence": 0.9,
+   "hard": false,
+   "subfolder": "03",
+   "document_type": "sepa_widerruf",
+   "scope": "owner"
+  },
+  "examples": {
+   "positive": [
+    "Widerruf des SEPA-Lastschriftmandats"
+   ],
+   "negative": [
+    "SEPA-Lastschriftmandat"
+   ]
+  }
+ },
+ {
+  "id": "R-05-SEPA-003",
+  "name": "Änderung Lastschriftmandat",
+  "version": 1,
+  "priority": 195,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)(ae|ä)nderung des (sepa-)?(lastschrift)?mandats",
+    "(?i)mandats(ae|ä)nderung"
+   ]
+  },
+  "then": {
+   "category": "05",
+   "confidence": 0.9,
+   "hard": false,
+   "subfolder": "03",
+   "document_type": "sepa_aenderung",
+   "scope": "owner"
+  },
+  "examples": {
+   "positive": [
+    "Änderung des SEPA-Mandats: neue Bankverbindung"
+   ],
+   "negative": [
+    "SEPA-Lastschriftmandat"
+   ]
+  }
+ },
+ {
+  "id": "R-05-SOLL-001",
+  "name": "Sollstellung",
+  "version": 1,
+  "priority": 185,
+  "scope": {
+   "management_types": [
+    "weg",
+    "weg_with_se"
+   ]
+  },
+  "when": {
+   "text_regex": [
+    "(?i)sollstellung"
+   ]
+  },
+  "then": {
+   "category": "05",
+   "confidence": 0.9,
+   "hard": false,
+   "subfolder": "04",
+   "document_type": "sollstellung",
+   "scope": "owner"
+  },
+  "examples": {
+   "positive": [
+    "Sollstellung Hausgeld 2026 für WE03"
+   ],
+   "negative": [
+    "Einzelabrechnung 2025"
+   ]
+  }
+ },
+ {
+  "id": "R-05-HGANP-001",
+  "name": "Hausgeldanpassung",
+  "version": 1,
+  "priority": 185,
+  "scope": {
+   "management_types": [
+    "weg",
+    "weg_with_se"
+   ]
+  },
+  "when": {
+   "text_regex": [
+    "(?i)hausgeld(anpassung|erh(oe|ö)hung|(ae|ä)nderung)"
+   ]
+  },
+  "then": {
+   "category": "05",
+   "confidence": 0.9,
+   "hard": false,
+   "subfolder": "04",
+   "document_type": "hausgeldanpassung",
+   "scope": "owner"
+  },
+  "examples": {
+   "positive": [
+    "Hausgeldanpassung ab 01.01.2027"
+   ],
+   "negative": [
+    "Zahlungserinnerung Hausgeld"
+   ]
+  }
+ },
+ {
+  "id": "R-05-ZAHLVER-001",
+  "name": "Zahlungsvereinbarung",
+  "version": 1,
+  "priority": 190,
+  "scope": {
+   "management_types": [
+    "weg",
+    "weg_with_se"
+   ]
+  },
+  "when": {
+   "any_of": {
+    "text_regex": [
+     "(?i)zahlungsvereinbarung",
+     "(?i)ratenzahlung(svereinbarung)?",
+     "(?i)stundung"
+    ]
+   }
+  },
+  "then": {
+   "category": "05",
+   "confidence": 0.9,
+   "hard": false,
+   "subfolder": "04",
+   "document_type": "zahlungsvereinbarung",
+   "scope": "owner"
+  },
+  "examples": {
+   "positive": [
+    "Zahlungsvereinbarung über die Sonderumlage in sechs Raten"
+   ],
+   "negative": [
+    "Zahlungserinnerung"
+   ]
+  }
+ },
+ {
+  "id": "R-05-EIGKONTO-001",
+  "name": "Eigentümerkonto",
+  "version": 1,
+  "priority": 185,
+  "scope": {
+   "management_types": [
+    "weg",
+    "weg_with_se"
+   ]
+  },
+  "when": {
+   "any_of": {
+    "text_regex": [
+     "(?i)eigent(ue|ü)merkonto",
+     "(?i)kontoauszug.{0,40}eigent(ue|ü)mer"
+    ]
+   }
+  },
+  "then": {
+   "category": "05",
+   "confidence": 0.9,
+   "hard": false,
+   "subfolder": "04",
+   "document_type": "eigentuemerkonto",
+   "scope": "owner"
+  },
+  "examples": {
+   "positive": [
+    "Kontoauszug Eigentümerkonto WE05"
+   ],
+   "negative": [
+    "Kontoauszug Gemeinschaftskonto"
+   ]
+  }
+ },
+ {
+  "id": "R-05-RUECKST-001",
+  "name": "Rückstandsaufstellung",
+  "version": 1,
+  "priority": 185,
+  "scope": {
+   "management_types": [
+    "weg",
+    "weg_with_se"
+   ]
+  },
+  "when": {
+   "text_regex": [
+    "(?i)r(ue|ü)ckstandsaufstellung",
+    "(?i)aufstellung der r(ue|ü)ckst(ae|ä)nde"
+   ]
+  },
+  "then": {
+   "category": "05",
+   "confidence": 0.9,
+   "hard": false,
+   "subfolder": "04",
+   "document_type": "rueckstandsaufstellung",
+   "scope": "owner"
+  },
+  "examples": {
+   "positive": [
+    "Rückstandsaufstellung Hausgeld WE05"
+   ],
+   "negative": [
+    "Zahlungserinnerung"
+   ]
+  }
+ },
+ {
+  "id": "R-05-SONDERUML-001",
+  "name": "Sonderumlage Einzelanforderung",
+  "version": 1,
+  "priority": 170,
+  "scope": {
+   "management_types": [
+    "weg",
+    "weg_with_se"
+   ]
+  },
+  "when": {
+   "text_regex": [
+    "(?i)sonderumlage"
+   ],
+   "entity_required": [
+    "unit"
+   ],
+   "not_text_regex": [
+    "(?i)zahlungsvereinbarung",
+    "(?i)ratenzahlung",
+    "(?i)protokoll der"
+   ]
+  },
+  "then": {
+   "category": "05",
+   "confidence": 0.85,
+   "hard": false,
+   "subfolder": "04",
+   "document_type": "sonderumlage_einzel",
+   "scope": "owner"
+  },
+  "examples": {
+   "positive": [
+    "Anforderung Sonderumlage Dach für WE03: 1.200,00 EUR"
+   ],
+   "negative": [
+    "Zahlungsvereinbarung über die Sonderumlage"
+   ]
+  }
+ },
+ {
+  "id": "R-05-ABR-001",
+  "name": "Einzelabrechnung",
+  "version": 1,
+  "priority": 180,
+  "scope": {
+   "management_types": [
+    "weg",
+    "weg_with_se"
+   ]
+  },
+  "when": {
+   "any_of": {
+    "filename_regex": [
+     "(?i)einzelabrechnung",
+     "(?i)einzel.?abr"
+    ],
+    "text_regex": [
+     "(?im)^\\s*einzelabrechnung\\b",
+     "(?i)abrechnungsergebnis.{0,80}(nachzahlung|guthaben)"
+    ]
+   },
+   "entity_required": [
+    "unit",
+    "period_year"
+   ],
+   "not_text_regex": [
+    "(?im)^\\s*gesamt(jahres)?abrechnung",
+    "(?i)alle\\s+einheiten",
+    "(?i)einwendung",
+    "(?i)widerspruch"
+   ]
+  },
+  "then": {
+   "category": "05",
+   "confidence": 0.95,
+   "hard": false,
+   "subfolder": "05",
+   "document_type": "einzelabrechnung",
+   "scope": "owner",
+   "metadata": {
+    "period_year": "{period_year}"
+   }
+  },
+  "examples": {
+   "positive": [
+    "Einzelabrechnung 2025 für Einheit WE03, Eigentümer Mustermann, Abrechnungsergebnis: Nachzahlung 312,40 EUR"
+   ],
+   "negative": [
+    "Gesamtabrechnung 2025 der WEG, alle Einheiten"
+   ]
+  }
+ },
+ {
+  "id": "R-05-KORREKTUR-001",
+  "name": "Korrekturabrechnung",
+  "version": 1,
+  "priority": 185,
+  "scope": {
+   "management_types": [
+    "weg",
+    "weg_with_se"
+   ]
+  },
+  "when": {
+   "text_regex": [
+    "(?i)korrekturabrechnung",
+    "(?i)korrigierte einzelabrechnung"
+   ]
+  },
+  "then": {
+   "category": "05",
+   "confidence": 0.9,
+   "hard": false,
+   "subfolder": "05",
+   "document_type": "korrekturabrechnung",
+   "scope": "owner",
+   "metadata": {
+    "period_year": "{period_year}"
+   }
+  },
+  "examples": {
+   "positive": [
+    "Korrekturabrechnung 2024 für WE03"
+   ],
+   "negative": [
+    "Einzelabrechnung 2025"
+   ]
+  }
+ },
+ {
+  "id": "R-05-EWP-001",
+  "name": "Einzelwirtschaftsplan",
+  "version": 1,
+  "priority": 180,
+  "scope": {
+   "management_types": [
+    "weg",
+    "weg_with_se"
+   ]
+  },
+  "when": {
+   "any_of": {
+    "text_regex": [
+     "(?i)einzelwirtschaftsplan"
+    ],
+    "filename_regex": [
+     "(?i)einzelwirtschaftsplan"
+    ]
+   },
+   "entity_required": [
+    "unit",
+    "period_year"
+   ],
+   "not_text_regex": [
+    "(?im)^\\s*gesamtwirtschaftsplan",
+    "(?i)protokoll der"
+   ]
+  },
+  "then": {
+   "category": "05",
+   "confidence": 0.95,
+   "hard": false,
+   "subfolder": "06",
+   "document_type": "einzelwirtschaftsplan",
+   "scope": "owner",
+   "metadata": {
+    "period_year": "{period_year}"
+   }
+  },
+  "examples": {
+   "positive": [
+    "Einzelwirtschaftsplan 2026 für Einheit WE07, Wirtschaftsjahr 2026"
+   ],
+   "negative": [
+    "Gesamtwirtschaftsplan 2026"
+   ]
+  }
+ },
+ {
+  "id": "R-05-HGVORSCH-001",
+  "name": "Hausgeldvorschuss",
+  "version": 1,
+  "priority": 170,
+  "scope": {
+   "management_types": [
+    "weg",
+    "weg_with_se"
+   ]
+  },
+  "when": {
+   "text_regex": [
+    "(?i)hausgeldvorschuss",
+    "(?i)vorschuss.{0,30}hausgeld"
+   ],
+   "entity_required": [
+    "unit"
+   ]
+  },
+  "then": {
+   "category": "05",
+   "confidence": 0.85,
+   "hard": false,
+   "subfolder": "06",
+   "document_type": "hausgeldvorschuss",
+   "scope": "owner",
+   "metadata": {
+    "period_year": "{period_year}"
+   }
+  },
+  "examples": {
+   "positive": [
+    "Hausgeldvorschuss 2026 für WE03"
+   ],
+   "negative": [
+    "Zahlungserinnerung Hausgeld"
+   ]
+  }
+ },
+ {
+  "id": "R-05-EINW-001",
+  "name": "Einwendung gegen Abrechnung",
+  "version": 1,
+  "priority": 190,
+  "scope": {},
+  "when": {
+   "any_of": {
+    "text_regex": [
+     "(?i)einwendung(en)? gegen (die |meine )?(einzel|jahres)?abrechnung",
+     "(?i)widerspruch gegen (die |meine )?(einzel|jahres)?abrechnung",
+     "(?i)einw(ae|ä)nde gegen (die )?abrechnung"
+    ]
+   }
+  },
+  "then": {
+   "category": "05",
+   "confidence": 0.9,
+   "hard": false,
+   "subfolder": "08",
+   "document_type": "einwendung_abrechnung",
+   "scope": "owner"
+  },
+  "examples": {
+   "positive": [
+    "Einwendungen gegen die Einzelabrechnung 2024"
+   ],
+   "negative": [
+    "Einzelabrechnung 2024"
+   ]
+  }
+ },
+ {
+  "id": "R-05-BESCHW-001",
+  "name": "Beschwerde",
+  "version": 1,
+  "priority": 160,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)beschwerde"
+   ],
+   "entity_required": [
+    "owner_candidate"
+   ]
+  },
+  "then": {
+   "category": "05",
+   "confidence": 0.85,
+   "hard": false,
+   "subfolder": "08",
+   "document_type": "beschwerde",
+   "scope": "owner"
+  },
+  "examples": {
+   "positive": [
+    "Beschwerde des Eigentümers Mustermann über Lärm"
+   ],
+   "negative": [
+    "Protokoll der Eigentümerversammlung"
+   ]
+  }
+ },
+ {
+  "id": "R-05-BAU-001",
+  "name": "Kommunikation Baumaßnahme",
+  "version": 1,
+  "priority": 150,
+  "scope": {},
+  "when": {
+   "any_of": {
+    "text_regex": [
+     "(?i)bauma(ss|ß)nahme",
+     "(?i)bauliche[nr]? ver(ae|ä)nderung",
+     "(?i)umbau"
+    ]
+   },
+   "entity_required": [
+    "owner"
+   ],
+   "not_text_regex": [
+    "(?i)protokoll der",
+    "(?i)beschluss-?sammlung"
+   ]
+  },
+  "then": {
+   "category": "05",
+   "confidence": 0.8,
+   "hard": false,
+   "subfolder": "08",
+   "document_type": "kommunikation_baumassnahme",
+   "scope": "owner"
+  },
+  "examples": {
+   "positive": [
+    "Schreiben des Eigentümers Mustermann zur baulichen Veränderung"
+   ],
+   "negative": [
+    "Protokoll der Eigentümerversammlung, TOP 7 bauliche Veränderung"
+   ]
+  }
+ },
+ {
+  "id": "R-05-ANFRAGE-001",
+  "name": "Anfrage",
+  "version": 1,
+  "priority": 140,
+  "scope": {},
+  "when": {
+   "any_of": {
+    "text_regex": [
+     "(?i)\\banfrage\\b",
+     "(?i)bitte um auskunft",
+     "(?i)mit freundlichen gr(ue|ü)(ss|ß)en"
+    ]
+   },
+   "entity_required": [
+    "owner"
+   ],
+   "not_entity": [
+    "own_company_as_agent"
+   ]
+  },
+  "then": {
+   "category": "05",
+   "confidence": 0.8,
+   "hard": false,
+   "subfolder": "08",
+   "document_type": "anfrage",
+   "scope": "owner"
+  },
+  "examples": {
+   "positive": [
+    "Anfrage des Eigentümers Beispiel zur Nutzung des Kellers"
+   ],
+   "negative": [
+    "Gesamtabrechnung"
+   ]
+  }
+ },
+ {
+  "id": "R-05-MAHN-001",
+  "name": "Zahlungserinnerung",
+  "version": 1,
+  "priority": 190,
+  "scope": {
+   "management_types": [
+    "weg",
+    "weg_with_se"
+   ]
+  },
+  "when": {
+   "text_regex": [
+    "(?i)zahlungserinnerung"
+   ]
+  },
+  "then": {
+   "category": "05",
+   "confidence": 0.9,
+   "hard": false,
+   "subfolder": "09",
+   "document_type": "zahlungserinnerung",
+   "scope": "owner"
+  },
+  "examples": {
+   "positive": [
+    "Zahlungserinnerung Hausgeld 03/2025"
+   ],
+   "negative": [
+    "Zahlungsvereinbarung"
+   ]
+  }
+ },
+ {
+  "id": "R-05-MAHN-002",
+  "name": "Mahnung",
+  "version": 1,
+  "priority": 185,
+  "scope": {
+   "management_types": [
+    "weg",
+    "weg_with_se"
+   ]
+  },
+  "when": {
+   "any_of": {
+    "text_regex": [
+     "(?i)\\b(erste|zweite|letzte)?\\s?mahnung\\b",
+     "(?i)mahngeb(ue|ü)hr"
+    ]
+   },
+   "not_text_regex": [
+    "(?i)mahnbescheid",
+    "(?i)mahnverfahren",
+    "(?i)zahlungserinnerung"
+   ]
+  },
+  "then": {
+   "category": "05",
+   "confidence": 0.9,
+   "hard": false,
+   "subfolder": "09",
+   "document_type": "mahnung",
+   "scope": "owner"
+  },
+  "examples": {
+   "positive": [
+    "Letzte Mahnung wegen Hausgeldrückstand"
+   ],
+   "negative": [
+    "Mahnbescheid des Amtsgerichts"
+   ]
+  }
+ },
+ {
+  "id": "R-05-FORD-001",
+  "name": "Forderungsaufstellung",
+  "version": 1,
+  "priority": 185,
+  "scope": {
+   "management_types": [
+    "weg",
+    "weg_with_se"
+   ]
+  },
+  "when": {
+   "text_regex": [
+    "(?i)forderungsaufstellung",
+    "(?i)forderungskonto"
+   ]
+  },
+  "then": {
+   "category": "05",
+   "confidence": 0.9,
+   "hard": false,
+   "subfolder": "09",
+   "document_type": "forderungsaufstellung",
+   "scope": "owner"
+  },
+  "examples": {
+   "positive": [
+    "Forderungsaufstellung zum 31.12.2025"
+   ],
+   "negative": [
+    "Zahlungserinnerung"
+   ]
+  }
+ },
+ {
+  "id": "R-05-ANWALT-001",
+  "name": "Anwaltliches Schreiben",
+  "version": 1,
+  "priority": 188,
+  "scope": {
+   "management_types": [
+    "weg",
+    "weg_with_se"
+   ]
+  },
+  "when": {
+   "any_of": {
+    "text_regex": [
+     "(?i)(rechtsanwalt|rechtsanw(ae|ä)lte|rechtsanw(ae|ä)ltin|kanzlei|anwaltskanzlei)"
+    ]
+   },
+   "text_regex": [
+    "(?i)(forderung|r(ue|ü)ckstand|r(ue|ü)ckst(ae|ä)nde|hausgeld|zahlung)"
+   ],
+   "entity_required": [
+    "owner_candidate"
+   ],
+   "not_text_regex": [
+    "(?i)protokoll der",
+    "(?i)kaufvertrag",
+    "(?i)klageschrift",
+    "(?i)mahnbescheid"
+   ]
+  },
+  "then": {
+   "category": "05",
+   "confidence": 0.9,
+   "hard": false,
+   "subfolder": "09",
+   "document_type": "anwaltsschreiben",
+   "scope": "owner"
+  },
+  "examples": {
+   "positive": [
+    "Schreiben der Kanzlei Musterrecht zu Hausgeldrückständen 2025, Schuldner Altmann"
+   ],
+   "negative": [
+    "Kaufvertrag, beurkundet von Notar"
+   ]
+  }
+ },
+ {
+  "id": "R-05-MAHNVERF-001",
+  "name": "Mahnverfahren",
+  "version": 1,
+  "priority": 190,
+  "scope": {
+   "management_types": [
+    "weg",
+    "weg_with_se"
+   ]
+  },
+  "when": {
+   "any_of": {
+    "text_regex": [
+     "(?i)mahnbescheid",
+     "(?i)vollstreckungsbescheid",
+     "(?i)mahnverfahren"
+    ]
+   }
+  },
+  "then": {
+   "category": "05",
+   "confidence": 0.9,
+   "hard": false,
+   "subfolder": "09",
+   "document_type": "mahnverfahren",
+   "scope": "owner"
+  },
+  "examples": {
+   "positive": [
+    "Mahnbescheid des Amtsgerichts"
+   ],
+   "negative": [
+    "Zahlungserinnerung"
+   ]
+  }
+ },
+ {
+  "id": "R-05-KLAGE-001",
+  "name": "Klageunterlagen",
+  "version": 1,
+  "priority": 190,
+  "scope": {
+   "management_types": [
+    "weg",
+    "weg_with_se"
+   ]
+  },
+  "when": {
+   "any_of": {
+    "text_regex": [
+     "(?i)klageschrift",
+     "(?i)klageerhebung",
+     "(?i)\\bklage\\b.{0,40}(hausgeld|r(ue|ü)ckstand)"
+    ]
+   },
+   "entity_required": [
+    "owner_candidate"
+   ]
+  },
+  "then": {
+   "category": "05",
+   "confidence": 0.85,
+   "hard": false,
+   "subfolder": "09",
+   "document_type": "klageunterlagen",
+   "scope": "owner"
+  },
+  "examples": {
+   "positive": [
+    "Klageschrift wegen Hausgeldrückständen gegen Altmann"
+   ],
+   "negative": [
+    "Zahlungserinnerung"
+   ]
+  }
+ },
+ {
+  "id": "R-05-VOLLM-002",
+  "name": "Versammlungsvollmacht",
+  "version": 1,
+  "priority": 180,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)vollmacht",
+    "(?i)versammlung"
+   ],
+   "entity_required": [
+    "owner"
+   ],
+   "not_entity": [
+    "own_company_as_agent"
+   ],
+   "not_text_regex": [
+    "(?i)protokoll der"
+   ]
+  },
+  "then": {
+   "category": "05",
+   "confidence": 0.9,
+   "hard": false,
+   "subfolder": "10",
+   "document_type": "versammlungsvollmacht",
+   "scope": "owner"
+  },
+  "examples": {
+   "positive": [
+    "Vollmacht: Mustermann bevollmächtigt Beispiel zur Vertretung in der Eigentümerversammlung"
+   ],
+   "negative": [
+    "Vollmacht der Gemeinschaft an die Hausverwaltung Müller GmbH"
+   ]
+  }
+ },
+ {
+  "id": "R-05-VOLLM-003",
+  "name": "Vertretungsvollmacht",
+  "version": 1,
+  "priority": 170,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)vollmacht"
+   ],
+   "entity_required": [
+    "owner"
+   ],
+   "not_entity": [
+    "own_company_as_agent"
+   ],
+   "not_text_regex": [
+    "(?i)versammlung",
+    "(?i)zustell"
+   ]
+  },
+  "then": {
+   "category": "05",
+   "confidence": 0.85,
+   "hard": false,
+   "subfolder": "10",
+   "document_type": "vertretungsvollmacht",
+   "scope": "owner"
+  },
+  "examples": {
+   "positive": [
+    "Vollmacht des Eigentümers Mustermann zur Vertretung gegenüber der Verwaltung"
+   ],
+   "negative": [
+    "Vollmacht zur Vertretung in der Eigentümerversammlung"
+   ]
+  }
+ },
+ {
+  "id": "R-05-VOLLM-004",
+  "name": "Zustellvollmacht",
+  "version": 1,
+  "priority": 175,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)zustell(ungs)?(vollmacht|bevollm(ae|ä)chtig)"
+   ],
+   "entity_required": [
+    "owner"
+   ]
+  },
+  "then": {
+   "category": "05",
+   "confidence": 0.85,
+   "hard": false,
+   "subfolder": "10",
+   "document_type": "zustellvollmacht",
+   "scope": "owner"
+  },
+  "examples": {
+   "positive": [
+    "Zustellvollmacht für den Bevollmächtigten des Eigentümers Beispiel"
+   ],
+   "negative": [
+    "Vollmacht zur Eigentümerversammlung"
+   ]
+  }
+ },
+ {
+  "id": "R-06-FREMD-001",
+  "name": "Fremdobjekt erkannt",
+  "version": 1,
+  "priority": 210,
+  "scope": {},
+  "when": {
+   "entity_required": [
+    "foreign_object_marker"
+   ],
+   "not_entity": [
+    "own_object_marker"
+   ]
+  },
+  "then": {
+   "category": "06",
+   "confidence": 0.9,
+   "hard": false,
+   "subfolder": "04",
+   "scope": "unclear",
+   "subtype": "foreign_object",
+   "proposal": "In Objekt {foreign_object_number} übernehmen",
+   "metadata": {
+    "foreign_object_number": "{foreign_object_number}"
+   }
+  },
+  "examples": {
+   "positive": [
+    "Rechnung Dachdecker für Beispielweg 2, Musterstadt (Objekt 631)"
+   ],
+   "negative": [
+    "Rechnung Dachdecker für Joachimstraße 49"
+   ]
+  }
+ },
+ {
+  "id": "R-06-RENTAL-001",
+  "name": "WEG-Begriffe in Mietverwaltung",
+  "version": 1,
+  "priority": 185,
+  "scope": {
+   "management_types": [
+    "rental"
+   ]
+  },
+  "when": {
+   "any_of": {
+    "text_regex": [
+     "(?i)hausgeld",
+     "(?i)wirtschaftsplan",
+     "(?i)\\bbeschluss\\b",
+     "(?i)eigent(ue|ü)merversammlung"
+    ]
+   },
+   "not_text_regex": [
+    "(?i)betriebskostenabrechnung",
+    "(?i)mietvertrag"
+   ]
+  },
+  "then": {
+   "category": "06",
+   "confidence": 0.9,
+   "hard": false,
+   "subfolder": "02",
+   "scope": "unclear",
+   "subtype": "misplaced_weg_document",
+   "proposal": "Verdacht auf Fehlablage aus einer WEG (E 2.4)"
+  },
+  "examples": {
+   "positive": [
+    "Sollstellung Hausgeld 2026 für Wohnung 4"
+   ],
+   "negative": [
+    "Betriebskostenabrechnung 2025 für Wohnung 4"
+   ]
+  }
+ }
+]

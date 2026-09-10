@@ -165,6 +165,17 @@ def hash_document(job: ProcessingJob) -> dict:
                 misc_code="03",
                 context={"original_document_id": original.pk, "sha256": digest, "name": doc.current_name},
             )
+        if original is not None:
+            # sichere 06-Entscheidung: physische Ablage in 03_Dubletten auch fuer Bestandsdateien (B-10)
+            if not (job.run and job.run.dry_run):
+                enqueue(
+                    JobType.FILE_TO_DRIVE,
+                    job.object,
+                    key=idempotency_key(JobType.FILE_TO_DRIVE, job.object_id, f"dup-{doc.pk}"),
+                    document=doc,
+                    run=job.run,
+                    payload={"category": "06", "subfolder": "03"},
+                )
             return {"duplicate_of": original.pk}
         doc.sha256 = digest
         doc.size_bytes = size
@@ -510,11 +521,265 @@ def extract_entities(job: ProcessingJob) -> dict:
             ],
             batch_size=500,
         )
+    if doc.status in ("ocr_done",):
+        enqueue(
+            JobType.CLASSIFY,
+            job.object,
+            key=idempotency_key(JobType.CLASSIFY, job.object_id, doc.sha256),
+            document=doc,
+            run=job.run,
+        )
     return {
         "entities": len(entities),
         "units": sum(1 for e in entities if e.entity_type == "unit_label"),
         "iban": sum(1 for e in entities if e.entity_type == "iban"),
     }
+
+
+# ---------------------------------------------------------------- 7 classify, 9 decide, 10 file_to_drive
+@job_task(JobType.CLASSIFY)
+def classify(job: ProcessingJob) -> dict:
+    """Stufe 1 und 2 mit Konfidenzmodell (docs/architektur.md 6.1 Nr. 7); Stufe 3 folgt in M8, sonst decide."""
+    from apps.classification import rules as rules_mod
+    from apps.classification import stage2
+    from apps.classification.confidence import combine
+    from apps.classification.context import build_context
+
+    doc = job.document
+    if doc is None or doc.status not in ("ocr_done", "classified", "review") or not doc.sha256:
+        raise SkipJob("not_ready")
+    ctx = build_context(doc)
+    s1 = rules_mod.evaluate(ctx)
+    s2 = stage2.predict(ctx)
+    combined = combine(s1, s2, ner_support=bool(ctx.owner_ids or ctx.unit_ids))
+    stage3 = stage2.stage3_enabled() and combined.stage3_required and not ctx.id_document_found
+    payload = {
+        "stage1": {
+            "category": s1.category,
+            "subfolder": s1.subfolder,
+            "document_type": s1.document_type,
+            "scope": s1.scope,
+            "confidence": s1.confidence,
+            "hard": s1.hard,
+            "conflict": s1.conflict,
+            "rule_codes": s1.rule_codes,
+            "metadata": s1.metadata,
+            "proposal": s1.proposal,
+            "subtype": s1.subtype,
+            "hits": s1.hits,
+        },
+        "stage2": {
+            "top": s2.top,
+            "p": s2.p,
+            "gap": s2.gap,
+            "labels": s2.labels,
+            "model_version": s2.model_version,
+            "cold_start": s2.cold_start,
+            "subfolder": s2.subfolder,
+            "document_type": s2.document_type,
+            "sub_p": s2.sub_p,
+        },
+        "combined": {
+            "category": combined.category,
+            "confidence": combined.confidence,
+            "reason": combined.reason,
+        },
+    }
+    next_type = JobType.CLASSIFY_AI if stage3 else JobType.DECIDE
+    enqueue(
+        next_type,
+        job.object,
+        key=idempotency_key(next_type, job.object_id, doc.sha256),
+        document=doc,
+        run=job.run,
+        payload=payload,
+    )
+    return {"stage1": s1.category, "stage2": s2.top, "confidence": combined.confidence, "next": next_type}
+
+
+def _stage_results(payload: dict):
+    from apps.classification.confidence import Stage1Result, Stage2Result
+
+    p1, p2 = payload.get("stage1") or {}, payload.get("stage2") or {}
+    s1 = Stage1Result(**{k: v for k, v in p1.items() if k in Stage1Result.__dataclass_fields__})
+    s2 = Stage2Result(
+        **{
+            k: (tuple(map(tuple, v)) if k == "labels" else v)
+            for k, v in p2.items()
+            if k in Stage2Result.__dataclass_fields__
+        }
+    )
+    s2.labels = [tuple(x) for x in s2.labels]
+    return s1, s2
+
+
+@job_task(JobType.DECIDE)
+def decide_task(job: ProcessingJob) -> dict:
+    """Entscheidungsalgorithmus und Fallbildung (docs/architektur.md 6.4, 6.5, 6.9); Dry-Run schreibt nur den Plan."""
+    from apps.classification import decide as decide_mod
+    from apps.classification.context import build_context
+
+    doc = job.document
+    if doc is None or doc.status not in ("ocr_done", "classified", "review") or not doc.sha256:
+        raise SkipJob("not_ready")
+    ctx = build_context(doc)
+    s1, s2 = _stage_results(job.payload or {})
+    dry_run = bool(job.run and job.run.dry_run)
+    decision = decide_mod.decide(ctx, s1, s2, doc)
+    final = decide_mod.persist(doc, ctx, s1, s2, decision, run=job.run, dry_run=dry_run)
+    result = {
+        "category": decision.category,
+        "subfolder": decision.subfolder,
+        "document_type": decision.document_type,
+        "confidence": decision.confidence,
+        "review": decision.review_required,
+        "plan": decision.plan_text(),
+        "dry_run": dry_run,
+        "classification_id": final.pk,
+    }
+    if dry_run or decision.physical_category is None or not decision.move_allowed:
+        return result
+    enqueue(
+        JobType.FILE_TO_DRIVE,
+        job.object,
+        key=idempotency_key(JobType.FILE_TO_DRIVE, job.object_id, doc.sha256),
+        document=doc,
+        run=job.run,
+        payload={
+            "category": decision.physical_category,
+            "subfolder": decision.physical_subfolder,
+            "owner_file_id": next((link.owner_file_id for link in decision.links if link.primary), None)
+            or decision.physical_owner_file_id,
+            "link_subfolder": next((link.subfolder for link in decision.links if link.primary), None),
+        },
+    )
+    return result
+
+
+@job_task(JobType.FILE_TO_DRIVE)
+def file_to_drive(job: ProcessingJob) -> dict:
+    """Letzter Schritt (docs/architektur.md 6.1 Nr. 10): Bestandsdatei per Elternwechsel verschieben, Upload in den
+    Zielordner mit Idempotenzpruefung, Elternordner zurücklesen, status filed. Sperre je Objekt."""
+    from django.core.cache import cache
+
+    from apps.audit.services import record
+    from apps.drive import oauth
+    from apps.drive.folders import FolderError, ensure_category_folder, ensure_owner_folder
+    from apps.drive.models import DriveNode as DriveNodeRow
+    from apps.drive.models import NodeStatus
+    from apps.parties.models import OwnerFile
+
+    doc = job.document
+    payload = job.payload or {}
+    if doc is None or doc.status not in ("classified", "review", "duplicate"):
+        raise SkipJob("not_ready")
+    if doc.drive_file_id is None and doc.source == "drive_existing":
+        raise SkipJob("no_drive_file")
+    drive = oauth.get_adapter()
+    if drive is None:
+        raise RetryableError("Keine Google-Verbindung für die Ablage")
+    lock_key = f"drive:write:{job.object_id}"
+    if not cache.add(lock_key, job.pk, timeout=600):
+        raise RetryableError("Drive-Schreibsperre des Objekts belegt")
+    try:
+        try:
+            if payload.get("category") == "05":
+                akte = OwnerFile.objects.get(pk=payload["owner_file_id"])
+                rows = ensure_owner_folder(akte, drive=drive)
+                sub_code = payload.get("subfolder") or payload.get("link_subfolder")
+                target = next((r for r in rows if r.subfolder_id and r.subfolder.code == sub_code), rows[0])
+            else:
+                target = ensure_category_folder(
+                    job.object, payload["category"], payload.get("subfolder"), drive=drive
+                )
+        except FolderError as exc:
+            raise RetryableError(str(exc)) from exc
+        if doc.source == "drive_existing" or (doc.drive_file_id and doc.source == "moved_in"):
+            node = drive.get(doc.drive_file_id)
+            if node is None:
+                raise SkipJob("drive_file_missing")
+            current_parent = node.parent_id
+            if current_parent != target.drive_file_id:
+                drive.move(doc.drive_file_id, current_parent, target.drive_file_id)
+                record(
+                    "drive.move",
+                    entity_type="document",
+                    entity_id=doc.pk,
+                    object_id=job.object_id,
+                    after={"from": current_parent, "to": target.drive_file_id, "name": doc.current_name},
+                )
+            action = "moved" if current_parent != target.drive_file_id else "already_there"
+        else:
+            # Dubletten tragen keinen eigenen Hash (Pruefabfrage sha256 eindeutig); Quelle ist die Datei des Originals
+            sha_for_file = doc.sha256 or (doc.duplicate_of.sha256 if doc.duplicate_of_id else None)
+            existing = next(
+                (
+                    c
+                    for c in drive.list_children(target.drive_file_id)
+                    if not c.is_folder
+                    and c.name == doc.current_name
+                    and (c.app_properties or {}).get("sha256") == sha_for_file
+                ),
+                None,
+            )
+            if existing is not None:
+                node = existing
+                action = "reused"
+            else:
+                original = (storage.original_path(sha_for_file) if sha_for_file else None) or (
+                    Path(doc.source_path) if doc.source_path and Path(doc.source_path).exists() else None
+                )
+                if original is None:
+                    raise RetryableError("Quelldatei für den Upload fehlt")
+                node = drive.upload(
+                    target.drive_file_id,
+                    original,
+                    doc.current_name,
+                    doc.mime_type,
+                    app_properties={
+                        "sha256": doc.sha256,
+                        "document_id": str(doc.pk),
+                        "object_id": str(job.object_id),
+                    },
+                )
+                record(
+                    "drive.upload",
+                    entity_type="document",
+                    entity_id=doc.pk,
+                    object_id=job.object_id,
+                    after={"drive_file_id": node.id, "to": target.drive_file_id, "name": doc.current_name},
+                )
+                action = "uploaded"
+            doc.drive_file_id = node.id
+            if doc.source_path and doc.source == "upload":
+                Path(doc.source_path).unlink(missing_ok=True)
+        # Elternordner zuruecklesen
+        check = drive.get(doc.drive_file_id)
+        if check is None or check.parent_id != target.drive_file_id:
+            raise RetryableError("Elternordner nach der Ablage stimmt nicht mit dem Ziel überein")
+        doc.drive_node = target
+        doc.target_drive_node = target
+        doc.drive_moved_at = timezone.now()
+        doc.filed_at = timezone.now()
+        if doc.status == "classified":  # mit offenem Fall bleibt review, Dubletten behalten ihren Status
+            doc.status = "filed"
+        doc.save(
+            update_fields=[
+                "drive_file_id",
+                "drive_node",
+                "target_drive_node",
+                "drive_moved_at",
+                "filed_at",
+                "status",
+                "updated_at",
+            ]
+        )
+        DriveNodeRow.objects.filter(pk=target.pk).update(
+            last_verified_at=timezone.now(), status=NodeStatus.ACTIVE
+        )
+    finally:
+        cache.delete(lock_key)
+    return {"action": action, "target": target.drive_file_id, "target_name": target.drive_name}
 
 
 # ---------------------------------------------------------------- Sweeper

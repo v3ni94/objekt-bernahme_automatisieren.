@@ -26,8 +26,27 @@ def data_dir(tmp_path, monkeypatch):
 
 
 @pytest.fixture
-def objekt(seeded, data_dir):
-    return ManagedObject.objects.create(
+def drive(seeded, monkeypatch):
+    """Fake-Drive fuer die Ablage (file_to_drive); ersetzt die Google-Verbindung."""
+    from apps.drive import oauth
+    from apps.drive.adapter import InMemoryDriveAdapter
+
+    adapter = InMemoryDriveAdapter()
+    monkeypatch.setattr(oauth, "get_adapter", lambda: adapter)
+    return adapter
+
+
+def reconcile(obj, drive):
+    from apps.drive.reconcile import DriveConfig, reconcile_object
+
+    reconcile_object(
+        obj, drive=drive, dry_run=False, cfg=DriveConfig.from_settings(root_folder_id=drive.root_id)
+    )
+
+
+@pytest.fixture
+def objekt(seeded, data_dir, drive):
+    obj = ManagedObject.objects.create(
         object_number="623",
         name="Musterstadt, Musterstraße 49",
         street="Musterstraße",
@@ -36,6 +55,8 @@ def objekt(seeded, data_dir):
         management_type="weg",
         is_test=True,
     )
+    reconcile(obj, drive)
+    return obj
 
 
 @pytest.fixture
@@ -67,6 +88,9 @@ def stammdaten(objekt):
         management_type="weg",
         is_test=True,
     )
+    from apps.drive import oauth
+
+    reconcile(other, oauth.get_adapter())
     return {"we1": we1, "we14": we14, "owner": owner, "other": other}
 
 

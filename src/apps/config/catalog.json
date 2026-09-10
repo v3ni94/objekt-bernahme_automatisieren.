@@ -1414,6 +1414,81 @@
         "minimum": 0.5,
         "maximum": 1
       }
+    },
+    {
+      "key": "classification.own_company_names",
+      "category": "classification",
+      "value_type": "list",
+      "description": "Eigene Firmen (Verwalterin) für die Regel Verwaltervollmacht und Verwaltervertrag",
+      "source": "E 2.1, CR 5 Zeile 10",
+      "schema": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    {
+      "key": "classification.contract_partners",
+      "category": "classification",
+      "value_type": "list",
+      "description": "Vertragspartner (Versicherer, Dienstleister, Versorger, Vorverwaltung) als Marker für Stammakte und Belege",
+      "source": "E 2.1",
+      "schema": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    {
+      "key": "classification.first_pages",
+      "category": "classification",
+      "value_type": "integer",
+      "description": "Anzahl erster Seiten (plus letzte Seite) als Eingabe für Regeln und Klassifikator",
+      "source": "ANNAHME A-16",
+      "schema": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 20
+      }
+    },
+    {
+      "key": "classification.text_max_chars",
+      "category": "classification",
+      "value_type": "integer",
+      "description": "Kürzung des Eingabetexts für den lokalen Klassifikator in Zeichen",
+      "source": "E 3.3",
+      "schema": {
+        "type": "integer",
+        "minimum": 500,
+        "maximum": 50000
+      }
+    },
+    {
+      "key": "classification.ner_support_bonus",
+      "category": "classification",
+      "value_type": "decimal",
+      "description": "Bonus auf die Regelkonfidenz einer 05-Regel, wenn Eigentümer oder Einheit erkannt sind (Stufe 2 in der Kaltstartphase)",
+      "source": "E 7.1 NER-Stütze, Ergänzung M6",
+      "schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 0.2
+      }
+    },
+    {
+      "key": "classification.segment_types",
+      "category": "classification",
+      "value_type": "list",
+      "description": "Dokumentunterarten, die auf eingebettete Einzelteile untersucht werden (E 6.3)",
+      "source": "E 6.3",
+      "schema": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
     }
   ]
 }

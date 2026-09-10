@@ -31,9 +31,9 @@ def test_echte_ocr_scan_pdf(objekt, stammdaten, pdf_factory, run_all, admin_user
     doc, _run = ingest.ingest_upload(objekt, filename="scan.pdf", data=pdf.read_bytes())
     run_all(objekt)
     doc.refresh_from_db()
-    assert doc.status == "ocr_done", ProcessingJob.objects.filter(document=doc).values_list(
-        "job_type", "status", "last_error"
-    )
+    assert doc.status in ("review", "classified", "filed"), ProcessingJob.objects.filter(
+        document=doc
+    ).values_list("job_type", "status", "last_error")
     pages = list(DocumentPage.objects.filter(document=doc).order_by("page_no"))
     assert len(pages) == 3
     for p, marker in zip(pages, markers, strict=True):

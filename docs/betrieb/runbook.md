@@ -18,6 +18,8 @@ Störungsfälle mit Erkennung, Sofortmaßnahme und Nacharbeit. Vollständige Fas
 | Lauf wartet dauerhaft (`pending`) | Dokumentliste zeigt Warteposition, kein Lauf `running` | Sweeper ausführen (startet wartende Läufe); `processing.max_parallel_objects` prüfen | Läuft ein Lauf seit Stunden ohne offene Jobs, Lauf über Sweeper abschließen lassen (maybe_finish_run) |
 | OCR schlägt fehl (`ocrmypdf endete mit`) | Job `ocr_chunk` `failed`, Dokument `error` | Job-Fehlertext lesen; Werkzeuge im Worker prüfen (`docker compose exec worker tesseract --list-langs`, `gs --version`) | Datei prüfen (verschlüsselt, beschädigt); nach Behebung erneut hochladen |
 | Platte knapp beim Ingest (`DiskFull`) | Upload oder Job `hash` meldet Reserve unterschritten | `work/` und `previews/` räumen (Sweeper entfernt verwaiste `work/`-Verzeichnisse nach `processing.work_orphan_hours`) | Reserve `DISK_RESERVE_GB` und Tarif prüfen |
+| Klassifikator liefert schlechtere Ergebnisse nach Nachtraining | Statusseite zeigt neue Modellversion, Review-Korrekturen häufen sich | `manage.py classifier list`, `manage.py classifier rollback <vorherige Version>` | Trainingsmenge prüfen (`training_samples`), Metriken unter `models/<version>/metrics.json` |
+| Viele Dokumente in 06/01_Unklar | KPI Anteil 06 je Lauf hoch, Fälle `unclear` mit Untertyp `below_threshold` | Kaltstartphase prüfen (Statusseite); Regeln in `db/seeds/rules` ergänzen, Seeds laden | Nach Freigabe F17 Stufe 3 aktivieren (M8) |
 | Fallback aktiv, Zertifikat, Kostenlimit | folgen mit M8 bis M13 | | |
 
 Kontakt und Zeitfenster für Deployments: Frage F27 (docs/umsetzungsplan.md).

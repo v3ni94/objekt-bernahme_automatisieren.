@@ -50,9 +50,18 @@ class Command(BaseCommand):
         with transaction.atomic():
             self.seed_roles(seed_dir)
             self.seed_catalog(seed_dir)
+            self.seed_rules()
         created, updated = store.seed_missing(force=options["force"])
         self.stdout.write(
             f"app_settings: {created} angelegt, {updated} aktualisiert, {len(store.catalog())} im Katalog"
+        )
+
+    def seed_rules(self) -> None:
+        from apps.classification.rules import load_seed_rules, sync_rules_to_db
+
+        created, updated, unchanged = sync_rules_to_db(load_seed_rules())
+        self.stdout.write(
+            f"classification_rules: {created} angelegt, {updated} aktualisiert, {unchanged} unverändert"
         )
 
     def seed_roles(self, seed_dir: Path) -> None:

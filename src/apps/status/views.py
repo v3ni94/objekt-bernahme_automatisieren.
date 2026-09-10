@@ -34,7 +34,10 @@ def processing_overview() -> dict:
     runs = ProcessingRun.objects.filter(status__in=[RunStatus.PENDING, RunStatus.RUNNING]).select_related(
         "object"
     )
+    from apps.classification.training import cold_start_status
+
     return {
+        "classifier": cold_start_status(),
         "progress": ObjectProgress.objects.select_related("object", "last_run").order_by(
             "object__object_number"
         ),

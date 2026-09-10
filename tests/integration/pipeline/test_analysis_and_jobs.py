@@ -149,7 +149,7 @@ def test_listenerkennung_erzeugt_import_candidate(objekt, stammdaten, run_all):
     doc, _run = ingest.ingest_upload(objekt, filename="Eigentuemer.xlsx", data=data)
     run_all(objekt)
     doc.refresh_from_db()
-    assert doc.status == "ocr_done" and doc.origin_kind == "digital"
+    assert doc.status in ("review", "classified", "filed") and doc.origin_kind == "digital"
     case = ReviewCase.objects.get(document=doc, case_type="import_candidate")
     assert case.context["profile"] in ("xlsx_generic", "generic_table")
     assert len(case.context["targets"]) >= 3
@@ -164,7 +164,7 @@ def test_nicht_unterstuetztes_format_geht_in_pruefung(objekt, stammdaten, run_al
     doc, _ = ingest.ingest_upload(objekt, filename="notiz.txt", data=b"Kurze Notiz ohne Bankverbindung")
     run_all(objekt)
     doc.refresh_from_db()
-    assert doc.status == "ocr_done" and doc.page_count == 1
+    assert doc.status in ("review", "classified", "filed") and doc.page_count == 1
 
 
 def test_oberflaeche_upload_liste_dokument_seitenbild_sweeper(
@@ -231,5 +231,5 @@ def test_arbeitsverzeichnis_fehlt_fuehrt_zu_erneutem_download(objekt, stammdaten
     shutil.rmtree(storage.work_dir(doc.sha256))
     run_all(objekt)
     doc.refresh_from_db()
-    assert doc.status == "ocr_done"
+    assert doc.status in ("review", "classified", "filed")
     assert ProcessingJob.objects.filter(document=doc, job_type=JobType.HASH).count() == 2

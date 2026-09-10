@@ -86,7 +86,7 @@ def dispatch_run(run: ProcessingRun) -> int:
     obj = run.object
     count = 0
     for doc in Document.objects.filter(
-        object=obj, deleted_at__isnull=True, status__in=["registered", "hashed"]
+        object=obj, deleted_at__isnull=True, status__in=["registered", "hashed", "ocr_done"]
     ):
         if doc.status == "registered" and doc.source == "drive_existing":
             key = idempotency_key(JobType.DISCOVER, obj.pk, doc.drive_file_id, doc.drive_md5 or "")
@@ -110,9 +110,12 @@ def dispatch_run(run: ProcessingRun) -> int:
                 payload={"source_path": doc.source_path},
                 dispatch=False,
             )
-        else:
+        elif doc.status == "hashed":
             key = idempotency_key(JobType.ANALYZE_PAGES, obj.pk, doc.sha256)
             job, _ = enqueue(JobType.ANALYZE_PAGES, obj, key=key, document=doc, run=run, dispatch=False)
+        else:
+            key = idempotency_key(JobType.EXTRACT_ENTITIES, obj.pk, doc.sha256)
+            job, _ = enqueue(JobType.EXTRACT_ENTITIES, obj, key=key, document=doc, run=run, dispatch=False)
         count += 1
     pending = ProcessingJob.objects.filter(object=obj, status=JobStatus.PENDING, run__isnull=True)
     pending.update(run=run)
@@ -153,6 +156,15 @@ def maybe_finish_run(run: ProcessingRun) -> bool:
             Decimal(str(round(100 * run.documents_misc / run.documents_total, 2)))
             if run.documents_total
             else None
+        )
+        # bereinigt (B-31): ohne 03_Dubletten, 04_Nicht_objektbezogen und Faelle mit fachlichem Grund in 02
+        from apps.documents.models import DocumentClassification
+
+        adjusted = DocumentClassification.objects.filter(
+            document__in=docs, is_final=True, features__kpi_misc_adjusted=True
+        ).count()
+        run.misc_share_adjusted_pct = (
+            Decimal(str(round(100 * adjusted / run.documents_total, 2))) if run.documents_total else None
         )
         from apps.documents.models import DocumentPage
 

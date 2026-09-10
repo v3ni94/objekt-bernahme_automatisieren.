@@ -17,7 +17,19 @@ pytestmark = pytest.mark.django_db
 GENERATOR = Path(__file__).resolve().parents[2] / "performance" / "corpus_generator.py"
 
 
-def test_generator_und_perf_run_lokal(seeded, data_dir, tmp_path, fake_ocr):
+def test_generator_und_perf_run_lokal(seeded, data_dir, tmp_path, fake_ocr, drive):
+    from .conftest import reconcile
+
+    messobjekt = ManagedObject.objects.create(
+        object_number="700",
+        name="Messobjekt",
+        management_type="weg",
+        is_test=True,
+        city="Musterstadt",
+        street="Testallee",
+        house_number="100",
+    )
+    reconcile(messobjekt, drive)
     corpus = tmp_path / "korpus"
     subprocess.run(
         [
@@ -60,4 +72,6 @@ def test_generator_und_perf_run_lokal(seeded, data_dir, tmp_path, fake_ocr):
     }
     obj = ManagedObject.objects.get(object_number="700")
     assert obj.is_test
-    assert Document.objects.filter(object=obj, status="ocr_done").count() == len(manifest["documents"])
+    assert Document.objects.filter(object=obj, status__in=["review", "classified", "filed"]).count() == len(
+        manifest["documents"]
+    )

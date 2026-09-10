@@ -53,6 +53,13 @@ class ProcessingRun(TimestampedModel):
     pages_done = models.PositiveIntegerField(null=True, blank=True)
     documents_misc = models.PositiveIntegerField(null=True, blank=True)
     misc_share_pct = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    misc_share_adjusted_pct = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Anteil 06 ohne 03_Dubletten, 04_Nicht_objektbezogen und Fälle mit fachlichem Grund (B-31)",
+    )
     pages_per_minute = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     ram_peak_mb = models.PositiveIntegerField(null=True, blank=True)
     ai_calls_count = models.PositiveIntegerField(null=True, blank=True)
