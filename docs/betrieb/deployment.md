@@ -29,4 +29,5 @@ Verbindliche Beschreibung in docs/betrieb.md Abschnitt 4. Hier die Befehlsfolge.
 | `app-seed [--force]` | Rollen, Dokumentkatalog (Kategorien, Unterordner, Unterarten), Aufbewahrungszeilen und `app_settings` aus `db/seeds/`; idempotent |
 | `app-create-admin --email ...` | Admin anlegen |
 | `app-grants-sql` | Tabellenrechte als SQL ausgeben (docs/architektur.md 9.4) |
+| `manage.py drive_reconcile --all --dry-run` | Sammellauf des Ordnerabgleichs als Probelauf (Definition of Done), weitere Befehle in docs/betrieb/google-oauth.md |
 | `manage.py bezeichnerregister --write` | Bezeichnerregister aus dem Code erzeugen (Entwicklung, vor jedem Commit mit Schemaänderung) |

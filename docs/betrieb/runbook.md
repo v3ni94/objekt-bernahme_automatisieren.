@@ -11,6 +11,9 @@ Störungsfälle mit Erkennung, Sofortmaßnahme und Nacharbeit. Vollständige Fas
 | Platte knapp | `/readyz/` disk.ok false, Ingest stoppt | `du -sh /srv/objektakte/*`; `work/` und `previews/` sind verlustfrei löschbar (docs/architektur.md 4.3) | Aufbewahrung der Sicherungen prüfen (F26), Tarif prüfen |
 | Konto gesperrt (zu viele Fehlversuche) | Meldung beim Login | Admin: Nutzerverwaltung, „entsperren" | Bei Häufung Angriff prüfen (Protokoll auth.login_failed) |
 | Zweiter Faktor verloren | Nutzer kann sich nicht anmelden | Admin: Identität außerhalb des Systems prüfen, „TOTP zurücksetzen" | Eintrag im Protokoll auth.totp_reset |
-| Token ungültig, Drive-Quota, Worker ohne Fortschritt, Fallback aktiv, Zertifikat, Kostenlimit, Dateianzahl ungleich | folgen mit M4 bis M13 | | |
+| Token widerrufen oder ungültig | Statusseite rot, Google Drive zeigt `widerrufen`, `drive.token_refresh` mit `revoked` | Admin: Google Drive, „Neu autorisieren“ mit `ablage@muellerhv.de`; Drive-Schreibjobs laufen danach weiter | Nachweiskette T9 beginnt neu; Ursache prüfen (docs/betrieb.md 7.10) |
+| Drive-Ratenlimit | Statusseite zeigt Zähler 403/429, Logs `drive files.list status=403` | nichts; Backoff wiederholt automatisch | `drive.max_requests_per_second` senken, Quota in der Cloud Console prüfen |
+| Dateianzahl nach Umbenennung ungleich | Lauf `failed`, Review-Fall `rename_count_mismatch`, weitere Schreibaktionen übersprungen | Ordner in Drive prüfen (gleichzeitige Änderung), Review-Fall entscheiden, Abgleich erneut ausführen | nichts wurde zurückgenommen; bei Bedarf `drive_undo_rename <action_id>` |
+| Worker ohne Fortschritt, Fallback aktiv, Zertifikat, Kostenlimit | folgen mit M5 bis M13 | | |
 
 Kontakt und Zeitfenster für Deployments: Frage F27 (docs/umsetzungsplan.md).

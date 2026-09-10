@@ -223,6 +223,17 @@ CELERY_BROKER_TRANSPORT_OPTIONS = {"visibility_timeout": env_int("JOBS_VISIBILIT
 CELERY_TIMEZONE = TIME_ZONE
 # Zeitplan (Serverzeit TZ). Uhrzeit des Konsistenzlaufs ist ANNAHME (nachts, ausserhalb der Verarbeitung), Frage F27.
 CELERY_BEAT_SCHEDULE: dict = {
+    # Drive-Ueberwachung (B-16, G 10): stuendlicher Lesetest, taeglicher erzwungener Refresh fuer den 8-Tage-Nachweis (T9)
+    "drive-hourly-read-test": {
+        "task": "drive.hourly_read_test",
+        "schedule": crontab(minute=7),
+        "options": {"queue": "io"},
+    },
+    "drive-daily-forced-refresh": {
+        "task": "drive.daily_forced_refresh",
+        "schedule": crontab(hour=4, minute=0),
+        "options": {"queue": "io"},
+    },
     "parties-check-assignment-consistency": {
         "task": "parties.check_assignment_consistency",
         "schedule": crontab(hour=3, minute=15),

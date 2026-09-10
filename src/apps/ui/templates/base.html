@@ -18,6 +18,7 @@
     {% if user|has_perm:"audit.read_own" or user|has_perm:"audit.read_all" %}<a href="{% url 'audit_list' %}">Protokoll</a>{% endif %}
     <a href="{% url 'settings_list' %}">Konfiguration</a>
     {% if user|has_perm:"users.manage" %}<a href="{% url 'user_list' %}">Nutzer</a>{% endif %}
+    {% if user|has_perm:"drive.connect" %}<a href="{% url 'drive_admin' %}">Google Drive</a>{% endif %}
     <a href="{% url 'mfa_index' %}">Konto</a>
     <form method="post" action="{% url 'account_logout' %}" class="inline">{% csrf_token %}<button class="link">Abmelden</button></form>
     <span class="nutzer">{{ user.display_name }} ({{ user.role.name }})</span>

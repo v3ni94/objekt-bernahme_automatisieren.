@@ -78,6 +78,7 @@ addopts = "-q --strict-markers"
 markers = [
   "integration: braucht MariaDB und Redis",
   "slow: Laufzeitmessung, dauert laenger",
+  "live: Live-Test gegen ein echtes Test-Wurzelverzeichnis (nur mit Umgebungsvariablen)",
 ]
 
 [tool.mypy]

@@ -22,6 +22,7 @@ AUDIT_ACTIONS: dict[str, str] = {
     "assignment.end": "Zuordnung beendet (Eigentümerwechsel)",
     "drive.authorize": "Google-Verbindung hergestellt",
     "drive.token_refresh": "Token erneuert",
+    "drive.reconcile": "Ordnerabgleich angestoßen",
     "drive.rename": "Ordner in Drive umbenannt",
     "drive.move": "Datei in Drive verschoben",
     "drive.create_folder": "Ordner in Drive angelegt",

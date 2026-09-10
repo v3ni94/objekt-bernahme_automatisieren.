@@ -90,8 +90,13 @@ def backup_status() -> dict:
 
 
 def oauth_status() -> dict:
-    # Platzhalter bis M4 (Drive-Adapter); die Statusseite zeigt das Feld bereits an
-    return {"ok": None, "status": "nicht verbunden (M4)"}
+    try:
+        from apps.drive.oauth import token_status
+
+        status = token_status()
+        return {**status, "status": status.get("text", status.get("status"))}
+    except Exception as exc:  # Datenbank nicht erreichbar: readyz meldet das ueber database
+        return {"ok": None, "status": "unbekannt", "error": exc.__class__.__name__}
 
 
 def readiness() -> tuple[bool, dict]:

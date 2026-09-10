@@ -16,8 +16,10 @@ def has_perm(user, code: str) -> bool:
 @register.filter
 def get_item(mapping, key):
     try:
-        return mapping.get(key, [])
-    except AttributeError:
+        if key in mapping:
+            return mapping[key]
+        return mapping.get(str(key), [])
+    except (AttributeError, TypeError):
         return []
 
 
