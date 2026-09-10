@@ -1316,3 +1316,94 @@ def bulk_execute(
         },
     )
     return {"bulk_key": bulk_key, "ok": ok, "failed": failed, "total": len(rows)}
+
+
+# ---------------------------------------------------------------- Import aus erkannter Liste (B-34, M9 Schritt 5)
+def document_bytes(doc: Document) -> bytes:
+    """Quelldatei eines Dokuments: Arbeitsverzeichnis, Upload-Transit oder Download aus Drive."""
+    import shutil
+    from pathlib import Path
+
+    from apps.pipeline import storage
+
+    if doc.sha256:
+        work = storage.work_dir(doc.sha256)
+        if work.exists():
+            for candidate in sorted(work.glob("original.*")):
+                return candidate.read_bytes()
+    if doc.source_path and Path(doc.source_path).exists():
+        return Path(doc.source_path).read_bytes()
+    if doc.drive_file_id:
+        from apps.drive import oauth
+
+        adapter = oauth.get_adapter()
+        if adapter is None:
+            raise ReviewError("Keine Google-Verbindung für den Download der Liste")
+        tmp = storage.work_tmp_dir()
+        try:
+            target = tmp / ("original" + Path(doc.current_name).suffix.lower())
+            adapter.download(doc.drive_file_id, target)
+            return target.read_bytes()
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+    raise ReviewError("Quelldatei der Liste ist nicht verfügbar")
+
+
+def start_import(case: ReviewCase, user, *, import_kind: str | None = None, request=None):
+    """Erkannte Liste in die Importkette (M3) uebergeben: import_batches anlegen, Einlesen als Job, Fall erledigt mit
+    Verweis auf den Import. Die Uebernahme selbst bleibt die Entscheidung im Import (H 6.7)."""
+    from apps.imports import services as import_services
+    from apps.imports.models import ImportKind
+    from apps.imports.tasks import parse_batch_task
+
+    if case.case_type != CaseType.IMPORT_CANDIDATE:
+        raise ReviewError("Import starten gilt nur für erkannte Listen")
+    doc = case.document
+    if doc is None:
+        raise ReviewError("Kein Dokument am Fall")
+    kind = import_kind or (case.context or {}).get("import_kind") or ImportKind.OWNER_LIST
+    if kind not in ImportKind.values:
+        raise ReviewError("Unbekannte Art der Liste")
+    data = document_bytes(doc)
+    with transaction.atomic():
+        case = ReviewCase.objects.select_for_update().get(pk=case.pk)
+        if case.status in (CaseStatus.RESOLVED, CaseStatus.DISMISSED):
+            raise ReviewError("Fall ist bereits erledigt")
+        try:
+            batch, created = import_services.create_batch(
+                doc.object, filename=doc.current_name, data=data, user=user, import_kind=kind
+            )
+        except import_services.ImportError_ as exc:
+            raise ReviewError(str(exc)) from exc
+        case.status = CaseStatus.RESOLVED
+        case.resolved_by = user
+        case.resolved_at = timezone.now()
+        case.resolution = {
+            "decision": "import",
+            "import_batch_id": batch.pk,
+            "import_kind": kind,
+            "created": created,
+        }
+        case.save(update_fields=["status", "resolved_by", "resolved_at", "resolution", "updated_at"])
+        ReviewDecision.objects.create(
+            review_case=case,
+            document=doc,
+            decision_type=DecisionType.CONFIRM,
+            decided_by=user,
+            decided_at=timezone.now(),
+            before_state={"status": "open", "proposal": case.context},
+            after_state={"import_batch_id": batch.pk, "import_kind": kind},
+            system_was_correct=True,
+        )
+        record(
+            "review.import_started",
+            entity_type="review_case",
+            entity_id=case.pk,
+            object_id=case.object_id,
+            request=request,
+            actor=user,
+            after={"import_batch_id": batch.pk, "import_kind": kind, "created": created},
+        )
+    if created:
+        parse_batch_task.delay(batch.pk)
+    return batch

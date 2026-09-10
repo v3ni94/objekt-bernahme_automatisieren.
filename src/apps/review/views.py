@@ -25,6 +25,7 @@ from apps.documents.models import (
     DocumentSubfolder,
     DocumentType,
 )
+from apps.imports.models import ImportKind
 from apps.objects.models import ManagedObject
 from apps.pipeline.previews import preview_path
 from apps.review import services
@@ -162,6 +163,7 @@ def case_detail(request, pk: int):
             "can_decide": user_has_permission(request.user, "review.decide"),
             "can_dismiss_object": user_has_permission(request.user, "review.dismiss_object_case"),
             "candidates": case.candidates or [],
+            "import_kinds": ImportKind.choices,
             "documents_same_object": Document.objects.filter(object=obj, deleted_at__isnull=True)
             .exclude(pk=doc.pk if doc else None)
             .order_by("current_name")[:300]
@@ -240,6 +242,12 @@ def case_action(request, pk: int):
                 case, request.user, target_obj, reason=request.POST.get("reason"), request=request
             )
             messages.success(request, f"Dokument in Objekt {target_obj.object_number} übernommen.")
+        elif action == "start_import":
+            batch = services.start_import(
+                case, request.user, import_kind=request.POST.get("import_kind") or None, request=request
+            )
+            messages.success(request, f"Import {batch.pk} angelegt, die Liste wird eingelesen.")
+            return redirect("import_batch", pk=batch.pk)
         else:
             return HttpResponseBadRequest("Unbekannte Aktion")
     except services.ReviewError as exc:

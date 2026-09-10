@@ -42,6 +42,7 @@ AUDIT_ACTIONS: dict[str, str] = {
     "review.reopen": "Fall wiedereröffnet",
     "review.bulk_execute": "Massenbearbeitung ausgeführt",
     "review.transfer_object": "in anderes Objekt übernommen",
+    "review.import_started": "Import aus erkannter Liste gestartet",
     "review.dismiss_object_case": "Fall zur Objektzuordnung verworfen (nur Admin)",
     "review.filter_saved": "Gespeicherte Sicht angelegt oder geändert",
     "review.filter_deleted": "Gespeicherte Sicht gelöscht",

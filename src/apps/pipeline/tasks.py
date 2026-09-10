@@ -252,8 +252,8 @@ def analyze_pages(job: ProcessingJob) -> dict:
     doc.page_count = result.page_count
     doc.origin_kind = result.origin_kind
     doc.save(update_fields=["page_count", "origin_kind", "updated_at"])
-    if result.kind == "office":
-        _maybe_import_candidate(job, doc, original)
+    if result.kind == "office" or (original.suffix.lower() == ".pdf" and result.digital_pages):
+        _maybe_import_candidate(job, doc, original)  # Listenerkennung auch fuer digitale PDF (M9 Schritt 5)
     if result.chunks:
         for i, pages in enumerate(result.chunks, start=1):
             enqueue(
@@ -301,35 +301,79 @@ LIST_FIELDS = {
 }
 
 
+TENANT_LIST_FIELDS = {
+    "tenant_name_raw",
+    "base_rent",
+    "utilities_prepayment",
+    "heating_prepayment",
+    "deposit_amount",
+    "deposit_type",
+    "start_date",
+    "end_date",
+    "persons_count",
+}
+OWNER_LIST_FIELDS = {
+    "owner_name_raw",
+    "co_ownership_share",
+    "house_fee_monthly",
+    "valid_from",
+    "valid_to",
+    "sepa_mandate_present",
+    "mandate_reference",
+}
+
+
+def _import_kind(targets: list[str]) -> str:
+    tenant = bool(TENANT_LIST_FIELDS & set(targets))
+    owner = bool(OWNER_LIST_FIELDS & set(targets))
+    if tenant and owner:
+        return "mixed"
+    return "tenant_list" if tenant else "owner_list"
+
+
 def _maybe_import_candidate(job: ProcessingJob, doc: Document, path: Path) -> bool:
-    """Erkannte Eigentuemer- oder Mieterliste (xlsx, csv) erzeugt einen Fall import_candidate mit vorbelegtem Profil
-    statt eines automatischen Imports (B-34, Plan M5 Schritt 5)."""
-    if path.suffix.lower() not in (".xlsx", ".xlsm", ".csv"):
+    """Erkannte Eigentuemer- oder Mieterliste (xlsx, csv, digitales PDF) erzeugt einen Fall import_candidate mit
+    vorbelegtem Profil und Art der Liste statt eines automatischen Imports (B-34, Plan M5 Schritt 5, M9 Schritt 5).
+    Gescannte Listen werden erst nach der OCR ueber den Import selbst gelesen (Profil pdf_scan_ocr)."""
+    suffix = path.suffix.lower()
+    if suffix not in (".xlsx", ".xlsm", ".csv", ".pdf"):
         return False
     try:
         from apps.imports.mapping import header_row_index, propose_mapping
         from apps.imports.profiles import choose_profile, read_csv, read_xlsx
 
-        table = read_csv(path) if path.suffix.lower() == ".csv" else read_xlsx(path)
+        if suffix == ".pdf":
+            from apps.imports import pdf_tables
+
+            if not pdf_tables.has_text_layer(path):
+                return False
+            result = pdf_tables.extract_digital(path, max_pages=3)
+            rows = result.rows
+        else:
+            table = read_csv(path) if suffix == ".csv" else read_xlsx(path)
+            rows = table.rows
         synonyms = store.get("import.column_synonyms", {}) or {}
-        idx = header_row_index(table.rows, synonyms)
-        header = table.rows[idx] if idx < len(table.rows) else []
-        proposals = propose_mapping(header, table.rows[idx + 1 : idx + 21], synonyms)
-        targets = sorted({p.target for p in proposals if p.target in LIST_FIELDS and p.confidence >= 0.8})
+        idx = header_row_index(rows, synonyms)
+        header = rows[idx] if idx < len(rows) else []
+        proposals = propose_mapping(header, rows[idx + 1 : idx + 21], synonyms)
+        fields = LIST_FIELDS | TENANT_LIST_FIELDS | OWNER_LIST_FIELDS
+        targets = sorted({p.target for p in proposals if p.target in fields and p.confidence >= 0.8})
         if len(targets) < 3:
             return False
         profile, _scores = choose_profile(path, doc.current_name)
+        kind = _import_kind(targets)
         _review_once(
             job.object,
             case_type=CaseType.IMPORT_CANDIDATE,
-            subtype="owner_list",
+            subtype=kind,
             document=doc,
             key=f"import_candidate:{doc.pk}",
             context={
                 "profile": profile.code,
                 "targets": targets,
+                "import_kind": kind,
                 "name": doc.current_name,
-                "rows": len(table.rows),
+                "rows": len(rows),
             },
         )
         return True

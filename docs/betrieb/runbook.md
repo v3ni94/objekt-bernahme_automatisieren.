@@ -26,5 +26,7 @@ Störungsfälle mit Erkennung, Sofortmaßnahme und Nacharbeit. Vollständige Fas
 | Kostenlimit erreicht | Fälle mit Grund „Kostenlimit erreicht“, `ai_calls.status = budget_blocked`, Statusseite Kosten je Objekt | Limit `ai.providers.<p>.cost_limit_eur_per_object` prüfen und bei Bedarf erhöhen, dann `ai_reclassify --object <nr>` | Preisliste `ai.price_list` aktuell halten; ohne Preise ist `cost_eur` 0 und das Limit greift nicht |
 | Maskierungssperre | `ai_calls.status = blocked_by_mask_check`, Fall mit Grund „Maskierungsprüfung hat den Aufruf gesperrt“ | Seitentext prüfen, Muster in `src/objektakte/masking.py` ergänzen, Dokument erneut verarbeiten | kein Text hat den Anbieter erreicht |
 | Zertifikat | folgt mit M13 | | |
+| Gescannte Liste mit vielen unsicheren Zeilen | Importzeilen mit Grund `low_ocr_confidence`, betroffene Felder in `parsed_fields._low_confidence_cells` | Zeilen im Review korrigieren; bei systematisch schlechter Vorlage besseren Scan oder Export anfordern (Nachforderung) | Schwelle `import.ocr_cell_confidence_min` (70) nach Stichprobe kalibrieren (A-33) |
+| Erkannte Liste im Review (`import_candidate`) | Fall mit Profil, Art der Liste und erkannten Feldern | „Import starten“ im Fall; danach Spaltenzuordnung und Übernahme im Import | ohne Bestätigung kein Import (B-34) |
 
 Kontakt und Zeitfenster für Deployments: Frage F27 (docs/umsetzungsplan.md).

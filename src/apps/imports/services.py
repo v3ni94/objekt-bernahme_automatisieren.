@@ -135,6 +135,8 @@ def parse_batch(
     header_idx = header_row_index(table.rows, synonyms)
     header = [c or f"Spalte {i + 1}" for i, c in enumerate(table.rows[header_idx])] if table.rows else []
     data_rows = table.rows[header_idx + 1 :]
+    conf_rows = (table.cell_confidence or [])[header_idx + 1 :]
+    cell_conf_min = float(store.get("import.ocr_cell_confidence_min", 70))
     proposals = propose_mapping(header, data_rows[:50], synonyms, confidence_min=conf_min)
     mapping = mapping_from_proposals(proposals)
     mapping.update(
@@ -157,15 +159,25 @@ def parse_batch(
             padded = list(cells) + [""] * (len(header) - len(cells))
             raw, masked_hits = _mask_cells(header, padded, hmac_key)
             is_record = any((v or "").strip() for v in padded) and not _looks_like_total(padded)
+            low_cells = _low_confidence_cells(
+                header, padded, conf_rows[offset] if offset < len(conf_rows) else None, cell_conf_min
+            )
+            fields = {}
+            if masked_hits:
+                fields["_masked"] = masked_hits
+            if low_cells:
+                fields["_low_confidence_cells"] = low_cells
             rows.append(
                 ImportRow(
                     batch=batch,
                     row_no=row_no,
                     sub_index=0,
                     raw_data=raw,
-                    parsed_fields={"_masked": masked_hits} if masked_hits else {},
+                    parsed_fields=fields,
                     status=RowStatus.PARSED if is_record else RowStatus.REJECTED,
-                    uncertainty_reasons=None if is_record else ["not_a_record"],
+                    uncertainty_reasons=(["low_ocr_confidence"] if low_cells else None)
+                    if is_record
+                    else ["not_a_record"],
                     notes=None if is_record else "automatisch: keine Datenzeile (leer oder Summenzeile)",
                 )
             )
@@ -187,6 +199,20 @@ def parse_batch(
         )
         refresh_counters(batch)
     return batch
+
+
+def _low_confidence_cells(
+    header: list[str], cells: list[str], conf: list[float | None] | None, minimum: float
+) -> list[dict]:
+    """Zellen mit mittlerer Wortkonfidenz unter der Schwelle (ANNAHME A-33, import.ocr_cell_confidence_min); die Zeile
+    wird unsicher (FA6), nichts wird verworfen."""
+    if not conf:
+        return []
+    out = []
+    for i, c in enumerate(conf):
+        if c is not None and c < minimum and i < len(cells) and (cells[i] or "").strip():
+            out.append({"column": header[i] if i < len(header) else f"Spalte {i + 1}", "confidence": c})
+    return out
 
 
 def _mask_cells(header: list[str], cells: list[str], hmac_key: bytes) -> tuple[dict, list[dict]]:
@@ -536,6 +562,9 @@ def normalize_batch(batch: ImportBatch, user=None) -> ImportBatch:
                 continue
             shared, reasons, conf = _normalize_shared(row, mapping, cfg)
             masked = (row.parsed_fields or {}).get("_masked")
+            low_cells = (row.parsed_fields or {}).get("_low_confidence_cells") or []
+            if low_cells:
+                reasons.append("low_ocr_confidence")
             proposal = "accept"
             # Immoware24-Regeln (H 6.2.1): Objektfilter ueber den Zahlenwert, Status steuert die Uebernahme
             onum = (shared.get("object_number") or {}).get("value")
@@ -601,6 +630,7 @@ def normalize_batch(batch: ImportBatch, user=None) -> ImportBatch:
                 target_row.parsed_fields = {
                     "shared": shared,
                     "_masked": masked,
+                    "_low_confidence_cells": low_cells,
                     "person": person.as_dict(),
                     "proposal": proposal,
                     "match": match.as_dict() if match else None,
@@ -631,6 +661,7 @@ def normalize_batch(batch: ImportBatch, user=None) -> ImportBatch:
                 target_row.parsed_fields = {
                     "shared": shared,
                     "_masked": masked,
+                    "_low_confidence_cells": low_cells,
                     "person": tenant.as_dict(),
                     "proposal": proposal,
                     "match": None,
@@ -650,6 +681,7 @@ def normalize_batch(batch: ImportBatch, user=None) -> ImportBatch:
                     "shared": shared,
                     "person": None,
                     "_masked": masked,
+                    "_low_confidence_cells": low_cells,
                     "proposal": "reject" if proposal == "reject" else "accept",
                     "match": None,
                     "options": [],
@@ -1174,26 +1206,37 @@ def _commit_tenant(batch, row, unit, shared, person, user, targets, prov) -> Non
     lease = None
     rent = _val(shared, "base_rent")
     if unit is not None:
-        notes = (
-            f"Miete lt. Export: {rent} EUR (Bedeutung Kaltmiete oder Gesamtmiete offen, F11)"
-            if rent
-            else None
-        )
-        lease = Lease.objects.create(
-            object=batch.object,
-            start_date=_date(_val(shared, "start_date")),
-            end_date=_date(_val(shared, "end_date")),
-            utilities_prepayment=_dec(_val(shared, "utilities_prepayment")),
-            heating_prepayment=_dec(_val(shared, "heating_prepayment")),
-            deposit_amount=_dec(_val(shared, "deposit_amount")),
-            deposit_type=_val(shared, "deposit_type"),
-            rent_adjustment_type=_val(shared, "rent_adjustment_type") or "unknown",
-            persons_count=_val(shared, "persons_count"),
-            notes=notes,
-            data_status="confirmed",
-            source_import_row=row,
-        )
-        targets.append({"type": "lease", "id": lease.pk, "created": True})
+        # H 6.9: ein Mietverhaeltnis je Quellzeile; Mitmieter derselben Zeile teilen es
+        lease = Lease.objects.filter(
+            source_import_row__batch=batch,
+            source_import_row__row_no=row.row_no,
+            deleted_at__isnull=True,
+        ).first()
+        if lease is None:
+            immoware = batch.parser_profile == "immoware24_export"
+            notes = (
+                f"Miete lt. Export: {rent} EUR (Bedeutung Kaltmiete oder Gesamtmiete offen, F11)"
+                if rent and immoware
+                else None
+            )
+            lease = Lease.objects.create(
+                object=batch.object,
+                start_date=_date(_val(shared, "start_date")),
+                end_date=_date(_val(shared, "end_date")),
+                base_rent=None if immoware else _dec(rent),
+                utilities_prepayment=_dec(_val(shared, "utilities_prepayment")),
+                heating_prepayment=_dec(_val(shared, "heating_prepayment")),
+                deposit_amount=_dec(_val(shared, "deposit_amount")),
+                deposit_type=_val(shared, "deposit_type") or "unknown",
+                rent_adjustment_type=_val(shared, "rent_adjustment_type") or "unknown",
+                persons_count=_val(shared, "persons_count"),
+                notes=notes,
+                data_status="confirmed",
+                source_import_row=row,
+            )
+            targets.append({"type": "lease", "id": lease.pk, "created": True})
+        else:
+            targets.append({"type": "lease", "id": lease.pk, "created": False})
         row.committed_lease = lease
         a = TenantUnitAssignment.objects.create(
             tenant=tenant,

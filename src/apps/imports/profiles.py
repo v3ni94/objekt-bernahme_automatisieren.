@@ -2,7 +2,8 @@
 
 Jedes Profil liefert einen Erkennungsscore und eine RawTable (alle Zeilen als Zeichenketten, Kopfzeile wird in
 apps.imports.mapping bestimmt). Leerzeilen und Summenzeilen bleiben erhalten und werden spaeter als not_a_record
-gefuehrt (nichts wird verworfen). PDF-Profile folgen nach der OCR-Pipeline (M9).
+gefuehrt (nichts wird verworfen). M9: pdf_digital_table (pdfplumber, Woerter mit Koordinaten), pdf_scan_ocr
+(Tesseract-TSV mit Wortkonfidenz), domus_export (Platzhalter bis zur Beispieldatei, F11).
 """
 
 from __future__ import annotations
@@ -42,6 +43,7 @@ class RawTable:
     rows: list[list[str]]
     sheet: str | None = None
     meta: dict = field(default_factory=dict)
+    cell_confidence: list[list[float | None]] | None = None  # je Zeile und Zelle 0 bis 100 (OCR), sonst None
 
     @property
     def width(self) -> int:
@@ -199,6 +201,65 @@ class Immoware24Export(FormatProfile):
         return table
 
 
+IMAGE_EXTENSIONS = (".png", ".jpg", ".jpeg", ".tif", ".tiff")
+
+
+def _table_from_result(result) -> RawTable:
+    return RawTable(result.rows, None, dict(result.meta), result.confidence)
+
+
+class PdfDigitalTable(FormatProfile):
+    """PDF mit Textebene: Tabellen ueber Linien, sonst Woerter mit Koordinaten (H 6.2)."""
+
+    code = "pdf_digital_table"
+    source_format = "pdf_digital"
+    extensions = (".pdf",)
+
+    def detect(self, path, filename):
+        if not filename.lower().endswith(self.extensions):
+            return 0.0
+        try:
+            from apps.imports import pdf_tables
+
+            return 0.8 if pdf_tables.has_text_layer(Path(path)) else 0.0
+        except Exception:
+            return 0.0
+
+    def extract(self, path, **options):
+        from apps.imports import pdf_tables
+
+        return _table_from_result(pdf_tables.extract_digital(Path(path)))
+
+
+class PdfScanOcr(FormatProfile):
+    """PDF ohne Textebene oder Bilddatei: Tesseract-TSV mit Wortkonfidenz, Zellkonfidenz je Zelle (H 6.2, A-33)."""
+
+    code = "pdf_scan_ocr"
+    source_format = "pdf_scan"
+    extensions = (".pdf", *IMAGE_EXTENSIONS)
+
+    def detect(self, path, filename):
+        low = filename.lower()
+        if low.endswith(IMAGE_EXTENSIONS):
+            return 0.8
+        if low.endswith(".pdf"):
+            try:
+                from apps.imports import pdf_tables
+
+                return 0.0 if pdf_tables.has_text_layer(Path(path)) else 0.75
+            except Exception:
+                return 0.0
+        return 0.0
+
+    def extract(self, path, **options):
+        from apps.config import store
+        from apps.imports import pdf_tables
+
+        return _table_from_result(
+            pdf_tables.extract_scan(Path(path), language=str(store.get("ocr.language", "deu") or "deu"))
+        )
+
+
 class GenericTable(FormatProfile):
     code = "generic_table"
     source_format = "other"
@@ -210,11 +271,39 @@ class GenericTable(FormatProfile):
         name = str(path).lower()
         if name.endswith((".xlsx", ".xlsm")):
             return read_xlsx(path, options.get("sheet"))
+        if name.endswith(".pdf"):
+            from apps.imports import pdf_tables
+
+            if pdf_tables.has_text_layer(Path(path)):
+                return PdfDigitalTable().extract(path, **options)
+            return PdfScanOcr().extract(path, **options)
+        if name.endswith(IMAGE_EXTENSIONS):
+            return PdfScanOcr().extract(path, **options)
         return read_csv(path)
 
 
+class DomusExport(GenericTable):
+    """Domus-Export (H 6.2): Spalten unbekannt, bis eine Beispieldatei vorliegt (F11). Keine automatische Erkennung;
+    manuell waehlbar, liest wie generic_table mit vollstaendig manueller Spaltenzuordnung."""
+
+    code = "domus_export"
+    source_format = "domus"
+
+    def detect(self, path, filename):
+        return 0.0
+
+
 PROFILES: dict[str, FormatProfile] = {
-    p.code: p for p in (Immoware24Export(), XlsxGeneric(), CsvGeneric(), GenericTable())
+    p.code: p
+    for p in (
+        Immoware24Export(),
+        XlsxGeneric(),
+        CsvGeneric(),
+        PdfDigitalTable(),
+        PdfScanOcr(),
+        DomusExport(),
+        GenericTable(),
+    )
 }
 
 
