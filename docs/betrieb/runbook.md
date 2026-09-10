@@ -20,6 +20,7 @@ Störungsfälle mit Erkennung, Sofortmaßnahme und Nacharbeit. Vollständige Fas
 | Platte knapp beim Ingest (`DiskFull`) | Upload oder Job `hash` meldet Reserve unterschritten | `work/` und `previews/` räumen (Sweeper entfernt verwaiste `work/`-Verzeichnisse nach `processing.work_orphan_hours`) | Reserve `DISK_RESERVE_GB` und Tarif prüfen |
 | Klassifikator liefert schlechtere Ergebnisse nach Nachtraining | Statusseite zeigt neue Modellversion, Review-Korrekturen häufen sich | `manage.py classifier list`, `manage.py classifier rollback <vorherige Version>` | Trainingsmenge prüfen (`training_samples`), Metriken unter `models/<version>/metrics.json` |
 | Viele Dokumente in 06/01_Unklar | KPI Anteil 06 je Lauf hoch, Fälle `unclear` mit Untertyp `below_threshold` | Kaltstartphase prüfen (Statusseite); Regeln in `db/seeds/rules` ergänzen, Seeds laden | Nach Freigabe F17 Stufe 3 aktivieren (M8) |
+| Sammelaktion hängt (Status queued oder running ohne Fortschritt) | Ergebnisseite der Sammelaktion ändert sich nicht, Queue io ohne Heartbeat | Worker io prüfen (`docker compose logs worker-io`); Sammelaktion erneut starten (bereits erledigte Fälle werden übersprungen) | Ursache im Worker-Log; Entscheidungen sind je Zeile atomar, keine Nacharbeit an den Daten |
 | Fallback aktiv, Zertifikat, Kostenlimit | folgen mit M8 bis M13 | | |
 
 Kontakt und Zeitfenster für Deployments: Frage F27 (docs/umsetzungsplan.md).

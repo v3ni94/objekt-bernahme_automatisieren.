@@ -1468,6 +1468,7 @@ Celery-Queues aus den Settings: `ai`, `classify`, `io`, `lists`, `ocr`
 | classification.retrain_after_new_labels | classification | integer | `50` |
 | classification.retrain_f1_tolerance | classification | decimal | `0.01` |
 | classification.segment_types | classification | list | `["gesamtjahresabrechnung", "gesamtwirtschaftsplan", "versammlungsprotokoll"]` |
+| classification.segments_require_review | classification | boolean | `true` |
 | classification.stage2_conflict_p | classification | decimal | `0.9` |
 | classification.stage2_min_samples_per_class | classification | integer | `15` |
 | classification.stage3_max_tokens | classification | integer | `3000` |
@@ -1604,6 +1605,9 @@ Celery-Queues aus den Settings: `ai`, `classify`, `io`, `lists`, `ocr`
 | review.bulk_execute | Massenbearbeitung ausgeführt |
 | review.transfer_object | in anderes Objekt übernommen |
 | review.dismiss_object_case | Fall zur Objektzuordnung verworfen (nur Admin) |
+| review.filter_saved | Gespeicherte Sicht angelegt oder geändert |
+| review.filter_deleted | Gespeicherte Sicht gelöscht |
+| review.bulk_preview | Vorschau der Massenbearbeitung (ohne Schreibwirkung) |
 | import.upload | Importdatei angenommen |
 | import.parse | Importzeilen erkannt |
 | import.row_commit | Importzeile übernommen oder abgelehnt |

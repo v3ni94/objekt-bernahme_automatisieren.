@@ -37,3 +37,11 @@ form p label { display:block; font-weight:600; margin-bottom:4px; } form p .help
 .aktionen form { margin-right:8px; }
 .errorlist { color:#b03a2e; list-style:none; padding:0; }
 tr.gelb td { background:#fff7e8; }
+/* Review Center */
+.raster.review { align-items:start; }
+.seitenleiste button.seite { margin:0 4px 4px 0; padding:2px 6px; border:1px solid var(--hellgrau); border-radius:3px; text-decoration:none; }
+.seitenleiste button.im-fall { border-color:var(--orange); background:#fff7e8; }
+.felder[hidden] { display:none; }
+.vorschlaege button { display:block; text-align:left; margin:2px 0; }
+.aktionen.weitere form { display:block; margin:6px 0; }
+tr.rot td { background:#fbe9e7; } tr.grau td { color:var(--mittelgrau); }

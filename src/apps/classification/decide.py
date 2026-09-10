@@ -15,6 +15,7 @@ from django.db import transaction
 
 from apps.classification.confidence import Combined, Stage1Result, Stage2Result, combine, thresholds
 from apps.classification.context import DocContext, PeriodRef
+from apps.config import store
 from apps.documents.models import (
     Document,
     DocumentClassification,
@@ -529,12 +530,49 @@ def decide(
                 page_from=seg["page_from"],
                 page_to=seg["page_to"],
             )
+            require_review = bool(store.get("classification.segments_require_review", True))
             for link in links:
                 link.primary = False
+                if require_review:
+                    link.status = "suggested"
                 base.links.append(link)
+            if case is None and require_review:
+                # eindeutiges Segment als bestaetigbarer Vorschlag in der Gruppe (H 2.5, Massenbearbeitung)
+                case = CasePlan(
+                    CaseType.OWNER_CANDIDATES,
+                    "segment_proposed",
+                    [
+                        {
+                            "assignment_id": link.assignment_id,
+                            "owner_id": link.owner_id,
+                            "unit_id": link.unit_id,
+                            "owner_file_id": link.owner_file_id,
+                        }
+                        for link in links
+                    ],
+                    {
+                        "action": "confirm_segment",
+                        "subfolder": seg["subfolder"],
+                        "document_type": seg["document_type"],
+                        "period_year": period.year,
+                    },
+                    {
+                        "reason": "Segment eines Gesamtdokuments, Vorschlag eindeutig",
+                        "page_from": seg["page_from"],
+                        "page_to": seg["page_to"],
+                        "clear": True,
+                    },
+                    page_from=seg["page_from"],
+                    page_to=seg["page_to"],
+                    priority=95,
+                )
             if case is not None:
                 case.misc_subfolder = None  # Masterdatei bleibt physisch in 02 bzw. 03 (E 6.3)
-                case.priority = 90
+                case.page_from, case.page_to = seg["page_from"], seg["page_to"]
+                case.priority = min(case.priority, 95)
+                case.context.setdefault(
+                    "segment", {"subfolder": seg["subfolder"], "document_type": seg["document_type"]}
+                )
                 base.cases.append(case)
         base.move_allowed = True
         return base
@@ -582,6 +620,30 @@ def decide(
             base.kpi_misc, base.kpi_misc_adjusted = True, False
         base.move_allowed = not existing
     return base
+
+
+def _batch_key(doc: Document, decision: Decision, plan: CasePlan, run) -> str:
+    """Gruppenschluessel nach H 2.5: Objekt, Herkunft (Masterdokument bei Segmenten, sonst Lauf), Kategorie,
+    Unterordner, Unterart und Jahr; Faelle ohne Lauf tragen das Dokument als Herkunft. Die Fallart gehoert nicht zum
+    Schluessel, damit Segmente mit Kandidaten in derselben Gruppe wie eindeutige Segmente erscheinen."""
+    segment = plan.context.get("segment") or {}
+    if plan.page_from:
+        origin = f"doc{doc.pk}"
+        parts = [
+            "05",
+            segment.get("subfolder") or "",
+            segment.get("document_type") or "",
+            decision.period.year or "",
+        ]
+    else:
+        origin = f"run{run.pk}" if run is not None else f"doc{doc.pk}"
+        parts = [
+            decision.category or "",
+            decision.subfolder or "",
+            decision.document_type or "",
+            decision.period.year or "",
+        ]
+    return ":".join(str(p) for p in [f"grp:{doc.object_id}", origin, *parts])[:120]
 
 
 def _intended(d: Decision) -> dict:
@@ -728,15 +790,32 @@ def persist(
         DocumentTenantLink.objects.filter(document=doc, status="suggested").delete()
         cases_by_span: dict[tuple, ReviewCase] = {}
         for plan in decision.cases:
-            key = f"decide:{doc.pk}:{plan.case_type}:{plan.subtype or ''}:{plan.page_from or 0}"
+            key = _batch_key(doc, decision, plan, run)
             case = ReviewCase.objects.filter(
-                batch_key=key, status__in=[CaseStatus.OPEN, CaseStatus.IN_PROGRESS]
+                document=doc,
+                page_from=plan.page_from,
+                page_to=plan.page_to,
+                status__in=[CaseStatus.OPEN, CaseStatus.IN_PROGRESS],
             ).first()
             misc = (
                 DocumentSubfolder.objects.filter(category_id="06", code=plan.misc_subfolder).first()
                 if plan.misc_subfolder
                 else None
             )
+            if case is not None and (
+                case.case_type != plan.case_type or (case.case_subtype or "") != (plan.subtype or "")[:32]
+            ):
+                # H 2.1 Regel 1: ein offener Fall je Seitenbereich, weitere Gruende in context.reasons
+                reasons = list((case.context or {}).get("reasons") or [])
+                reasons.append(
+                    {
+                        "case_type": plan.case_type,
+                        "subtype": plan.subtype,
+                        "reason": plan.context.get("reason"),
+                    }
+                )
+                case.context = {**(case.context or {}), "reasons": reasons}
+                case.save(update_fields=["context", "updated_at"])
             if case is None:
                 case = ReviewCase.objects.create(
                     object=obj,
@@ -752,6 +831,8 @@ def persist(
                         **plan.context,
                         "decision": decision.plan_text(),
                         "confidence": decision.confidence,
+                        "intended": plan.context.get("intended") or _intended(decision),
+                        "file_name": doc.current_name,
                     },
                     batch_key=key,
                     priority=plan.priority,

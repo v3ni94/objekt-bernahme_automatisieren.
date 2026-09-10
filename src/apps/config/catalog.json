@@ -1489,6 +1489,16 @@
           "type": "string"
         }
       }
+    },
+    {
+      "key": "classification.segments_require_review",
+      "category": "classification",
+      "value_type": "boolean",
+      "description": "Segmente von Gesamtdokumenten als Review-Fälle in einer Gruppe vorlegen (Massenbestätigung); bei false werden eindeutige Segmente automatisch bestätigt (E 6.3)",
+      "source": "H 2.5, Umsetzungsplan M7",
+      "schema": {
+        "type": "boolean"
+      }
     }
   ]
 }

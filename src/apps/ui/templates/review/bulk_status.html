@@ -1,0 +1,9 @@
+{% extends "base.html" %}{% block title %}Sammelaktion · {{ APP_NAME }}{% endblock %}
+{% block content %}<h1>Sammelaktion <span class="mono klein">{{ bulk_key }}</span></h1>
+<p><a href="{% url 'review_list' %}">Review Center</a></p>
+<div class="karte"><p>Status: <strong>{{ state.status }}</strong>{% if state.total %}, {{ state.total }} Fälle{% endif %}{% if state.ok is not None and state.status == "done" %}, {{ state.ok }} erledigt, {{ state.failed|length }} fehlgeschlagen{% endif %}</p>
+{% if state.failed %}<ul>{% for f in state.failed %}<li>Fall {{ f.case_id }}: {{ f.error }}</li>{% endfor %}</ul>{% endif %}
+{% if state.status != "done" %}<p class="klein">Seite neu laden, um den Fortschritt zu sehen.</p>{% endif %}</div>
+<div class="karte"><h2>Entscheidungen ({{ decisions|length }})</h2><table class="voll"><thead><tr><th>Fall</th><th>Dokument</th><th>Seiten</th><th>Art</th><th>Ziel</th></tr></thead><tbody>
+{% for d in decisions %}<tr><td><a href="{% url 'review_detail' d.review_case_id %}">{{ d.review_case_id }}</a></td><td>{{ d.document.current_name }}</td><td>{% if d.page_from %}{{ d.page_from }} bis {{ d.page_to }}{% endif %}</td><td>{{ d.get_decision_type_display }}</td><td class="klein">{{ d.after_state.target.category }}/{{ d.after_state.target.subfolder|default:"" }} {{ d.after_state.target.document_type|default:"" }}</td></tr>{% endfor %}</tbody></table></div>
+{% endblock %}

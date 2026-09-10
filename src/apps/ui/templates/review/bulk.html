@@ -1,0 +1,29 @@
+{% extends "base.html" %}{% load perms %}{% block title %}Massenbearbeitung · {{ APP_NAME }}{% endblock %}
+{% block content %}<h1>Massenbearbeitung <span class="klein">{{ rows|length }} Fälle: {{ green }} eindeutig, {{ yellow }} mit Hinweis, {{ red }} mit Konflikt</span></h1>
+<p><a href="{% url 'review_list' %}">Review Center</a></p>
+<form method="post" action="{% url 'review_bulk' %}" id="vorschauform">{% csrf_token %}
+{% for id in ids %}<input type="hidden" name="case_id" value="{{ id }}">{% endfor %}<input type="hidden" name="batch_key" value="{{ batch_key }}">
+<div class="karte"><h2>Sammelfelder (gelten für alle Zeilen)</h2>
+<p class="filter"><select name="category"><option value="">Zielbereich unverändert</option><option value="05" {% if overrides.category == "05" %}selected{% endif %}>05 Eigentümerakte</option><option value="03" {% if overrides.category == "03" %}selected{% endif %}>03 Buchhaltung</option><option value="02" {% if overrides.category == "02" %}selected{% endif %}>02 Stammakte</option><option value="06" {% if overrides.category == "06" %}selected{% endif %}>06 Sonstiges</option></select>
+<select name="subfolder"><option value="">Unterordner unverändert</option>{% for s in subfolders %}<option value="{{ s.code }}" {% if overrides.subfolder == s.code %}selected{% endif %}>{{ s.folder_name }}</option>{% endfor %}</select>
+<select name="document_type"><option value="">Unterart unverändert</option>{% for t in document_types %}<option value="{{ t.code }}" {% if overrides.document_type == t.code %}selected{% endif %}>{{ t.category_id }} {{ t.name }}</option>{% endfor %}</select>
+<input type="number" name="period_year" placeholder="Jahr" value="{{ overrides.period_year|default:'' }}" style="width:100px">
+<button type="submit">Vorschau aktualisieren</button></p></div>
+<div class="karte"><table class="voll"><thead><tr><th>Ausschließen</th><th>Dokument</th><th>Seiten</th><th>Eigentümer</th><th>Einheit</th><th>Zielakte / Pfad</th><th>Unterordner</th><th>Unterart</th><th>Jahr</th><th>Hinweis</th></tr></thead><tbody>
+{% for r in rows %}<tr class="{% if r.case_id in exclude %}grau{% elif r.state == 'rot' %}rot{% elif r.state == 'gelb' %}gelb{% endif %}">
+<td><input type="checkbox" name="exclude" value="{{ r.case_id }}" style="width:auto" {% if r.case_id in exclude %}checked{% endif %}> <a href="{% url 'review_detail' r.case_id %}" class="klein">Fall {{ r.case_id }}</a></td>
+<td>{{ r.document }}</td><td>{% if r.page_from %}{{ r.page_from }} bis {{ r.page_to }}{% endif %}</td>
+<td>{{ r.owner|default:"" }}{% if r.state != 'gruen' %}<br><select name="row_{{ r.case_id }}_assignment_id" style="width:200px"><option value="">Kandidat wählen</option>{% for u in units %}{% endfor %}</select>{% endif %}</td>
+<td>{{ r.unit|default:"" }}{% if not r.unit %}<br><select name="row_{{ r.case_id }}_unit_id" style="width:160px"><option value="">Einheit wählen</option>{% for u in units %}<option value="{{ u.id }}">{{ u.label }}</option>{% endfor %}</select>{% endif %}</td>
+<td class="mono klein">{{ r.folder_name|default:"" }} {% if r.folder_name %}{% if r.folder_exists %}<span class="ampel gruen">vorhanden</span>{% else %}<span class="ampel grau">wird angelegt</span>{% endif %}{% endif %}</td>
+<td>{{ r.target.subfolder|default:"" }}</td><td>{{ r.target.document_type|default:"" }}</td><td>{{ r.target.period_year|default:"" }}</td>
+<td class="klein">{% for e in r.errors %}<span class="ampel rot">{{ e }}</span> {% endfor %}{% for w in r.warnings %}<span class="ampel grau">{{ w }}</span> {% endfor %}</td></tr>{% endfor %}</tbody></table>
+<p class="klein">Zeilen mit Konflikt sind von der Sammelaktion ausgenommen, bis sie korrigiert oder ausgeschlossen sind. Zeilen ohne Eigentümer: Kandidaten in der Fallansicht wählen oder Fall ausschließen.</p>
+</div>
+</form>
+<form method="post" action="{% url 'review_bulk_execute' %}" id="ausfuehrenform">{% csrf_token %}
+{% for id in ids %}<input type="hidden" name="case_id" value="{{ id }}">{% endfor %}
+{% for k, v in overrides.items %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
+{% for id in exclude %}<input type="hidden" name="exclude" value="{{ id }}">{% endfor %}
+<p><button type="submit" {% if blocking %}disabled title="{{ blocking|length }} Zeilen mit Konflikt"{% endif %}>Ausführen: {{ green|add:yellow }} Entscheidungen in einer Aktion</button></p></form>
+{% endblock %}

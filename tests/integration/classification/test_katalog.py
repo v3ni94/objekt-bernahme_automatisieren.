@@ -93,7 +93,11 @@ def test_katalog_vollstaendig(welt, katalog, fake_oauth, run_all):
             if exp["segments"] and not doc.is_master_with_segments:
                 failures.append((entry["id"], "master"))
         # Ablage in Drive: ohne Fall filed im Zielordner
-        if not exp["case_type"] and doc.status != "filed":
+        if (
+            not exp["case_type"]
+            and doc.status != "filed"
+            and not (exp.get("segments") and doc.status == "review")
+        ):
             failures.append(
                 (
                     entry["id"],

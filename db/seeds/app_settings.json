@@ -568,5 +568,6 @@
     "gesamtjahresabrechnung",
     "gesamtwirtschaftsplan",
     "versammlungsprotokoll"
-  ]
+  ],
+  "classification.segments_require_review": true
 }
