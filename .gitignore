@@ -25,10 +25,10 @@ node_modules/
 dist/
 
 # Laufzeitdaten (liegen auf dem Server unter /srv/objektakte/, nie im Repo)
-data/
-transit/
-ocr-cache/
-backup/
+/data/
+/transit/
+/ocr-cache/
+/backup/
 *.sqlite3
 
 # Editoren und Betriebssystem
