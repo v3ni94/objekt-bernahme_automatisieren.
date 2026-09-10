@@ -1,6 +1,6 @@
-# Deployment (Kurzform, Stand M1)
+# Deployment (Kurzform, Stand M5)
 
-Verbindliche Beschreibung in docs/betrieb.md Abschnitt 4. Hier die Befehlsfolge.
+Verbindliche Beschreibung in docs/betrieb.md Abschnitt 4. Hier die Befehlsfolge. Anbindung an GitHub über SSH (Deploy Key und Workflow `Deploy`) in docs/betrieb/github-deploy.md.
 
 ## Erstinstallation
 
@@ -14,7 +14,7 @@ Verbindliche Beschreibung in docs/betrieb.md Abschnitt 4. Hier die Befehlsfolge.
 
 ## Regelbetrieb
 
-- Deployment: `scripts/deploy.sh [branch]` (Dump vor Migration, Migration als eigener Schritt, Tabellenrechte, Containerwechsel, Smoke-Test, Tags).
+- Deployment: `scripts/deploy.sh [branch]` (Dump vor Migration, Migration als eigener Schritt, Tabellenrechte, Containerwechsel, Smoke-Test, Tags); aus GitHub heraus über den Workflow `Deploy` (manuell, docs/betrieb/github-deploy.md), der auf dem Server nur `scripts/deploy_remote.sh` aufrufen darf.
 - Rollback: `scripts/rollback.sh` (ein Befehl, vorheriges Image).
 - Schema-Rollback nur als Ausnahme nach docs/betrieb.md 4.4: `docker compose run --rm --no-deps web app-migrate --down <app> <migration>`.
 - Seeds erneut laden: `docker compose run --rm --no-deps web app-seed` (`--force` überschreibt geänderte Werte, protokolliert).
@@ -31,3 +31,5 @@ Verbindliche Beschreibung in docs/betrieb.md Abschnitt 4. Hier die Befehlsfolge.
 | `app-grants-sql` | Tabellenrechte als SQL ausgeben (docs/architektur.md 9.4) |
 | `manage.py drive_reconcile --all --dry-run` | Sammellauf des Ordnerabgleichs als Probelauf (Definition of Done), weitere Befehle in docs/betrieb/google-oauth.md |
 | `manage.py bezeichnerregister --write` | Bezeichnerregister aus dem Code erzeugen (Entwicklung, vor jedem Commit mit Schemaänderung) |
+| `manage.py perf_run --corpus <verzeichnis> [--local]` | Messlauf der Pipeline mit synthetischem Korpus (`tests/performance/corpus_generator.py`); Messprotokoll als JSON (Seiten je Minute je Schritt, Platte, RAM im lokalen Modus) |
+| Statusseite, „Sweeper jetzt ausführen“ | Sweeper sofort (Jobs mit veraltetem Heartbeat zurücksetzen, wartende Läufe starten); sonst Beat jede Minute |

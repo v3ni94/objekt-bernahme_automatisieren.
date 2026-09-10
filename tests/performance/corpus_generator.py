@@ -219,6 +219,59 @@ def build_page_texts(rng: random.Random, template: dict, fields: dict, pages: in
     return result
 
 
+def build_gesamtabrechnung(
+    rng: random.Random, fields: dict, unit_count: int
+) -> tuple[list[list[str]], list[dict]]:
+    """Gesamtabrechnung: Deckblatt und Gesamtkosten, danach je Einheit eine eingebettete Einzelabrechnung auf
+    eigener Seite. Rueckgabe Seitentexte und Segmentliste (Seitenbereich je Einheit) fuer die Segmentpruefung (M9)."""
+    header = f"Objekt {fields['number']} {fields['city']}, {fields['street']}"
+    year = fields["year"]
+    pages: list[list[str]] = [
+        [
+            header,
+            f"Gesamtabrechnung {year} der Wohnungseigentümergemeinschaft {fields['city']}, {fields['street']}",
+            "",
+            f"Abrechnungszeitraum 01.01.{year} bis 31.12.{year}. Anzahl Einheiten: {unit_count}.",
+            f"Gesamtkosten der Gemeinschaft: {fields['total']} EUR. Zuführung zur Instandhaltungsrücklage: {fields['reserve']} EUR.",
+            "Die Einzelabrechnungen der Einheiten folgen auf den nächsten Seiten in der Reihenfolge der Einheitennummern.",
+            "",
+            "Position                          Gesamt EUR      Anteil EUR",
+        ]
+        + [
+            f"{pos:<32} {rnd_amount(rng, 800, 25_000):>12}  {rnd_amount(rng, 20, 900):>12}"
+            for pos in (
+                "Heizkosten",
+                "Wasser und Abwasser",
+                "Allgemeinstrom",
+                "Hausmeister",
+                "Versicherung",
+                "Verwaltung",
+            )
+        ]
+        + ["", f"Seite 1 von {unit_count + 1}"]
+    ]
+    segments: list[dict] = []
+    for i in range(1, unit_count + 1):
+        unit = f"WE{i:02d}"
+        first, last = rng.choice(FIRSTNAMES), rng.choice(SURNAMES)
+        result = rng.uniform(-900, 900)
+        page_no = i + 1
+        pages.append(
+            [
+                header,
+                f"Einzelabrechnung {year} für Einheit {unit} (Anlage zur Gesamtabrechnung)",
+                "",
+                f"Eigentümer: {first} {last}, Einheit {unit}, Miteigentumsanteil {rng.randint(120, 900)}/10.000.",
+                f"Anteil an den Gesamtkosten: {rnd_amount(rng, 900, 6_000)} EUR. Geleistete Vorauszahlungen: {rnd_amount(rng, 1_500, 5_000)} EUR.",
+                f"Abrechnungsergebnis: {rnd_amount(rng, 0, abs(result) + 1)} EUR {'Nachzahlung' if result > 0 else 'Guthaben'}.",
+                "",
+                f"Seite {page_no} von {unit_count + 1}",
+            ]
+        )
+        segments.append({"unit": unit, "page_from": page_no, "page_to": page_no, "owner": f"{first} {last}"})
+    return pages, segments
+
+
 def write_digital_pdf(path: Path, page_texts: list[list[str]]) -> None:
     c = canvas.Canvas(str(path), pagesize=A4)
     width, height = A4
@@ -323,6 +376,15 @@ def main() -> int:
     )
     ap.add_argument("--dpi", type=int, default=300, help="Rasteraufloesung der Scans (Standard 300)")
     ap.add_argument("--degrade", action="store_true", help="Scans leicht drehen und staerker komprimieren")
+    ap.add_argument(
+        "--gesamt-share",
+        type=float,
+        default=0.1,
+        help="Anteil Dokumente als Gesamtabrechnung mit eingebetteten Einzelabrechnungen (Standard 0,1)",
+    )
+    ap.add_argument(
+        "--gesamt-units", type=int, default=6, help="Einheiten je Gesamtabrechnung hoechstens (Standard 6)"
+    )
     ap.add_argument("--seed", type=int, default=20260910, help="Zufallsstartwert (deterministisch)")
     args = ap.parse_args()
 
@@ -342,10 +404,19 @@ def main() -> int:
 
     for kind, target in (("scan", target_scan), ("digital", target_digital)):
         while counters[kind] < target:
-            pages = min(rng.randint(1, args.max_pages_per_doc), target - counters[kind])
-            template = rng.choice(TEMPLATES)
             fields = make_fields(rng)
-            page_texts = build_page_texts(rng, template, fields, pages)
+            remaining = target - counters[kind]
+            segments: list[dict] = []
+            if remaining >= 3 and rng.random() < args.gesamt_share:
+                unit_count = min(rng.randint(2, max(2, args.gesamt_units)), remaining - 1)
+                page_texts, segments = build_gesamtabrechnung(rng, fields, unit_count)
+                pages = len(page_texts)
+                category_hint = "05/05_Abrechnungen (Gesamtabrechnung mit Einzelabrechnungen)"
+            else:
+                pages = min(rng.randint(1, args.max_pages_per_doc), remaining)
+                template = rng.choice(TEMPLATES)
+                page_texts = build_page_texts(rng, template, fields, pages)
+                category_hint = template["category"]
             doc_index += 1
             name = f"doc{doc_index:04d}_{kind}"
             digital_pdf = (
@@ -368,7 +439,8 @@ def main() -> int:
                     "pages": pages,
                     "path": str(final_pdf.relative_to(out)),
                     "truth_dir": str(truth_dir.relative_to(out)),
-                    "category_hint": template["category"],
+                    "category_hint": category_hint,
+                    "segments": segments,
                     "sha256": sha256_of(final_pdf),
                     "bytes": final_pdf.stat().st_size,
                 }

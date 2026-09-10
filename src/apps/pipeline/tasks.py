@@ -1,0 +1,562 @@
+"""Pipeline-Tasks (Fachentwurf E 1.2, docs/architektur.md 6.1): discover, hash, analyze_pages, ocr_chunk, merge_pages,
+render_previews, extract_entities, sweep. Jeder Task prueft den Zustand in der Datenbank, arbeitet, schreibt den
+Folgezustand und reiht den naechsten Job ein. Klassifikation (classify, classify_ai, decide, file_to_drive) folgt in M6."""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import logging
+import shutil
+import time
+from pathlib import Path
+
+from celery import shared_task
+from django.db import transaction
+from django.utils import timezone
+
+from apps.config import store
+from apps.documents.models import Document, DocumentEntity, DocumentPage
+from apps.pipeline import analysis as analysis_mod
+from apps.pipeline import ocr as ocr_mod
+from apps.pipeline import storage
+from apps.pipeline.entities import build_gazetteer, extract_page, match_iban_owners
+from apps.pipeline.jobs import (
+    RetryableError,
+    SkipJob,
+    enqueue,
+    heartbeat,
+    idempotency_key,
+    job_task,
+    sweep_stale_jobs,
+)
+from apps.pipeline.models import JobStatus, JobType, ProcessingJob
+from apps.pipeline.previews import render_previews
+from apps.review.models import CaseStatus, CaseType, ReviewCase
+
+logger = logging.getLogger(__name__)
+
+
+def _review_once(
+    obj,
+    *,
+    case_type: str,
+    subtype: str,
+    document=None,
+    key: str,
+    misc_code: str | None = None,
+    context: dict | None = None,
+) -> ReviewCase | None:
+    if ReviewCase.objects.filter(
+        batch_key=key, status__in=[CaseStatus.OPEN, CaseStatus.IN_PROGRESS]
+    ).exists():
+        return None
+    misc = None
+    if misc_code:
+        from apps.documents.models import DocumentSubfolder
+
+        misc = DocumentSubfolder.objects.filter(category_id="06", code=misc_code).first()
+    return ReviewCase.objects.create(
+        object=obj,
+        case_type=case_type,
+        case_subtype=subtype[:32],
+        document=document,
+        misc_subfolder=misc,
+        batch_key=key,
+        priority=80,
+        context=context or {},
+    )
+
+
+def _hmac_key() -> bytes:
+    from apps.parties.services import _hmac_key
+
+    return _hmac_key()
+
+
+# ---------------------------------------------------------------- 1 discover
+@job_task(JobType.DISCOVER)
+def discover(job: ProcessingJob) -> dict:
+    doc = job.document
+    if doc is None:
+        raise SkipJob("kein Dokument")
+    if doc.status not in ("registered",):
+        raise SkipJob("already_processed")
+    limit = int(store.get("documents.max_download_bytes", 524288000))
+    if doc.size_bytes and doc.size_bytes > limit:
+        _review_once(
+            job.object,
+            case_type=CaseType.UNCLEAR,
+            subtype="file_too_large",
+            document=doc,
+            key=f"file_too_large:{doc.pk}",
+            misc_code="02",
+            context={"size_bytes": doc.size_bytes, "limit": limit, "name": doc.current_name},
+        )
+        return {"skipped": "file_too_large"}
+    key = idempotency_key(JobType.HASH, job.object_id, doc.drive_file_id or f"upload-{doc.pk}")
+    enqueue(
+        JobType.HASH, job.object, key=key, document=doc, run=job.run, payload={"source_path": doc.source_path}
+    )
+    return {"next": "hash"}
+
+
+# ---------------------------------------------------------------- 2 hash
+def _download(doc: Document, target_dir: Path) -> Path:
+    if doc.source == "drive_existing":
+        from apps.drive import oauth
+
+        adapter = oauth.get_adapter()
+        if adapter is None:
+            raise RetryableError("Keine Google-Verbindung für den Download")
+        target = target_dir / ("original" + Path(doc.current_name).suffix.lower())
+        adapter.download(doc.drive_file_id, target)
+        return target
+    src = Path(doc.source_path or "")
+    if not src.exists():
+        raise FileNotFoundError(f"Quelldatei fehlt: {doc.source_path}")
+    target = target_dir / ("original" + src.suffix.lower())
+    shutil.copy2(src, target)
+    return target
+
+
+@job_task(JobType.HASH)
+def hash_document(job: ProcessingJob) -> dict:
+    doc = job.document
+    if doc is None or doc.status not in ("registered",):
+        raise SkipJob("already_processed")
+    storage.ensure_disk_reserve()
+    tmp = storage.work_tmp_dir()
+    try:
+        path = _download(doc, tmp)
+        sha = hashlib.sha256()
+        with path.open("rb") as fh:
+            for block in iter(lambda: fh.read(1024 * 1024), b""):
+                sha.update(block)
+        digest = sha.hexdigest()
+        final_dir = storage.work_dir(digest)
+        if final_dir.exists():
+            shutil.rmtree(tmp, ignore_errors=True)
+        else:
+            tmp.rename(final_dir)
+    except Exception:
+        shutil.rmtree(tmp, ignore_errors=True)
+        raise
+    size = storage.original_path(digest).stat().st_size if storage.original_path(digest) else doc.size_bytes
+    with transaction.atomic():
+        doc = Document.objects.select_for_update().get(pk=doc.pk)
+        original = (
+            Document.objects.filter(object=doc.object, sha256=digest, deleted_at__isnull=True)
+            .exclude(pk=doc.pk)
+            .first()
+        )
+        if original is not None:
+            # Dublette im Objekt: keine OCR, Verweis auf das Original, Fall mit Ablagevorschlag 03_Dubletten (E 1.2 Schritt 3)
+            doc.status = "duplicate"
+            doc.duplicate_of = original
+            doc.size_bytes = size
+            doc.save(update_fields=["status", "duplicate_of", "size_bytes", "updated_at"])
+            _review_once(
+                doc.object,
+                case_type=CaseType.UNCLEAR,
+                subtype="duplicate",
+                document=doc,
+                key=f"duplicate:{doc.pk}",
+                misc_code="03",
+                context={"original_document_id": original.pk, "sha256": digest, "name": doc.current_name},
+            )
+            return {"duplicate_of": original.pk}
+        doc.sha256 = digest
+        doc.size_bytes = size
+        doc.status = "hashed"
+        doc.save(update_fields=["sha256", "size_bytes", "status", "updated_at"])
+    elsewhere = (
+        Document.objects.filter(sha256=digest, deleted_at__isnull=True)
+        .exclude(object=doc.object)
+        .values_list("object__object_number", flat=True)
+    )
+    result = {"sha256": digest, "size": size}
+    if elsewhere:
+        result["same_hash_in_objects"] = list(elsewhere)[:5]
+    key = idempotency_key(JobType.ANALYZE_PAGES, job.object_id, digest)
+    enqueue(JobType.ANALYZE_PAGES, job.object, key=key, document=doc, run=job.run)
+    return result
+
+
+# ---------------------------------------------------------------- 3 analyze_pages
+@job_task(JobType.ANALYZE_PAGES)
+def analyze_pages(job: ProcessingJob) -> dict:
+    doc = job.document
+    if doc is None or doc.status not in ("hashed",) or not doc.sha256:
+        raise SkipJob("already_processed")
+    original = storage.original_path(doc.sha256)
+    if original is None:
+        # Arbeitsverzeichnis fehlt (geraeumt oder anderer Host): erneut laden
+        doc.status = "registered"
+        doc.save(update_fields=["status", "updated_at"])
+        enqueue(
+            JobType.HASH,
+            job.object,
+            key=idempotency_key(JobType.HASH, job.object_id, doc.drive_file_id or f"upload-{doc.pk}"),
+            document=doc,
+            run=job.run,
+        )
+        return {"requeued": "hash"}
+    work = storage.work_dir(doc.sha256)
+    result = analysis_mod.analyze_file(
+        original,
+        doc.mime_type,
+        min_chars=int(store.get("ocr.digital_min_chars", 50)),
+        alnum_ratio=float(store.get("ocr.digital_alnum_ratio", 0.6)),
+        cover_ratio=float(store.get("ocr.image_cover_ratio", 0.9)),
+        chunk_pages=int(store.get("ocr.chunk_pages", 20)),
+        work=work,
+    )
+    if result.kind in ("unsupported", "google_doc"):
+        _review_once(
+            job.object,
+            case_type=CaseType.UNCLEAR,
+            subtype="unsupported_format",
+            document=doc,
+            key=f"unsupported:{doc.pk}",
+            misc_code="02",
+            context={"mime_type": doc.mime_type, "name": doc.current_name, "note": result.note},
+        )
+        doc.status = "review"
+        doc.save(update_fields=["status", "updated_at"])
+        return {"kind": result.kind}
+    storage.cache_dir(doc.sha256).mkdir(parents=True, exist_ok=True)
+    storage.analysis_path(doc.sha256).write_text(
+        json.dumps(result.to_json(), ensure_ascii=False), encoding="utf-8"
+    )
+    key = _hmac_key()
+    for page_no in result.digital_pages:
+        ocr_mod.mask_and_cache(
+            doc.sha256,
+            page_no,
+            result.texts.get(page_no, ""),
+            source="text_layer" if result.kind != "office" else "office",
+            hmac_key=key,
+        )
+    doc.page_count = result.page_count
+    doc.origin_kind = result.origin_kind
+    doc.save(update_fields=["page_count", "origin_kind", "updated_at"])
+    if result.kind == "office":
+        _maybe_import_candidate(job, doc, original)
+    if result.chunks:
+        for i, pages in enumerate(result.chunks, start=1):
+            enqueue(
+                JobType.OCR_CHUNK,
+                job.object,
+                key=f"ocr:{job.object_id}:{doc.sha256}:{i}",
+                document=doc,
+                run=job.run,
+                payload={"chunk_no": i, "pages": pages, "pdf": str(result.pdf_path)},
+            )
+    else:
+        enqueue(
+            JobType.MERGE_PAGES,
+            job.object,
+            key=idempotency_key(JobType.MERGE_PAGES, job.object_id, doc.sha256),
+            document=doc,
+            run=job.run,
+        )
+    return {
+        "kind": result.kind,
+        "pages": result.page_count,
+        "digital": len(result.digital_pages),
+        "ocr": len(result.ocr_pages),
+        "chunks": len(result.chunks),
+    }
+
+
+LIST_FIELDS = {
+    "last_name",
+    "first_name",
+    "owner_name_raw",
+    "tenant_name_raw",
+    "company_name",
+    "unit_label",
+    "external_ref",
+    "co_ownership_share",
+    "iban_raw",
+    "valid_from",
+    "postal_code",
+    "street",
+    "email",
+    "phone",
+    "house_fee_monthly",
+    "base_rent",
+}
+
+
+def _maybe_import_candidate(job: ProcessingJob, doc: Document, path: Path) -> bool:
+    """Erkannte Eigentuemer- oder Mieterliste (xlsx, csv) erzeugt einen Fall import_candidate mit vorbelegtem Profil
+    statt eines automatischen Imports (B-34, Plan M5 Schritt 5)."""
+    if path.suffix.lower() not in (".xlsx", ".xlsm", ".csv"):
+        return False
+    try:
+        from apps.imports.mapping import header_row_index, propose_mapping
+        from apps.imports.profiles import choose_profile, read_csv, read_xlsx
+
+        table = read_csv(path) if path.suffix.lower() == ".csv" else read_xlsx(path)
+        synonyms = store.get("import.column_synonyms", {}) or {}
+        idx = header_row_index(table.rows, synonyms)
+        header = table.rows[idx] if idx < len(table.rows) else []
+        proposals = propose_mapping(header, table.rows[idx + 1 : idx + 21], synonyms)
+        targets = sorted({p.target for p in proposals if p.target in LIST_FIELDS and p.confidence >= 0.8})
+        if len(targets) < 3:
+            return False
+        profile, _scores = choose_profile(path, doc.current_name)
+        _review_once(
+            job.object,
+            case_type=CaseType.IMPORT_CANDIDATE,
+            subtype="owner_list",
+            document=doc,
+            key=f"import_candidate:{doc.pk}",
+            context={
+                "profile": profile.code,
+                "targets": targets,
+                "name": doc.current_name,
+                "rows": len(table.rows),
+            },
+        )
+        return True
+    except Exception:  # Erkennung ist Zusatznutzen, darf die Seitenanalyse nicht scheitern lassen
+        logger.exception("Listenerkennung für Dokument %s fehlgeschlagen", doc.pk)
+        return False
+
+
+# ---------------------------------------------------------------- 4 ocr_chunk
+@job_task(JobType.OCR_CHUNK)
+def ocr_chunk(job: ProcessingJob) -> dict:
+    doc = job.document
+    payload = job.payload or {}
+    if doc is None or doc.status in ("ocr_done", "classified", "filed", "review", "duplicate", "moved_out"):
+        raise SkipJob("already_processed")
+    pages = payload.get("pages") or []
+    pdf = Path(payload.get("pdf") or "")
+    if not pdf.exists():
+        raise RetryableError(f"Block-PDF fehlt: {pdf}")
+    if not ocr_mod.tools_available():
+        raise RetryableError("Tesseract oder Ghostscript nicht verfügbar")
+    missing = [p for p in pages if storage.read_page(doc.sha256, p) is None]
+    if not missing:
+        result_pages = len(pages)
+    else:
+        res = ocr_mod.ocr_chunk(
+            pdf,
+            doc.sha256,
+            missing,
+            int(payload.get("chunk_no", 1)),
+            storage.work_dir(doc.sha256),
+            language=store.get("ocr.language", "deu"),
+            hmac_key=_hmac_key(),
+            heartbeat=lambda n: heartbeat(job, n),
+        )
+        result_pages = len(res.pages)
+    # Letzter fertiger Block loest merge_pages aus (unter Zeilensperre auf dem Dokument, E 10.2)
+    with transaction.atomic():
+        Document.objects.select_for_update().get(pk=doc.pk)
+        open_chunks = (
+            ProcessingJob.objects.filter(document=doc, job_type=JobType.OCR_CHUNK)
+            .exclude(pk=job.pk)
+            .exclude(status__in=[JobStatus.DONE, JobStatus.SKIPPED])
+            .exists()
+        )
+        if not open_chunks:
+            enqueue(
+                JobType.MERGE_PAGES,
+                job.object,
+                key=idempotency_key(JobType.MERGE_PAGES, job.object_id, doc.sha256),
+                document=doc,
+                run=job.run,
+            )
+    return {"pages": result_pages, "reused": len(pages) - len(missing)}
+
+
+# ---------------------------------------------------------------- 5 merge_pages und render_previews
+@job_task(JobType.MERGE_PAGES)
+def merge_pages(job: ProcessingJob) -> dict:
+    doc = job.document
+    if doc is None or doc.status not in ("hashed",):
+        raise SkipJob("already_processed")
+    analysis_file = storage.analysis_path(doc.sha256)
+    if not analysis_file.exists():
+        raise RetryableError("Seitenanalyse fehlt")
+    analysis = json.loads(analysis_file.read_text(encoding="utf-8"))
+    page_count = int(analysis.get("page_count") or 0)
+    rows: list[DocumentPage] = []
+    missing: list[int] = []
+    for page_no in range(1, page_count + 1):
+        cached = storage.read_page(doc.sha256, page_no)
+        if cached is None:
+            missing.append(page_no)
+            continue
+        text, hits, meta = cached
+        source = meta.get("source") or "ocr"
+        rows.append(
+            DocumentPage(
+                document=doc,
+                page_no=page_no,
+                text_source="text_layer" if source in ("text_layer", "office") else "ocr",
+                is_scan=source == "ocr",
+                text_content=text,
+                text_hash=hashlib.sha256(text.encode("utf-8")).hexdigest(),
+                char_count=len(text),
+                word_count=len(text.split()),
+                ocr_engine=meta.get("engine"),
+                ocr_language=store.get("ocr.language", "deu") if source == "ocr" else None,
+                masked_entities_count=len(hits),
+            )
+        )
+    if missing:
+        raise RetryableError(f"Seitentexte fehlen: {missing[:10]}")
+    with transaction.atomic():
+        doc = Document.objects.select_for_update().get(pk=doc.pk)
+        if doc.status != "hashed":
+            raise SkipJob("already_processed")
+        DocumentPage.objects.filter(document=doc).delete()
+        DocumentPage.objects.bulk_create(rows, batch_size=500)
+        doc.status = "ocr_done"
+        doc.ocr_cache_key = doc.sha256
+        doc.page_count = page_count
+        doc.save(update_fields=["status", "ocr_cache_key", "page_count", "updated_at"])
+    enqueue(
+        JobType.RENDER_PREVIEWS,
+        job.object,
+        key=idempotency_key(JobType.RENDER_PREVIEWS, job.object_id, doc.sha256),
+        document=doc,
+        run=job.run,
+        priority=200,
+    )
+    enqueue(
+        JobType.EXTRACT_ENTITIES,
+        job.object,
+        key=idempotency_key(JobType.EXTRACT_ENTITIES, job.object_id, doc.sha256),
+        document=doc,
+        run=job.run,
+    )
+    return {"pages": page_count, "masked": sum(r.masked_entities_count for r in rows)}
+
+
+@job_task(JobType.RENDER_PREVIEWS)
+def render_previews_task(job: ProcessingJob) -> dict:
+    doc = job.document
+    if doc is None or not doc.sha256:
+        raise SkipJob("kein Dokument")
+    analysis_file = storage.analysis_path(doc.sha256)
+    pdf_path = None
+    if analysis_file.exists():
+        pdf_path = json.loads(analysis_file.read_text(encoding="utf-8")).get("pdf_path")
+    if not pdf_path or not Path(pdf_path).exists():
+        raise SkipJob("kein PDF für Seitenbilder")
+    count = render_previews(
+        Path(pdf_path),
+        doc.pk,
+        long_edge_px=int(store.get("previews.long_edge_px", 1200)),
+        quality=int(store.get("previews.jpeg_quality", 80)),
+        heartbeat=lambda n: heartbeat(job, n),
+    )
+    return {"rendered": count}
+
+
+# ---------------------------------------------------------------- 6 extract_entities
+@job_task(JobType.EXTRACT_ENTITIES)
+def extract_entities(job: ProcessingJob) -> dict:
+    doc = job.document
+    if doc is None or doc.status not in ("ocr_done", "classified", "review", "filed"):
+        raise SkipJob("not_ready")
+    gaz = build_gazetteer(job.object)
+    fuzzy_auto = int(store.get("classification.fuzzy_auto", 90))
+    fuzzy_candidate = int(store.get("classification.fuzzy_candidate_min", 78))
+    entities = []
+    for page in DocumentPage.objects.filter(document=doc).order_by("page_no"):
+        cached = storage.read_page(doc.sha256, page.page_no)
+        hits = cached[1] if cached else []
+        entities.extend(
+            extract_page(
+                page.text_content or "",
+                page.page_no,
+                gaz,
+                hits,
+                fuzzy_auto=fuzzy_auto,
+                fuzzy_candidate=fuzzy_candidate,
+            )
+        )
+        heartbeat(job, page.page_no)
+    match_iban_owners(entities, job.object)
+    with transaction.atomic():
+        DocumentEntity.objects.filter(document=doc).delete()
+        DocumentEntity.objects.bulk_create(
+            [
+                DocumentEntity(
+                    document=doc,
+                    page_no=e.page_no,
+                    entity_type=e.entity_type,
+                    value_text=(e.value_text or "")[:255],
+                    value_normalized=(e.value_normalized or None) and e.value_normalized[:255],
+                    iban_last4=e.iban_last4,
+                    iban_hash=e.iban_hash,
+                    char_from=e.char_from,
+                    char_to=e.char_to,
+                    confidence=e.confidence,
+                    matched_owner_id=e.matched_owner_id,
+                    matched_unit_id=e.matched_unit_id,
+                    matched_tenant_id=e.matched_tenant_id,
+                    match_confidence=e.match_confidence,
+                )
+                for e in entities
+            ],
+            batch_size=500,
+        )
+    return {
+        "entities": len(entities),
+        "units": sum(1 for e in entities if e.entity_type == "unit_label"),
+        "iban": sum(1 for e in entities if e.entity_type == "iban"),
+    }
+
+
+# ---------------------------------------------------------------- Sweeper
+@shared_task(name="pipeline.sweep", queue="io")
+def sweep() -> dict:
+    from apps.pipeline.runs import maybe_finish_run, schedule_runs
+
+    result = sweep_stale_jobs()
+    result["orphans_removed"] = remove_orphan_work_dirs()
+    from apps.pipeline.models import ProcessingRun, RunStatus
+
+    for run in ProcessingRun.objects.filter(status=RunStatus.RUNNING):
+        maybe_finish_run(run)
+    result["runs_started"] = len(schedule_runs())
+    return result
+
+
+def remove_orphan_work_dirs() -> int:
+    """work/<sha256> ohne offenen Job nach processing.work_orphan_hours loeschen (E 10.4 Punkt 4); ocr-cache bleibt."""
+    hours = int(store.get("processing.work_orphan_hours", 48))
+    root = storage.data_dir() / "work"
+    if not root.exists():
+        return 0
+    removed = 0
+    cutoff = time.time() - hours * 3600
+    for path in root.iterdir():
+        if not path.is_dir() or path.stat().st_mtime > cutoff:
+            continue
+        sha = path.name
+        if sha.startswith("tmp-"):
+            shutil.rmtree(path, ignore_errors=True)
+            removed += 1
+            continue
+        active = ProcessingJob.objects.filter(
+            document__sha256=sha, status__in=[JobStatus.PENDING, JobStatus.RUNNING]
+        ).exists()
+        unfinished = Document.objects.filter(sha256=sha, status__in=["hashed"]).exists()
+        if not active and not unfinished:
+            shutil.rmtree(path, ignore_errors=True)
+            removed += 1
+    return removed
+
+
+def now_iso() -> str:
+    return timezone.now().isoformat()

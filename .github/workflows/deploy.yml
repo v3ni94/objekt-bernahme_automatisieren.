@@ -1,0 +1,51 @@
+name: Deploy
+
+# Deployment auf den VPS ueber SSH (docs/betrieb/github-deploy.md). Nur manuell (workflow_dispatch), damit Deployments im
+# vereinbarten Zeitfenster (F27) und ausserhalb laufender Objektverarbeitung stattfinden. Der Schluessel darf auf dem
+# Server nur scripts/deploy_remote.sh ausfuehren (command= in authorized_keys).
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "Branch, der auf dem Server ausgecheckt und deployed wird"
+        required: true
+        default: "main"
+      action:
+        description: "deploy oder rollback"
+        required: true
+        default: "deploy"
+        type: choice
+        options: ["deploy", "rollback"]
+
+concurrency:
+  group: deploy-vps
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: SSH-Schluessel und bekannte Hosts einrichten
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          test -n "$DEPLOY_SSH_KEY" || { echo "Secret DEPLOY_SSH_KEY fehlt"; exit 1; }
+          test -n "$DEPLOY_KNOWN_HOSTS" || { echo "Secret DEPLOY_KNOWN_HOSTS fehlt"; exit 1; }
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/id_deploy && chmod 600 ~/.ssh/id_deploy
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts && chmod 644 ~/.ssh/known_hosts
+      - name: Deployment auf dem Server ausfuehren
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          BRANCH: ${{ inputs.branch }}
+          ACTION: ${{ inputs.action }}
+        run: |
+          test -n "$DEPLOY_HOST" || { echo "Secret DEPLOY_HOST fehlt"; exit 1; }
+          test -n "$DEPLOY_USER" || { echo "Secret DEPLOY_USER fehlt"; exit 1; }
+          case "$BRANCH" in *[!A-Za-z0-9._/-]*) echo "unzulaessiger Branchname"; exit 1;; esac
+          ssh -i ~/.ssh/id_deploy -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o BatchMode=yes \
+            "$DEPLOY_USER@$DEPLOY_HOST" "$ACTION $BRANCH"

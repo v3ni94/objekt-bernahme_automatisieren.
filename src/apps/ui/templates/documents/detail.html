@@ -1,0 +1,26 @@
+{% extends "base.html" %}{% load perms %}{% block title %}Dokument {{ document.pk }} · {{ APP_NAME }}{% endblock %}
+{% block content %}<h1>{{ document.current_name }}</h1>
+<p><a href="{% url 'document_list' object.pk %}">Dokumente Objekt {{ object.object_number }}</a></p>
+<div class="raster">
+<div class="karte"><h2>Dokument</h2>
+<table><tr><td>Status</td><td>{{ document.get_status_display }}</td></tr>
+<tr><td>Quelle</td><td>{{ document.get_source_display }}</td></tr>
+<tr><td>Größe</td><td>{{ document.size_bytes|filesizeformat }}</td></tr>
+<tr><td>Typ</td><td class="mono">{{ document.mime_type }}</td></tr>
+<tr><td>SHA-256</td><td class="mono">{{ document.sha256|default:"noch nicht berechnet" }}</td></tr>
+<tr><td>Seiten</td><td>{{ document.page_count|default:"" }} {{ document.get_origin_kind_display|default:"" }}</td></tr>
+<tr><td>Kategorie</td><td>{{ document.category.folder_name|default:"noch nicht klassifiziert" }}{% if document.subfolder %} / {{ document.subfolder.folder_name }}{% endif %}</td></tr>
+{% if document.duplicate_of %}<tr><td>Dublette von</td><td><a href="{% url 'document_detail' document.duplicate_of.pk %}">Dokument {{ document.duplicate_of.pk }} {{ document.duplicate_of.current_name }}</a></td></tr>{% endif %}
+{% if document.error_message %}<tr><td>Fehler</td><td class="mono">{{ document.error_message }}</td></tr>{% endif %}</table></div>
+<div class="karte"><h2>Jobs</h2>
+<table class="voll"><thead><tr><th>Typ</th><th>Status</th><th>Versuche</th><th>Dauer</th><th>Fehler</th></tr></thead><tbody>
+{% for j in jobs %}<tr><td>{{ j.get_job_type_display }}{% if j.payload.chunk_no %} Block {{ j.payload.chunk_no }}{% endif %}</td><td>{{ j.get_status_display }}</td><td>{{ j.attempt_count }}</td><td>{% if j.duration_ms %}{{ j.duration_ms }} ms{% endif %}</td><td class="mono">{{ j.last_error|default:""|truncatechars:120 }}</td></tr>{% empty %}<tr><td colspan="5">Keine Jobs.</td></tr>{% endfor %}</tbody></table></div>
+</div>
+<div class="karte"><h2>Entitäten ({{ entities|length }})</h2>
+<table class="voll"><thead><tr><th>Seite</th><th>Typ</th><th>Wert</th><th>Normalisiert</th><th>Konfidenz</th><th>Zuordnung</th></tr></thead><tbody>
+{% for e in entities %}<tr><td>{{ e.page_no }}</td><td>{{ e.get_entity_type_display }}</td><td>{% if e.entity_type == "iban" %}**** {{ e.iban_last4 }}{% else %}{{ e.value_text }}{% endif %}</td><td class="mono">{{ e.value_normalized|default:"" }}</td><td>{{ e.confidence|default:"" }}</td><td>{% if e.matched_owner %}Eigentümer {{ e.matched_owner }}{% elif e.matched_unit %}Einheit {{ e.matched_unit.unit_label }}{% elif e.matched_tenant %}Mieter {{ e.matched_tenant }}{% endif %}{% if e.match_confidence %} ({{ e.match_confidence }}){% endif %}</td></tr>{% empty %}<tr><td colspan="6">Noch keine Entitäten.</td></tr>{% endfor %}</tbody></table></div>
+<div class="karte"><h2>Seitentexte (maskiert)</h2>
+{% for p in pages %}<details><summary>Seite {{ p.page_no }} · {{ p.get_text_source_display }} · {{ p.char_count }} Zeichen{% if p.masked_entities_count %} · {{ p.masked_entities_count }} maskiert{% endif %}</summary>
+{% if previews|get_item:p.page_no %}<p><img src="{% url 'document_preview' document.pk p.page_no %}" alt="Seite {{ p.page_no }}" style="max-width:100%;height:auto;border:1px solid #ccc"></p>{% endif %}
+<pre class="mono" style="white-space:pre-wrap">{{ p.text_content }}</pre></details>{% empty %}<p class="klein">Noch keine Seitentexte.</p>{% endfor %}</div>
+{% endblock %}

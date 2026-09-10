@@ -551,5 +551,9 @@
       "Versicherung",
       "Kautionsversicherung"
     ]
-  }
+  },
+  "processing.work_orphan_hours": 48,
+  "processing.heartbeat_seconds": 30,
+  "ocr.language": "deu",
+  "ocr.image_cover_ratio": 0.9
 }

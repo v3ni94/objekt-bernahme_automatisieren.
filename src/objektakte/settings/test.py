@@ -30,6 +30,7 @@ PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
 STORAGES["staticfiles"] = {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"}
 CELERY_TASK_ALWAYS_EAGER = True
 OBJEKTAKTE["DATA_DIR"] = REPO_DIR / "data"
+OBJEKTAKTE["JOB_DISPATCH"] = "none"  # Jobs laufen in Tests ueber apps.pipeline.local.run_pending_jobs
 OBJEKTAKTE["READYZ_TOKEN"] = "test-readyz-token"  # noqa: S105
 FIELD_KEYS = {
     "totp": "dGVzdC1zY2hsdWVzc2VsLXRvdHAtMzItYnl0ZXMtbGFuZw==",

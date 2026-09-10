@@ -1,0 +1,4 @@
+{% extends "base.html" %}{% block title %}Dokumente hochladen · {{ APP_NAME }}{% endblock %}
+{% block content %}<div class="karte schmal"><h1>Dokumente hochladen</h1><p class="klein">Objekt {{ object.object_number }} {{ object.name|default:"" }}</p>
+<form method="post" enctype="multipart/form-data">{% csrf_token %}{{ form.as_p }}<button type="submit">Hochladen</button> <a href="{% url 'document_list' object.pk %}">Abbrechen</a></form>
+<p class="hinweis">Unterstützt: PDF, Bilder (JPG, PNG, TIFF), Word, Excel, CSV, Text. Die Dateien werden gehasht, auf Dubletten geprüft, seitenweise analysiert und nur bei fehlender Textebene erkannt. Bankverbindungen werden vor jeder Speicherung maskiert. Die Verarbeitung läuft je Objekt nacheinander; weitere Objekte warten mit sichtbarer Position.</p></div>{% endblock %}

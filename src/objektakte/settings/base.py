@@ -234,6 +234,8 @@ CELERY_BEAT_SCHEDULE: dict = {
         "schedule": crontab(hour=4, minute=0),
         "options": {"queue": "io"},
     },
+    # Sweeper der Verarbeitung jede Minute (E 10.4); zusaetzlich beim Start jedes Worker-Containers (objektakte.celery)
+    "pipeline-sweep": {"task": "pipeline.sweep", "schedule": crontab(minute="*"), "options": {"queue": "io"}},
     "parties-check-assignment-consistency": {
         "task": "parties.check_assignment_consistency",
         "schedule": crontab(hour=3, minute=15),
@@ -251,6 +253,7 @@ OBJEKTAKTE = {
     "SEED_DIR": REPO_DIR / "db" / "seeds",
     "CATALOG_FILE": SRC_DIR / "apps" / "config" / "catalog.json",
     "HEARTBEAT_STALE_SECONDS": 120,  # ANNAHME A19
+    "JOB_DISPATCH": env_str("JOB_DISPATCH", "celery"),  # celery | none (Tests und lokaler Runner)
     "SERVICES_WITH_HEARTBEAT": env_list(
         "SERVICES_WITH_HEARTBEAT", ["worker-ocr", "worker-nlp", "worker-io", "beat"]
     ),

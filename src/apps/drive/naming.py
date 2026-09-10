@@ -175,6 +175,12 @@ def _fit_length(prefix: str, names: list[str], cfg: OwnerFileNamingConfig) -> st
         if len(base) <= cfg.name_max_length:
             return base
     room = cfg.name_max_length - (len(prefix) + 1 if prefix else 0)
+    if prefix and room < 3:
+        # Einheitentoken laenger als die Hoechstlaenge erlaubt: Token kuerzen, Trennzeichen und mindestens drei
+        # Zeichen des Namensteils bleiben erhalten (Eigenschaft: Ordnername beginnt mit dem Einheitentoken)
+        keep = max(cfg.name_max_length - 4, 1)
+        prefix = prefix[:keep].rstrip(" .-_") or prefix[:keep]
+        room = cfg.name_max_length - len(prefix) - 1
     if room <= 0:
         return base[: cfg.name_max_length]
     return (f"{prefix}_" if prefix else "") + name_part[:room].rstrip(" .-")

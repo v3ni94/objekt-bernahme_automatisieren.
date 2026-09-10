@@ -1365,6 +1365,55 @@
           }
         }
       }
+    },
+    {
+      "key": "processing.work_orphan_hours",
+      "category": "processing",
+      "value_type": "integer",
+      "nullable": false,
+      "description": "Frist, nach der verwaiste Arbeitsverzeichnisse unter work/ ohne aktiven Job geräumt werden (E 10.4 Punkt 4); ANNAHME",
+      "source": "E 10.4",
+      "schema": {
+        "type": "integer",
+        "minimum": 1
+      }
+    },
+    {
+      "key": "processing.heartbeat_seconds",
+      "category": "processing",
+      "value_type": "integer",
+      "nullable": false,
+      "description": "Abstand der Heartbeats laufender Jobs in Sekunden (ANNAHME A-13)",
+      "source": "A-13",
+      "schema": {
+        "type": "integer",
+        "minimum": 5
+      }
+    },
+    {
+      "key": "ocr.language",
+      "category": "ocr",
+      "value_type": "string",
+      "nullable": false,
+      "description": "Tesseract-Sprachkürzel für ocrmypdf (CR 0.1: deu)",
+      "source": "CR 0.1",
+      "schema": {
+        "type": "string",
+        "minLength": 3
+      }
+    },
+    {
+      "key": "ocr.image_cover_ratio",
+      "category": "ocr",
+      "value_type": "decimal",
+      "nullable": false,
+      "description": "Anteil der Seitenfläche, ab dem ein einzelnes Bild als seitenfüllend gilt (Kriterium 3 in E 1.3); ANNAHME A-11",
+      "source": "E 1.3",
+      "schema": {
+        "type": "number",
+        "minimum": 0.5,
+        "maximum": 1
+      }
     }
   ]
 }

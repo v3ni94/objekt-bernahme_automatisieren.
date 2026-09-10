@@ -14,6 +14,19 @@
 {% if backup.ok %}<p><span class="ampel gruen">ok</span> letzter Lauf {{ backup.last_run }}, vor {{ backup.age_h }} h, {{ backup.total_bytes|filesizeformat }}</p>{% else %}<p><span class="ampel rot">{% if backup.status %}{{ backup.status }}{% elif backup.error %}{{ backup.error }}{% else %}unbekannt{% endif %}</span></p>{% endif %}
 <p class="hinweis">Manueller Lauf: <code>docker compose exec -T backup /usr/local/bin/backup.sh</code></p>
 </section>
-<section class="karte"><h2>Verarbeitung</h2><p class="hinweis">Fortschritt je Objekt, Warteschlangen und Review-Fälle folgen mit Meilenstein M5 und M7.</p></section>
+<section class="karte"><h2>Warteschlangen</h2>
+<table><tr><th>Queue</th><th>wartet</th><th>läuft</th></tr>
+{% for q, n in processing.queues.items %}<tr><td class="mono">{{ q }}</td><td>{{ n.pending }}</td><td>{{ n.running }}</td></tr>{% empty %}<tr><td colspan="3">Keine offenen Jobs.</td></tr>{% endfor %}
+</table>
+<p class="klein">Fehlgeschlagene Jobs: {{ processing.failed_jobs }}</p>
+{% if can_operate %}<form method="post" action="{% url 'status_sweep' %}">{% csrf_token %}<button type="submit">Sweeper jetzt ausführen</button></form>{% endif %}
+</section>
+<section class="karte"><h2>Läufe</h2>
+<table><tr><th>Objekt</th><th>Art</th><th>Status</th><th>Position</th></tr>
+{% for r, pos in processing.runs %}<tr><td><a href="{% url 'document_list' r.object.pk %}">{{ r.object.object_number }}</a></td><td>{{ r.get_run_type_display }}</td><td>{% if r.status == "running" %}<span class="ampel gruen">läuft</span>{% else %}<span class="ampel grau">wartet</span>{% endif %}</td><td>{% if pos %}{{ pos }}{% endif %}</td></tr>{% empty %}<tr><td colspan="4">Kein offener Lauf.</td></tr>{% endfor %}
+</table></section>
 </div>
+<section class="karte"><h2>Verarbeitung je Objekt</h2>
+<table class="voll"><thead><tr><th>Objekt</th><th>Dokumente</th><th>Hash</th><th>Text</th><th>Klassifiziert</th><th>Abgelegt</th><th>Prüfung</th><th>Dubletten</th><th>Fehler</th><th>Seiten</th><th>Review offen</th><th>Stand</th></tr></thead><tbody>
+{% for p in processing.progress %}<tr><td><a href="{% url 'document_list' p.object.pk %}">{{ p.object.object_number }}</a></td><td>{{ p.documents_total }}</td><td>{{ p.documents_hashed }}</td><td>{{ p.documents_ocr_done }}</td><td>{{ p.documents_classified }}</td><td>{{ p.documents_filed }}</td><td>{{ p.documents_review }}</td><td>{{ p.documents_duplicate }}</td><td>{% if p.documents_error %}<span class="ampel rot">{{ p.documents_error }}</span>{% else %}0{% endif %}</td><td>{{ p.pages_done }} / {{ p.pages_total }}</td><td>{{ p.review_open }}</td><td>{{ p.updated_at|date:"d.m.Y H:i" }}</td></tr>{% empty %}<tr><td colspan="12">Noch keine Verarbeitung.</td></tr>{% endfor %}</tbody></table></section>
 {% endblock %}

@@ -1511,6 +1511,8 @@ Celery-Queues aus den Settings: `ai`, `classify`, `io`, `lists`, `ocr`
 | ocr.digital_alnum_ratio | ocr | decimal | `0.6` |
 | ocr.digital_min_chars | ocr | integer | `50` |
 | ocr.dpi_cap | ocr | integer | `300` |
+| ocr.image_cover_ratio | ocr | decimal | `0.9` |
+| ocr.language | ocr | string | `"deu"` |
 | ocr.tessdata_variant | ocr | string | `"standard"` |
 | ocr.two_phase_enabled | ocr | boolean | `false` |
 | ocr.two_phase_head_pages | ocr | integer | `3` |
@@ -1531,7 +1533,9 @@ Celery-Queues aus den Settings: `ai`, `classify`, `io`, `lists`, `ocr`
 | previews.jpeg_quality | previews | integer | `80` |
 | previews.long_edge_px | previews | integer | `1200` |
 | previews.retention_days_after_resolve | previews | integer | `90` |
+| processing.heartbeat_seconds | processing | integer | `30` |
 | processing.max_parallel_objects | processing | integer | `1` |
+| processing.work_orphan_hours | processing | integer | `48` |
 | reports.misc_share_target_pct | reports | integer | `5` |
 | reports.review_age_warning_days | reports | integer | `10` |
 | retention.hint | retention | string | `"durch Geschäftsführung und Steuerberater festzulegen"` |
@@ -1575,6 +1579,9 @@ Celery-Queues aus den Settings: `ai`, `classify`, `io`, `lists`, `ocr`
 | drive.move | Datei in Drive verschoben |
 | drive.create_folder | Ordner in Drive angelegt |
 | drive.upload | Datei nach Drive hochgeladen |
+| document.ingest | Dokument hochgeladen (Upload in die Verarbeitung) |
+| processing.start | Verarbeitungslauf angefordert |
+| processing.sweep | Sweeper manuell ausgeführt |
 | document.view | Dokument aus Eigentümerakte angesehen (nur bei security.log_document_views) |
 | document.download | Dokument aus Eigentümerakte heruntergeladen (nur bei security.log_document_views) |
 | review.assign | Fall zugewiesen |
@@ -1603,7 +1610,7 @@ Celery-Queues aus den Settings: `ai`, `classify`, `io`, `lists`, `ocr`
 
 ## Startparameter (.env)
 
-`IMAGE_TAG`, `APP_UID`, `APP_ENV`, `TZ`, `APP_DOMAIN`, `APP_BASE_URL`, `TESSDATA_VARIANT`, `TRAEFIK_NETWORK`, `TRAEFIK_ENTRYPOINT`, `TRAEFIK_ENTRYPOINT_INSECURE`, `TRAEFIK_CERTRESOLVER`, `TRAEFIK_REDIRECT_ROUTER`, `TRUSTED_PROXY_CIDR`, `MARIADB_TAG`, `REDIS_IMAGE`, `REDIS_TAG`, `DB_NAME`, `DB_USER`, `DB_WORKER_USER`, `DB_MIGRATE_USER`, `DB_BACKUP_USER`, `DB_MAX_CONNECTIONS`, `DB_INNODB_BUFFER_POOL`, `GUNICORN_WORKERS`, `GUNICORN_THREADS`, `GUNICORN_TIMEOUT`, `OCR_PROCESSES`, `NLP_CONCURRENCY`, `IO_CONCURRENCY`, `WORKER_MAX_TASKS_PER_CHILD`, `WORKER_MAX_MEMORY_PER_CHILD_KB`, `WORKER_STOP_GRACE`, `JOBS_VISIBILITY_TIMEOUT_S`, `WEB_CPUS`, `WEB_MEM`, `WORKER_CPUS`, `WORKER_MEM`, `WORKER_NLP_CPUS`, `WORKER_NLP_MEM`, `WORKER_IO_CPUS`, `WORKER_IO_MEM`, `BEAT_CPUS`, `BEAT_MEM`, `DB_CPUS`, `DB_MEM`, `REDIS_CPUS`, `REDIS_MEM`, `REDIS_MAXMEMORY`, `BACKUP_CPUS`, `BACKUP_MEM`, `CLASSIFIER_CPUS`, `CLASSIFIER_MEM`, `LOG_LEVEL`, `LOG_FORMAT`, `LOG_MAX_SIZE`, `LOG_MAX_FILE`, `DISK_RESERVE_GB`, `BACKUP_CRON`, `BACKUP_RETENTION_DAYS`, `BACKUP_MAX_AGE_HOURS`, `OFFSITE_ENABLED`, `OFFSITE_REMOTE`, `GOOGLE_CLIENT_ID`, `GOOGLE_REDIRECT_URI`, `GOOGLE_LOGIN_REDIRECT_URI`, `DRIVE_ACCOUNT_EMAIL`, `DRIVE_SCOPES`, `GOOGLE_LOGIN_ENABLED`, `GOOGLE_LOGIN_HOSTED_DOMAIN`, `OPENAI_BASE_URL`, `ANTHROPIC_BASE_URL`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_FROM`, `ALERT_EMAIL_TO`, `ALERTS_ENABLED`, `SESSION_IDLE_MINUTES`, `SESSION_ABSOLUTE_HOURS`, `LOGIN_MAX_ATTEMPTS`, `LOGIN_LOCKOUT_MINUTES`, `PASSWORD_MIN_LENGTH`, `REAUTH_TIMEOUT_SECONDS`, `MFA_REQUIRED`
+`IMAGE_TAG`, `APP_UID`, `APP_ENV`, `TZ`, `APP_DOMAIN`, `APP_BASE_URL`, `TESSDATA_VARIANT`, `JOB_DISPATCH`, `TRAEFIK_NETWORK`, `TRAEFIK_ENTRYPOINT`, `TRAEFIK_ENTRYPOINT_INSECURE`, `TRAEFIK_CERTRESOLVER`, `TRAEFIK_REDIRECT_ROUTER`, `TRUSTED_PROXY_CIDR`, `MARIADB_TAG`, `REDIS_IMAGE`, `REDIS_TAG`, `DB_NAME`, `DB_USER`, `DB_WORKER_USER`, `DB_MIGRATE_USER`, `DB_BACKUP_USER`, `DB_MAX_CONNECTIONS`, `DB_INNODB_BUFFER_POOL`, `GUNICORN_WORKERS`, `GUNICORN_THREADS`, `GUNICORN_TIMEOUT`, `OCR_PROCESSES`, `NLP_CONCURRENCY`, `IO_CONCURRENCY`, `WORKER_MAX_TASKS_PER_CHILD`, `WORKER_MAX_MEMORY_PER_CHILD_KB`, `WORKER_STOP_GRACE`, `JOBS_VISIBILITY_TIMEOUT_S`, `WEB_CPUS`, `WEB_MEM`, `WORKER_CPUS`, `WORKER_MEM`, `WORKER_NLP_CPUS`, `WORKER_NLP_MEM`, `WORKER_IO_CPUS`, `WORKER_IO_MEM`, `BEAT_CPUS`, `BEAT_MEM`, `DB_CPUS`, `DB_MEM`, `REDIS_CPUS`, `REDIS_MEM`, `REDIS_MAXMEMORY`, `BACKUP_CPUS`, `BACKUP_MEM`, `CLASSIFIER_CPUS`, `CLASSIFIER_MEM`, `LOG_LEVEL`, `LOG_FORMAT`, `LOG_MAX_SIZE`, `LOG_MAX_FILE`, `DISK_RESERVE_GB`, `BACKUP_CRON`, `BACKUP_RETENTION_DAYS`, `BACKUP_MAX_AGE_HOURS`, `OFFSITE_ENABLED`, `OFFSITE_REMOTE`, `GOOGLE_CLIENT_ID`, `GOOGLE_REDIRECT_URI`, `GOOGLE_LOGIN_REDIRECT_URI`, `DRIVE_ACCOUNT_EMAIL`, `DRIVE_SCOPES`, `GOOGLE_LOGIN_ENABLED`, `GOOGLE_LOGIN_HOSTED_DOMAIN`, `OPENAI_BASE_URL`, `ANTHROPIC_BASE_URL`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_FROM`, `ALERT_EMAIL_TO`, `ALERTS_ENABLED`, `SESSION_IDLE_MINUTES`, `SESSION_ABSOLUTE_HOURS`, `LOGIN_MAX_ATTEMPTS`, `LOGIN_LOCKOUT_MINUTES`, `PASSWORD_MIN_LENGTH`, `REAUTH_TIMEOUT_SECONDS`, `MFA_REQUIRED`
 
 ## Rechte (roles.permissions)
 

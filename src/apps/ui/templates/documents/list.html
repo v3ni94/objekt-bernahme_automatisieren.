@@ -1,0 +1,29 @@
+{% extends "base.html" %}{% block title %}Dokumente Objekt {{ object.object_number }} · {{ APP_NAME }}{% endblock %}
+{% block content %}<h1>Dokumente und Verarbeitung: Objekt {{ object.object_number }} {{ object.name|default:"" }}</h1>
+<p><a href="{% url 'object_detail' object.pk %}">Zurück zum Objekt</a></p>
+<div class="raster">
+<div class="karte"><h2>Fortschritt</h2>
+<table><tr><td>Dokumente gesamt</td><td>{{ progress.documents_total }}</td></tr>
+<tr><td>Hash bekannt</td><td>{{ progress.documents_hashed }}</td></tr>
+<tr><td>Text erkannt</td><td>{{ progress.documents_ocr_done }}</td></tr>
+<tr><td>Klassifiziert</td><td>{{ progress.documents_classified }}</td></tr>
+<tr><td>Abgelegt</td><td>{{ progress.documents_filed }}</td></tr>
+<tr><td>In Prüfung</td><td>{{ progress.documents_review }}</td></tr>
+<tr><td>Dubletten</td><td>{{ progress.documents_duplicate }}</td></tr>
+<tr><td>Fehler</td><td>{{ progress.documents_error }}</td></tr>
+<tr><td>Seiten erkannt</td><td>{{ progress.pages_done }} von {{ progress.pages_total }}</td></tr>
+<tr><td>Offene Review-Fälle</td><td>{{ progress.review_open }}</td></tr></table>
+{% if open_jobs %}<p class="klein">Offene Jobs: {% for j in open_jobs %}{{ j.job_type }} {{ j.status }} {{ j.c }}{% if not forloop.last %}, {% endif %}{% endfor %}</p>{% endif %}
+{% if can_ingest %}<p><a class="knopf" href="{% url 'document_upload' object.pk %}">Dokumente hochladen</a>
+<form method="post" action="{% url 'processing_start' object.pk %}" class="inline">{% csrf_token %}<input type="hidden" name="run_type" value="incremental"><button type="submit">Verarbeitung starten</button></form></p>{% endif %}</div>
+<div class="karte"><h2>Läufe</h2>
+<table class="voll"><thead><tr><th>Nr.</th><th>Art</th><th>Status</th><th>Warteposition</th><th>Dokumente</th><th>Seiten</th><th>Seiten je Minute</th><th>Start</th><th>Ende</th></tr></thead><tbody>
+{% for r, pos in runs %}<tr><td>{{ r.pk }}</td><td>{{ r.get_run_type_display }}</td><td>{% if r.status == "running" %}<span class="ampel gruen">läuft</span>{% elif r.status == "pending" %}<span class="ampel grau">wartet</span>{% elif r.status == "done" %}fertig{% else %}<span class="ampel rot">{{ r.get_status_display }}</span>{% endif %}</td><td>{% if pos %}{{ pos }}{% endif %}</td><td>{{ r.documents_done|default:"0" }} / {{ r.documents_total|default:"0" }}</td><td>{{ r.pages_done|default:"" }}</td><td>{{ r.pages_per_minute|default:"" }}</td><td>{{ r.started_at|date:"d.m.Y H:i"|default:"" }}</td><td>{{ r.finished_at|date:"d.m.Y H:i"|default:"" }}</td></tr>
+{% empty %}<tr><td colspan="9">Noch kein Lauf.</td></tr>{% endfor %}</tbody></table></div>
+</div>
+<div class="karte"><h2>Dokumente ({{ documents|length }})</h2>
+<form method="get" class="filter inline"><select name="status"><option value="">alle Status</option>{% for code, n in counts.items %}<option value="{{ code }}" {% if code == status_filter %}selected{% endif %}>{{ code }} ({{ n }})</option>{% endfor %}</select><button type="submit">Filtern</button></form>
+<table class="voll"><thead><tr><th>Name</th><th>Quelle</th><th>Status</th><th>Seiten</th><th>Herkunft</th><th>Kategorie</th><th>Dublette von</th><th>Angelegt</th></tr></thead><tbody>
+{% for d in documents %}<tr><td><a href="{% url 'document_detail' d.pk %}">{{ d.current_name }}</a></td><td>{{ d.get_source_display }}</td><td>{% if d.status == "error" %}<span class="ampel rot">Fehler</span>{% elif d.status == "duplicate" %}<span class="ampel grau">Dublette</span>{% else %}{{ d.get_status_display }}{% endif %}</td><td>{{ d.page_count|default:"" }}</td><td>{{ d.get_origin_kind_display|default:"" }}</td><td>{{ d.category.folder_name|default:"" }}</td><td>{% if d.duplicate_of %}<a href="{% url 'document_detail' d.duplicate_of.pk %}">{{ d.duplicate_of.pk }}</a>{% endif %}</td><td>{{ d.created_at|date:"d.m.Y H:i" }}</td></tr>
+{% empty %}<tr><td colspan="8">Noch keine Dokumente.</td></tr>{% endfor %}</tbody></table></div>
+{% endblock %}
