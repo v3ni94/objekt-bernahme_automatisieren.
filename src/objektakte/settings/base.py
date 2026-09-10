@@ -261,6 +261,8 @@ OBJEKTAKTE = {
     "SERVICE_NAME": env_str("SERVICE_NAME", "web"),
     # Unterschriftsbild der Geschaeftsfuehrung nur aus dem Betrieb (Docker Secret oder Volume), nie im Repository
     "HVM_SIGNATURE_PATH": env_str("HVM_SIGNATURE_PATH", "/run/secrets/hvm_signature"),
+    # Automatische Listenerzeugung nach Lauf, Review, Import und Stammdatenaenderung (CR 12a); in Tests aus
+    "LISTS_AUTO_GENERATE": env_str("LISTS_AUTO_GENERATE", "true").lower() in ("1", "true", "yes"),
     "DATA_DIR": Path(env_str("DATA_DIR", "/data")),
     "DISK_RESERVE_GB": env_int("DISK_RESERVE_GB", 10),
     "HEARTBEAT_FILE": env_str("HEARTBEAT_FILE", "/tmp/heartbeat"),

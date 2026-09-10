@@ -187,5 +187,9 @@ def maybe_finish_run(run: ProcessingRun) -> bool:
     from apps.requirements.tasks import trigger_evaluation
 
     trigger_evaluation(run.object_id, "run")  # H 3.5: Bewertung nach jedem Verarbeitungslauf
+    if not run.dry_run:
+        from apps.lists.services import request_generation
+
+        request_generation(run.object_id, "run")  # CR 12a: Listen nach jedem Verarbeitungslauf (entprellt)
     schedule_runs()
     return True

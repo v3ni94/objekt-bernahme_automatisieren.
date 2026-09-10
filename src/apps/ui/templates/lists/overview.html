@@ -1,0 +1,17 @@
+{% extends "base.html" %}{% load perms %}{% block title %}Listen {{ object.object_number }} · {{ APP_NAME }}{% endblock %}
+{% block content %}<h1>Listen Objekt {{ object.object_number }} {{ object.name|default:"" }}</h1>
+<p><a href="{% url 'object_detail' object.pk %}">Objekt</a> · <a href="{% url 'completeness' object.pk %}">Vollständigkeit</a></p>
+<div class="karte"><h2>Stand je Liste und Format</h2>
+<p class="klein">Je Objekt genau eine Datei je Liste und Format in Drive (Eigentümerliste im Hauptordner 05, Mieterliste im Hauptordner 04), neue Version derselben Datei bei geändertem Inhalt, kein Datum im Dateinamen. Erzeugung nach Verarbeitungslauf, Review-Bestätigung (entprellt), Import-Übernahme, Stammdatenänderung und manuell.</p>
+<table class="voll"><thead><tr><th>Liste</th><th>Format</th><th>Sollname</th><th>Letzter Lauf</th><th>Status</th><th>Zeilen aktuell / Historie / offen</th><th>Drive</th><th>Lokal</th></tr></thead><tbody>
+{% for r in rows %}<tr><td>{{ r.label }}</td><td>{{ r.format }}</td><td class="mono">{{ r.name }}</td><td>{% if r.gen %}{{ r.gen.generated_at|date:"d.m.Y H:i" }} ({{ r.gen.get_trigger_kind_display }}){% else %}noch nicht erzeugt{% endif %}</td>
+<td>{% if not r.gen %}<span class="ampel grau">offen</span>{% elif r.gen.status == "done" %}<span class="ampel gruen">fertig</span>{% elif r.gen.status == "skipped_unchanged" %}<span class="ampel gruen">unverändert</span>{% else %}<span class="ampel rot">fehlgeschlagen</span> <span class="klein">{{ r.gen.error_message|default:"" }}</span>{% endif %}</td>
+<td>{% if r.gen %}{{ r.gen.rows_current }} / {{ r.gen.rows_history }} / {{ r.gen.rows_open }}{% endif %}</td>
+<td class="mono klein">{% if r.gen and r.gen.drive_node %}{{ r.gen.drive_node.drive_file_id }}{% elif r.gen %}nicht veröffentlicht{% endif %}</td>
+<td>{% if r.local and can_generate %}<a href="{% url 'list_download' object.pk r.list_type r.format %}">herunterladen</a>{% endif %}</td></tr>{% endfor %}</tbody></table>
+{% if can_generate %}<form method="post" class="inline">{% csrf_token %}<button type="submit">Listen jetzt erzeugen</button></form>{% endif %}</div>
+<div class="karte"><h2>Verlauf</h2>
+<table class="voll"><thead><tr><th>Zeitpunkt</th><th>Liste</th><th>Format</th><th>Auslöser</th><th>Status</th><th>Zeilen</th><th>Dauer</th><th>Prüfsumme</th><th>Fehler</th></tr></thead><tbody>
+{% for g in history %}<tr><td>{{ g.generated_at|date:"d.m.Y H:i:s" }}</td><td>{{ g.list_type }}</td><td>{{ g.list_format }}</td><td>{{ g.get_trigger_kind_display }}{% if g.triggered_by %} ({{ g.triggered_by.display_name }}){% endif %}</td><td>{{ g.get_status_display }}</td><td>{{ g.rows_current }} / {{ g.rows_history }} / {{ g.rows_open }}</td><td>{{ g.duration_ms }} ms</td><td class="mono klein">{{ g.content_hash|slice:":12" }}</td><td class="klein">{{ g.error_message|default:"" }}</td></tr>
+{% empty %}<tr><td colspan="9">Noch keine Erzeugung.</td></tr>{% endfor %}</tbody></table></div>
+{% endblock %}

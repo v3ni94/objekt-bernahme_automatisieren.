@@ -13,6 +13,7 @@ urlpatterns = [
     path("", include("apps.documents.urls")),
     path("", include("apps.review.urls")),
     path("", include("apps.requirements.urls")),
+    path("", include("apps.lists.urls")),
     path("verwaltung/", include("apps.config.urls")),
     path("verwaltung/", include("apps.audit.urls")),
     path("verwaltung/", include("apps.accounts.urls")),

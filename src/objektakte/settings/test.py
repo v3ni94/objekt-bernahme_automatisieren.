@@ -44,3 +44,4 @@ STATIC_ROOT = REPO_DIR / ".static_test"
 STATIC_ROOT.mkdir(exist_ok=True)
 WHITENOISE_USE_FINDERS = True
 WHITENOISE_AUTOREFRESH = True
+OBJEKTAKTE["LISTS_AUTO_GENERATE"] = False  # Listen in Tests nur auf ausdrueckliche Anforderung

@@ -81,6 +81,9 @@ def object_edit(request, pk: int):
         from apps.requirements.tasks import trigger_evaluation
 
         trigger_evaluation(obj.pk, "object_update")  # H 3.5: Stammdatenaenderung
+        from apps.lists.services import request_generation
+
+        request_generation(obj.pk, "masterdata_change", user_id=request.user.pk)
         messages.success(request, f"Objekt {obj.object_number} gespeichert.")
         return redirect("object_detail", pk=obj.pk)
     return render(
