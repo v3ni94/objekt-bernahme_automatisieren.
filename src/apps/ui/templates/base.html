@@ -1,0 +1,31 @@
+{% load static perms %}<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}{{ APP_NAME }}{% endblock %}</title>
+<link rel="stylesheet" href="{% static 'css/app.css' %}">
+</head>
+<body>
+<div class="kennlinie"></div>
+<header class="kopf">
+  <div class="marke"><strong>{{ APP_NAME }}</strong> <span class="sub">{{ APP_OWNER }}</span></div>
+  {% if user.is_authenticated %}
+  <nav>
+    <a href="{% url 'status_page' %}">Status</a>
+    {% if user|has_perm:"audit.read_own" or user|has_perm:"audit.read_all" %}<a href="{% url 'audit_list' %}">Protokoll</a>{% endif %}
+    <a href="{% url 'settings_list' %}">Konfiguration</a>
+    {% if user|has_perm:"users.manage" %}<a href="{% url 'user_list' %}">Nutzer</a>{% endif %}
+    <a href="{% url 'mfa_index' %}">Konto</a>
+    <form method="post" action="{% url 'account_logout' %}" class="inline">{% csrf_token %}<button class="link">Abmelden</button></form>
+    <span class="nutzer">{{ user.display_name }} ({{ user.role.name }})</span>
+  </nav>
+  {% endif %}
+</header>
+<main class="inhalt">
+  {% if messages %}<ul class="meldungen">{% for m in messages %}<li class="{{ m.tags }}">{{ m }}</li>{% endfor %}</ul>{% endif %}
+  {% block content %}{% endblock %}
+</main>
+<footer class="fuss">{{ APP_OWNER }} · Version {{ IMAGE_TAG }}</footer>
+</body>
+</html>

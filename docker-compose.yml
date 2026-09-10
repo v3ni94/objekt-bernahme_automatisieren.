@@ -1,0 +1,565 @@
+# Produktion (docs/betrieb.md 3.5). Alle serverabhaengigen Werte kommen aus .env; Geheimnisse aus
+# /srv/objektakte/secrets/ als dateibasierte Secrets. Kein Dienst veroeffentlicht Host-Ports; Traefik erreicht web
+# ueber das externe Netz ${TRAEFIK_NETWORK}. Migrationen laufen ueber scripts/deploy.sh, nie beim Start.
+name: objektakte
+
+x-app-env: &app-env
+  TZ: ${TZ}
+  APP_ENV: ${APP_ENV}
+  APP_DOMAIN: ${APP_DOMAIN}
+  APP_BASE_URL: ${APP_BASE_URL}
+  IMAGE_TAG: ${IMAGE_TAG:-dev}
+  DB_HOST: db
+  DB_PORT: "3306"
+  DB_NAME: ${DB_NAME}
+  DB_USER: ${DB_USER}                                   # app_rw fuer web und beat
+  DB_PASSWORD_FILE: /run/secrets/db_app_password
+  REDIS_URL: redis://redis:6379/0
+  REDIS_PASSWORD_FILE: /run/secrets/redis_password
+  APP_SECRET_KEY_FILE: /run/secrets/app_secret_key
+  IBAN_KEY_FILE: /run/secrets/iban_key
+  IBAN_HMAC_KEY_FILE: /run/secrets/iban_hmac_key
+  TOKEN_KEY_FILE: /run/secrets/token_key
+  TOTP_KEY_FILE: /run/secrets/totp_key
+  GOOGLE_CLIENT_SECRET_FILE: /run/secrets/google_client_secret
+  OPENAI_API_KEY_FILE: /run/secrets/openai_api_key
+  ANTHROPIC_API_KEY_FILE: /run/secrets/anthropic_api_key
+  SMTP_PASSWORD_FILE: /run/secrets/smtp_password
+  READYZ_TOKEN_FILE: /run/secrets/readyz_token
+  HEARTBEAT_FILE: /tmp/heartbeat
+  DATA_DIR: /data
+  DISK_RESERVE_GB: ${DISK_RESERVE_GB}
+  LOG_LEVEL: ${LOG_LEVEL}
+  LOG_FORMAT: ${LOG_FORMAT}
+  TRUSTED_PROXY_CIDR: ${TRUSTED_PROXY_CIDR}
+  SESSION_IDLE_MINUTES: ${SESSION_IDLE_MINUTES}
+  SESSION_ABSOLUTE_HOURS: ${SESSION_ABSOLUTE_HOURS}
+  LOGIN_MAX_ATTEMPTS: ${LOGIN_MAX_ATTEMPTS}
+  LOGIN_LOCKOUT_MINUTES: ${LOGIN_LOCKOUT_MINUTES}
+  JOBS_VISIBILITY_TIMEOUT_S: ${JOBS_VISIBILITY_TIMEOUT_S:-3600}
+  GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+  GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI}
+  GOOGLE_LOGIN_REDIRECT_URI: ${GOOGLE_LOGIN_REDIRECT_URI}
+  GOOGLE_LOGIN_ENABLED: ${GOOGLE_LOGIN_ENABLED}
+  GOOGLE_LOGIN_HOSTED_DOMAIN: ${GOOGLE_LOGIN_HOSTED_DOMAIN}
+  DRIVE_ACCOUNT_EMAIL: ${DRIVE_ACCOUNT_EMAIL}
+  DRIVE_SCOPES: ${DRIVE_SCOPES}
+  OPENAI_BASE_URL: ${OPENAI_BASE_URL}
+  ANTHROPIC_BASE_URL: ${ANTHROPIC_BASE_URL}
+  SMTP_HOST: ${SMTP_HOST}
+  SMTP_PORT: ${SMTP_PORT}
+  SMTP_USER: ${SMTP_USER}
+  SMTP_FROM: ${SMTP_FROM}
+  ALERT_EMAIL_TO: ${ALERT_EMAIL_TO}
+  ALERTS_ENABLED: ${ALERTS_ENABLED}
+
+x-worker-env: &worker-env
+  <<: *app-env
+  DB_USER: ${DB_WORKER_USER}                            # app_worker, Mindestrechte
+  DB_PASSWORD_FILE: /run/secrets/db_worker_password
+
+x-common: &common
+  env_file: .env
+  restart: unless-stopped
+  user: "${APP_UID}:${APP_UID}"
+  security_opt:
+    - no-new-privileges:true
+  logging:
+    driver: json-file
+    options:
+      max-size: "${LOG_MAX_SIZE}"
+      max-file: "${LOG_MAX_FILE}"
+  depends_on:
+    db:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+
+x-worker-secrets: &worker-secrets
+  - db_worker_password
+  - redis_password
+  - app_secret_key
+  - iban_key
+  - iban_hmac_key
+  - token_key
+  - totp_key
+  - google_client_secret
+  - openai_api_key
+  - anthropic_api_key
+  - smtp_password
+  - readyz_token
+
+x-worker-healthcheck: &worker-healthcheck
+  test: ["CMD-SHELL", "test -n \"$$(find /tmp/heartbeat -mmin -2 2>/dev/null)\""]
+  interval: 60s
+  timeout: 10s
+  retries: 3
+  start_period: 90s
+
+services:
+
+  web:
+    <<: *common
+    image: objektakte/web:${IMAGE_TAG:-dev}
+    build:
+      context: .
+      dockerfile: docker/app.Dockerfile
+      target: web
+      args:
+        APP_UID: "${APP_UID}"
+    command: >
+      gunicorn objektakte.wsgi:application
+      --bind 0.0.0.0:8000
+      --worker-class gthread
+      --workers ${GUNICORN_WORKERS}
+      --threads ${GUNICORN_THREADS}
+      --timeout ${GUNICORN_TIMEOUT}
+      --access-logfile - --error-logfile -
+      --forwarded-allow-ips ${TRUSTED_PROXY_CIDR}
+    environment:
+      <<: *app-env
+      SERVICE_NAME: web
+      DB_MIGRATE_USER: ${DB_MIGRATE_USER}               # nur fuer app-migrate (deploy.sh)
+      DB_MIGRATE_PASSWORD_FILE: /run/secrets/db_migrate_password
+    read_only: true
+    tmpfs:
+      - /tmp:size=256m
+    networks:
+      - data
+      - egress
+      - traefik
+    volumes:
+      - /srv/objektakte/transit:/data/transit
+      - /srv/objektakte/previews:/data/previews:ro
+      - /srv/objektakte/requests:/data/requests:ro
+      - /srv/objektakte/lists:/data/lists:ro
+      - /srv/objektakte/exports:/data/exports:ro
+      - /srv/objektakte/backup:/data/backup:ro           # Anwendung liest nur status.json
+    secrets:
+      - db_app_password
+      - db_migrate_password
+      - redis_password
+      - app_secret_key
+      - iban_key
+      - iban_hmac_key
+      - token_key
+      - totp_key
+      - google_client_secret
+      - openai_api_key
+      - anthropic_api_key
+      - smtp_password
+      - readyz_token
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: "${TRAEFIK_NETWORK}"
+      traefik.http.routers.objektakte.rule: "Host(`${APP_DOMAIN}`)"
+      traefik.http.routers.objektakte.entrypoints: "${TRAEFIK_ENTRYPOINT}"
+      traefik.http.routers.objektakte.tls: "true"
+      traefik.http.routers.objektakte.tls.certresolver: "${TRAEFIK_CERTRESOLVER}"
+      traefik.http.routers.objektakte.middlewares: "objektakte-headers"
+      traefik.http.services.objektakte.loadbalancer.server.port: "8000"
+      traefik.http.middlewares.objektakte-headers.headers.stsSeconds: "31536000"
+      traefik.http.middlewares.objektakte-headers.headers.stsIncludeSubdomains: "false"
+      traefik.http.middlewares.objektakte-headers.headers.contentTypeNosniff: "true"
+      traefik.http.middlewares.objektakte-headers.headers.customFrameOptionsValue: "SAMEORIGIN"
+      traefik.http.middlewares.objektakte-headers.headers.referrerPolicy: "strict-origin-when-cross-origin"
+      # Optionaler Redirect-Router, nur wenn der Serverbefund keinen globalen
+      # HTTP-zu-HTTPS-Redirect zeigt (TRAEFIK_REDIRECT_ROUTER=true). Sonst diese vier Zeilen entfernen.
+      traefik.http.routers.objektakte-http.rule: "Host(`${APP_DOMAIN}`)"
+      traefik.http.routers.objektakte-http.entrypoints: "${TRAEFIK_ENTRYPOINT_INSECURE}"
+      traefik.http.routers.objektakte-http.middlewares: "objektakte-redirect"
+      traefik.http.middlewares.objektakte-redirect.redirectscheme.scheme: "https"
+      # Falls der Serverbefund providers.docker.constraints zeigt: Zusatzlabel hier eintragen.
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; r=urllib.request.urlopen('http://127.0.0.1:8000/healthz/', timeout=5); sys.exit(0 if r.status==200 else 1)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    cpu_shares: 1024
+    deploy:
+      resources:
+        limits:
+          cpus: "${WEB_CPUS}"
+          memory: "${WEB_MEM}"
+
+  worker:
+    <<: *common
+    image: objektakte/worker:${IMAGE_TAG:-dev}
+    build:
+      context: .
+      dockerfile: docker/app.Dockerfile
+      target: worker
+      args:
+        APP_UID: "${APP_UID}"
+        TESSDATA_VARIANT: "${TESSDATA_VARIANT}"
+    command: >
+      celery -A objektakte worker
+      -Q ocr -n worker-ocr@%h
+      --concurrency ${OCR_PROCESSES}
+      --prefetch-multiplier 1
+      --max-tasks-per-child ${WORKER_MAX_TASKS_PER_CHILD}
+      --max-memory-per-child ${WORKER_MAX_MEMORY_PER_CHILD_KB}
+    environment:
+      <<: *worker-env
+      SERVICE_NAME: worker-ocr
+      OMP_THREAD_LIMIT: "1"
+    networks:
+      - data
+      - egress
+    volumes:
+      - /srv/objektakte/transit:/data/transit
+      - /srv/objektakte/work:/data/work
+      - /srv/objektakte/ocr-cache:/data/ocr-cache
+      - /srv/objektakte/previews:/data/previews
+    secrets: *worker-secrets
+    stop_grace_period: ${WORKER_STOP_GRACE}
+    healthcheck: *worker-healthcheck
+    cpu_shares: 256
+    deploy:
+      resources:
+        limits:
+          cpus: "${WORKER_CPUS}"
+          memory: "${WORKER_MEM}"
+
+  worker-nlp:
+    <<: *common
+    image: objektakte/worker:${IMAGE_TAG:-dev}
+    build:
+      context: .
+      dockerfile: docker/app.Dockerfile
+      target: worker
+      args:
+        APP_UID: "${APP_UID}"
+        TESSDATA_VARIANT: "${TESSDATA_VARIANT}"
+    command: >
+      celery -A objektakte worker
+      -Q classify -n worker-nlp@%h
+      --concurrency ${NLP_CONCURRENCY}
+      --prefetch-multiplier 1
+      --max-tasks-per-child ${WORKER_MAX_TASKS_PER_CHILD}
+    environment:
+      <<: *worker-env
+      SERVICE_NAME: worker-nlp
+      OMP_THREAD_LIMIT: "1"
+    networks:
+      - data
+    volumes:
+      - /srv/objektakte/ocr-cache:/data/ocr-cache:ro
+      - /srv/objektakte/models:/data/models
+    secrets: *worker-secrets
+    stop_grace_period: ${WORKER_STOP_GRACE}
+    healthcheck: *worker-healthcheck
+    cpu_shares: 512
+    deploy:
+      resources:
+        limits:
+          cpus: "${WORKER_NLP_CPUS}"
+          memory: "${WORKER_NLP_MEM}"
+
+  worker-io:
+    <<: *common
+    image: objektakte/worker:${IMAGE_TAG:-dev}
+    build:
+      context: .
+      dockerfile: docker/app.Dockerfile
+      target: worker
+      args:
+        APP_UID: "${APP_UID}"
+        TESSDATA_VARIANT: "${TESSDATA_VARIANT}"
+    command: >
+      celery -A objektakte worker
+      -Q io,ai,lists -n worker-io@%h
+      --pool threads
+      --concurrency ${IO_CONCURRENCY}
+      --prefetch-multiplier 1
+    environment:
+      <<: *worker-env
+      SERVICE_NAME: worker-io
+    networks:
+      - data
+      - egress
+    volumes:
+      - /srv/objektakte/transit:/data/transit
+      - /srv/objektakte/work:/data/work:ro
+      - /srv/objektakte/ocr-cache:/data/ocr-cache:ro
+      - /srv/objektakte/lists:/data/lists
+      - /srv/objektakte/requests:/data/requests
+      - /srv/objektakte/imports:/data/imports
+      - /srv/objektakte/exports:/data/exports
+      - /srv/objektakte/models:/data/models:ro
+    secrets: *worker-secrets
+    stop_grace_period: ${WORKER_STOP_GRACE}
+    healthcheck: *worker-healthcheck
+    cpu_shares: 512
+    deploy:
+      resources:
+        limits:
+          cpus: "${WORKER_IO_CPUS}"
+          memory: "${WORKER_IO_MEM}"
+
+  beat:
+    <<: *common
+    image: objektakte/web:${IMAGE_TAG:-dev}
+    build:
+      context: .
+      dockerfile: docker/app.Dockerfile
+      target: web
+      args:
+        APP_UID: "${APP_UID}"
+    command: celery -A objektakte beat --schedule /tmp/celerybeat-schedule --pidfile=
+    environment:
+      <<: *app-env
+      SERVICE_NAME: beat
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m
+    networks:
+      - data
+      - egress
+    secrets:
+      - db_app_password
+      - redis_password
+      - app_secret_key
+      - iban_key
+      - iban_hmac_key
+      - token_key
+      - totp_key
+      - google_client_secret
+      - openai_api_key
+      - anthropic_api_key
+      - smtp_password
+      - readyz_token
+    healthcheck:
+      test: ["CMD-SHELL", "test -n \"$$(find /tmp/heartbeat -mmin -3 2>/dev/null)\""]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    cpu_shares: 256
+    deploy:
+      resources:
+        limits:
+          cpus: "${BEAT_CPUS}"
+          memory: "${BEAT_MEM}"
+
+  redis:
+    image: ${REDIS_IMAGE}:${REDIS_TAG}
+    command: >
+      sh -c 'exec redis-server
+      --requirepass "$$(cat /run/secrets/redis_password)"
+      --appendonly yes
+      --maxmemory ${REDIS_MAXMEMORY}
+      --maxmemory-policy noeviction
+      --save ""'
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - data
+    volumes:
+      - redis-data:/data
+    secrets:
+      - redis_password
+    logging:
+      driver: json-file
+      options:
+        max-size: "${LOG_MAX_SIZE}"
+        max-file: "${LOG_MAX_FILE}"
+    healthcheck:
+      test: ["CMD-SHELL", "REDISCLI_AUTH=\"$$(cat /run/secrets/redis_password)\" redis-cli ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: "${REDIS_CPUS}"
+          memory: "${REDIS_MEM}"
+
+  db:
+    image: mariadb:${MARIADB_TAG}
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      TZ: ${TZ}
+      MARIADB_DATABASE: ${DB_NAME}
+      MARIADB_USER: ${DB_USER}
+      MARIADB_PASSWORD_FILE: /run/secrets/db_app_password
+      MARIADB_ROOT_PASSWORD_FILE: /run/secrets/db_root_password
+      MARIADB_AUTO_UPGRADE: "1"
+    command: >
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+      --innodb-buffer-pool-size=${DB_INNODB_BUFFER_POOL}
+      --max-connections=${DB_MAX_CONNECTIONS}
+      --sql-mode=STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION
+      --skip-name-resolve
+    networks:
+      - data
+    volumes:
+      - db-data:/var/lib/mysql
+      - ./docker/db/conf.d:/etc/mysql/conf.d:ro
+      - ./docker/db/init:/docker-entrypoint-initdb.d:ro
+    secrets:
+      - db_root_password
+      - db_app_password
+      - db_worker_password
+      - db_migrate_password
+      - db_backup_password
+      - db_ro_password
+    logging:
+      driver: json-file
+      options:
+        max-size: "${LOG_MAX_SIZE}"
+        max-file: "${LOG_MAX_FILE}"
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    cpu_shares: 768
+    deploy:
+      resources:
+        limits:
+          cpus: "${DB_CPUS}"
+          memory: "${DB_MEM}"
+
+  backup:
+    image: objektakte/backup:${IMAGE_TAG:-dev}
+    build:
+      context: .
+      dockerfile: docker/backup/Dockerfile
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      TZ: ${TZ}
+      DB_HOST: db
+      DB_NAME: ${DB_NAME}
+      DB_BACKUP_USER: ${DB_BACKUP_USER}
+      DB_BACKUP_PASSWORD_FILE: /run/secrets/db_backup_password
+      DB_ROOT_PASSWORD_FILE: /run/secrets/db_root_password
+      BACKUP_CRON: ${BACKUP_CRON}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS}
+      BACKUP_MAX_AGE_HOURS: ${BACKUP_MAX_AGE_HOURS}
+      BACKUP_ENCRYPT_RECIPIENT_FILE: /run/secrets/backup_age_recipient
+      OFFSITE_ENABLED: ${OFFSITE_ENABLED}
+      OFFSITE_REMOTE: ${OFFSITE_REMOTE}
+      RCLONE_CONFIG: /run/secrets/rclone_conf
+    networks:
+      - data
+      # - egress                                        # nur bei OFFSITE_ENABLED=true einkommentieren
+    volumes:
+      - /srv/objektakte/transit:/src/transit:ro
+      - /srv/objektakte/ocr-cache:/src/ocr-cache:ro
+      - /srv/objektakte/models:/src/models:ro
+      - /srv/objektakte/lists:/src/lists:ro
+      - /srv/objektakte/requests:/src/requests:ro
+      - /srv/objektakte/imports:/src/imports:ro
+      - /srv/objektakte/exports:/src/exports:ro
+      - /srv/objektakte/deploy:/src/deploy:ro
+      - ./.env:/src/config/.env:ro
+      - ./docker-compose.yml:/src/config/docker-compose.yml:ro
+      - /srv/objektakte/backup:/backup
+    secrets:
+      - db_backup_password
+      - db_root_password
+      - backup_age_recipient
+      - rclone_conf
+    logging:
+      driver: json-file
+      options:
+        max-size: "${LOG_MAX_SIZE}"
+        max-file: "${LOG_MAX_FILE}"
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep cron >/dev/null && test -n \"$$(find /backup/status.json -mmin -$$((BACKUP_MAX_AGE_HOURS*60)) 2>/dev/null)\""]
+      interval: 5m
+      timeout: 10s
+      retries: 3
+      start_period: 2m
+    depends_on:
+      db:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "${BACKUP_CPUS}"
+          memory: "${BACKUP_MEM}"
+
+  classifier:
+    <<: *common
+    profiles: ["classifier"]
+    image: objektakte/worker:${IMAGE_TAG:-dev}
+    build:
+      context: .
+      dockerfile: docker/app.Dockerfile
+      target: worker
+      args:
+        APP_UID: "${APP_UID}"
+    command: python -m objektakte.classifier.server --port 9000
+    environment:
+      <<: *worker-env
+      SERVICE_NAME: classifier
+    networks:
+      - data
+    volumes:
+      - /srv/objektakte/models:/data/models:ro
+    secrets: *worker-secrets
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; r=urllib.request.urlopen('http://127.0.0.1:9000/healthz', timeout=5); sys.exit(0 if r.status==200 else 1)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: "${CLASSIFIER_CPUS}"
+          memory: "${CLASSIFIER_MEM}"
+
+networks:
+  data:
+    driver: bridge
+    internal: true
+  egress:
+    driver: bridge
+  traefik:
+    external: true
+    name: ${TRAEFIK_NETWORK}
+
+volumes:
+  db-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /srv/objektakte/db
+  redis-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /srv/objektakte/redis
+
+secrets:
+  db_root_password:        { file: /srv/objektakte/secrets/db_root_password }
+  db_app_password:         { file: /srv/objektakte/secrets/db_app_password }
+  db_worker_password:      { file: /srv/objektakte/secrets/db_worker_password }
+  db_migrate_password:     { file: /srv/objektakte/secrets/db_migrate_password }
+  db_backup_password:      { file: /srv/objektakte/secrets/db_backup_password }
+  db_ro_password:          { file: /srv/objektakte/secrets/db_ro_password }
+  redis_password:          { file: /srv/objektakte/secrets/redis_password }
+  app_secret_key:          { file: /srv/objektakte/secrets/app_secret_key }
+  iban_key:                { file: /srv/objektakte/secrets/iban_key }
+  iban_hmac_key:           { file: /srv/objektakte/secrets/iban_hmac_key }
+  token_key:               { file: /srv/objektakte/secrets/token_key }
+  totp_key:                { file: /srv/objektakte/secrets/totp_key }
+  google_client_secret:    { file: /srv/objektakte/secrets/google_client_secret }
+  openai_api_key:          { file: /srv/objektakte/secrets/openai_api_key }
+  anthropic_api_key:       { file: /srv/objektakte/secrets/anthropic_api_key }
+  smtp_password:           { file: /srv/objektakte/secrets/smtp_password }
+  readyz_token:            { file: /srv/objektakte/secrets/readyz_token }
+  backup_age_recipient:    { file: /srv/objektakte/secrets/backup_age_recipient }
+  rclone_conf:             { file: /srv/objektakte/secrets/rclone.conf }

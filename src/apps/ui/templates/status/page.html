@@ -1,0 +1,19 @@
+{% extends "base.html" %}{% block title %}Status · {{ APP_NAME }}{% endblock %}
+{% block content %}
+<h1>Status {% if ok %}<span class="ampel gruen">bereit</span>{% else %}<span class="ampel rot">gestört</span>{% endif %}</h1>
+<div class="raster">
+<section class="karte"><h2>Dienste</h2>
+<table><tr><th>Prüfung</th><th>Ergebnis</th><th>Details</th></tr>
+{% for name, r in report.items %}<tr><td>{{ name }}</td><td>{% if r.ok %}<span class="ampel gruen">ok</span>{% elif r.ok is None %}<span class="ampel grau">offen</span>{% else %}<span class="ampel rot">Fehler</span>{% endif %}</td><td class="mono">{% for k, v in r.items %}{% if k != "ok" %}{{ k }}={{ v }} {% endif %}{% endfor %}</td></tr>{% endfor %}
+</table></section>
+<section class="karte"><h2>Heartbeats</h2>
+<table><tr><th>Dienst</th><th>Alter</th></tr>
+{% for name, h in heartbeats.items %}<tr><td>{{ name }}</td><td>{% if h.ok %}<span class="ampel gruen">{{ h.age_s }} s</span>{% elif h.age_s %}<span class="ampel rot">{{ h.age_s }} s</span>{% else %}<span class="ampel grau">kein Signal</span>{% endif %}</td></tr>{% endfor %}
+</table></section>
+<section class="karte"><h2>Sicherung</h2>
+{% if backup.ok %}<p><span class="ampel gruen">ok</span> letzter Lauf {{ backup.last_run }}, vor {{ backup.age_h }} h, {{ backup.total_bytes|filesizeformat }}</p>{% else %}<p><span class="ampel rot">{% if backup.status %}{{ backup.status }}{% elif backup.error %}{{ backup.error }}{% else %}unbekannt{% endif %}</span></p>{% endif %}
+<p class="hinweis">Manueller Lauf: <code>docker compose exec -T backup /usr/local/bin/backup.sh</code></p>
+</section>
+<section class="karte"><h2>Verarbeitung</h2><p class="hinweis">Fortschritt je Objekt, Warteschlangen und Review-Fälle folgen mit Meilenstein M5 und M7.</p></section>
+</div>
+{% endblock %}

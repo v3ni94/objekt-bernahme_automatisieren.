@@ -43,3 +43,6 @@ Thumbs.db
 # M0-Ergebnisse werden erst nach Pruefung unter docs/betrieb/ abgelegt
 probe-out/
 serverbefund-*.md
+.static_test/
+staticfiles/
+.venv/

@@ -1,0 +1,2 @@
+{% extends "base.html" %}{% block title %}Rolle ändern · {{ APP_NAME }}{% endblock %}
+{% block content %}<div class="karte schmal"><h1>Rolle für {{ target.email }}</h1><form method="post">{% csrf_token %}{{ form.as_p }}<button type="submit">Speichern</button> <a href="{% url 'user_list' %}">Abbrechen</a></form></div>{% endblock %}

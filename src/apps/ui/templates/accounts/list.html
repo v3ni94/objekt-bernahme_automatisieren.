@@ -1,0 +1,11 @@
+{% extends "base.html" %}{% block title %}Nutzer · {{ APP_NAME }}{% endblock %}
+{% block content %}
+<h1>Nutzer</h1><p><a class="knopf" href="{% url 'user_create' %}">Nutzer anlegen</a></p>
+<table class="voll"><tr><th>E-Mail</th><th>Name</th><th>Rolle</th><th>Status</th><th>2. Faktor</th><th>Letzter Login</th><th>Aktionen</th></tr>
+{% for u in users %}<tr><td>{{ u.email }}</td><td>{{ u.display_name }}</td><td>{{ u.role.name }} (<a href="{% url 'user_role' u.pk %}">ändern</a>)</td><td>{{ u.get_status_display }}{% if u.is_locked %} · gesperrt bis {{ u.locked_until|date:"H:i" }}{% endif %}</td><td>{% if u.pk in totp_users %}eingerichtet{% else %}offen{% endif %}</td><td>{{ u.last_login|date:"d.m.Y H:i"|default:"nie" }}</td>
+<td class="aktionen">
+<form method="post" action="{% url 'user_toggle' u.pk %}" class="inline">{% csrf_token %}<button class="link">{% if u.status == "active" %}sperren{% else %}aktivieren{% endif %}</button></form>
+<form method="post" action="{% url 'user_reset_totp' u.pk %}" class="inline" onsubmit="return confirm('Zweiten Faktor zurücksetzen? Identität vorher außerhalb des Systems prüfen.')">{% csrf_token %}<button class="link">TOTP zurücksetzen</button></form>
+{% if u.is_locked %}<form method="post" action="{% url 'user_unlock' u.pk %}" class="inline">{% csrf_token %}<button class="link">entsperren</button></form>{% endif %}
+</td></tr>{% endfor %}</table>
+{% endblock %}

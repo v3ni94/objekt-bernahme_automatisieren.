@@ -23,8 +23,8 @@ def test_unguenstiger_fall_ohne_digitalseiten():
 def test_wandzeit_mit_drei_prozessen_haelt_nur_ohne_reserve():
     wall = pm.wall_seconds(21_400.0, 3, 0.85)
     assert wall == pytest.approx(8392.16, rel=1e-4)
-    assert wall > pm.OCR_BUDGET_SECONDS           # verfehlt das OCR-Budget von 2 h
-    assert wall < pm.TOTAL_BUDGET_SECONDS         # haelt die 3-Stunden-Vorgabe knapp
+    assert wall > pm.OCR_BUDGET_SECONDS  # verfehlt das OCR-Budget von 2 h
+    assert wall < pm.TOTAL_BUDGET_SECONDS  # haelt die 3-Stunden-Vorgabe knapp
 
 
 def test_wandzeit_mit_fuenf_prozessen_haelt_mit_reserve():
@@ -32,11 +32,11 @@ def test_wandzeit_mit_fuenf_prozessen_haelt_mit_reserve():
 
 
 def test_p_min_basisfall_ergibt_vier_prozesse():
-    assert pm.p_min(21_400.0, 0.85) == 4          # 3,5 aufgerundet
+    assert pm.p_min(21_400.0, 0.85) == 4  # 3,5 aufgerundet
 
 
 def test_p_min_unguenstiger_fall_ergibt_sechs_prozesse():
-    assert pm.p_min(35_000.0, 0.85) == 6          # 5,7 aufgerundet
+    assert pm.p_min(35_000.0, 0.85) == 6  # 5,7 aufgerundet
 
 
 def test_skalierungseffizienz():
@@ -46,12 +46,12 @@ def test_skalierungseffizienz():
 
 def test_szenariotabelle_markiert_verfehlte_zellen():
     rows = pm.scenario_table(
-        [pm.Scenario("Basis", 0.40, 3.5, 0.1), pm.Scenario("Ungünstig", 0.0, 3.5, 0.1)],
-        [3, 5, 7], 0.85)
+        [pm.Scenario("Basis", 0.40, 3.5, 0.1), pm.Scenario("Ungünstig", 0.0, 3.5, 0.1)], [3, 5, 7], 0.85
+    )
     basis, unguenstig = rows
     assert basis["cells"][3]["within_total_budget"] is True
     assert basis["cells"][5]["within_ocr_budget"] is True
-    assert unguenstig["cells"][3]["within_total_budget"] is False   # rund 229 min
+    assert unguenstig["cells"][3]["within_total_budget"] is False  # rund 229 min
     assert unguenstig["cells"][5]["within_total_budget"] is True
     assert math.isclose(unguenstig["cells"][3]["wall_minutes"], 228.8, abs_tol=0.5)
 

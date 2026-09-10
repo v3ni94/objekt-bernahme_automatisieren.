@@ -1,0 +1,34 @@
+# Testprofil fuer Integrationstests im Container: docker compose -f docker-compose.test.yml run --rm tests
+services:
+  db-test:
+    image: mariadb:${MARIADB_TAG:-11}
+    environment:
+      MARIADB_ROOT_PASSWORD: testroot
+      MARIADB_DATABASE: objektakte_dev
+      MARIADB_USER: objektakte_test
+      MARIADB_PASSWORD: testpasswort
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+  redis-test:
+    image: ${REDIS_IMAGE:-redis}:${REDIS_TAG:-7}
+  tests:
+    build:
+      context: .
+      dockerfile: docker/app.Dockerfile
+      target: worker
+    environment:
+      DJANGO_SETTINGS_MODULE: objektakte.settings.test
+      TEST_DB_HOST: db-test
+      TEST_DB_USER: root
+      TEST_DB_PASSWORD: testroot
+      REDIS_URL: redis://redis-test:6379/0
+    depends_on:
+      db-test:
+        condition: service_healthy
+    volumes:
+      - ./tests:/app/tests:ro
+    command: sh -c "pip install -q -r requirements-dev.lock.txt && python -m pytest -q"

@@ -1,0 +1,80 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    services:
+      mariadb:
+        image: mariadb:11
+        env:
+          MARIADB_ROOT_PASSWORD: testroot
+          MARIADB_DATABASE: objektakte_dev
+        ports: ["3306:3306"]
+        options: >-
+          --health-cmd "healthcheck.sh --connect --innodb_initialized"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+      redis:
+        image: redis:7
+        ports: ["6379:6379"]
+    env:
+      DJANGO_SETTINGS_MODULE: objektakte.settings.test
+      TEST_DB_HOST: 127.0.0.1
+      TEST_DB_USER: root
+      TEST_DB_PASSWORD: testroot
+      REDIS_URL: redis://127.0.0.1:6379/0
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Systempakete
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libmariadb-dev pkg-config
+      - name: Abhaengigkeiten
+        run: |
+          pip install uv
+          uv venv --python 3.12 .venv
+          uv pip install --python .venv/bin/python -r requirements-dev.lock.txt
+      - name: Lint
+        run: .venv/bin/ruff check src tests manage.py && .venv/bin/ruff format --check src tests manage.py
+      - name: Grep-Pruefung Altbezeichnung (Definition of Done)
+        run: scripts/check_no_legacy_names.sh
+      - name: PII-Pruefung (ohne CSVs uebersprungen)
+        run: scripts/check_no_pii.sh
+      - name: Tests
+        run: .venv/bin/python -m pytest -q
+      - name: Migrationen vorwaerts und rueckwaerts (T8)
+        run: scripts/check_migrations_roundtrip.sh
+
+  images:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Image web
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/app.Dockerfile
+          target: web
+          push: false
+          tags: objektakte/web:ci
+      - name: Image worker
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/app.Dockerfile
+          target: worker
+          push: false
+          tags: objektakte/worker:ci
+      - name: Image backup
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/backup/Dockerfile
+          push: false
+          tags: objektakte/backup:ci

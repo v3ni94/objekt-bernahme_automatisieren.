@@ -68,7 +68,16 @@ TEMPLATES = [
             "Geleistete Hausgeldvorauszahlungen: {prepaid} EUR. Abrechnungsergebnis: {result} EUR {result_kind}.",
             "Die Instandhaltungsrücklage wurde mit {reserve} EUR dotiert. Der Anteil Ihrer Einheit beträgt {reserve_share} EUR.",
         ],
-        "table": ["Heizkosten", "Wasser und Abwasser", "Allgemeinstrom", "Hausmeister", "Gebäudeversicherung", "Verwaltung", "Aufzug", "Gartenpflege"],
+        "table": [
+            "Heizkosten",
+            "Wasser und Abwasser",
+            "Allgemeinstrom",
+            "Hausmeister",
+            "Gebäudeversicherung",
+            "Verwaltung",
+            "Aufzug",
+            "Gartenpflege",
+        ],
     },
     {
         "title": "Einzelwirtschaftsplan {year} für Einheit {unit}",
@@ -197,7 +206,9 @@ def build_page_texts(rng: random.Random, template: dict, fields: dict, pages: in
             lines.append("Position                          Gesamt EUR      Anteil EUR")
             for pos in template["table"]:
                 lines.append(f"{pos:<32} {rnd_amount(rng, 800, 25_000):>12}  {rnd_amount(rng, 20, 900):>12}")
-            lines.append(f"{'Summe':<32} {rnd_amount(rng, 30_000, 120_000):>12}  {rnd_amount(rng, 900, 6_000):>12}")
+            lines.append(
+                f"{'Summe':<32} {rnd_amount(rng, 30_000, 120_000):>12}  {rnd_amount(rng, 900, 6_000):>12}"
+            )
         lines.append("")
         lines.append(
             "Dieses Dokument wurde maschinell erstellt und ist ohne Unterschrift gültig. "
@@ -247,11 +258,26 @@ def rasterize(pdf: Path, dpi: int, workdir: Path) -> list[Path]:
     """Rastert alle Seiten als Graustufen-PNG. Nutzt pdftoppm, sonst Ghostscript."""
     prefix = workdir / "page"
     if shutil.which("pdftoppm"):
-        subprocess.run(["pdftoppm", "-r", str(dpi), "-gray", "-png", str(pdf), str(prefix)],
-                       check=True, capture_output=True)
+        subprocess.run(
+            ["pdftoppm", "-r", str(dpi), "-gray", "-png", str(pdf), str(prefix)],
+            check=True,
+            capture_output=True,
+        )
     elif shutil.which("gs"):
-        subprocess.run(["gs", "-q", "-dNOPAUSE", "-dBATCH", "-sDEVICE=pnggray", f"-r{dpi}",
-                        f"-sOutputFile={prefix}-%03d.png", str(pdf)], check=True, capture_output=True)
+        subprocess.run(
+            [
+                "gs",
+                "-q",
+                "-dNOPAUSE",
+                "-dBATCH",
+                "-sDEVICE=pnggray",
+                f"-r{dpi}",
+                f"-sOutputFile={prefix}-%03d.png",
+                str(pdf),
+            ],
+            check=True,
+            capture_output=True,
+        )
     else:
         sys.exit("Weder pdftoppm (poppler-utils) noch gs (Ghostscript) gefunden.")
     return sorted(workdir.glob("page-*.png"))
@@ -269,8 +295,14 @@ def write_scan_pdf(digital_pdf: Path, scan_pdf: Path, dpi: int, degrade: bool, r
             images.append(img)
         first, rest = images[0], images[1:]
         # Pillow schreibt eine reine Bild-PDF ohne Textebene (JPEG-Kodierung fuer Graustufen)
-        first.save(str(scan_pdf), "PDF", save_all=True, append_images=rest, resolution=dpi,
-                   quality=75 if degrade else 90)
+        first.save(
+            str(scan_pdf),
+            "PDF",
+            save_all=True,
+            append_images=rest,
+            resolution=dpi,
+            quality=75 if degrade else 90,
+        )
 
 
 def sha256_of(path: Path) -> str:
@@ -286,7 +318,9 @@ def main() -> int:
     ap.add_argument("--out", required=True, type=Path, help="Zielverzeichnis des Korpus")
     ap.add_argument("--pages", type=int, default=100, help="Gesamtzahl Seiten (Standard 100)")
     ap.add_argument("--scan-share", type=float, default=0.5, help="Anteil Scan-Seiten 0 bis 1 (Standard 0,5)")
-    ap.add_argument("--max-pages-per-doc", type=int, default=6, help="Seiten je Dokument hoechstens (Standard 6)")
+    ap.add_argument(
+        "--max-pages-per-doc", type=int, default=6, help="Seiten je Dokument hoechstens (Standard 6)"
+    )
     ap.add_argument("--dpi", type=int, default=300, help="Rasteraufloesung der Scans (Standard 300)")
     ap.add_argument("--degrade", action="store_true", help="Scans leicht drehen und staerker komprimieren")
     ap.add_argument("--seed", type=int, default=20260910, help="Zufallsstartwert (deterministisch)")
@@ -314,7 +348,9 @@ def main() -> int:
             page_texts = build_page_texts(rng, template, fields, pages)
             doc_index += 1
             name = f"doc{doc_index:04d}_{kind}"
-            digital_pdf = out / "digital" / f"{name}.pdf" if kind == "digital" else out / "scan" / f"{name}.src.pdf"
+            digital_pdf = (
+                out / "digital" / f"{name}.pdf" if kind == "digital" else out / "scan" / f"{name}.src.pdf"
+            )
             write_digital_pdf(digital_pdf, page_texts)
             final_pdf = digital_pdf
             if kind == "scan":
@@ -325,23 +361,27 @@ def main() -> int:
             truth_dir.mkdir(exist_ok=True)
             for i, lines in enumerate(page_texts, start=1):
                 (truth_dir / f"p{i:03d}.txt").write_text("\n".join(lines), encoding="utf-8")
-            manifest["documents"].append({
-                "name": name,
-                "kind": kind,
-                "pages": pages,
-                "path": str(final_pdf.relative_to(out)),
-                "truth_dir": str(truth_dir.relative_to(out)),
-                "category_hint": template["category"],
-                "sha256": sha256_of(final_pdf),
-                "bytes": final_pdf.stat().st_size,
-            })
+            manifest["documents"].append(
+                {
+                    "name": name,
+                    "kind": kind,
+                    "pages": pages,
+                    "path": str(final_pdf.relative_to(out)),
+                    "truth_dir": str(truth_dir.relative_to(out)),
+                    "category_hint": template["category"],
+                    "sha256": sha256_of(final_pdf),
+                    "bytes": final_pdf.stat().st_size,
+                }
+            )
             counters[kind] += pages
 
     manifest["pages_scan"] = counters["scan"]
     manifest["pages_digital"] = counters["digital"]
     (out / "manifest.json").write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
-    print(f"Korpus erzeugt unter {out}: {len(manifest['documents'])} Dokumente, "
-          f"{counters['scan']} Scan-Seiten, {counters['digital']} Digitalseiten, {args.dpi} dpi")
+    print(
+        f"Korpus erzeugt unter {out}: {len(manifest['documents'])} Dokumente, "
+        f"{counters['scan']} Scan-Seiten, {counters['digital']} Digitalseiten, {args.dpi} dpi"
+    )
     return 0
 
 

@@ -1,0 +1,16 @@
+{% extends "base.html" %}{% block title %}Protokoll · {{ APP_NAME }}{% endblock %}
+{% block content %}
+<h1>Revisionsprotokoll</h1>
+<form method="get" class="filter">
+<input name="action" placeholder="Aktion (z. B. review.)" value="{{ filters.action }}">
+<input name="user" placeholder="Nutzer" value="{{ filters.user }}">
+<input name="entity_type" placeholder="Entität" value="{{ filters.entity_type }}">
+<input name="since" type="date" value="{{ filters.since }}"> <input name="until" type="date" value="{{ filters.until }}">
+<button type="submit">Filtern</button>
+{% if user|has_perm:"audit.read_all" %}<a href="{% url 'audit_export' %}?{{ request.GET.urlencode }}">CSV-Export</a>{% endif %}
+</form>
+<table class="voll"><tr><th>Zeitpunkt</th><th>Nutzer</th><th>Aktion</th><th>Entität</th><th>Objekt</th><th>Grund</th><th>Vorher</th><th>Nachher</th></tr>
+{% for e in page %}<tr><td>{{ e.occurred_at|date:"d.m.Y H:i:s" }}</td><td>{{ e.user_email|default:e.actor_type }}</td><td class="mono">{{ e.action }}</td><td class="mono">{{ e.entity_type }}{% if e.entity_id %}#{{ e.entity_id }}{% endif %}</td><td>{{ e.object_id|default_if_none:"" }}</td><td>{{ e.reason|default:"" }}</td><td class="mono klein">{{ e.before_state|default_if_none:"" }}</td><td class="mono klein">{{ e.after_state|default_if_none:"" }}</td></tr>{% empty %}<tr><td colspan="8">Keine Einträge.</td></tr>{% endfor %}
+</table>
+<p class="seiten">Seite {{ page.number }} von {{ page.paginator.num_pages }}{% if page.has_previous %} · <a href="?{{ filters.urlencode }}&seite={{ page.previous_page_number }}">zurück</a>{% endif %}{% if page.has_next %} · <a href="?{{ filters.urlencode }}&seite={{ page.next_page_number }}">weiter</a>{% endif %}</p>
+{% endblock %}

@@ -1,0 +1,91 @@
+[project]
+name = "objektakte"
+version = "0.1.0"
+description = "Objektuebernahme der Hausverwaltung Mueller GmbH: Drive-Abgleich, OCR, Klassifikation, Review Center (CR-05)"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "Proprietary" }
+dependencies = [
+  # Web (Stack A, docs/architektur.md 3.1)
+  "Django>=5.2,<6.0",
+  "django-allauth[mfa]>=65.0",
+  "gunicorn>=23.0",
+  "whitenoise>=6.7",
+  # Datenbank und Queue
+  "mysqlclient>=2.2",
+  "celery[redis]>=5.4",
+  "redis>=5.0",
+  # Sicherheit und Konfiguration
+  "cryptography>=43.0",
+  "jsonschema>=4.23",
+  "argon2-cffi>=23.1",
+  "qrcode>=7.4",
+]
+
+[project.optional-dependencies]
+worker = [
+  # OCR und Dokumentverarbeitung (Ziel worker, docs/architektur.md 4.1); Tesseract und Ghostscript kommen aus dem Betriebssystem
+  "ocrmypdf>=16.0",
+  "pikepdf>=9.0",
+  "pypdfium2>=4.30",
+  "pdfplumber>=0.11",
+  "img2pdf>=0.5",
+  "Pillow>=10.4",
+  "rapidfuzz>=3.9",
+  "scikit-learn>=1.5",
+  "spacy>=3.7",
+  "openpyxl>=3.1",
+  "reportlab>=4.2",
+  "python-docx>=1.1",
+  "google-api-python-client>=2.140",
+  "google-auth>=2.34",
+  "google-auth-oauthlib>=1.2",
+  "openai>=1.40",
+  "anthropic>=0.34",
+  "tenacity>=9.0",
+]
+dev = [
+  "pytest>=8.3",
+  "pytest-django>=4.9",
+  "factory-boy>=3.3",
+  "freezegun>=1.5",
+  "hypothesis>=6.110",
+  "ruff>=0.6",
+  "mypy>=1.11",
+  "django-stubs>=5.0",
+  "types-requests",
+]
+
+[tool.ruff]
+line-length = 110
+target-version = "py312"
+src = ["src", "tests"]
+extend-exclude = ["src/apps/*/migrations"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "DJ", "S"]
+# DJ001: Das Datenmodell D verwendet NULL fuer optionale Zeichenketten (Fachentwurf D, Konventionen); bewusst beibehalten.
+ignore = ["S101", "S603", "S607", "B008", "S108", "S311", "E501", "DJ001"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S105", "S106", "S108"]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "objektakte.settings.test"
+pythonpath = ["src", "tests/performance"]
+testpaths = ["tests"]
+addopts = "-q --strict-markers"
+markers = [
+  "integration: braucht MariaDB und Redis",
+]
+
+[tool.mypy]
+python_version = "3.12"
+plugins = ["mypy_django_plugin.main"]
+mypy_path = "src"
+ignore_missing_imports = true
+check_untyped_defs = true
+files = ["src/objektakte/masking.py", "src/objektakte/secrets.py", "src/apps/config/store.py", "src/apps/audit/services.py"]
+
+[tool.django-stubs]
+django_settings_module = "objektakte.settings.test"

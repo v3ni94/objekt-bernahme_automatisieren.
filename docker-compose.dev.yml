@@ -1,0 +1,19 @@
+# Lokale Entwicklung: docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+# Host-Ports nur hier, nie in Produktion. Traefik-Netz wird durch ein lokales Netz ersetzt.
+services:
+  web:
+    command: python manage.py runserver 0.0.0.0:8000
+    environment:
+      DJANGO_SETTINGS_MODULE: objektakte.settings.development
+    ports:
+      - "127.0.0.1:8000:8000"
+    read_only: false
+    volumes:
+      - ./src:/app/src
+  db:
+    ports:
+      - "127.0.0.1:3306:3306"
+networks:
+  traefik:
+    external: false
+    name: objektakte-dev-traefik

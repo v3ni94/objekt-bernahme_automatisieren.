@@ -1,0 +1,38 @@
+/* Oberflaeche in der Farbwelt der Hausverwaltung Mueller GmbH (Skill hvm-ci): Orange #E6A83C als Akzent,
+   Anthrazit #87888A, Hellgrau #D7D8DA, Textschwarz #1A1A1A. Schrift system-ui, Helvetica, Arial. */
+:root { --orange:#E6A83C; --anthrazit:#87888A; --mittelgrau:#9C9D9F; --hellgrau:#D7D8DA; --umriss:#ECECEC; --text:#1A1A1A; }
+* { box-sizing: border-box; }
+body { margin:0; font-family: system-ui, "Helvetica Neue", Helvetica, Arial, sans-serif; font-size:15px; color:var(--text); background:#fafafa; }
+.kennlinie { height:4px; background: linear-gradient(90deg, var(--anthrazit) 0 40%, var(--mittelgrau) 40% 60%, var(--orange) 60% 67.5%, var(--hellgrau) 67.5% 100%); }
+.kopf { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; padding:12px 24px; background:#fff; border-bottom:1px solid var(--hellgrau); }
+.marke .sub { color:var(--anthrazit); margin-left:8px; font-size:13px; }
+nav a, nav .link { margin-right:14px; color:var(--text); text-decoration:none; border-bottom:2px solid transparent; }
+nav a:hover { border-bottom-color:var(--orange); }
+nav .nutzer { color:var(--anthrazit); font-size:13px; }
+.inhalt { padding:20px 24px; max-width:1400px; }
+.fuss { padding:12px 24px; color:var(--anthrazit); font-size:12px; border-top:1px solid var(--hellgrau); }
+h1 { font-size:22px; margin:0 0 16px; } h2 { font-size:16px; margin:0 0 10px; color:var(--anthrazit); }
+.karte { background:#fff; border:1px solid var(--hellgrau); border-radius:4px; padding:16px 20px; margin-bottom:16px; }
+.karte.schmal { max-width:560px; }
+.raster { display:grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap:16px; }
+table { border-collapse:collapse; width:100%; } table.voll { background:#fff; }
+th { text-align:left; background:var(--orange); color:var(--text); padding:6px 8px; font-weight:600; font-size:13px; }
+td { padding:6px 8px; border-bottom:1px solid var(--umriss); vertical-align:top; }
+tr:nth-child(even) td { background:#f6f6f7; }
+.mono { font-family: ui-monospace, Menlo, Consolas, monospace; font-size:13px; word-break:break-word; }
+.klein { font-size:12px; color:var(--anthrazit); }
+.ampel { display:inline-block; padding:2px 8px; border-radius:10px; font-size:12px; color:#fff; }
+.ampel.gruen { background:#3a8f4a; } .ampel.rot { background:#b03a2e; } .ampel.grau { background:var(--mittelgrau); }
+.meldungen { list-style:none; padding:0; } .meldungen li { padding:8px 12px; border-left:4px solid var(--orange); background:#fff; margin-bottom:8px; }
+.meldungen li.error { border-left-color:#b03a2e; }
+.warnung { border-left:4px solid var(--orange); background:#fff7e8; padding:8px 12px; }
+.hinweis { color:var(--anthrazit); font-size:13px; }
+form.inline { display:inline; } button.link { background:none; border:none; color:var(--text); cursor:pointer; padding:0; font:inherit; text-decoration:underline; }
+button, .knopf { background:var(--orange); border:none; padding:8px 14px; border-radius:3px; cursor:pointer; font:inherit; color:var(--text); text-decoration:none; display:inline-block; }
+input, select, textarea { font:inherit; padding:6px 8px; border:1px solid var(--mittelgrau); border-radius:3px; width:100%; max-width:520px; }
+form p label { display:block; font-weight:600; margin-bottom:4px; } form p .helptext { display:block; color:var(--anthrazit); font-size:12px; }
+.filter input { width:auto; max-width:200px; margin-right:6px; }
+.reiter a { display:inline-block; padding:6px 12px; margin:0 4px 12px 0; border:1px solid var(--hellgrau); border-radius:3px; text-decoration:none; color:var(--text); }
+.reiter a.aktiv { border-color:var(--orange); background:#fff7e8; }
+.aktionen form { margin-right:8px; }
+.errorlist { color:#b03a2e; list-style:none; padding:0; }

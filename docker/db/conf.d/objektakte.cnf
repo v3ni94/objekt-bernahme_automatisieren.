@@ -1,0 +1,9 @@
+# MariaDB-Konfiguration fuer die Objektuebernahme (docs/architektur.md 3.1, Volltextparameter C-05)
+[mariadb]
+character-set-server = utf8mb4
+collation-server = utf8mb4_unicode_ci
+# Volltextsuche: keine Stoppwortliste, kurze Token (Einheitenlabels wie WE, GE)
+innodb_ft_enable_stopword = OFF
+innodb_ft_min_token_size = 2
+# Zeitstempel in UTC, Anwendung rechnet nach Europe/Berlin um
+default_time_zone = '+00:00'

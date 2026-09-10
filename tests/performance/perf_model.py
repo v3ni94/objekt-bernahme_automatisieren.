@@ -24,9 +24,9 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
-PAGES_PER_OBJECT = 10_000          # CR-05 Abschnitt 7
-TOTAL_BUDGET_SECONDS = 3 * 3600    # CR-05 Abschnitt 7: unter 3 Stunden
-OCR_BUDGET_SECONDS = 2 * 3600      # Umsetzungsplan 2.8: OCR-Anteil unter 2 Stunden
+PAGES_PER_OBJECT = 10_000  # CR-05 Abschnitt 7
+TOTAL_BUDGET_SECONDS = 3 * 3600  # CR-05 Abschnitt 7: unter 3 Stunden
+OCR_BUDGET_SECONDS = 2 * 3600  # Umsetzungsplan 2.8: OCR-Anteil unter 2 Stunden
 
 
 def cpu_seconds(pages: int, digital_share: float, t_ocr: float, t_txt: float) -> float:
@@ -52,8 +52,9 @@ def p_min(cpu: float, efficiency: float, budget: float = OCR_BUDGET_SECONDS) -> 
     return max(1, math.ceil(cpu / (efficiency * budget)))
 
 
-def scaling_efficiency(pages_per_second_single: float, pages_per_second_parallel: float,
-                       processes: int) -> float:
+def scaling_efficiency(
+    pages_per_second_single: float, pages_per_second_parallel: float, processes: int
+) -> float:
     """e = Durchsatz mit P Prozessen / (P * Durchsatz mit einem Prozess)."""
     if processes < 1 or pages_per_second_single <= 0:
         raise ValueError("ungueltige Eingaben fuer die Skalierungseffizienz")
@@ -71,9 +72,13 @@ class Scenario:
         return cpu_seconds(pages, self.digital_share, self.t_ocr, self.t_txt)
 
 
-def scenario_table(scenarios: list[Scenario], process_counts: list[int], efficiency: float,
-                   pages: int = PAGES_PER_OBJECT,
-                   limit_seconds: float = OCR_BUDGET_SECONDS) -> list[dict]:
+def scenario_table(
+    scenarios: list[Scenario],
+    process_counts: list[int],
+    efficiency: float,
+    pages: int = PAGES_PER_OBJECT,
+    limit_seconds: float = OCR_BUDGET_SECONDS,
+) -> list[dict]:
     """Zeilen fuer die Szenariotabelle aus Umsetzungsplan 2.8."""
     rows = []
     for sc in scenarios:
@@ -87,13 +92,15 @@ def scenario_table(scenarios: list[Scenario], process_counts: list[int], efficie
                 "within_ocr_budget": wall <= limit_seconds,
                 "within_total_budget": wall <= TOTAL_BUDGET_SECONDS,
             }
-        rows.append({
-            "scenario": sc.name,
-            "digital_share": sc.digital_share,
-            "t_ocr": sc.t_ocr,
-            "t_txt": sc.t_txt,
-            "cpu_seconds": cpu,
-            "p_min": p_min(cpu, efficiency, limit_seconds),
-            "cells": cells,
-        })
+        rows.append(
+            {
+                "scenario": sc.name,
+                "digital_share": sc.digital_share,
+                "t_ocr": sc.t_ocr,
+                "t_txt": sc.t_txt,
+                "cpu_seconds": cpu,
+                "p_min": p_min(cpu, efficiency, limit_seconds),
+                "cells": cells,
+            }
+        )
     return rows

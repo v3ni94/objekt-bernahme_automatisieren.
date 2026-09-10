@@ -1,0 +1,9 @@
+{% extends "base.html" %}{% block title %}Konfiguration · {{ APP_NAME }}{% endblock %}
+{% block content %}
+<h1>Konfiguration</h1>
+<nav class="reiter">{% for c in categories %}<a href="?kategorie={{ c }}" class="{% if c == category %}aktiv{% endif %}">{{ c }}</a>{% endfor %}</nav>
+{% if retention_hint %}<p class="warnung">Aufbewahrungsfristen sind durch Geschäftsführung und Steuerberater festzulegen. Ohne gesetzten und freigegebenen Wert ist kein Löschlauf auslösbar.</p>{% endif %}
+<table class="voll"><tr><th>Schlüssel</th><th>Wert</th><th>Beschreibung</th><th>Herkunft</th>{% if can_edit %}<th></th>{% endif %}</tr>
+{% for r in rows %}<tr><td class="mono">{{ r.key }}</td><td class="mono">{% if r.entry.is_secret %}[maskiert]{% else %}{{ r.value|default_if_none:"leer" }}{% endif %}</td><td>{{ r.entry.description }}</td><td class="klein">{{ r.entry.source|default:"" }}</td>{% if can_edit %}<td><a href="{% url 'setting_edit' r.key %}">ändern</a></td>{% endif %}</tr>{% endfor %}
+</table>
+{% endblock %}
