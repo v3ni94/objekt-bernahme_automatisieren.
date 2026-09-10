@@ -39,3 +39,7 @@ Thumbs.db
 
 # Scratch
 /tmp/
+
+# M0-Ergebnisse werden erst nach Pruefung unter docs/betrieb/ abgelegt
+probe-out/
+serverbefund-*.md
