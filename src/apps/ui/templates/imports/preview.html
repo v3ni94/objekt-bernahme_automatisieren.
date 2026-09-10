@@ -1,0 +1,9 @@
+{% extends "base.html" %}{% block title %}Vorschau Import {{ batch.pk }} · {{ APP_NAME }}{% endblock %}
+{% block content %}<h1>Vorschau: {{ preview|length }} Zeilen {% if action == "accept" %}übernehmen{% else %}nicht übernehmen{% endif %}</h1>
+<p class="klein">Import {{ batch.pk }} {{ batch.source_file_name }}, Objekt {{ object.object_number }}</p>
+<div class="karte"><table class="voll"><thead><tr><th>Zeile</th><th>Einheit</th><th>Person</th><th>Eigentümer</th><th>Eigentumsbeginn</th><th>Status</th></tr></thead><tbody>
+{% for p in preview %}<tr><td>{{ p.row.row_no }}{% if p.row.sub_index %}.{{ p.row.sub_index }}{% endif %}</td><td class="mono">{{ p.unit|default:"" }} {% if p.unit %}<span class="klein">{% if p.unit_exists %}vorhanden{% else %}wird angelegt{% endif %}</span>{% endif %}</td><td>{{ p.person }}</td><td>{{ p.owner_action }}</td><td>{{ p.valid_from|default:"unbekannt" }}</td><td>{{ p.row.get_status_display }}</td></tr>{% endfor %}
+</tbody></table>
+<form method="post" action="{% url 'import_commit' batch.pk %}">{% csrf_token %}{% for id in row_ids %}<input type="hidden" name="row" value="{{ id }}">{% endfor %}<input type="hidden" name="action" value="{{ action }}">
+<p><button type="submit">Ausführen</button> <a href="{% url 'import_batch' batch.pk %}">Abbrechen</a></p></form>
+<p class="hinweis">Unsichere Zeilen in der Auswahl werden bei Übernahme übersprungen und bleiben zur Einzelentscheidung offen; bei Ablehnung werden sie mit abgelehnt.</p></div>{% endblock %}

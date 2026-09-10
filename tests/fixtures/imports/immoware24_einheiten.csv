@@ -1,0 +1,10 @@
+Objekt-Nr;Status;Objekt;Verwaltungsart;Gebaeude;VE-Nr;VE-Beschreibung;Lage;Eigentuemer;Hausgeld_EUR_mtl;Mieter;Miete_EUR_mtl
+623;aktiv;Musterstadt, Musterweg 1;WEG;Haus A;1001;WE 1;EG links;Mustermann, Erika & Max;245,50;;
+623;aktiv;Musterstadt, Musterweg 1;WEG;Haus A;1002;WE 2;EG rechts;Erika und Max Beispiel;198,00;Altmieter, Anna;650,00
+623;aktiv;Musterstadt, Musterweg 1;WEG;Haus A;1003;WE 3;1. OG links;Muster GbR;310,25;;
+623;aktiv;Musterstadt, Musterweg 1;WEG;Haus A;1004;WE 4 - 1.OG rechts;;Erbengemeinschaft Altmuster;200,00;;
+623;aktiv;Musterstadt, Musterweg 1;WEG;Haus B;1005;Garage 1;;Mustermann, Erika & Max;15,00;;
+623;archiv;Musterstadt, Musterweg 1;WEG;Haus A;1006;WE 5;2. OG;Anna Maria Neumuster Beispiel;180,00;;
+623;aktiv;Musterstadt, Musterweg 1;WEG;Haus A;1007;WE 6;2. OG rechts;Dr. Erika Neumuster-Beispiel c/o Beispiel Hausverwaltung;210,10;;
+624;aktiv;Beispielstadt, Beispielweg 2;WEG;;2001;WE 1;;Fremd, Franz;100,00;;
+623;technisch;Musterstadt, Musterweg 1;WEG;Haus A;1008;Heizung;Keller;;;;

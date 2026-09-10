@@ -1,0 +1,13 @@
+{% extends "base.html" %}{% block title %}Importzeile {{ row.row_no }} · {{ APP_NAME }}{% endblock %}
+{% block content %}<h1>Importzeile {{ row.row_no }}{% if row.sub_index %}.{{ row.sub_index }}{% endif %} entscheiden</h1>
+<p class="klein">Import {{ batch.pk }} {{ batch.source_file_name }}, Objekt {{ object.object_number }} · Konfidenz {{ row.confidence }} · Gründe: {{ row.uncertainty_reasons|join:", " }}</p>
+<div class="raster">
+<div class="karte"><h2>Rohzeile</h2><table>{% for k, v in row.raw_data.items %}<tr><td class="klein">{{ k }}</td><td>{{ v }}</td></tr>{% endfor %}</table></div>
+<div class="karte"><h2>Erkannte Felder</h2><table>
+{% if person %}<tr><td>Person</td><td>{{ person.type }}: {{ person.company_name|default:"" }}{{ person.first_name|default:"" }} {{ person.last_name|default:"" }}</td></tr>{% endif %}
+{% for k, f in shared.items %}{% if f.value != None and f.value != "" %}<tr><td class="klein">{{ k }}</td><td>{{ f.value }} <span class="klein">({{ f.confidence }}{% if f.notes %}, {{ f.notes|join:", " }}{% endif %})</span></td></tr>{% endif %}{% endfor %}</table>
+{% if current %}<h2>Aktuelle Zuordnung der Einheit</h2><ul>{% for a in current %}<li>{{ a.owner }} seit {{ a.valid_from|date:"d.m.Y"|default:"unbekannt" }}</li>{% endfor %}</ul>{% endif %}
+{% if candidates %}<h2>Kandidaten</h2><table><thead><tr><th>ID</th><th>Eigentümer</th><th>Score</th><th>Signale</th></tr></thead><tbody>{% for c in candidates %}<tr><td class="mono">{{ c.owner_id }}</td><td>{{ c.display }}</td><td>{{ c.score }}</td><td class="klein">{{ c.signals|join:", " }}{% if not c.in_object %}, anderes Objekt{% endif %}</td></tr>{% endfor %}</tbody></table>{% endif %}</div>
+</div>
+<div class="karte schmal"><h2>Entscheidung</h2><form method="post">{% csrf_token %}{{ form.as_p }}<button type="submit">Speichern</button> <a href="{% url 'import_batch' batch.pk %}">Abbrechen</a></form>
+<p class="hinweis">Eigentümerwechsel beendet die bestehende Zuordnung am Tag vor dem Eigentumsbeginn und legt die neue an; Mehrfacheigentum ergänzt eine zweite Zuordnung; Dublette übernimmt nichts Neues. Feldkorrekturen gelten nur für diese Zeile.</p></div>{% endblock %}

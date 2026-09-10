@@ -138,6 +138,7 @@ def test_praefixlose_nummer():
 def test_lagezusatz_nach_bindestrich():
     parsed = parse_unit_label("WE 14 - 2.OG rechts", MAPPING)
     assert parsed.number == "14" and parsed.rest == "2.OG rechts" and parsed.label_normalized == "WE14"
+    assert parsed.label == "WE 14"
 
 
 def test_sonderform_nicht_zerlegt():

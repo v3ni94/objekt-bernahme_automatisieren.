@@ -1,0 +1,4 @@
+ID;Name;Briefanrede;Adresse;PLZ;Stadt;Land;Telefon;E-Mail
+1;Mustermann, Erika;Frau;Musterweg 1;12345;Musterstadt;Deutschland;0171 1234567;erika.mustermann@example.test
+2;Mustermann, Max;Herr;Musterweg 1;12345;Musterstadt;Deutschland;0211 123456;
+3;Muster GbR;;Beispielallee 5;12345;Musterstadt;D;;info@muster-gbr.example.test

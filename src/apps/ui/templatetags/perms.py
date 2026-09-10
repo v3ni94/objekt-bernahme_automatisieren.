@@ -19,3 +19,11 @@ def get_item(mapping, key):
         return mapping.get(key, [])
     except AttributeError:
         return []
+
+
+@register.filter
+def get_index(sequence, index):
+    try:
+        return sequence[int(index)]
+    except (IndexError, ValueError, TypeError):
+        return {}

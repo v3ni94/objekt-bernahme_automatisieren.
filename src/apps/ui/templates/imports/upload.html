@@ -1,0 +1,4 @@
+{% extends "base.html" %}{% block title %}Liste importieren · {{ APP_NAME }}{% endblock %}
+{% block content %}<div class="karte schmal"><h1>Liste importieren</h1><p class="klein">Objekt {{ object.object_number }} {{ object.name|default:"" }}</p>
+<form method="post" enctype="multipart/form-data">{% csrf_token %}{{ form.as_p }}<button type="submit">Hochladen</button> <a href="{% url 'object_detail' object.pk %}">Abbrechen</a></form>
+<p class="hinweis">Unterstützt: CSV (Trennzeichen und Zeichensatz werden erkannt), Excel (xlsx, Blattwahl), Immoware24-Export (einheiten.csv, kontakte.csv). Die Datei wird geprüft und eingelesen; Stammdaten entstehen erst nach Bestätigung der Zeilen. Vollständige IBAN werden sofort maskiert.</p></div>{% endblock %}

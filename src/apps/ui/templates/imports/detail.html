@@ -1,0 +1,42 @@
+{% extends "base.html" %}{% load perms %}{% block title %}Import {{ batch.pk }} · {{ APP_NAME }}{% endblock %}
+{% block content %}<h1>Import {{ batch.pk }}: {{ batch.source_file_name }}</h1>
+<p class="klein">Objekt <a href="{% url 'object_detail' object.pk %}">{{ object.object_number }} {{ object.name|default:"" }}</a> · Profil {{ batch.parser_profile }}{% if mapping.sheet %} · Blatt {{ mapping.sheet }}{% endif %} · Status {{ batch.get_status_display }} · SHA-256 <span class="mono">{{ batch.source_sha256|slice:":16" }}…</span></p>
+<div class="raster">
+<div class="karte"><h2>Zähler</h2><table>
+<tr><td>Zeilen gesamt</td><td>{{ batch.rows_total|default_if_none:"–" }}</td></tr>
+<tr><td>sicher (eingelesen)</td><td>{{ counts.parsed }}</td></tr><tr><td>unsicher</td><td>{{ counts.uncertain }}</td></tr>
+<tr><td>übernommen</td><td>{{ counts.committed }}</td></tr><tr><td>abgelehnt</td><td>{{ counts.rejected }}</td></tr><tr><td>Dubletten</td><td>{{ counts.duplicate }}</td></tr></table>
+{% if batch.error_message %}<p class="warnung">{{ batch.error_message }}</p>{% endif %}
+<p><a href="{% url 'import_protocol' batch.pk %}">Importprotokoll (Excel)</a>{% if not protocol_exists %} <span class="klein">wird beim Abruf erzeugt</span>{% endif %} · <a href="{% url 'import_list' object.pk %}">alle Importe</a></p></div>
+<div class="karte"><h2>Datei neu einlesen</h2>
+{% if user|has_perm:"imports.write" %}<form method="post" action="{% url 'import_reparse' batch.pk %}">{% csrf_token %}{{ reparse_form.as_p }}<button type="submit">Neu einlesen</button></form>
+<p class="hinweis">Erkannte Profile: {% for code, score in mapping.profile_scores.items %}{{ code }} {{ score }}{% if not forloop.last %}, {% endif %}{% endfor %}. Neu einlesen verwirft erkannte Zeilen, nicht die Datei.</p>{% endif %}</div>
+</div>
+<div class="karte"><h2>Spaltenzuordnung</h2>
+{% if columns %}<form method="post" action="{% url 'import_mapping' batch.pk %}">{% csrf_token %}
+<table class="voll"><thead><tr><th>Quellspalte</th><th>Beispiele</th><th>Zielfeld</th><th>Vorschlag</th></tr></thead><tbody>
+{% for field in mapping_form %}{% with col=columns|get_index:forloop.counter0 %}
+<tr{% if col.target and col.confidence < confidence_min %} class="gelb"{% endif %}><td>{{ field.label }}</td><td class="klein">{{ col.samples|join:", " }}</td><td>{{ field }}</td><td class="klein">{% if col.target %}{{ col.target }} ({{ col.confidence }}){% if col.manual %}, manuell{% endif %}{% else %}kein Vorschlag{% endif %}</td></tr>
+{% endwith %}{% endfor %}</tbody></table>
+{% if user|has_perm:"imports.write" %}<p><button type="submit">Zuordnung übernehmen und Zeilen erkennen</button></p>{% endif %}</form>
+<p class="hinweis">Gelb markierte Spalten liegen unter der Konfidenz {{ confidence_min }}. Nicht zugeordnete Spalten bleiben in der Rohzeile erhalten und werden im Protokoll als nicht übernommen geführt.</p>
+{% else %}<p>Noch nicht eingelesen.</p>{% endif %}</div>
+<div class="karte"><h2>Zeilen</h2>
+<p class="reiter"><a href="?" class="{% if not status_filter %}aktiv{% endif %}">alle</a><a href="?status=parsed" class="{% if status_filter == 'parsed' %}aktiv{% endif %}">sicher</a><a href="?status=uncertain" class="{% if status_filter == 'uncertain' %}aktiv{% endif %}">unsicher</a><a href="?status=committed" class="{% if status_filter == 'committed' %}aktiv{% endif %}">übernommen</a><a href="?status=rejected" class="{% if status_filter == 'rejected' %}aktiv{% endif %}">abgelehnt</a></p>
+<form method="post" action="{% url 'import_preview' batch.pk %}">{% csrf_token %}
+<table class="voll"><thead><tr><th></th><th>Zeile</th><th>Status</th><th>Konf.</th><th>Einheit</th><th>Person</th><th>Zielart</th><th>Vorschlag</th><th>Gründe</th><th>Rohzeile</th><th></th></tr></thead><tbody>
+{% for r in rows %}<tr>
+<td>{% if r.status == "parsed" or r.status == "uncertain" %}<input type="checkbox" name="row" value="{{ r.pk }}">{% endif %}</td>
+<td>{{ r.row_no }}{% if r.sub_index %}.{{ r.sub_index }}{% endif %}</td><td>{{ r.get_status_display }}</td><td>{{ r.confidence|default_if_none:"" }}</td>
+<td class="mono">{{ r.parsed_fields.shared.unit_label.value|default:"" }}{% if r.parsed_fields.unit_exists %} <span class="klein">(vorhanden)</span>{% endif %}</td>
+<td>{% with p=r.parsed_fields.person %}{% if p %}{{ p.company_name|default:"" }}{{ p.first_name|default:"" }} {{ p.last_name|default:"" }}{% if p.type == "community" %} <span class="klein">Gemeinschaft</span>{% endif %}{% endif %}{% endwith %}{% if r.parsed_fields.match.decision == "auto" %} <span class="ampel gruen">bestehend</span>{% elif r.parsed_fields.match.decision == "candidates" %} <span class="ampel grau">Kandidaten</span>{% endif %}</td>
+<td class="klein">{{ r.target_entity_type|default:"" }}</td><td>{{ r.parsed_fields.proposal|default:"" }}</td>
+<td class="klein">{{ r.uncertainty_reasons|join:", " }}</td>
+<td class="klein">{% for k, v in r.raw_data.items %}{% if v %}<span title="{{ k }}">{{ v }}</span>; {% endif %}{% endfor %}</td>
+<td>{% if r.status == "uncertain" and user|has_perm:"imports.write" %}<a href="{% url 'import_row' r.pk %}">Entscheiden</a>{% elif r.status == "committed" %}<span class="klein">{{ r.committed_targets|length }} Ziele</span>{% endif %}</td></tr>
+{% empty %}<tr><td colspan="11">Keine Zeilen.</td></tr>{% endfor %}</tbody></table>
+{% if user|has_perm:"imports.write" %}<p class="aktionen"><label><input type="checkbox" name="all_parsed" value="1"> alle sicheren Zeilen einschließen</label>
+<button type="submit" name="action" value="accept">Ausgewählte übernehmen (Vorschau)</button> <button type="submit" name="action" value="reject" class="link">Ausgewählte nicht übernehmen (Vorschau)</button></p>{% endif %}
+</form>
+<p class="hinweis">Sichere Zeilen werden gesammelt bestätigt (Vorschau vor Ausführung); unsichere Zeilen einzeln über Entscheiden. Nichts wird stillschweigend übernommen oder verworfen; rows_total entspricht der Summe der Statuswerte.</p></div>
+{% endblock %}

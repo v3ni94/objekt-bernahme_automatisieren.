@@ -36,3 +36,4 @@ form p label { display:block; font-weight:600; margin-bottom:4px; } form p .help
 .reiter a.aktiv { border-color:var(--orange); background:#fff7e8; }
 .aktionen form { margin-right:8px; }
 .errorlist { color:#b03a2e; list-style:none; padding:0; }
+tr.gelb td { background:#fff7e8; }

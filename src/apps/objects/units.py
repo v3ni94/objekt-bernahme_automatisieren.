@@ -73,6 +73,9 @@ def parse_unit_label(
         number = number.lstrip("0") or "0"
     suffix = (match.group("suffix") or "").lower()
     rest = (match.group("rest") or "").strip() or None
+    if rest:
+        # Lagezusatz gehoert nach units.location; die Bezeichnung endet vor dem Trennstrich (H 6.5)
+        clean = clean[: match.start("rest")].rstrip(" -–")
     reasons: list[str] = []
     if not key:
         unit_type = default_type_without_prefix

@@ -1,0 +1,4 @@
+Einheit,Eigentümer,Straße,PLZ,Ort,E-Mail,MEA,Eigentum seit,IBAN
+WE01,"Mustermann, Erika",Musterweg 12a,12345,Musterstadt,erika@example.test,125/10000,01.01.2015,DE02 1203 0000 0000 2020 51
+WE02,Beispiel Hans,Beispielweg 3,12345,Musterstadt,,250/10000,15.06.2020,
+Summe,,,,,,375/10000,,

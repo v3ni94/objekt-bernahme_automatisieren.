@@ -1489,8 +1489,14 @@ Celery-Queues aus den Settings: `ai`, `classify`, `io`, `lists`, `ocr`
 | drive.root_folder_id | drive | string | `null` |
 | drive.upload_chunk_bytes | drive | integer | `8388608` |
 | import.column_confidence_min | import | decimal | `0.8` |
+| import.column_synonyms | import | object | `{"unit_label": ["WE", "Einheit", "Whg", "Wohnung", "Nr", "Nr.", "VE", "VE-Beschreibung"...` |
+| import.deposit_type_synonyms | import | object | `{"cash_account": ["Kautionskonto", "Konto", "Sparkonto", "Bar", "Barkaution", "Überweis...` |
+| import.legal_form_markers | import | list | `["GmbH", "AG", "KG", "OHG", "UG", "e.V.", "GbR", "Stiftung", "Genossenschaft", "eG", "G...` |
 | import.name_split_thresholds | import | object | `{"high": 0.9, "medium": 0.6}` |
 | import.ocr_cell_confidence_min | import | integer | `70` |
+| import.owner_match_thresholds | import | object | `{"auto": 90, "candidate": 78}` |
+| import.owner_match_weights | import | object | `{"same_unit": 15, "same_address": 8, "same_email": 15, "same_iban_hash": 15, "same_firs...` |
+| import.unit_status_active_values | import | list | `["aktiv"]` |
 | jobs.max_attempts_default | jobs | integer | `3` |
 | jobs.stale_minutes | jobs | object | `{"default": 15, "ocr_chunk": 10, "classify": 3, "classify_ai": 5, "file_to_drive": 5}` |
 | lists.debounce_seconds | lists | integer | `60` |
@@ -1581,7 +1587,10 @@ Celery-Queues aus den Settings: `ai`, `classify`, `io`, `lists`, `ocr`
 | review.bulk_execute | Massenbearbeitung ausgeführt |
 | review.transfer_object | in anderes Objekt übernommen |
 | review.dismiss_object_case | Fall zur Objektzuordnung verworfen (nur Admin) |
-| import.commit | Import übernommen |
+| import.upload | Importdatei angenommen |
+| import.parse | Importzeilen erkannt |
+| import.row_commit | Importzeile übernommen oder abgelehnt |
+| import.commit | Import übernommen (Lauf) |
 | import.rollback | Import zurückgenommen |
 | retention.approve | Aufbewahrungsfrist freigegeben |
 | deletion.propose | Löschvorschlag erzeugt |

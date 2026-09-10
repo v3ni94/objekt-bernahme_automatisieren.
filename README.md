@@ -8,7 +8,7 @@ Die Anwendung unterstützt die Übernahme von Verwaltungsobjekten (WEG und Miete
 
 ## Status
 
-Umsetzung nach Freigabe FG-1 bis FG-3 vom 10.09.2026 (docs/plan/entscheidungen.md). Stand: M1 (Gerüst, Betrieb, Sicherheit) und M2 (Datenmodell, Objektverwaltung) im Repository; Fortschritt in docs/plan/status.md. Stack laut Gutachtergremium: Python-Monolith mit Django, HTMX, Celery, Redis und MariaDB (docs/architektur.md 3). Serverseitige Schritte (Serverbefund M0, Verzeichnisse, Secrets, Härtung, Deployment-Tests) warten auf den SSH-Zugang zum VPS (V-01).
+Umsetzung nach Freigabe FG-1 bis FG-3 vom 10.09.2026 (docs/plan/entscheidungen.md). Stand: M1 (Gerüst, Betrieb, Sicherheit), M2 (Datenmodell, Objektverwaltung) und M3 (Import von Eigentümerlisten aus CSV, Excel und Immoware24) im Repository; Fortschritt in docs/plan/status.md. Stack laut Gutachtergremium: Python-Monolith mit Django, HTMX, Celery, Redis und MariaDB (docs/architektur.md 3). Serverseitige Schritte (Serverbefund M0, Verzeichnisse, Secrets, Härtung, Deployment-Tests) warten auf den SSH-Zugang zum VPS (V-01).
 
 Entwicklung lokal: MariaDB und Redis starten, `.venv` mit `requirements-dev.lock.txt`, dann `make test` (Details in docs/betrieb/deployment.md und Makefile). Verbindliche Bezeichner: docs/architektur/bezeichnerregister.md; Datenmodell: docs/architektur/datenmodell.md.
 
