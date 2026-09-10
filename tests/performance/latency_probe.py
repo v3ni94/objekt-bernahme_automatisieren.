@@ -1,11 +1,16 @@
 #!/usr/bin/env python3
-"""Latenzsonde fuer das Review Center (M7 Schritt 10, B-35): p95 und p99 der Endpunkte Liste, Detail, Vorschaubild,
-Eigentuemersuche und Entscheidung. Laeuft gegen einen Server (URL) mit Anmeldedaten aus Umgebungsvariablen oder in der
-Testsuite mit dem Django-Testclient (tests/integration/review/test_latenz.py). Zielwert p95 unter 2 s, p99 unter 4 s.
+"""Latenzsonde (M7 Schritt 10, M13 Schritt 2, B-35): p95 und p99 je Endpunkt bei mehreren gleichzeitigen Nutzern.
+Endpunkte nach Umsetzungsplan 2.17: Objektansicht, Review-Liste, Detail, Vorschaubild, Eigentuemersuche, Suche,
+Berichte. Die Entscheidung (POST) wird nicht von der Sonde ausgeloest, weil sie Daten veraendert; ihre Laufzeit wird
+in tests/integration/review/test_latenz.py und ueber die Dauer der Aktion im Audit gemessen. Zielwert p95 unter 2 s,
+p99 unter 4 s (ANNAHME H01).
 
-Aufruf gegen einen Server:
-    LATENZ_BASE_URL=https://... LATENZ_EMAIL=... LATENZ_PASSWORD=... python3 latency_probe.py --users 5 --rounds 20
-Der Login mit TOTP ist nicht automatisiert; gegen den Server wird ein Sitzungs-Cookie erwartet (LATENZ_SESSION_COOKIE).
+Aufruf gegen einen Server (waehrend des Performance-Laufs, Messdatei nach /srv/objektakte/exports/perf/):
+    LATENZ_BASE_URL=https://... LATENZ_SESSION_COOKIE=... python3 latency_probe.py --users 5 --rounds 20 \
+        --object 1 --case 1 --document 1 --query Abrechnung > latenz.json
+Der Login mit TOTP ist nicht automatisiert; die Sonde erwartet das Sitzungs-Cookie eines angemeldeten Nutzers.
+Endpunkte, die 4xx liefern (zum Beispiel fehlende Fall-ID), werden mit Statuscode im Bericht ausgewiesen und nicht
+in die Perzentile aufgenommen.
 """
 
 from __future__ import annotations
@@ -29,6 +34,7 @@ def percentile(values: list[float], pct: float) -> float:
 def measure(fetch, endpoints: dict[str, str], *, users: int, rounds: int) -> dict:
     """fetch(name, url) -> Statuscode; misst je Endpunkt Wanduhrzeit je Anfrage."""
     samples: dict[str, list[float]] = {name: [] for name in endpoints}
+    statuses: dict[str, dict[int, int]] = {name: {} for name in endpoints}
 
     def worker(_):
         for _round in range(rounds):
@@ -36,7 +42,8 @@ def measure(fetch, endpoints: dict[str, str], *, users: int, rounds: int) -> dic
                 t0 = time.perf_counter()
                 status = fetch(name, url)
                 dt = time.perf_counter() - t0
-                if status < 500:
+                statuses[name][status] = statuses[name].get(status, 0) + 1
+                if status < 400:
                     samples[name].append(dt)
 
     with ThreadPoolExecutor(max_workers=users) as pool:
@@ -49,9 +56,17 @@ def measure(fetch, endpoints: dict[str, str], *, users: int, rounds: int) -> dic
             "p95_s": round(percentile(values, 95), 4),
             "p99_s": round(percentile(values, 99), 4),
             "max_s": round(max(values), 4) if values else None,
+            "status": {str(k): v for k, v in sorted(statuses[name].items())},
         }
     worst = max((r["p95_s"] for r in report.values()), default=0)
-    report["_summary"] = {"users": users, "rounds": rounds, "p95_max_s": worst, "ok": worst < 2.0}
+    complete = all(r["n"] > 0 for r in report.values())
+    report["_summary"] = {
+        "users": users,
+        "rounds": rounds,
+        "p95_max_s": worst,
+        "ok": worst < 2.0 and complete,
+        "alle_endpunkte_erreichbar": complete,
+    }
     return report
 
 
@@ -63,16 +78,24 @@ def main() -> int:
     ap.add_argument("--users", type=int, default=5)
     ap.add_argument("--rounds", type=int, default=10)
     ap.add_argument("--case", type=int, default=1, help="Fall-ID fuer die Detailansicht")
-    ap.add_argument("--object", type=int, default=1, help="Objekt-ID fuer die Eigentuemersuche")
+    ap.add_argument("--object", type=int, default=1, help="Objekt-ID fuer Objektansicht und Eigentuemersuche")
+    ap.add_argument("--document", type=int, default=1, help="Dokument-ID fuer das Vorschaubild (Seite 1)")
+    ap.add_argument("--query", default="Abrechnung", help="Suchwort fuer die Volltextsuche")
     args = ap.parse_args()
     base = os.environ.get("LATENZ_BASE_URL")
     cookie = os.environ.get("LATENZ_SESSION_COOKIE")
     if not base or not cookie:
         sys.exit("LATENZ_BASE_URL und LATENZ_SESSION_COOKIE setzen")
+    from urllib.parse import quote
+
     endpoints = {
+        "objektansicht": f"{base}/objekte/{args.object}/",
         "liste": f"{base}/review/",
         "detail": f"{base}/review/{args.case}/",
-        "suche": f"{base}/review/objekte/{args.object}/eigentuemer.json?q=mu",
+        "vorschaubild": f"{base}/dokumente/{args.document}/seite/1.jpg",
+        "eigentuemersuche": f"{base}/review/objekte/{args.object}/eigentuemer.json?q=mu",
+        "suche": f"{base}/suche/?q={quote(args.query)}",
+        "berichte": f"{base}/berichte/",
     }
 
     def fetch(name, url):
