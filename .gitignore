@@ -1,0 +1,41 @@
+# Zugangsdaten und Umgebungskonfiguration gehoeren nie ins Repository
+.env
+.env.*
+!.env.example
+secrets/
+*.pem
+*.key
+token*.json
+client_secret*.json
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+
+# Node (falls Frontend-Tooling)
+node_modules/
+dist/
+
+# Laufzeitdaten (liegen auf dem Server unter /srv/objektakte/, nie im Repo)
+data/
+transit/
+ocr-cache/
+backup/
+*.sqlite3
+
+# Editoren und Betriebssystem
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Scratch
+/tmp/
