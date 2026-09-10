@@ -57,7 +57,7 @@ chown -R "$APP_UID:$APP_UID" "$BASE"/{transit,work,ocr-cache,previews,models,lis
 chmod 750 "$BASE"/{transit,work,ocr-cache,previews,models,lists,requests,imports,exports}
 chmod 700 "$BASE/secrets" "$BASE/backup"
 chown "$DEPLOY_USER:$DEPLOY_USER" "$BASE/deploy" && chmod 750 "$BASE/deploy"
-mkdir -p /opt/objektakte && chown "$DEPLOY_USER:$DEPLOY_USER" /opt/objektakte
+mkdir -p /opt/objektakte && chown -R "$DEPLOY_USER:$DEPLOY_USER" /opt/objektakte
 ls -la "$BASE" | sed 's/^/   /'
 
 echo "== 3. Secrets unter $BASE/secrets (vorhandene Dateien bleiben unveraendert)"
@@ -78,6 +78,13 @@ echo "   Die Schluessel (iban_key, iban_hmac_key, token_key, totp_key, app_secre
 echo "== 4. SSH-Schluessel fuer GitHub"
 OUT="$DH/github-werte.txt"
 : > "$OUT"; chmod 600 "$OUT"; chown "$DEPLOY_USER:$DEPLOY_USER" "$OUT"
+# Wurde der Deploy Key fuer den ersten Checkout bereits als root erzeugt (docs/betrieb/github-deploy.md, Ablauf),
+# wandert er zu deploy; so bleibt es bei einem einzigen Deploy Key im Repository.
+if [ ! -f "$DH/.ssh/github_deploy" ] && [ -f "$CALLER_HOME/.ssh/github_deploy" ] && [ "$CALLER_HOME" != "$DH" ]; then
+  mv "$CALLER_HOME/.ssh/github_deploy" "$CALLER_HOME/.ssh/github_deploy.pub" "$DH/.ssh/"
+  chown "$DEPLOY_USER:$DEPLOY_USER" "$DH/.ssh/github_deploy" "$DH/.ssh/github_deploy.pub"; chmod 600 "$DH/.ssh/github_deploy"
+  echo "   Deploy Key von $CALLER nach $DH/.ssh uebernommen (bereits in GitHub eingetragen: Abschnitt A ueberspringen)."
+fi
 if [ ! -f "$DH/.ssh/github_deploy" ]; then
   sudo -u "$DEPLOY_USER" ssh-keygen -q -t ed25519 -N "" -C "objektakte-vps-deploy-key" -f "$DH/.ssh/github_deploy"
 fi
