@@ -17,12 +17,25 @@ cd /opt/objektakte
 LOG=/srv/objektakte/deploy/remote.log
 mkdir -p "$(dirname "$LOG")"
 read -r ACTION BRANCH ARG _ <<<"${SSH_ORIGINAL_COMMAND:-}"
+envval() { grep -E "^$1=" .env 2>/dev/null | head -1 | cut -d= -f2- | awk '{print $1}'; }
+ensure_network() {
+  # Traefik laeuft im Host-Netz (Serverbefund); das Proxy-Netz wird mit festem Subnetz angelegt, damit
+  # TRUSTED_PROXY_CIDR stimmt. Vorhandenes Netz bleibt unveraendert.
+  local net cidr; net="$(envval TRAEFIK_NETWORK)"; cidr="$(envval TRUSTED_PROXY_CIDR)"
+  [ -n "$net" ] || { echo "TRAEFIK_NETWORK fehlt in .env"; return 1; }
+  if docker network inspect "$net" >/dev/null 2>&1; then
+    echo "Netz $net vorhanden: $(docker network inspect "$net" --format '{{range .IPAM.Config}}{{.Subnet}}{{end}}')"
+  else
+    docker network create --driver bridge ${cidr:+--subnet "$cidr"} "$net" >/dev/null
+    echo "Netz $net angelegt${cidr:+ mit Subnetz $cidr}"
+  fi
+}
 case "$BRANCH" in *[!A-Za-z0-9._/-]*|*..*|"") case "$ACTION" in rollback|check) ;; *) echo "Branch fehlt oder unzulaessig"; exit 2 ;; esac ;; esac
 case "${ARG:-}" in *[!A-Za-z0-9@._+-]*) echo "Argument unzulaessig"; exit 2 ;; esac
 echo "$(date -Is) $ACTION ${BRANCH:-} ${ARG:-} von ${SSH_CLIENT:-unbekannt}" >> "$LOG"
 case "$ACTION" in
-  deploy)    exec scripts/deploy.sh "$BRANCH" ;;
-  first-run) exec scripts/deploy.sh --first-run "$BRANCH" ;;
+  deploy)    ensure_network; exec scripts/deploy.sh "$BRANCH" ;;
+  first-run) ensure_network; exec scripts/deploy.sh --first-run "$BRANCH" ;;
   rollback)  exec scripts/rollback.sh ;;
   check)
     echo "Verbindung ok: $(hostname) als $(whoami), Checkout $(git rev-parse --abbrev-ref HEAD) $(git rev-parse --short=12 HEAD)"
@@ -48,6 +61,8 @@ case "$ACTION" in
       cp deploy/env.produktion .env && chmod 600 .env
       echo ".env aus deploy/env.produktion angelegt ($(grep -c '' .env) Zeilen)"
     fi
+    ensure_network
+    docker compose config --quiet && echo "Compose-Datei mit dieser .env gueltig"
     ;;
   create-admin)
     [ -n "${ARG:-}" ] || { echo "E-Mail fehlt"; exit 2; }

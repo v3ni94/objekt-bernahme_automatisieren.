@@ -166,13 +166,12 @@ services:
       traefik.http.middlewares.objektakte-headers.headers.contentTypeNosniff: "true"
       traefik.http.middlewares.objektakte-headers.headers.customFrameOptionsValue: "SAMEORIGIN"
       traefik.http.middlewares.objektakte-headers.headers.referrerPolicy: "strict-origin-when-cross-origin"
-      # Optionaler Redirect-Router, nur wenn der Serverbefund keinen globalen
-      # HTTP-zu-HTTPS-Redirect zeigt (TRAEFIK_REDIRECT_ROUTER=true). Sonst diese vier Zeilen entfernen.
-      traefik.http.routers.objektakte-http.rule: "Host(`${APP_DOMAIN}`)"
-      traefik.http.routers.objektakte-http.entrypoints: "${TRAEFIK_ENTRYPOINT_INSECURE}"
-      traefik.http.routers.objektakte-http.middlewares: "objektakte-redirect"
-      traefik.http.middlewares.objektakte-redirect.redirectscheme.scheme: "https"
-      # Falls der Serverbefund providers.docker.constraints zeigt: Zusatzlabel hier eintragen.
+      # Kein eigener Redirect-Router: Der Serverbefund vom 10.09.2026 zeigt einen globalen HTTP-zu-HTTPS-Redirect
+      # am Entrypoint web (TRAEFIK_REDIRECT_ROUTER=false). Bei einem Traefik ohne globalen Redirect vier Labels ergaenzen:
+      # objektakte-http.rule, objektakte-http.entrypoints=${TRAEFIK_ENTRYPOINT_INSECURE}, objektakte-http.middlewares,
+      # middlewares.objektakte-redirect.redirectscheme.scheme=https (docs/betrieb.md 3.6).
+      # Traefik laeuft im Host-Netz; das Netz ${TRAEFIK_NETWORK} legt scripts/deploy_remote.sh mit festem Subnetz
+      # (TRUSTED_PROXY_CIDR) an, Traefik erreicht den Container ueber dessen Adresse in diesem Netz.
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request,sys; r=urllib.request.urlopen('http://127.0.0.1:8000/healthz/', timeout=5); sys.exit(0 if r.status==200 else 1)"]
       interval: 30s
