@@ -64,9 +64,25 @@ Settings, Secrets and variables, Actions, Environment `production` (oder Reposit
 
 Für die Umgebung `production` empfiehlt sich in GitHub die Freigabepflicht durch eine benannte Person (Required reviewers), damit kein Deployment ohne Vier-Augen-Prinzip startet.
 
-## Schritt 4: Probelauf
+## Schritt 4: Aktionen des Workflows
 
-0. Verbindungsprobe ohne Schreibwirkung: Actions, Workflow `Deploy`, Run workflow, Aktion `check`. Das Log zeigt Hostname, Nutzer, ausgecheckten Branch und ob `.env` vorhanden ist. Damit sind Secrets, Host-Key und das erzwungene Kommando geprüft, bevor ein Deployment läuft.
+Actions, Workflow `Deploy`, Run workflow; Eingaben Branch, Aktion und (nur für create-admin) Argument. Auf dem Server führt `scripts/deploy_remote.sh` genau diese Aktionen aus, alles andere weist es ab. Reihenfolge der Erstinstallation: `check`, `befund`, `env-init` (nachdem `deploy/env.produktion` aus dem Befund befüllt wurde), `first-run`, `create-admin`.
+
+| Aktion | Wirkung | Schreibt auf dem Server |
+|---|---|---|
+| `check` | Hostname, Nutzer, ausgecheckter Branch, ob `.env` vorhanden ist | nichts |
+| `pull` | Checkout auf den angegebenen Branch bringen (`git fetch`, `checkout`, `pull --ff-only`) | nur den Checkout |
+| `befund` | Serverbefund nach docs/betrieb/m0-anleitung.md ins Log (Kerne, RAM, Platte, Docker, Traefik, Host-Sicherheit; Geheimnisse geschwärzt) | nichts |
+| `env-init` | `.env` aus `deploy/env.produktion` anlegen; ist `.env` vorhanden, nur Abweichungen anzeigen | `.env`, einmalig |
+| `first-run` | Erstinstallation `scripts/deploy.sh --first-run <branch>` (Images bauen, db und redis starten, Migration, Seeds, Rechte, alle Dienste, Smoke-Test) | alles |
+| `deploy` | Deployment `scripts/deploy.sh <branch>` | alles |
+| `rollback` | vorherige Version (`scripts/rollback.sh`) | Container |
+| `create-admin` | Admin mit der E-Mail aus dem Argument anlegen; Startpasswort nur in `/home/deploy/admin-startpasswort.txt` auf dem Server, nie im Log | Datenbank, eine Datei |
+
+Die Aktionen kennt nur die Fassung von `deploy_remote.sh`, die auf dem Server ausgecheckt ist. Nach dem ersten Checkout deshalb einmal von Hand `git -C /opt/objektakte pull` als deploy; danach genügt die Aktion `pull`.
+
+## Schritt 5: Probelauf
+
 1. Actions, Workflow `Deploy`, Run workflow, Branch `main`, Aktion `deploy`.
 2. Erwartung: Das Log zeigt die Schritte von `scripts/deploy.sh` (Dump, Migration, Containerwechsel, Smoke-Test). Auf dem Server steht der Aufruf in `/srv/objektakte/deploy/remote.log`.
 3. Rollback-Probe: Aktion `rollback` (ein Befehl, docs/betrieb.md 4.3).
@@ -83,7 +99,7 @@ Der Workflow läuft ausschließlich manuell. Ein automatisches Deployment bei je
 
 | Fehler | Ursache | Maßnahme |
 |---|---|---|
-| `Host key verification failed` | `DEPLOY_KNOWN_HOSTS` fehlt oder passt nicht zum Host | `ssh-keyscan -t ed25519 <host>` erneut ausführen, Secret ersetzen |
+| `Host key verification failed` oder `REMOTE HOST IDENTIFICATION HAS CHANGED` | `DEPLOY_KNOWN_HOSTS` fehlt oder enthält einen anderen Schlüssel als der Server | Auf dem Server `ssh-keyscan -t ed25519 127.0.0.1 2>/dev/null \| sed 's/^127.0.0.1/187.124.23.80/'` ausführen, Zeile als Secret ersetzen; Kontrolle: `ssh-keyscan -t ed25519 127.0.0.1 2>/dev/null \| ssh-keygen -lf -` zeigt denselben SHA256-Fingerabdruck wie die Fehlermeldung im Workflow-Log |
 | `Permission denied (publickey)` | öffentlicher Teil nicht in `authorized_keys` oder Datei mit falschen Rechten | Zeile prüfen, `chmod 700 ~/.ssh && chmod 600 ~/.ssh/authorized_keys` |
-| `Nur 'deploy <branch>', 'rollback' oder 'check' erlaubt` | erzwungenes Kommando greift, Eingabe unbekannt | Workflow-Eingaben prüfen; direkter Shell-Zugang mit diesem Schlüssel ist nicht vorgesehen |
+| `Nur check, pull, befund, ... erlaubt` | erzwungenes Kommando greift, Eingabe unbekannt | Workflow-Eingaben prüfen; direkter Shell-Zugang mit diesem Schlüssel ist nicht vorgesehen |
 | `git fetch` schlägt fehl (`Repository not found`) | Deploy Key nicht eingetragen oder `remote` zeigt auf HTTPS | Schritt 1 wiederholen, `git remote -v` prüfen |

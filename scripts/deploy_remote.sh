@@ -2,22 +2,59 @@
 # Eingeschraenkter SSH-Einstieg fuer GitHub Actions (docs/betrieb/github-deploy.md).
 # In ~/.ssh/authorized_keys des Deploy-Nutzers eingetragen als
 #   command="/opt/objektakte/scripts/deploy_remote.sh",no-port-forwarding,no-agent-forwarding,no-X11-forwarding,no-pty ssh-ed25519 AAAA... github-actions-deploy
-# Der Schluessel kann damit ausschliesslich "deploy <branch>", "rollback" oder "check" (Verbindungsprobe ohne
-# Schreibwirkung) ausloesen; jede andere Eingabe wird abgewiesen.
+# Erlaubte Eingaben (erstes Wort Aktion, zweites Wort Branch, drittes Wort Argument):
+#   check <branch>            Verbindungsprobe ohne Schreibwirkung
+#   pull <branch>             Checkout aktualisieren, nichts starten
+#   befund <branch>           Serverbefund (scripts/measure_server.sh, geschwaerzt) ausgeben
+#   env-init <branch>         .env aus deploy/env.produktion anlegen, nie ueberschreiben
+#   first-run <branch>        Erstinstallation (scripts/deploy.sh --first-run)
+#   deploy <branch>           Deployment (scripts/deploy.sh)
+#   rollback                  vorherige Version (scripts/rollback.sh)
+#   create-admin <branch> <email>  Admin anlegen; Startpasswort nur in /home/deploy/admin-startpasswort.txt
+# Jede andere Eingabe wird abgewiesen.
 set -euo pipefail
 cd /opt/objektakte
 LOG=/srv/objektakte/deploy/remote.log
 mkdir -p "$(dirname "$LOG")"
-read -r ACTION BRANCH _ <<<"${SSH_ORIGINAL_COMMAND:-}"
-case "$BRANCH" in *[!A-Za-z0-9._/-]*|"") case "$ACTION" in rollback|check) ;; *) echo "Branch fehlt oder unzulaessig"; exit 2 ;; esac ;; esac
-echo "$(date -Is) $ACTION ${BRANCH:-} von ${SSH_CLIENT:-unbekannt}" >> "$LOG"
+read -r ACTION BRANCH ARG _ <<<"${SSH_ORIGINAL_COMMAND:-}"
+case "$BRANCH" in *[!A-Za-z0-9._/-]*|*..*|"") case "$ACTION" in rollback|check) ;; *) echo "Branch fehlt oder unzulaessig"; exit 2 ;; esac ;; esac
+case "${ARG:-}" in *[!A-Za-z0-9@._+-]*) echo "Argument unzulaessig"; exit 2 ;; esac
+echo "$(date -Is) $ACTION ${BRANCH:-} ${ARG:-} von ${SSH_CLIENT:-unbekannt}" >> "$LOG"
 case "$ACTION" in
-  deploy)   exec scripts/deploy.sh "$BRANCH" ;;
-  rollback) exec scripts/rollback.sh ;;
+  deploy)    exec scripts/deploy.sh "$BRANCH" ;;
+  first-run) exec scripts/deploy.sh --first-run "$BRANCH" ;;
+  rollback)  exec scripts/rollback.sh ;;
   check)
     echo "Verbindung ok: $(hostname) als $(whoami), Checkout $(git rev-parse --abbrev-ref HEAD) $(git rev-parse --short=12 HEAD)"
-    [ -f .env ] && echo ".env vorhanden" || echo ".env fehlt noch (vor dem ersten Deployment anlegen)"
+    [ -f .env ] && echo ".env vorhanden" || echo ".env fehlt noch (Aktion env-init)"
     docker compose version 2>/dev/null | head -1 || echo "docker compose nicht verfuegbar"
     ;;
-  *) echo "Nur 'deploy <branch>', 'rollback' oder 'check' erlaubt"; exit 2 ;;
+  pull)
+    git fetch --tags origin
+    git checkout "$BRANCH" && git pull --ff-only origin "$BRANCH"
+    echo "Checkout jetzt: $(git log -1 --format='%h %s')"
+    ;;
+  befund)
+    OUT="$(mktemp)"
+    bash scripts/measure_server.sh "$OUT" >/dev/null 2>&1 || echo "Hinweis: Serverbefund mit Warnungen (Ausgabe folgt)"
+    cat "$OUT"; rm -f "$OUT"
+    ;;
+  env-init)
+    if [ -f .env ]; then
+      echo ".env ist vorhanden und wird nicht ueberschrieben. Abweichungen zur Vorlage:"
+      diff -u deploy/env.produktion .env || true
+    else
+      [ -f deploy/env.produktion ] || { echo "deploy/env.produktion fehlt im Checkout"; exit 2; }
+      cp deploy/env.produktion .env && chmod 600 .env
+      echo ".env aus deploy/env.produktion angelegt ($(grep -c '' .env) Zeilen)"
+    fi
+    ;;
+  create-admin)
+    [ -n "${ARG:-}" ] || { echo "E-Mail fehlt"; exit 2; }
+    PW="$(openssl rand -base64 18)"
+    ADMIN_PASSWORD="$PW" docker compose exec -T -e ADMIN_PASSWORD web app-create-admin --email "$ARG" --no-input
+    umask 077; printf 'Startpasswort fuer %s: %s\n' "$ARG" "$PW" > /home/deploy/admin-startpasswort.txt
+    echo "Startpasswort liegt auf dem Server in /home/deploy/admin-startpasswort.txt (nach dem ersten Login loeschen: shred -u)."
+    ;;
+  *) echo "Nur check, pull, befund, env-init, first-run, deploy, rollback oder create-admin erlaubt"; exit 2 ;;
 esac

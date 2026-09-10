@@ -68,7 +68,7 @@ wait_healthy 180
 # 8. Smoke-Test ueber Traefik (TLS, Anwendung)
 curl -fsS --retry 6 --retry-delay 10 -o /dev/null -w 'healthz %{http_code} tls %{ssl_verify_result}\n' "https://${APP_DOMAIN}/healthz/"
 curl -fsS "https://${APP_DOMAIN}/readyz/" \
-  -H "Authorization: Bearer $(sudo cat /srv/objektakte/secrets/readyz_token 2>/dev/null || echo none)" | head -c 400; echo
+  -H "Authorization: Bearer $(docker compose exec -T web cat /run/secrets/readyz_token 2>/dev/null || echo none)" | head -c 400; echo
 
 # 9. Tags fortschreiben
 [ "$CUR_TAG" != none ] && echo "$CUR_TAG" > "$DEPLOY_DIR/previous"

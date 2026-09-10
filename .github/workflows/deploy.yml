@@ -12,11 +12,15 @@ on:
         required: true
         default: "main"
       action:
-        description: "check (Verbindungsprobe ohne Schreibwirkung), deploy oder rollback"
+        description: "check, pull, befund, env-init, first-run, deploy, rollback, create-admin (docs/betrieb/github-deploy.md)"
         required: true
         default: "check"
         type: choice
-        options: ["check", "deploy", "rollback"]
+        options: ["check", "pull", "befund", "env-init", "first-run", "deploy", "rollback", "create-admin"]
+      argument:
+        description: "Nur fuer create-admin: E-Mail-Adresse des neuen Admins"
+        required: false
+        default: ""
 
 concurrency:
   group: deploy-vps
@@ -43,9 +47,11 @@ jobs:
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
           BRANCH: ${{ inputs.branch }}
           ACTION: ${{ inputs.action }}
+          ARGUMENT: ${{ inputs.argument }}
         run: |
           test -n "$DEPLOY_HOST" || { echo "Secret DEPLOY_HOST fehlt"; exit 1; }
           test -n "$DEPLOY_USER" || { echo "Secret DEPLOY_USER fehlt"; exit 1; }
           case "$BRANCH" in *[!A-Za-z0-9._/-]*) echo "unzulaessiger Branchname"; exit 1;; esac
+          case "$ARGUMENT" in *[!A-Za-z0-9@._+-]*) echo "unzulaessiges Argument"; exit 1;; esac
           ssh -i ~/.ssh/id_deploy -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o BatchMode=yes \
-            "$DEPLOY_USER@$DEPLOY_HOST" "$ACTION $BRANCH"
+            -o ServerAliveInterval=30 "$DEPLOY_USER@$DEPLOY_HOST" "$ACTION $BRANCH $ARGUMENT"
