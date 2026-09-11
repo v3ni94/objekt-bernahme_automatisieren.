@@ -1,10 +1,10 @@
 # Deployment-Tests T1 bis T14 (Protokoll)
 
-Stand: 10.09.2026. Definition aus Fachentwurf G Abschnitt 12 und Umsetzungsplan 2.17 Schritt 6. Alle Tests laufen auf dem VPS; Ergebnisse mit Datum, Durchführendem, Befehlsausgaben und Bildschirmfotos (ohne Secrets). Bis zum Serverzugang (V-01) sind alle Ergebnisse „ausstehend“; nichts wird vorab als bestanden eingetragen. Die Tests T8 (Migration vorwärts und rückwärts) und die Prüfabfragen werden zusätzlich in der CI beziehungsweise in der Entwicklungsumgebung ausgeführt; das ersetzt den Nachweis auf dem Server nicht.
+Stand: 10.09.2026. Definition aus Fachentwurf G Abschnitt 12 und Umsetzungsplan 2.17 Schritt 6. Alle Tests laufen auf dem VPS; Ergebnisse mit Datum, Durchführendem, Befehlsausgaben und Bildschirmfotos (ohne Secrets). Nichts wird vorab als bestanden eingetragen; ausstehende Zeilen bleiben offen, bis der Nachweis auf dem Server vorliegt. Die Tests T8 (Migration vorwärts und rückwärts) und die Prüfabfragen werden zusätzlich in der CI beziehungsweise in der Entwicklungsumgebung ausgeführt; das ersetzt den Nachweis auf dem Server nicht.
 
 | Nr. | Test | Erwartung (Kurzfassung) | Vorbereitung im Repository | Ergebnis auf dem VPS | Datum, Durchführender | Nachweis |
 |---|---|---|---|---|---|---|
-| T1 | Frischer Checkout | Alle Dienste `healthy` in 3 min, HTTPS mit gültigem Zertifikat, HTTP leitet um | `scripts/deploy.sh`, `docker-compose.yml`, docs/betrieb/deployment.md | teilweise am 11.09.2026: alle acht Dienste `healthy` (Anwendungsdienste binnen 11 Sekunden nach dem Start), HTTP leitet global auf HTTPS um (Traefik), Anwendung antwortet über HTTPS mit 200; **Zertifikat offen**, Let's Encrypt scheitert an der DNS-Zweitprüfung | 11.09.2026, Deploy-Workflow | Workflow-Lauf `first-run`, Bereitschaftsabfrage `/readyz/` |
+| T1 | Frischer Checkout | Alle Dienste `healthy` in 3 min, HTTPS mit gültigem Zertifikat, HTTP leitet um | `scripts/deploy.sh`, `docker-compose.yml`, docs/betrieb/deployment.md | **bestanden am 11.09.2026**: alle acht Dienste `healthy` (Anwendungsdienste binnen 11 Sekunden nach dem Start), HTTP leitet global auf HTTPS um (Traefik), HTTPS mit Zertifikatsprüfung antwortet mit 200 (`tls 0`), Zertifikat von Let's Encrypt (Aussteller CN = YR2, Inhaber CN = uebernahme.muellerhv.de, gültig vom 11.09.2026 bis 10.12.2026) | 11.09.2026, Deploy-Workflow | Workflow-Läufe `first-run`, `cert-retry`, `smoke` (Lauf 34555104682), Bereitschaftsabfrage `/readyz/` |
 | T2 | Kein Host-Port | Nur Traefik veröffentlicht 80 und 443 | Compose ohne `ports:` an Anwendungsdiensten | ausstehend | | Ausgaben |
 | T3 | Isolation `data` | Kein Weg ins Internet aus `db` und `redis` | Netz `data` mit `internal: true` | ausstehend | | Ausgabe |
 | T4 | Serverneustart | Lauf wird fortgesetzt, keine Doppelverarbeitung, Sweeper im Log | Jobs mit Idempotenzschlüssel (B-03), Sweeper beim Start (M5) | ausstehend | | Abfrage, Log |
@@ -30,4 +30,4 @@ docker compose logs | grep -E 'DE[0-9]{2}[0-9 ]{18,}'
 
 ## Abschluss
 
-Definition of Done für den Betriebsteil: T1 bis T14 bestanden und dokumentiert, Serverbefund abgelegt, Runbook vorhanden, Wiederherstellungsprotokoll vorhanden. Stand: offen (V-01).
+Definition of Done für den Betriebsteil: T1 bis T14 bestanden und dokumentiert, Serverbefund abgelegt, Runbook vorhanden, Wiederherstellungsprotokoll vorhanden. Stand am 11.09.2026: T1 bestanden, T14 teilweise, T2 bis T13 ausstehend; Serverbefund abgelegt (docs/betrieb/serverbefund.md), Runbook vorhanden (docs/betrieb.md), Wiederherstellungsprotokoll ausstehend (T6).
