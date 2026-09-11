@@ -280,6 +280,23 @@ for j in ProcessingJob.objects.filter(status="pending", last_error__startswith="
     print(f"  wartet {j.job_type} Job {j.pk}: {(j.last_error or '')[:120]}")
 laeufe = ProcessingRun.objects.values("status").annotate(c=Count("id"))
 print("Laeufe:", ", ".join(f"{r['status']}={r['c']}" for r in laeufe) or "keine")
+# Ordnerabgleiche je Objekt (letzte drei), Struktur in drive_nodes, offene Faelle nach Art; ohne Dateinamen
+from apps.drive.models import DriveNode, DriveSyncRun
+from apps.review.models import ReviewCase
+for obj in ManagedObject.objects.filter(deleted_at__isnull=True).order_by("object_number_numeric"):
+    knoten = DriveNode.objects.filter(object=obj, status="active").values("node_kind").annotate(c=Count("id"))
+    print(f"Objekt {obj.object_number}: Drive-Wurzel {'ja' if obj.drive_root_folder_id else 'nein'}; Knoten "
+          + (", ".join(f"{k['node_kind']}={k['c']}" for k in knoten) or "keine"))
+    for run in DriveSyncRun.objects.filter(object=obj).order_by("-id")[:3]:
+        s = run.summary or {}
+        print(f"  Abgleich {run.pk} {run.status} dry_run={run.dry_run} trigger={s.get('trigger')} "
+              f"aktionen={run.actions_executed} fehler={(run.error_message or '')[:160]!r} "
+              f"hinweise={[h[:100] for h in (s.get('hints') or [])][:4]} blockiert={s.get('blocked_categories')}")
+    faelle = ReviewCase.objects.filter(object=obj, status__in=["open", "in_progress"]).values("case_type", "case_subtype").annotate(c=Count("id")).order_by("-c")[:8]
+    print("  offene Faelle:", ", ".join(f"{f['case_type']}/{f['case_subtype']}={f['c']}" for f in faelle) or "keine")
+wartend = ProcessingJob.objects.filter(status="pending", last_error__startswith="wartet").values("job_type", "last_error").annotate(c=Count("id"))
+for w in wartend:
+    print(f"wartend {w['job_type']} x{w['c']}: {w['last_error'][:160]}")
 PY
     ;;
   config-set)
