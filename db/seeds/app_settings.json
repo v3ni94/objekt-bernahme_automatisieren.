@@ -1,6 +1,7 @@
 {
   "drive.root_folder_id": null,
   "drive.root_drive_id": null,
+  "drive.create_folders_on_object_create": true,
   "drive.object_folder_name_pattern": "{number} {city}, {street} {house_number}",
   "drive.object_number_digits_min": 2,
   "drive.object_number_digits_max": 6,

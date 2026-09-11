@@ -18,6 +18,18 @@ from apps.objects.models import ManagedObject, Unit
 from apps.parties.models import OwnerFile, OwnerUnitAssignment
 from apps.parties.services import owners_at
 
+# Rueckmeldung der Ordneranlage an den Anwender; "disabled" bleibt ohne Hinweis, weil bewusst abgeschaltet.
+_FOLDER_HINTS = {
+    "queued": "Der Objektordner wird in Drive angelegt. Der Verlauf steht unter Ordnerabgleich.",
+    "not_connected": (
+        "Ohne Google-Verbindung wurde kein Ordner angelegt. Nach dem Verbinden den Ordnerabgleich starten."
+    ),
+    "no_root": (
+        "Der Wurzelordner ist nicht gesetzt, es wurde kein Ordner angelegt. Einrichtung unter Google Drive."
+    ),
+    "error": "Die Ordneranlage konnte nicht eingereiht werden. Ordnerabgleich später von Hand starten.",
+}
+
 
 def _changes(before: dict, after: dict) -> tuple[dict, dict]:
     keys = [k for k in after if before.get(k) != after.get(k)]
@@ -55,7 +67,24 @@ def object_create(request):
                 request=request,
                 after=model_to_dict(obj),
             )
+        # H 3.5, CR 2: Der Objektordner in Drive entsteht unmittelbar mit dem Objekt. Der Abgleich laeuft als
+        # Job, damit die Anlage nicht an der Antwortzeit oder an einem Drive-Fehler haengt.
+        from apps.drive.tasks import trigger_object_folders
+
+        outcome = trigger_object_folders(obj.pk, user_id=request.user.pk, trigger="object_create")
+        if outcome == "queued":
+            record(
+                "drive.reconcile",
+                entity_type="object",
+                entity_id=obj.pk,
+                object_id=obj.pk,
+                request=request,
+                after={"dry_run": False, "trigger": "object_create"},
+            )
         messages.success(request, f"Objekt {obj.object_number} angelegt.")
+        hint = _FOLDER_HINTS.get(outcome)
+        if hint:
+            (messages.info if outcome == "queued" else messages.warning)(request, hint)
         return redirect("object_detail", pk=obj.pk)
     return render(request, "objects/form.html", {"form": form, "title": "Objekt anlegen"})
 

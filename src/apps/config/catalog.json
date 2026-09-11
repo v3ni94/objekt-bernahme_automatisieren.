@@ -31,6 +31,16 @@
       }
     },
     {
+      "key": "drive.create_folders_on_object_create",
+      "category": "drive",
+      "value_type": "boolean",
+      "description": "Objektordner samt Unterstruktur direkt beim Anlegen eines Objekts in Drive erzeugen",
+      "source": "CR 2, Entscheidung 11.09.2026",
+      "schema": {
+        "type": "boolean"
+      }
+    },
+    {
       "key": "drive.object_folder_name_pattern",
       "category": "drive",
       "value_type": "string",

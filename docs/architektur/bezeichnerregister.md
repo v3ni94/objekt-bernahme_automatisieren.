@@ -1502,6 +1502,7 @@ Celery-Queues aus den Settings: `ai`, `classify`, `io`, `lists`, `ocr`
 | documents.duplicate_owner_documents_in_drive | documents | boolean | `false` |
 | documents.max_download_bytes | documents | integer | `524288000` |
 | drive.backoff | drive | object | `{"base_s": 1, "factor": 2, "max_s": 64, "attempts": 8}` |
+| drive.create_folders_on_object_create | drive | boolean | `true` |
 | drive.legacy_conflict_rename_pattern | drive | string | `null` |
 | drive.legacy_folder_aliases | drive | object | `siehe db/seeds/app_settings.json (einzige Fundstelle der Altbezeichnung)` |
 | drive.max_requests_per_second | drive | integer | `5` |

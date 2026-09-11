@@ -40,6 +40,20 @@ Voraussetzung: Objektnummer und Stammdaten aus dem Übernahmevertrag beziehungsw
 6. Testobjekt nur ankreuzen, wenn das Objekt zu Übungs- oder Messzwecken dient (es erscheint gekennzeichnet).
 7. Speichern. Die Objektansicht zeigt Stammdaten, Ordnerabgleiche, Dokumente und Verarbeitung, Vollständigkeit, Nachforderungen und Listen.
 
+Mit dem Speichern beginnt die Anwendung, den Objektordner in Drive anzulegen: Objektordner nach dem Namensmuster aus der Konfiguration und darunter die Hauptordner 01 bis 06 mit den Unterordnern von 06. Der Vorgang läuft als Auftrag im Hintergrund, die Meldung „Der Objektordner wird in Drive angelegt" erscheint sofort, der Ordner selbst nach wenigen Sekunden. Den Verlauf zeigt die Objektansicht unter Ordnerabgleiche.
+
+Besteht in Drive schon ein Ordner mit derselben Objektnummer, übernimmt die Anwendung diesen und legt keinen zweiten an. Sind mehrere Ordner mit derselben Nummer vorhanden oder liegt ein Treffer im Papierkorb, entsteht ein Fall im Review Center und es wird nichts angelegt.
+
+Anstelle der Ordneranlage erscheint ein Hinweis, wenn eine Voraussetzung fehlt:
+
+| Hinweis | Bedeutung | Was zu tun ist |
+|---|---|---|
+| Ohne Google-Verbindung wurde kein Ordner angelegt | Das Token fehlt, ist abgelaufen oder widerrufen | Admin: Google Drive verbinden, danach in der Objektansicht „Ausführen" beim Ordnerabgleich |
+| Der Wurzelordner ist nicht gesetzt | `drive.root_folder_id` fehlt | Admin: Google Drive, Pfad auflösen und Wurzel bestätigen, danach Ordnerabgleich |
+| Die Ordneranlage konnte nicht eingereiht werden | Die Auftragsverwaltung war nicht erreichbar | Ordnerabgleich später von Hand starten; das Objekt selbst ist gespeichert |
+
+Das Objekt wird immer gespeichert, auch wenn die Ordneranlage nicht möglich ist. Wer die automatische Anlage nicht will, setzt in der Konfiguration `drive.create_folders_on_object_create` auf `false`; dann bleibt es beim Ordnerabgleich von Hand.
+
 Einheiten und Eigentümer:
 
 1. In der Objektansicht „Einheit anlegen“: Bezeichnung (zum Beispiel WE 14), Typ, Miteigentumsanteil mit Basis, Gebäude, Lage. Die Bezeichnung wird normalisiert, WE 14 und WE14 sind dieselbe Einheit.

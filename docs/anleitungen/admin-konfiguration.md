@@ -1,14 +1,15 @@
 # Admin-Konfiguration (app_settings)
 
-Stand: 10.09.2026, erzeugt aus `src/apps/config/catalog.json` und `db/seeds/app_settings.json` (Definition of Done CR 14: Namensmuster Objektordner, Unterstruktur, Schwellwerte, Duplikat-Option, KI-Provider, Aufbewahrungsfristen). Änderungen erfolgen in der Anwendung unter Konfiguration (Recht `settings.write`), jede Änderung steht im Audit (`setting.update`). Werte wirken ohne Neustart; Ausnahmen stehen in der Spalte Wirkung. Seed-Werte sind Vorschläge (ANNAHME), sofern die Quelle nichts anderes sagt.
+Stand: 11.09.2026, erzeugt aus `src/apps/config/catalog.json` und `db/seeds/app_settings.json` (Definition of Done CR 14: Namensmuster Objektordner, Unterstruktur, Schwellwerte, Duplikat-Option, KI-Provider, Aufbewahrungsfristen). Änderungen erfolgen in der Anwendung unter Konfiguration (Recht `settings.write`), jede Änderung steht im Audit (`setting.update`). Werte wirken ohne Neustart; Ausnahmen stehen in der Spalte Wirkung. Seed-Werte sind Vorschläge (ANNAHME), sofern die Quelle nichts anderes sagt.
 
-Schlüssel: 117 in 18 Gruppen.
+Schlüssel: 118 in 18 Gruppen.
 
 ## Google Drive und Objektordner (`drive.*`)
 
 | Schlüssel | Typ | Seed | Bedeutung | Quelle | Wertebereich |
 |---|---|---|---|---|---|
 | `drive.backoff` | object | `{"base_s": 1, "factor": 2, "max_s": 64, "attempts": 8}` | Exponentieller Backoff: base_s, factor, max_s, attempts | ANNAHME A15 | object |
+| `drive.create_folders_on_object_create` | boolean | `true` | Objektordner samt Unterstruktur direkt beim Anlegen eines Objekts in Drive erzeugen; bei `false` nur über den Ordnerabgleich von Hand | CR 2, Entscheidung 11.09.2026 | boolean |
 | `drive.legacy_conflict_rename_pattern` | string | `leer` | Umbenennungsmuster für einen Altordner, wenn Alt- und Zielordner gleichzeitig existieren; leer bedeutet Review-Fall | Frage F24 | ['string', 'null'] |
 | `drive.legacy_folder_aliases` | object | siehe db/seeds/app_settings.json (Altbezeichnung nur dort) | Zuordnung Zielordner zu Altbezeichnungen, die beim Abgleich umbenannt werden (CR 9.3); einzige Fundstelle der Altbezeichnung | CR 9.3, Befund 6.4 | object |
 | `drive.max_requests_per_second` | integer | `5` | Clientseitige Ratenbegrenzung je Prozess | ANNAHME A15 | min 1, max 50 |

@@ -134,3 +134,28 @@ def ensure_owner_folder_task(owner_file_id: int) -> dict:
         return {"ok": False, "reason": "not_connected"}
     rows = ensure_owner_folder(OwnerFile.objects.get(pk=owner_file_id), drive=adapter)
     return {"ok": True, "nodes": len(rows)}
+
+
+def trigger_object_folders(
+    object_id: int, *, user_id: int | None = None, trigger: str = "object_create"
+) -> str:
+    """Objektordner samt Unterstruktur direkt nach der Objektanlage erzeugen (Ausfuehrungslauf, kein Probelauf).
+
+    Der Abgleich erkennt einen bereits vorhandenen Ordner mit derselben Objektnummer und uebernimmt ihn, statt
+    einen zweiten anzulegen; erst ohne Treffer entsteht ein neuer Ordner nach drive.object_folder_name_pattern.
+    Rueckgabe sagt dem Aufrufer, was der Anwender erfahren muss; die Objektanlage selbst scheitert nie daran.
+    """
+    from apps.config import store
+
+    if not store.get("drive.create_folders_on_object_create", True):
+        return "disabled"
+    if oauth.token_status().get("status") != "active":
+        return "not_connected"
+    if not store.get("drive.root_folder_id"):
+        return "no_root"
+    try:
+        reconcile_object_task.delay(object_id, False, user_id, trigger)
+    except Exception:  # Broker nicht erreichbar: Anlage bleibt gueltig, Ordner spaeter ueber den Abgleich
+        logger.exception("Ordneranlage für Objekt %s konnte nicht angestoßen werden", object_id)
+        return "error"
+    return "queued"
