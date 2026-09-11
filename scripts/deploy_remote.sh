@@ -146,7 +146,10 @@ with urllib.request.urlopen(req, timeout=10) as r:
   create-admin)
     [ -n "${ARG:-}" ] || { echo "E-Mail fehlt"; exit 2; }
     PW="$(openssl rand -base64 18)"
-    ADMIN_PASSWORD="$PW" docker compose exec -T -e ADMIN_PASSWORD web app-create-admin --email "$ARG" --no-input
+    # docker compose exec umgeht das ENTRYPOINT des Images; die Unterbefehle (app-*) liegen dort, also
+    # wird das Entrypoint-Skript ausdruecklich aufgerufen.
+    ADMIN_PASSWORD="$PW" docker compose exec -T -e ADMIN_PASSWORD web \
+      /usr/local/bin/entrypoint.sh app-create-admin --email "$ARG" --no-input
     umask 077; printf 'Startpasswort fuer %s: %s\n' "$ARG" "$PW" > /home/deploy/admin-startpasswort.txt
     echo "Startpasswort liegt auf dem Server in /home/deploy/admin-startpasswort.txt (nach dem ersten Login loeschen: shred -u)."
     ;;

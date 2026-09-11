@@ -1262,7 +1262,7 @@ Migrationen, die nicht rückrollbar sind (Verlust nach der Migration entstandene
 2. Verzeichnisse (Abschnitt 3.3), Secrets (Abschnitt 3.8), `.env` aus `.env.example` mit den Werten des Ergebnisblatts (Abschnitt 1.6).
 3. `sudo mkdir -p /opt/objektakte && sudo chown deploy:deploy /opt/objektakte && git clone [REPO_URL] /opt/objektakte && cd /opt/objektakte`.
 4. `scripts/deploy.sh --first-run main`.
-5. Ersten Admin anlegen: `docker compose exec web app-create-admin --email [ADMIN_ADRESSE]`; TOTP beim ersten Login einrichten. Zweiten Admin anlegen (Empfehlung F28).
+5. Ersten Admin anlegen: `docker compose exec web /usr/local/bin/entrypoint.sh app-create-admin --email [ADMIN_ADRESSE]` (`exec` umgeht das ENTRYPOINT, deshalb der ausdrückliche Aufruf; `run` braucht ihn nicht); TOTP beim ersten Login einrichten. Zweiten Admin anlegen (Empfehlung F28).
 6. Deployment-Tests T1, T2, T3, T7, T8, T11, T12, T13, T14 durchführen und protokollieren (Abschnitt 9).
 7. Google-Verbindung nach Abschnitt 7.7 herstellen, sobald die OAuth-App vorliegt (V-06); 8-Tage-Nachweis starten.
 8. Wiederherstellung einmal in Grundform proben (Abschnitt 5.4, ohne Fachdaten).

@@ -9,7 +9,7 @@ Verbindliche Beschreibung in docs/betrieb.md Abschnitt 4. Hier die Befehlsfolge.
 3. Verzeichnisse (docs/betrieb.md 3.3), Secrets (3.8), Deploy-Nutzer und GitHub-Schlüssel in einem Lauf: `sudo bash scripts/bootstrap_vps.sh` (docs/betrieb/github-deploy.md); `.env` aus `.env.example` mit den Werten des Ergebnisblatts.
 4. Checkout: `sudo mkdir -p /opt/objektakte && sudo chown deploy:deploy /opt/objektakte && git clone [REPO_URL] /opt/objektakte && cd /opt/objektakte`
 5. `scripts/deploy.sh --first-run main` (baut Images, startet db, redis, backup, migriert, lädt Seeds, setzt Tabellenrechte, startet alle Dienste, Smoke-Test).
-6. Ersten Admin anlegen: `docker compose exec web app-create-admin --email [ADMIN_ADRESSE]`; TOTP beim ersten Login einrichten. Zweiten Admin anlegen.
+6. Ersten Admin anlegen: `docker compose exec web /usr/local/bin/entrypoint.sh app-create-admin --email [ADMIN_ADRESSE]` (`exec` umgeht das ENTRYPOINT, deshalb der ausdrückliche Aufruf; `run` braucht ihn nicht); TOTP beim ersten Login einrichten. Zweiten Admin anlegen.
 7. Deployment-Tests T1, T2, T3, T7, T8, T11, T12, T13, T14 durchführen und in docs/betrieb/deployment-test.md protokollieren.
 
 ## Regelbetrieb
