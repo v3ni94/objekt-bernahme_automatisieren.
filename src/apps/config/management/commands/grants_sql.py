@@ -65,10 +65,16 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         db = options["database"] or connection.settings_dict["NAME"]
-        tables = sorted(connection.introspection.table_names())
-        if not tables:
-            # Ohne Verbindung (z. B. Vorschau) aus dem Modellregister ableiten
-            tables = sorted({m._meta.db_table for m in apps.get_models()} | {"django_migrations"})
+        # Modellregister und Datenbank zusammen: das Modellregister kennt auch Tabellen, die die Anwendungskennung
+        # noch nicht sehen darf (frisch migriert, Rechte fehlen noch), die Datenbank kennt Tabellen ohne Modell
+        # (Fremdschluesselketten, Bibliothek). Befund 11.09.2026: takeover_sources fehlte nach der Migration, weil
+        # app_rw die neue Tabelle in der Introspektion nicht sah und deshalb kein Recht erhielt.
+        model_tables = {m._meta.db_table for m in apps.get_models()} | {"django_migrations"}
+        try:
+            seen = set(connection.introspection.table_names())
+        except Exception:  # ohne Verbindung (Vorschau) nur aus dem Modellregister
+            seen = set()
+        tables = sorted(seen | model_tables)
         lines = [f"-- erzeugt von grants_sql fuer Datenbank {db}; idempotent"]
         # Das Image legt app_rw mit allen Rechten auf die Datenbank an; diese werden hier durch Tabellenrechte
         # ersetzt. REVOKE bricht mit Fehler 1141 ab, wenn kein datenbankweites Recht (mehr) existiert, also ab

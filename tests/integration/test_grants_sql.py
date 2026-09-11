@@ -65,3 +65,20 @@ def test_worker_darf_die_von_ihm_neu_aufgebauten_tabellen_leeren():
 
 def test_jede_loeschbare_tabelle_ist_auch_schreibbar():
     assert GRANTS.WORKER_DELETE <= GRANTS.WORKER_WRITE
+
+
+def test_neue_modelltabelle_erhaelt_rechte_auch_ohne_sichtbarkeit(monkeypatch):
+    """Nach einer Migration sieht app_rw die neue Tabelle noch nicht (kein Recht); die GRANT-Ausgabe muss sie aus dem
+    Modellregister dennoch enthalten (Befund 11.09.2026: takeover_sources ohne SELECT-Recht)."""
+    from django.db import connection
+
+    echt = connection.introspection.table_names
+    monkeypatch.setattr(
+        connection.introspection,
+        "table_names",
+        lambda *a, **kw: [t for t in echt() if t != "takeover_sources"],
+    )
+    out = StringIO()
+    call_command("grants_sql", stdout=out)
+    text = out.getvalue()
+    assert "`takeover_sources` TO 'app_rw'@'%'" in text and "GRANT SELECT ON" in text
