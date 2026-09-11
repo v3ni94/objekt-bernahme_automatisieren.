@@ -12,6 +12,7 @@
 #   rollback                  vorherige Version (scripts/rollback.sh)
 #   create-admin <branch> <email>  Admin anlegen; Startpasswort nur in /home/deploy/admin-startpasswort.txt
 #   ps <branch>               Zustand aller Container anzeigen (nur lesend)
+#   smoke <branch>            Anwendung und Zertifikat ueber die Domain pruefen (nur lesend)
 #   logs <branch> [dienst]    Letzte Logzeilen; ohne Dienst die der Anwendungsdienste (nur lesend)
 #   db-status <branch>        Datenbankkonten und Tabellenzahl anzeigen (nur lesend)
 #   db-reset <branch>         Datenverzeichnis der Datenbank leeren und neu initialisieren; bricht ab,
@@ -83,6 +84,20 @@ case "$ACTION" in
     ensure_network
     docker compose config --quiet && echo "Compose-Datei mit dieser .env gueltig"
     ;;
+  smoke)
+    dom="$(envval APP_DOMAIN)"
+    echo "Anwendung ueber Traefik (ohne Zertifikatspruefung):"
+    curl -sk -o /dev/null -w '  HTTPS %{http_code}\n' --max-time 10 "https://${dom}/healthz/" || echo "  keine Antwort"
+    echo "Zertifikat:"
+    echo | openssl s_client -connect "${dom}:443" -servername "${dom}" 2>/dev/null \
+      | openssl x509 -noout -issuer -subject -dates 2>/dev/null | sed 's/^/  /' || echo "  kein Zertifikat lesbar"
+    echo "Mit Zertifikatspruefung:"
+    curl -fsS -o /dev/null -w '  HTTPS %{http_code} tls %{ssl_verify_result}\n' --max-time 10 "https://${dom}/healthz/" \
+      || echo "  Zertifikat nicht gueltig"
+    echo "Traefik-Meldungen:"
+    docker logs "$(docker ps --filter name=traefik --format '{{.Names}}' | head -1)" --tail 40 2>&1 \
+      | grep -iE 'acme|certificate|objektakte' | tail -15 | sed 's/^/  /' || echo "  keine Meldungen"
+    ;;
   ps)
     docker compose ps --all
     ;;
@@ -127,5 +142,5 @@ case "$ACTION" in
     umask 077; printf 'Startpasswort fuer %s: %s\n' "$ARG" "$PW" > /home/deploy/admin-startpasswort.txt
     echo "Startpasswort liegt auf dem Server in /home/deploy/admin-startpasswort.txt (nach dem ersten Login loeschen: shred -u)."
     ;;
-  *) echo "Nur check, pull, befund, env-init, ps, logs, db-status, db-reset, first-run, deploy, rollback oder create-admin erlaubt"; exit 2 ;;
+  *) echo "Nur check, pull, befund, env-init, ps, logs, smoke, db-status, db-reset, first-run, deploy, rollback oder create-admin erlaubt"; exit 2 ;;
 esac

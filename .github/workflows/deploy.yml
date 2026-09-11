@@ -12,11 +12,11 @@ on:
         required: true
         default: "main"
       action:
-        description: "check, pull, befund, env-init, ps, logs, db-status, db-reset, first-run, deploy, rollback, create-admin (docs/betrieb/github-deploy.md)"
+        description: "check, pull, befund, env-init, ps, logs, smoke, db-status, db-reset, first-run, deploy, rollback, create-admin (docs/betrieb/github-deploy.md)"
         required: true
         default: "check"
         type: choice
-        options: ["check", "pull", "befund", "env-init", "ps", "logs", "db-status", "db-reset", "first-run", "deploy", "rollback", "create-admin"]
+        options: ["check", "pull", "befund", "env-init", "ps", "logs", "smoke", "db-status", "db-reset", "first-run", "deploy", "rollback", "create-admin"]
       argument:
         description: "Nur fuer create-admin (E-Mail) und logs (Dienstname, leer = alle Anwendungsdienste)"
         required: false

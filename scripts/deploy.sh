@@ -70,7 +70,27 @@ docker compose up -d --remove-orphans
 wait_healthy 300
 
 # 8. Smoke-Test ueber Traefik (TLS, Anwendung)
-curl -fsS --retry 6 --retry-delay 10 -o /dev/null -w 'healthz %{http_code} tls %{ssl_verify_result}\n' "https://${APP_DOMAIN}/healthz/"
+# Traefik fordert das Zertifikat erst an, wenn die Domain zum ersten Mal angefragt wird, und liefert bis
+# dahin sein Platzhalterzertifikat. curl wiederholt bei einem Zertifikatsfehler nicht von selbst, deshalb
+# hier eine eigene Schleife (bis zu drei Minuten). Getrennt ausgewiesen: Antwort der Anwendung und Zertifikat.
+echo "Smoke-Test gegen https://${APP_DOMAIN}/healthz/"
+SMOKE=false
+for versuch in $(seq 1 18); do
+  if curl -fsS --max-time 10 -o /dev/null "https://${APP_DOMAIN}/healthz/"; then SMOKE=true; break; fi
+  CODE=$(curl -sk -o /dev/null -w '%{http_code}' --max-time 10 "https://${APP_DOMAIN}/healthz/" || echo 000)
+  echo "  Versuch ${versuch}: Anwendung antwortet mit ${CODE}, Zertifikat noch nicht gueltig"
+  sleep 10
+done
+if ! $SMOKE; then
+  echo "Smoke-Test fehlgeschlagen. Ausgeliefertes Zertifikat:"
+  echo | openssl s_client -connect "${APP_DOMAIN}:443" -servername "${APP_DOMAIN}" 2>/dev/null \
+    | openssl x509 -noout -issuer -subject -dates 2>/dev/null || echo "  kein Zertifikat lesbar"
+  echo "Traefik-Meldungen zur Zertifikatsausstellung:"
+  docker logs "$(docker ps --filter name=traefik --format '{{.Names}}' | head -1)" --tail 30 2>&1 \
+    | grep -iE 'acme|certificate|objektakte' | tail -15 || echo "  keine Meldungen gefunden"
+  exit 1
+fi
+curl -fsS -o /dev/null -w 'healthz %{http_code} tls %{ssl_verify_result}\n' "https://${APP_DOMAIN}/healthz/"
 curl -fsS "https://${APP_DOMAIN}/readyz/" \
   -H "Authorization: Bearer $(docker compose exec -T web cat /run/secrets/readyz_token 2>/dev/null || echo none)" | head -c 400; echo
 
