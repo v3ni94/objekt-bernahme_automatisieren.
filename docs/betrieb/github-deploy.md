@@ -74,6 +74,8 @@ Actions, Workflow `Deploy`, Run workflow; Eingaben Branch, Aktion und (nur für 
 | `pull` | Checkout auf den angegebenen Branch bringen (`git fetch`, `checkout`, `pull --ff-only`) | nur den Checkout |
 | `befund` | Serverbefund nach docs/betrieb/m0-anleitung.md ins Log (Kerne, RAM, Platte, Docker, Traefik, Host-Sicherheit; Geheimnisse geschwärzt) | nichts |
 | `env-init` | `.env` aus `deploy/env.produktion` anlegen; ist `.env` vorhanden, nur Abweichungen anzeigen; legt das Proxy-Netz an und prüft die Compose-Datei | `.env`, Docker-Netz |
+| `ps` | Zustand aller Container | nichts |
+| `logs` | letzte 40 Logzeilen; ohne Argument die der Anwendungsdienste, sonst der genannte Dienst | nichts |
 | `db-status` | Datenbankkonten und Tabellenzahl anzeigen | nichts |
 | `db-reset` | Datenverzeichnis der Datenbank leeren und neu initialisieren; bricht ab, sobald `django_migrations` vorhanden oder nicht prüfbar ist | Datenverzeichnis der Datenbank |
 | `first-run` | Erstinstallation `scripts/deploy.sh --first-run <branch>` (Images bauen, db und redis starten, Migration, Seeds, Rechte, alle Dienste, Smoke-Test) | alles |

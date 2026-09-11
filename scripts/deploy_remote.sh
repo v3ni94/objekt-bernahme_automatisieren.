@@ -11,6 +11,8 @@
 #   deploy <branch>           Deployment (scripts/deploy.sh)
 #   rollback                  vorherige Version (scripts/rollback.sh)
 #   create-admin <branch> <email>  Admin anlegen; Startpasswort nur in /home/deploy/admin-startpasswort.txt
+#   ps <branch>               Zustand aller Container anzeigen (nur lesend)
+#   logs <branch> [dienst]    Letzte Logzeilen; ohne Dienst die der Anwendungsdienste (nur lesend)
 #   db-status <branch>        Datenbankkonten und Tabellenzahl anzeigen (nur lesend)
 #   db-reset <branch>         Datenverzeichnis der Datenbank leeren und neu initialisieren; bricht ab,
 #                             sobald ein Schema vorhanden ist (Schutz gegen Datenverlust)
@@ -81,6 +83,20 @@ case "$ACTION" in
     ensure_network
     docker compose config --quiet && echo "Compose-Datei mit dieser .env gueltig"
     ;;
+  ps)
+    docker compose ps --all
+    ;;
+  logs)
+    case "${ARG:-}" in
+      "") set -- web worker worker-nlp worker-io beat ;;
+      web|worker|worker-nlp|worker-io|beat|db|redis|backup|classifier) set -- "$ARG" ;;
+      *) echo "Unbekannter Dienst: $ARG"; exit 2 ;;
+    esac
+    for svc in "$@"; do
+      echo "===== $svc ====="
+      docker compose logs --no-color --tail 40 "$svc" 2>&1 | tail -40
+    done
+    ;;
   db-status)
     docker compose exec -T db sh -c 'mariadb -uroot -p"$(cat /run/secrets/db_root_password)" -N -e "
       SELECT CONCAT(\"Konto: \", user) FROM mysql.user WHERE user LIKE \"app_%\" ORDER BY user;
@@ -111,5 +127,5 @@ case "$ACTION" in
     umask 077; printf 'Startpasswort fuer %s: %s\n' "$ARG" "$PW" > /home/deploy/admin-startpasswort.txt
     echo "Startpasswort liegt auf dem Server in /home/deploy/admin-startpasswort.txt (nach dem ersten Login loeschen: shred -u)."
     ;;
-  *) echo "Nur check, pull, befund, env-init, db-status, db-reset, first-run, deploy, rollback oder create-admin erlaubt"; exit 2 ;;
+  *) echo "Nur check, pull, befund, env-init, ps, logs, db-status, db-reset, first-run, deploy, rollback oder create-admin erlaubt"; exit 2 ;;
 esac
