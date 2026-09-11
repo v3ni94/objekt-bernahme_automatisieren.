@@ -780,7 +780,10 @@ def file_to_drive(job: ProcessingJob) -> dict:
         raise DeferJob("Keine Google-Verbindung für die Ablage")
     lock_key = f"drive:write:{job.object_id}"
     if not cache.add(lock_key, job.pk, timeout=600):
-        raise RetryableError("Drive-Schreibsperre des Objekts belegt")
+        # Ein anderes Dokument desselben Objekts wird gerade abgelegt. Das ist Reihenfolge, kein Fehler: kurz
+        # warten, ohne einen Versuch zu verbrauchen. Mit RetryableError standen bei acht gleichzeitigen Uploads
+        # fuenf Dokumente nach drei schnellen Fehlversuchen auf error (Befund 11.09.2026).
+        raise DeferJob("Drive-Schreibsperre des Objekts belegt", seconds=20)
     try:
         try:
             if payload.get("category") == "05":
