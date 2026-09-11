@@ -13,6 +13,8 @@
 #   create-admin <branch> <email>  Admin anlegen; Startpasswort nur in /home/deploy/admin-startpasswort.txt
 #   ps <branch>               Zustand aller Container anzeigen (nur lesend)
 #   smoke <branch>            Anwendung und Zertifikat ueber die Domain pruefen (nur lesend)
+#   cert-retry <branch>       Neue Zertifikatsanforderung ausloesen (Web-Container neu aufbauen);
+#                             hoechstens einmal je Stunde, Let's Encrypt begrenzt Fehlversuche
 #   logs <branch> [dienst]    Letzte Logzeilen; ohne Dienst die der Anwendungsdienste (nur lesend)
 #   db-status <branch>        Datenbankkonten und Tabellenzahl anzeigen (nur lesend)
 #   db-reset <branch>         Datenverzeichnis der Datenbank leeren und neu initialisieren; bricht ab,
@@ -106,6 +108,34 @@ with urllib.request.urlopen(req, timeout=10) as r:
     docker logs "$(docker ps --filter name=traefik --format '{{.Names}}' | head -1)" --tail 40 2>&1 \
       | grep -iE 'acme|certificate|objektakte' | tail -15 | sed 's/^/  /' || echo "  keine Meldungen"
     ;;
+  cert-retry)
+    # Traefik fordert ein Zertifikat nur an, wenn ein Router neu bekannt wird oder eine Anfrage eintrifft,
+    # und wartet nach Fehlschlaegen. Ein Neuaufbau des Web-Containers meldet den Router neu an und loest
+    # damit einen neuen Versuch aus. Nicht oefter als einmal je Stunde aufrufen: Let's Encrypt begrenzt
+    # fehlgeschlagene Validierungen auf fuenf je Stunde und Name.
+    dom="$(envval APP_DOMAIN)"
+    [ -n "$dom" ] || { echo "APP_DOMAIN fehlt in .env"; exit 2; }
+    echo "Web-Container neu aufbauen, damit Traefik den Router neu aufnimmt"
+    docker compose up -d --force-recreate --no-deps web
+    for i in $(seq 1 12); do
+      sleep 10
+      [ "$(docker compose ps web --format '{{.Health}}' 2>/dev/null)" = "healthy" ] && break
+    done
+    echo "Warte auf ein gueltiges Zertifikat fuer ${dom} (bis zu drei Minuten):"
+    for i in $(seq 1 18); do
+      if curl -fsS --max-time 10 -o /dev/null "https://${dom}/healthz/"; then
+        echo "  Zertifikat gueltig (Versuch ${i})"
+        echo | openssl s_client -connect "${dom}:443" -servername "${dom}" 2>/dev/null \
+          | openssl x509 -noout -issuer -subject -dates 2>/dev/null | sed 's/^/  /'
+        exit 0
+      fi
+      sleep 10
+    done
+    echo "  Zertifikat weiterhin nicht gueltig. Juengste Meldungen zur Ausstellung:"
+    docker logs "$(docker ps --filter name=traefik --format '{{.Names}}' | head -1)" --tail 300 2>&1 \
+      | grep -iE "acme|obtain" | grep -i "${dom}" | tail -3 | sed 's/^/  /'
+    exit 1
+    ;;
   ps)
     docker compose ps --all
     ;;
@@ -153,5 +183,5 @@ with urllib.request.urlopen(req, timeout=10) as r:
     umask 077; printf 'Startpasswort fuer %s: %s\n' "$ARG" "$PW" > /home/deploy/admin-startpasswort.txt
     echo "Startpasswort liegt auf dem Server in /home/deploy/admin-startpasswort.txt (nach dem ersten Login loeschen: shred -u)."
     ;;
-  *) echo "Nur check, pull, befund, env-init, ps, logs, smoke, db-status, db-reset, first-run, deploy, rollback oder create-admin erlaubt"; exit 2 ;;
+  *) echo "Nur check, pull, befund, env-init, ps, logs, smoke, cert-retry, db-status, db-reset, first-run, deploy, rollback oder create-admin erlaubt"; exit 2 ;;
 esac

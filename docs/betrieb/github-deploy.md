@@ -76,6 +76,7 @@ Actions, Workflow `Deploy`, Run workflow; Eingaben Branch, Aktion und (nur für 
 | `env-init` | `.env` aus `deploy/env.produktion` anlegen; ist `.env` vorhanden, nur Abweichungen anzeigen; legt das Proxy-Netz an und prüft die Compose-Datei | `.env`, Docker-Netz |
 | `ps` | Zustand aller Container | nichts |
 | `smoke` | Anwendung über die Domain aufrufen, Zertifikat anzeigen, Traefik-Meldungen zur Ausstellung | nichts |
+| `cert-retry` | Web-Container neu aufbauen, damit Traefik den Router neu aufnimmt und ein Zertifikat anfordert; wartet bis zu drei Minuten. Höchstens einmal je Stunde, Let's Encrypt begrenzt fehlgeschlagene Validierungen auf fünf je Stunde und Name | Web-Container |
 | `logs` | letzte 40 Logzeilen; ohne Argument die der Anwendungsdienste, sonst der genannte Dienst | nichts |
 | `db-status` | Datenbankkonten und Tabellenzahl anzeigen | nichts |
 | `db-reset` | Datenverzeichnis der Datenbank leeren und neu initialisieren; bricht ab, sobald `django_migrations` vorhanden oder nicht prüfbar ist | Datenverzeichnis der Datenbank |
