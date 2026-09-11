@@ -177,6 +177,14 @@ def object_reconcile(request, pk: int):
     if oauth.token_status().get("status") != "active":
         messages.error(request, "Keine Google-Verbindung; Ordnerabgleich nicht möglich.")
         return redirect("object_detail", pk=obj.pk)
+    if not store.get("drive.root_folder_id"):
+        # Ohne Wurzel wuerde der Lauf sofort mit ReconcileError scheitern; der Hinweis fuehrt zur Einrichtung.
+        messages.error(
+            request,
+            "Der Wurzelordner ist noch nicht bestätigt. Unter Google Drive den Pfad auflösen und die Wurzel "
+            "bestätigen, danach den Ordnerabgleich starten.",
+        )
+        return redirect("drive_admin")
     reconcile_object_task.delay(obj.pk, dry_run, request.user.pk, "manual")
     record(
         "drive.reconcile",
