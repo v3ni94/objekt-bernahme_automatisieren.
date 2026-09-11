@@ -3,7 +3,7 @@
 # In ~/.ssh/authorized_keys des Deploy-Nutzers eingetragen als
 #   command="/opt/objektakte/scripts/deploy_remote.sh",no-port-forwarding,no-agent-forwarding,no-X11-forwarding,no-pty ssh-ed25519 AAAA... github-actions-deploy
 # Erlaubte Eingaben (erstes Wort Aktion, zweites Wort Branch, drittes Wort Argument):
-#   check <branch>            Verbindungsprobe ohne Schreibwirkung
+#   check <branch>            Verbindungsprobe ohne Schreibwirkung, zeigt zusaetzlich die Verzeichnisse
 #   pull <branch>             Checkout aktualisieren, nichts starten
 #   befund <branch>           Serverbefund (scripts/measure_server.sh, geschwaerzt) ausgeben
 #   env-init <branch>         .env aus deploy/env.produktion anlegen, nie ueberschreiben
@@ -62,6 +62,17 @@ case "$ACTION" in
     echo "Verbindung ok: $(hostname) als $(whoami), Checkout $(git rev-parse --abbrev-ref HEAD) $(git rev-parse --short=12 HEAD)"
     [ -f .env ] && echo ".env vorhanden" || echo ".env fehlt noch (Aktion env-init)"
     docker compose version 2>/dev/null | head -1 || echo "docker compose nicht verfuegbar"
+    echo "Verzeichnisse:"
+    echo "  Programm und Konfiguration: /opt/objektakte ($(du -sh /opt/objektakte 2>/dev/null | cut -f1))"
+    echo "  Daten, Secrets, Sicherungen: /srv/objektakte ($(du -sh /srv/objektakte 2>/dev/null | cut -f1))"
+    ls -1 /srv/objektakte 2>/dev/null | sed 's/^/    /' || echo "    /srv/objektakte nicht lesbar"
+    echo "  Ablaufprotokoll der Fernaufrufe: $LOG"
+    # Nur Vorhandensein und Alter, nie der Inhalt: Workflow-Logs sind fuer jeden mit Repository-Zugang lesbar.
+    if [ -f /home/deploy/admin-startpasswort.txt ]; then
+      echo "  Startpasswort des ersten Admin: /home/deploy/admin-startpasswort.txt vorhanden, geschrieben am $(date -r /home/deploy/admin-startpasswort.txt '+%d.%m.%Y %H:%M') (lesen mit: sudo cat, danach shred -u)"
+    else
+      echo "  Startpasswort des ersten Admin: /home/deploy/admin-startpasswort.txt nicht vorhanden (nie geschrieben oder bereits geloescht)"
+    fi
     ;;
   pull)
     ensure_github_hostkey

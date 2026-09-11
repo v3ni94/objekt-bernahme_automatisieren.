@@ -70,7 +70,7 @@ Actions, Workflow `Deploy`, Run workflow; Eingaben Branch, Aktion und (nur für 
 
 | Aktion | Wirkung | Schreibt auf dem Server |
 |---|---|---|
-| `check` | Hostname, Nutzer, ausgecheckter Branch, ob `.env` vorhanden ist | nichts |
+| `check` | Hostname, Nutzer, ausgecheckter Branch, ob `.env` vorhanden ist, Verzeichnisse mit Belegung und ob die Startpasswortdatei noch existiert (ohne Inhalt) | nichts |
 | `pull` | Checkout auf den angegebenen Branch bringen (`git fetch`, `checkout`, `pull --ff-only`) | nur den Checkout |
 | `befund` | Serverbefund nach docs/betrieb/m0-anleitung.md ins Log (Kerne, RAM, Platte, Docker, Traefik, Host-Sicherheit; Geheimnisse geschwärzt) | nichts |
 | `env-init` | `.env` aus `deploy/env.produktion` anlegen; ist `.env` vorhanden, nur Abweichungen anzeigen; legt das Proxy-Netz an und prüft die Compose-Datei | `.env`, Docker-Netz |
