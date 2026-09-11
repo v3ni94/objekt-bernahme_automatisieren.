@@ -162,9 +162,9 @@ def _name_owner_file(unit: Unit, assignment: OwnerUnitAssignment, user) -> None:
             unit=unit, valid_from=assignment.valid_from, valid_to=assignment.valid_to
         ).select_related("owner")
     )
-    existed = OwnerFile.active.filter(unit=unit, file_kind="unit_owner").exists()
+    before_ids = set(OwnerFile.active.filter(unit=unit, file_kind="unit_owner").values_list("pk", flat=True))
     akte = owner_file_for_assignments(unit, group)
-    if not existed and not (akte.name_basis or {}).get("adopted_placeholder"):
+    if akte.pk not in before_ids and not (akte.name_basis or {}).get("adopted_placeholder"):
         # mit der Zuordnung angelegt (kein Platzhalter): der Name bleibt von der Anwendung gefuehrt und folgt der Gruppe
         akte.name_basis = {**(akte.name_basis or {}), "managed_name": True}
         akte.save(update_fields=["name_basis", "updated_at"])

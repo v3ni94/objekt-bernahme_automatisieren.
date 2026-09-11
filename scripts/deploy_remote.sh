@@ -294,8 +294,13 @@ try:
     value = json.loads(raw)
 except json.JSONDecodeError:
     value = raw
-before = store.get(key)
-store.set(key, value, reason="Deploy-Workflow config-set")
+from django.core.exceptions import ValidationError
+try:
+    before = store.get(key)
+    store.set(key, value, reason="Deploy-Workflow config-set")
+except (store.UnknownSetting, ValidationError, ValueError) as exc:
+    print(f"config-set abgelehnt: {exc}")
+    raise SystemExit(2)
 print(f"{key}: {before!r} -> {store.get(key)!r}")
 PY
     ;;

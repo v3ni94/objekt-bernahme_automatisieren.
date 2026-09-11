@@ -11,7 +11,8 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-from django.db import transaction
+from django.core.cache import cache
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 from apps.audit.services import record
@@ -19,7 +20,7 @@ from apps.config import store
 from apps.documents.models import Document
 from apps.drive.adapter import DriveAdapter, DriveNode, sort_deterministic
 from apps.objects.models import ManagedObject
-from apps.pipeline.jobs import JobType, enqueue, idempotency_key
+from apps.pipeline.jobs import JobType, enqueue, idempotency_key, send
 from apps.pipeline.models import ProcessingRun, RunStatus, RunType
 from apps.pipeline.runs import start_run
 
@@ -120,12 +121,12 @@ def collect_files(
         for node in sort_deterministic(drive.list_children(folder.id)):
             if not node.is_folder and not node.trashed:
                 out.append(FileEntry(node=node, path=node.name))
+        if only_ids is not None:
+            out = [e for e in out if e.node.id in only_ids]
         if len(out) > limit:
             raise TakeoverError(
                 f"Mehr als {limit} Dateien im Ordner „{folder.name}“; drive.takeover_max_files anpassen."
             )
-    if only_ids is not None:
-        out = [e for e in out if e.node.id in only_ids]
     return out
 
 
@@ -144,13 +145,30 @@ def register_files(
     Laeuft fuer das Objekt bereits ein Lauf, haengen sich die Jobs an ihn; sonst startet ein inkrementeller Lauf.
     """
     result = TakeoverResult()
+    lock_key = f"takeover:{obj.pk}"
+    if not cache.add(lock_key, "1", timeout=300):
+        raise TakeoverError(
+            "Für dieses Objekt läuft gerade eine Übernahme; bitte kurz warten und die Seite neu laden."
+        )
+    try:
+        return _register_locked(
+            obj, entries, result, source_folder=source_folder, user=user, request=request, extra=extra
+        )
+    finally:
+        cache.delete(lock_key)
+
+
+def _register_locked(obj, entries, result, *, source_folder, user, request, extra) -> TakeoverResult:
     registered = _registered_map([e.node.id for e in entries])
     now = timezone.now()
+    jobs = []
     with transaction.atomic():
+        # Nur ein echter Lauf zaehlt; ein Dry-Run wuerde die Ablage nie ausfuehren
         active_run = ProcessingRun.objects.filter(
             object=obj,
             status__in=[RunStatus.PENDING, RunStatus.RUNNING],
             run_type__in=(RunType.FULL, RunType.INCREMENTAL),
+            dry_run=False,
         ).first()
         for e in entries:
             node = e.node
@@ -160,21 +178,27 @@ def register_files(
             if node.id in registered:
                 result.skipped_registered += 1
                 continue
-            doc = Document.objects.create(
-                object=obj,
-                drive_file_id=node.id,
-                drive_md5=node.md5,
-                size_bytes=node.size or 0,
-                mime_type=node.mime_type or "application/octet-stream",
-                original_name=node.name,
-                current_name=node.name,
-                source="drive_existing",
-                source_path=f"{source_folder.name}/{e.path}"[:1000],
-                status="registered",
-                first_seen_at=now,
-            )
-            key = idempotency_key(JobType.DISCOVER, obj.pk, node.id, node.md5 or node.modified_time or "")
-            enqueue(
+            try:
+                with transaction.atomic():
+                    doc = Document.objects.create(
+                        object=obj,
+                        drive_file_id=node.id,
+                        drive_md5=node.md5,
+                        size_bytes=node.size or 0,
+                        mime_type=node.mime_type or "application/octet-stream",
+                        original_name=node.name,
+                        current_name=node.name,
+                        source="drive_existing",
+                        source_path=f"{source_folder.name}/{e.path}"[:1000],
+                        status="registered",
+                        first_seen_at=now,
+                    )
+            except IntegrityError:  # zeitgleich registriert (Doppelklick, Inventur des Abgleichs)
+                result.skipped_registered += 1
+                continue
+            # Schluessel wie in dispatch_run, damit ein spaeterer Lauf keinen zweiten Discover-Job anlegt
+            key = idempotency_key(JobType.DISCOVER, obj.pk, node.id, node.md5 or "")
+            job, _ = enqueue(
                 JobType.DISCOVER,
                 obj,
                 key=key,
@@ -187,8 +211,9 @@ def register_files(
                     "name": node.name,
                     "takeover_folder_id": source_folder.id,
                 },
-                dispatch=active_run is not None,
+                dispatch=False,
             )
+            jobs.append(job)
             registered[node.id] = obj.object_number
             result.registered += 1
             result.document_ids.append(doc.pk)
@@ -210,6 +235,10 @@ def register_files(
         )
         if active_run is not None:
             result.run_id = active_run.pk
+    if active_run is not None and active_run.status == RunStatus.RUNNING:
+        # Lauf arbeitet bereits: Jobs nach dem Commit einreihen; ein wartender Lauf nimmt sie beim Start mit
+        for job in jobs:
+            send(job)
     if result.registered and result.run_id is None:
         run = start_run(obj, run_type=RunType.INCREMENTAL, user=user)
         result.run_id = run.pk

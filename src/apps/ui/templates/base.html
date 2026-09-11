@@ -32,7 +32,7 @@
 </header>
 <main class="inhalt">
   {% if messages %}<ul class="meldungen" role="status">{% for m in messages %}<li class="{{ m.tags }}">{{ m }}</li>{% endfor %}</ul>{% endif %}
-  {% block content %}{% endblock %}
+  {% block main %}{% block content %}{% endblock %}{% endblock %}
 </main>
 <footer class="fuss">{{ APP_OWNER }} · Version {{ IMAGE_TAG }}</footer>
 </body>

@@ -1058,6 +1058,7 @@ class BulkRow:
     folder_exists: bool
     warnings: list[str]
     errors: list[str]
+    candidates: list[dict] = field(default_factory=list)
 
     @property
     def state(self) -> str:
@@ -1257,6 +1258,7 @@ def bulk_rows(
                 exists,
                 warnings,
                 errors,
+                list(case.candidates or []),
             )
         )
     return rows

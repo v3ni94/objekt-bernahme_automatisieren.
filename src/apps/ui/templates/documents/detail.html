@@ -29,6 +29,6 @@
 {% for e in entities %}<tr><td>{{ e.page_no }}</td><td>{{ e.get_entity_type_display }}</td><td>{% if e.entity_type == "iban" %}**** {{ e.iban_last4 }}{% else %}{{ e.value_text }}{% endif %}</td><td class="mono">{{ e.value_normalized|default:"" }}</td><td>{{ e.confidence|default:"" }}</td><td>{% if e.matched_owner %}Eigentümer {{ e.matched_owner }}{% elif e.matched_unit %}Einheit {{ e.matched_unit.unit_label }}{% elif e.matched_tenant %}Mieter {{ e.matched_tenant }}{% endif %}{% if e.match_confidence %} ({{ e.match_confidence }}){% endif %}</td></tr>{% empty %}<tr><td colspan="6">Noch keine Entitäten.</td></tr>{% endfor %}</tbody></table></div>
 <div class="karte"><h2>Seitentexte (maskiert)</h2>
 {% for p in pages %}<details><summary>Seite {{ p.page_no }} · {{ p.get_text_source_display }} · {{ p.char_count }} Zeichen{% if p.masked_entities_count %} · {{ p.masked_entities_count }} maskiert{% endif %}</summary>
-{% if previews|get_item:p.page_no %}<p><img src="{% url 'document_preview' document.pk p.page_no %}" alt="Seite {{ p.page_no }}" style="max-width:100%;height:auto;border:1px solid #ccc"></p>{% endif %}
+{% if previews|get_item:p.page_no %}<p><img src="{% url 'document_preview' document.pk p.page_no %}" alt="Seite {{ p.page_no }}" class="seitenbild"></p>{% endif %}
 <pre class="mono" style="white-space:pre-wrap">{{ p.text_content }}</pre></details>{% empty %}<p class="klein">Noch keine Seitentexte.</p>{% endfor %}</div>
 {% endblock %}

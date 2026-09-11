@@ -8,7 +8,10 @@ ueber apps.drive.naming, damit Platzhalter und endgueltige Namen demselben Schem
 
 from __future__ import annotations
 
-from django.db import transaction
+from datetime import date
+
+from django.core.cache import cache
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 from apps.audit.services import record
@@ -55,6 +58,8 @@ def ensure_placeholder_units(obj, count: int, *, user=None) -> list[Unit]:
     Bezeichnung und Typ ueber die Einheitennormalisierung; Datenstatus unvollstaendig, bis Stammdaten folgen."""
     if not count or count <= 0 or Unit.active.filter(object=obj).exists():
         return []
+    if not cache.add(f"unit-files:{obj.pk}", "1", timeout=30):
+        return []  # ein anderer Aufruf (Doppelklick, paralleler Task) legt gerade an
     created: list[Unit] = []
     with transaction.atomic():
         for i in range(1, count + 1):
@@ -78,6 +83,7 @@ def ensure_placeholder_units(obj, count: int, *, user=None) -> list[Unit]:
                 after={"unit_label": label, "placeholder": True, "source": "expected_unit_count"},
             )
             created.append(unit)
+    cache.delete(f"unit-files:{obj.pk}")
     return created
 
 
@@ -97,41 +103,99 @@ def current_tenant_assignments(unit: Unit) -> list[TenantUnitAssignment]:
     return list(qs.select_related("tenant").distinct().order_by("valid_from"))
 
 
+def _owner_groups(assignments: list[OwnerUnitAssignment]) -> list[list[OwnerUnitAssignment]]:
+    """Eigentuemergruppen wie in der Klassifikation (gleicher Zeitraum = eine Gruppe, CR 4); die heute geltende
+    Gruppe zuerst, damit sie den Platzhalter uebernimmt, kuenftige Gruppen erhalten eigene Akten."""
+    today = timezone.localdate()
+    groups: dict[tuple, list[OwnerUnitAssignment]] = {}
+    for a in assignments:
+        groups.setdefault((a.valid_from, a.valid_to), []).append(a)
+
+    def rank(key):
+        start, end = key
+        current = (start is None or start <= today) and (end is None or end >= today)
+        return (0 if current else 1, start or date.min)
+
+    return [groups[k] for k in sorted(groups, key=rank)]
+
+
+def _tenant_groups(assignments: list[TenantUnitAssignment]) -> list[list[TenantUnitAssignment]]:
+    """Mitmieter desselben Mietverhaeltnisses teilen die Akte (H 6.9); ohne Mietverhaeltnis je Zuordnung eine."""
+    groups: dict[object, list[TenantUnitAssignment]] = {}
+    for a in assignments:
+        groups.setdefault(a.lease_id or f"a{a.pk}", []).append(a)
+    return list(groups.values())
+
+
+def _create_placeholder(model, obj, unit: Unit, file_kind: str, cfg: OwnerFileNamingConfig):
+    try:
+        with transaction.atomic():
+            return model.objects.create(
+                object=obj,
+                unit=unit,
+                file_kind=file_kind,
+                folder_name=_unique_name(placeholder_name(unit, cfg), model, obj),
+                name_basis={"unit": unit.pk, "placeholder": True, "mode": cfg.unit_prefix_mode},
+            )
+    except IntegrityError:  # gleichzeitiger Aufruf hat die Akte angelegt
+        return model.active.filter(unit=unit, file_kind=file_kind).order_by("id").first()
+
+
 def ensure_unit_files(obj) -> dict[str, int]:
     """Je aktive Einheit eine Eigentuemer- und eine Mieterakte. Sind Eigentuemer oder Mieter bereits zugeordnet,
-    entsteht die Akte gleich mit Namen; sonst als Platzhalter mit dem Einheitenkuerzel."""
+    entsteht je Gruppe eine Akte mit Namen (aktuelle Gruppe zuerst); sonst ein Platzhalter mit dem Einheitenkuerzel."""
     from apps.classification.ownerfiles import owner_file_for_assignments
 
     cfg = OwnerFileNamingConfig.from_settings()
     stats = {"owner_files": 0, "tenant_files": 0}
     for unit in Unit.active.filter(object=obj).order_by("unit_label_normalized"):
         if not OwnerFile.active.filter(unit=unit, file_kind="unit_owner").exists():
-            owners = current_owner_assignments(unit)
-            if owners:
-                owner_file_for_assignments(unit, owners)
+            groups = _owner_groups(current_owner_assignments(unit))
+            if groups:
+                for group in groups:
+                    owner_file_for_assignments(unit, group)
             else:
-                OwnerFile.objects.create(
-                    object=obj,
-                    unit=unit,
-                    file_kind="unit_owner",
-                    folder_name=_unique_name(placeholder_name(unit, cfg), OwnerFile, obj),
-                    name_basis={"unit": unit.pk, "placeholder": True, "mode": cfg.unit_prefix_mode},
-                )
+                _create_placeholder(OwnerFile, obj, unit, "unit_owner", cfg)
             stats["owner_files"] += 1
         if not TenantFile.active.filter(unit=unit, file_kind="unit_tenant").exists():
-            tenants = current_tenant_assignments(unit)
-            if tenants:
-                tenant_file_for_assignments(unit, tenants)
+            groups = _tenant_groups(current_tenant_assignments(unit))
+            if groups:
+                for group in groups:
+                    tenant_file_for_assignments(unit, group)
             else:
-                TenantFile.objects.create(
-                    object=obj,
-                    unit=unit,
-                    file_kind="unit_tenant",
-                    folder_name=_unique_name(placeholder_name(unit, cfg), TenantFile, obj),
-                    name_basis={"unit": unit.pk, "placeholder": True, "mode": cfg.unit_prefix_mode},
-                )
+                _create_placeholder(TenantFile, obj, unit, "unit_tenant", cfg)
             stats["tenant_files"] += 1
     return stats
+
+
+def rename_unit_files(unit: Unit) -> int:
+    """Einheit umbenannt (WE 1 wird WE 1a): Platzhalter und von der Anwendung benannte Akten der Einheit folgen dem
+    neuen Kuerzel; von Hand in Drive vergebene Ordnernamen bleiben (sync_file_names). Rueckgabe: geaenderte Akten."""
+    cfg = OwnerFileNamingConfig.from_settings()
+    changed = 0
+    for model, kind in ((OwnerFile, "unit_owner"), (TenantFile, "unit_tenant")):
+        for akte in model.active.filter(unit=unit, file_kind=kind):
+            basis = akte.name_basis or {}
+            links = list(akte.file_assignments.select_related("assignment"))
+            if basis.get("placeholder") and not links:
+                name = (
+                    _unique_name(placeholder_name(unit, cfg), model, unit.object)
+                    if akte.folder_name != placeholder_name(unit, cfg)
+                    else akte.folder_name
+                )
+                if name.rsplit("_", 1)[0] == akte.folder_name:  # nur Zaehlsuffix, Name unveraendert
+                    name = akte.folder_name
+            elif basis.get("adopted_placeholder") or basis.get("managed_name"):
+                assignments = [fl.assignment for fl in links]
+                parties = [getattr(a, "owner", None) or getattr(a, "tenant", None) for a in assignments]
+                name = _group_name(model, unit, parties, assignments, akte.folder_name, akte.pk)
+            else:
+                continue
+            if name != akte.folder_name:
+                akte.folder_name = name
+                akte.save(update_fields=["folder_name", "updated_at"])
+                changed += 1
+    return changed
 
 
 def _existing_names(model, obj, exclude_pk: int | None = None) -> frozenset[str]:
@@ -233,7 +297,12 @@ def tenant_file_for_assignments(unit: Unit, assignments: list[TenantUnitAssignme
     if linked is not None:
         for a in assignments:
             TenantFileAssignment.objects.get_or_create(assignment=a, defaults={"tenant_file": linked})
-        _refresh_tenant_file_name(linked, unit, assignments)
+        alle = [
+            fl.assignment
+            for fl in linked.file_assignments.select_related("assignment__tenant")
+            if fl.assignment.deleted_at is None
+        ]
+        _refresh_tenant_file_name(linked, unit, alle or list(assignments))
         return linked
     cfg = OwnerFileNamingConfig.from_settings()
     placeholder = (
@@ -269,9 +338,17 @@ def tenant_file_for_assignments(unit: Unit, assignments: list[TenantUnitAssignme
             placeholder.save(update_fields=["folder_name", "name_basis", "updated_at"])
             akte = placeholder
         else:
-            akte = TenantFile.objects.create(
-                object=unit.object, unit=unit, file_kind="unit_tenant", folder_name=name, name_basis=basis
-            )
+            try:
+                with transaction.atomic():
+                    akte = TenantFile.objects.create(
+                        object=unit.object,
+                        unit=unit,
+                        file_kind="unit_tenant",
+                        folder_name=name,
+                        name_basis=basis,
+                    )
+            except IntegrityError:  # gleichzeitige Anlage durch ein zweites Dokument derselben Einheit
+                akte = TenantFile.active.get(object=unit.object, folder_name=name)
         for a in assignments:
             TenantFileAssignment.objects.get_or_create(assignment=a, defaults={"tenant_file": akte})
     return akte
@@ -285,13 +362,8 @@ def tenant_file_for_unit(unit: Unit) -> TenantFile:
     existing = TenantFile.active.filter(unit=unit, file_kind="unit_tenant").order_by("id").first()
     if existing is not None:
         return existing
-    cfg = OwnerFileNamingConfig.from_settings()
-    return TenantFile.objects.create(
-        object=unit.object,
-        unit=unit,
-        file_kind="unit_tenant",
-        folder_name=_unique_name(placeholder_name(unit, cfg), TenantFile, unit.object),
-        name_basis={"unit": unit.pk, "placeholder": True, "mode": cfg.unit_prefix_mode},
+    return _create_placeholder(
+        TenantFile, unit.object, unit, "unit_tenant", OwnerFileNamingConfig.from_settings()
     )
 
 

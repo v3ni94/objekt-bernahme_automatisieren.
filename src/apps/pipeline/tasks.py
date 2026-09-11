@@ -121,11 +121,33 @@ def _download(doc: Document, target_dir: Path) -> Path:
     return target
 
 
+GOOGLE_DOC_PREFIX = "application/vnd.google-apps."
+
+
 @job_task(JobType.HASH)
 def hash_document(job: ProcessingJob) -> dict:
     doc = job.document
     if doc is None or doc.status not in ("registered",):
         raise SkipJob("already_processed")
+    if (doc.mime_type or "").startswith(GOOGLE_DOC_PREFIX):
+        # Google-Dokumente haben keine herunterladbare Datei (nur Export); sie gehen ohne Download in die Pruefung,
+        # wie es die Seitenanalyse fuer nicht unterstuetzte Formate tut (Bestand und Uebernahme gleich behandelt)
+        _review_once(
+            job.object,
+            case_type=CaseType.UNCLEAR,
+            subtype="unsupported_format",
+            document=doc,
+            key=f"unsupported:{doc.pk}",
+            misc_code="02",
+            context={
+                "mime_type": doc.mime_type,
+                "name": doc.current_name,
+                "note": "Google-Dokument, Export offen",
+            },
+        )
+        doc.status = "review"
+        doc.save(update_fields=["status", "updated_at"])
+        return {"kind": "google_doc"}
     storage.ensure_disk_reserve()
     tmp = storage.work_tmp_dir()
     try:
@@ -740,14 +762,19 @@ def decide_task(job: ProcessingJob) -> dict:
     tenant_file_id = None
     if decision.physical_category == "04":
         # Akten-Vorlage: Mieterdokumente in die Mieterakte der Einheit; ohne Akte (Schalter aus) flach in 04
+        from django.db import IntegrityError
+
         from apps.parties.unit_files import tenant_file_for_document
 
-        akte = tenant_file_for_document(
-            job.object,
-            decision.tenant_ids,
-            ctx.unit_ids,
-            create=bool(store.get("owner_file.create_folders_eagerly", False)),
-        )
+        try:
+            akte = tenant_file_for_document(
+                job.object,
+                decision.tenant_ids,
+                ctx.unit_ids,
+                create=bool(store.get("owner_file.create_folders_eagerly", False)),
+            )
+        except IntegrityError:  # zweites Dokument derselben Einheit hat die Akte gleichzeitig angelegt
+            akte = tenant_file_for_document(job.object, decision.tenant_ids, ctx.unit_ids, create=False)
         tenant_file_id = akte.pk if akte is not None else None
         if tenant_file_id:
             from apps.documents.models import DocumentTenantLink

@@ -107,7 +107,7 @@ Liegen die Unterlagen eines Objekts noch in der alten Ordnerstruktur (außerhalb
 
 1. Objektansicht oder Dokumentseite, „Bestand aus Drive übernehmen“. Die Seite zeigt den Wurzelordner mit Unterordnern und Dateien.
 2. Ordner für Ordner anklicken; der Pfad oben zeigt, wo man steht. Ein beliebiger Ordner lässt sich auch über seine ID oder den Drive-Link öffnen.
-3. Übernehmen: einzelne Dateien ankreuzen und „Ausgewählte übernehmen“, „Alle freien Dateien dieses Ordners übernehmen“ oder „Ordner mit allen Unterordnern übernehmen“ (Höchstzahl je Vorgang `drive.takeover_max_files`, Vorgabe 500; größere Bestände ordnerweise).
+3. Übernehmen: einzelne Dateien ankreuzen und „Ausgewählte übernehmen“, „Alle … freien Dateien dieses Ordners übernehmen“ oder „Ordner mit allen Unterordnern übernehmen“ (Höchstzahl je Vorgang `drive.takeover_max_files`, Vorgabe 500; größere Bestände ordnerweise).
 4. Die Dateien werden als Bestandsdokumente registriert und ein Verarbeitungslauf startet. Die Kette liest jede Datei, erkennt Inhalt und Zuordnung und verschiebt sie in den passenden Ordner der neuen Struktur (Elternwechsel, kein Kopieren). Der Herkunftspfad steht am Dokument.
 5. Fortschritt auf der Dokumentseite; unklare Dateien landen unter 06_Sonstiges mit Fall im Review Center und werden dort zugeordnet.
 

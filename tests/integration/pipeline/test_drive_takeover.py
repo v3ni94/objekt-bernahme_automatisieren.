@@ -122,3 +122,54 @@ def test_parse_folder_ref():
     assert takeover.parse_folder_ref(f"https://drive.google.com/drive/u/0/folders/{fid}") == fid
     assert takeover.parse_folder_ref(f"https://drive.google.com/open?id={fid}") == fid
     assert takeover.parse_folder_ref("") is None and takeover.parse_folder_ref("kurz") is None
+
+
+def test_einzelauswahl_in_grossem_ordner_und_wartender_lauf(
+    client_as, clerk_user, admin_user, objekt, drive, altbestand, monkeypatch
+):
+    from django.core.cache import cache
+
+    from apps.pipeline.models import ProcessingRun, RunStatus, RunType
+
+    store.set("drive.takeover_max_files", 10, user=admin_user, reason="Test")
+    for i in range(12):
+        drive.add_file(altbestand["rechnungen"], f"Beleg {i}.pdf", b"x")
+    client = client_as(clerk_user)
+    url = f"/objekte/{objekt.pk}/uebernahme/"
+    # Einzelauswahl bleibt moeglich, obwohl der Ordner mehr als die Grenze enthaelt
+    resp = client.post(
+        url, {"folder": altbestand["rechnungen"], "mode": "selected", "files": [altbestand["a"]]}, follow=True
+    )
+    assert Document.objects.filter(object=objekt).count() == 1
+    assert not any("Mehr als" in m.message for m in resp.context["messages"])
+    # Wartender Lauf: Jobs werden angehaengt, aber nicht sofort versendet (Objektserialitaet); Dry-Run zaehlt nicht
+    gesendet = []
+    from apps.drive import takeover as takeover_mod
+
+    monkeypatch.setattr(takeover_mod, "send", lambda job: gesendet.append(job.pk))
+    ProcessingRun.objects.filter(object=objekt).update(status=RunStatus.DONE)
+    dry = ProcessingRun.objects.create(
+        object=objekt, run_type=RunType.FULL, status=RunStatus.RUNNING, dry_run=True
+    )
+    wartend = ProcessingRun.objects.create(
+        object=objekt, run_type=RunType.INCREMENTAL, status=RunStatus.PENDING
+    )
+    client.post(
+        url, {"folder": altbestand["rechnungen"], "mode": "selected", "files": [altbestand["b"]]}, follow=True
+    )
+    job = ProcessingJob.objects.get(document__drive_file_id=altbestand["b"], job_type=JobType.DISCOVER)
+    assert job.run_id == wartend.pk and job.run_id != dry.pk and gesendet == []
+    # laufender Lauf: Jobs werden nach dem Commit versendet
+    wartend.status = RunStatus.RUNNING
+    wartend.save(update_fields=["status"])
+    client.post(
+        url, {"folder": altbestand["alt"], "mode": "selected", "files": [altbestand["notiz"]]}, follow=True
+    )
+    assert len(gesendet) == 1
+    # Sperre je Objekt: waehrend einer laufenden Uebernahme wird die zweite abgewiesen
+    cache.add(f"takeover:{objekt.pk}", "1", timeout=60)
+    resp = client.post(
+        url, {"folder": altbestand["rechnungen"], "mode": "selected", "files": [altbestand["a"]]}, follow=True
+    )
+    assert any("läuft gerade eine Übernahme" in m.message for m in resp.context["messages"])
+    cache.delete(f"takeover:{objekt.pk}")

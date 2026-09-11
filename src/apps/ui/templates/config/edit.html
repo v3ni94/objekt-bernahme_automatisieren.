@@ -1,6 +1,6 @@
 {% extends "base.html" %}{% block title %}{{ key }} · {{ APP_NAME }}{% endblock %}
 {% block content %}
-<div class="karte schmal"><h1 class="mono">{{ key }}</h1><p>{{ entry.description }}</p>
+<div class="karte schmal"><h1><span class="mono schluessel">{{ key }}</span></h1><p>{{ entry.description }}</p>
 <p class="klein">Typ {{ entry.value_type }}{% if entry.source %} · Herkunft {{ entry.source }}{% endif %}{% if entry.restart_required %} · Neustart erforderlich{% endif %}</p>
 <form method="post">{% csrf_token %}{{ form.as_p }}<button type="submit">Speichern</button> <a href="{% url 'settings_list' %}?kategorie={{ entry.category }}">Abbrechen</a></form></div>
 {% endblock %}

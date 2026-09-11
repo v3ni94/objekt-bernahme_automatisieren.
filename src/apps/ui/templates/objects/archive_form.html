@@ -1,6 +1,6 @@
 {% extends "base.html" %}{% block title %}{{ title }} · {{ APP_NAME }}{% endblock %}
 {% block content %}<div class="karte schmal"><h1>{{ title }}</h1>
 <p>{{ object.object_number }} {{ object.name|default:"" }}, {{ object.address|default:"" }}</p>
-{% if open_runs %}<p class="ampel rot">{{ open_runs }} offene(r) Verarbeitungslauf. Archivieren ist erst möglich, wenn kein Lauf mehr wartet oder läuft.</p>{% endif %}
+{% if open_runs %}<p class="warnung">{{ open_runs }} offene(r) Verarbeitungslauf. Archivieren ist erst möglich, wenn kein Lauf mehr wartet oder läuft.</p>{% endif %}
 <form method="post">{% csrf_token %}{{ form.as_p }}<button type="submit"{% if open_runs %} disabled{% endif %}>Archivieren</button> <a href="{% url 'object_detail' object.pk %}">Abbrechen</a></form>
 <p class="hinweis">Archivieren ist kein Löschen. Das Objekt verschwindet aus den Listen und aus den nächtlichen Läufen; Einheiten, Eigentümer, Dokumente, Fälle und Protokoll bleiben erhalten. In Drive wird nichts gelöscht, verschoben oder umbenannt. Über „Archiv“ in der Objektliste lässt sich das Objekt wiederherstellen.</p></div>{% endblock %}

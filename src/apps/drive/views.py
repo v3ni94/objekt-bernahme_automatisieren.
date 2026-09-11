@@ -274,7 +274,12 @@ def object_takeover(request, pk: int):
         messages.error(request, "Keine Google-Verbindung. Der Admin verbindet Google Drive unter Verwaltung.")
         return redirect("document_list", pk=obj.pk)
     ref = request.POST.get("folder") if request.method == "POST" else request.GET.get("ordner")
-    folder_id = takeover.parse_folder_ref(ref or "") or root_id
+    folder_id = takeover.parse_folder_ref(ref or "")
+    if ref and not folder_id:
+        messages.warning(
+            request, "Eingabe nicht als Ordner-ID oder Drive-Link erkannt; Wurzelordner wird gezeigt."
+        )
+    folder_id = folder_id or root_id
     if not folder_id:
         messages.error(request, "Kein Startordner: Wurzelordner setzen oder eine Ordner-ID eingeben.")
         return redirect("document_list", pk=obj.pk)
@@ -329,7 +334,13 @@ def _takeover_register(request, obj, adapter, folder):
     if not entries:
         messages.warning(request, f"Im Ordner „{folder.name}“ liegen keine Dateien.")
         return redirect(f"{request.path}?ordner={folder.id}")
-    result = takeover.register_files(obj, entries, source_folder=folder, user=request.user, request=request)
+    try:
+        result = takeover.register_files(
+            obj, entries, source_folder=folder, user=request.user, request=request
+        )
+    except takeover.TakeoverError as exc:
+        messages.error(request, str(exc))
+        return redirect(f"{request.path}?ordner={folder.id}")
     if result.registered:
         messages.success(
             request,

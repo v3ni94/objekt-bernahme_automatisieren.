@@ -17,6 +17,6 @@
 <p class="hinweis">Bei mehreren Treffern die richtige ID unten eintragen; nichts wird geraten.</p>{% endif %}
 <form method="post" action="{% url 'drive_confirm_root' %}">{% csrf_token %}{{ confirm_form.as_p }}<button type="submit">Wurzel bestätigen</button></form>{% endif %}</div>
 </div>
-<div class="karte"><h2>Nachweiskette Token (T9, letzte 9 Tage)</h2>
+<div class="karte"><h2>Nachweiskette Token (letzte 9 Tage)</h2>
 <table class="voll"><thead><tr><th>Zeitpunkt</th><th>Ereignis</th><th>Ergebnis</th><th>Grund</th></tr></thead><tbody>{% for r in proof %}<tr><td>{{ r.occurred_at }}</td><td>{{ r.action }}</td><td>{{ r.result }}</td><td>{{ r.reason|default:"" }}</td></tr>{% empty %}<tr><td colspan="4">Noch keine Ereignisse.</td></tr>{% endfor %}</tbody></table>
-<p class="hinweis">Kriterium: kein drive.authorize nach Tag 0, alle Refreshes ok, Tage seit Autorisierung größer oder gleich 8 (docs/betrieb.md 7.9).</p></div>{% endblock %}
+<p class="hinweis">Die Verbindung gilt als stabil, wenn nach der Autorisierung keine erneute Anmeldung nötig war, alle Erneuerungen des Tokens gelungen sind und mindestens acht Tage vergangen sind.</p></div>{% endblock %}

@@ -2,7 +2,7 @@
 {% block content %}
 <p><a href="{% url 'review_list' %}?{{ query }}">Review Center</a>{% if position %} · Fall {{ position.0 }} von {{ position.1 }} im Filter{% endif %} {% if prev_id %}<a href="{% url 'review_detail' prev_id %}?{{ query }}" id="nav-prev">vorheriger (K)</a>{% endif %} {% if next_id %}<a href="{% url 'review_detail' next_id %}?{{ query }}" id="nav-next">nächster (J)</a>{% endif %}</p>
 <h1>{{ case.get_case_type_display }}{% if case.case_subtype %} <span class="klein">{{ case.case_subtype }}</span>{% endif %} {% if case.status != "open" %}<span class="ampel grau">{{ case.get_status_display }}</span>{% endif %}</h1>
-<div class="raster review" style="grid-template-columns: minmax(280px, 1fr) minmax(320px, 1.4fr) minmax(320px, 1.2fr)">
+<div class="raster review">
 <div class="karte"><h2>Fall</h2>
 <p><strong>Grund:</strong> {{ case.context.reason|default:"" }}{% if case.context.decision %}<br><span class="klein">Systementscheidung: {{ case.context.decision }}</span>{% endif %}</p>
 {% if object %}<p><strong>Objekt:</strong> <a href="{% url 'object_detail' object.pk %}">{{ object.object_number }} {{ object.name|default:"" }}</a> ({{ object.get_management_type_display }})</p>{% endif %}
@@ -22,7 +22,7 @@
 {% if pages %}<div class="seitenleiste">{% for p in pages %}<button type="button" class="link seite {% if case.page_from and p.page_no >= case.page_from and p.page_no <= case.page_to %}im-fall{% endif %}" data-page="{{ p.page_no }}">{{ p.page_no }}</button>{% endfor %}</div>
 <div id="hauptansicht">{% for p in pages %}<div class="seite-inhalt" data-page="{{ p.page_no }}" {% if not forloop.first %}hidden{% endif %}>
 <p class="klein">Seite {{ p.page_no }} von {{ pages|length }} · {{ p.get_text_source_display }} · {{ p.char_count }} Zeichen · <button type="button" class="link toggle-text">Text</button></p>
-{% if previews|get_item:p.page_no %}<img src="{% url 'document_preview' document.pk p.page_no %}" alt="Seite {{ p.page_no }}" style="max-width:100%;border:1px solid #ccc">{% else %}<p class="hinweis">Kein Seitenbild vorhanden.</p>{% endif %}
+{% if previews|get_item:p.page_no %}<img src="{% url 'document_preview' document.pk p.page_no %}" alt="Seite {{ p.page_no }}" class="seitenbild">{% else %}<p class="hinweis">Kein Seitenbild vorhanden.</p>{% endif %}
 <pre class="mono seitentext" hidden style="white-space:pre-wrap">{{ p.text_content }}</pre></div>{% endfor %}</div>
 {% else %}<p class="hinweis">Kein Dokument oder keine Seiten.</p>{% endif %}</div>
 <div class="karte" id="entscheidung"><h2>Entscheidung</h2>

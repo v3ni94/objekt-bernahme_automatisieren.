@@ -52,7 +52,12 @@ def owner_create(request):
         messages.success(request, f"Eigentümer {owner} angelegt.")
         nxt = request.GET.get("next")
         return redirect(nxt) if nxt and nxt.startswith("/") else redirect("owner_list")
-    return render(request, "parties/owner_form.html", {"form": form, "title": "Eigentümer anlegen"})
+    nxt = request.GET.get("next")
+    return render(
+        request,
+        "parties/owner_form.html",
+        {"form": form, "title": "Eigentümer anlegen", "next": nxt if nxt and nxt.startswith("/") else None},
+    )
 
 
 @permission_required("masterdata.write")

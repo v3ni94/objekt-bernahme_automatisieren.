@@ -3,9 +3,10 @@ Einheit, Ordner in Drive sofort, Umbenennung nach Zuordnung, manuelle Namen blei
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 
 import pytest
+from django.utils import timezone
 
 from apps.audit.models import AuditEvent
 from apps.config import store
@@ -255,3 +256,114 @@ def test_knopf_akten_anlegen(client_as, clerk_user, admin_user, objekt_mit_sollz
     assert ev.after_state["units_created"] == 3 and ev.after_state["drive"] == "queued"
     texte = [m.message for m in resp.context["messages"]]
     assert any("3 Eigentümerakten und 3 Mieterakten" in t for t in texte)
+
+
+def test_mieterakte_mit_mitmietern_wird_bei_ablage_nicht_verkuerzt(objekt_mit_sollzahl, drive):
+    """Zwei Mieter teilen ein Mietverhaeltnis; die Ablage eines Dokuments mit nur einem erkannten Mieter darf den
+    Aktennamen nicht auf diesen einen verkuerzen (Befund der Gegenpruefung)."""
+    from apps.parties.models import Lease
+    from apps.parties.unit_files import tenant_file_for_assignments
+
+    obj = objekt_mit_sollzahl
+    ensure_placeholder_units(obj, 3)
+    ensure_unit_files(obj)
+    we1 = Unit.active.get(object=obj, unit_label_normalized="WE1")
+    lease = Lease.objects.create(object=obj, start_date=date(2022, 3, 1), data_status="confirmed")
+    m1 = Tenant.objects.create(
+        type="natural_person", first_name="Mia", last_name="Mieterling", search_name="MIETERLING MIA"
+    )
+    m2 = Tenant.objects.create(
+        type="natural_person", first_name="Max", last_name="Wohner", search_name="WOHNER MAX"
+    )
+    a1 = TenantUnitAssignment.objects.create(tenant=m1, unit=we1, lease=lease, valid_from=date(2022, 3, 1))
+    a2 = TenantUnitAssignment.objects.create(tenant=m2, unit=we1, lease=lease, valid_from=date(2022, 3, 1))
+    akte = tenant_file_for_assignments(we1, [a1, a2])
+    assert akte.folder_name == "WE01_Mieterling-Wohner"
+    # Dokument nennt nur Max Wohner: Akte bleibt die gemeinsame, Name unveraendert
+    treffer = tenant_file_for_document(obj, [m2.pk], [])
+    assert treffer.pk == akte.pk
+    akte.refresh_from_db()
+    assert akte.folder_name == "WE01_Mieterling-Wohner"
+
+
+def test_eigentuemerwechsel_neue_gruppe_folgt_weiteren_eigentuemern(objekt_mit_sollzahl, drive):
+    """Nach dem Wechsel ist die Akte der neuen Gruppe ebenfalls von der Anwendung gefuehrt: ein zweiter
+    Miteigentuemer derselben Gruppe erweitert ihren Namen."""
+    obj = objekt_mit_sollzahl
+    ensure_placeholder_units(obj, 3)
+    ensure_unit_files(obj)
+    we1 = Unit.active.get(object=obj, unit_label_normalized="WE1")
+    alt = Owner.objects.create(
+        type="natural_person", first_name="Ute", last_name="Alt", search_name="ALT UTE"
+    )
+    party_services.create_assignment(
+        owner=alt, unit=we1, valid_from=date(2015, 1, 1), valid_to=date(2024, 6, 30)
+    )
+    neu1 = Owner.objects.create(
+        type="natural_person", first_name="Nina", last_name="Neu", search_name="NEU NINA"
+    )
+    neu2 = Owner.objects.create(
+        type="natural_person", first_name="Bo", last_name="Beispiel", search_name="BEISPIEL BO"
+    )
+    party_services.create_assignment(owner=neu1, unit=we1, valid_from=date(2024, 7, 1), valid_to=None)
+    party_services.create_assignment(owner=neu2, unit=we1, valid_from=date(2024, 7, 1), valid_to=None)
+    namen = sorted(OwnerFile.active.filter(unit=we1).values_list("folder_name", flat=True))
+    assert namen == ["WE01_Alt", "WE01_Beispiel-Neu"]
+
+
+def test_einheit_umbenannt_akten_folgen(
+    client_as, clerk_user, admin_user, objekt_mit_sollzahl, drive, monkeypatch
+):
+
+    obj = objekt_mit_sollzahl
+    ensure_placeholder_units(obj, 3)
+    ensure_unit_files(obj)
+    we3 = Unit.active.get(object=obj, unit_label_normalized="WE3")
+    owner = Owner.objects.create(
+        type="natural_person", first_name="Karl", last_name="Schmidt", search_name="SCHMIDT KARL"
+    )
+    party_services.create_assignment(owner=owner, unit=we3, valid_from=date(2020, 1, 1), valid_to=None)
+    monkeypatch.setattr(oauth, "token_status", lambda: {"status": "active", "ok": True})
+    store.set("drive.root_folder_id", drive.root_id, user=admin_user, reason="Test")
+    client = client_as(admin_user)  # masterdata.write
+    resp = client.post(
+        f"/einheiten/{we3.pk}/bearbeiten/",
+        {"unit_label": "WE 30", "unit_type": "apartment", "status": "active"},
+        follow=True,
+    )
+    assert resp.status_code == 200
+    we3.refresh_from_db()
+    assert we3.unit_label_normalized == "WE30"
+    assert OwnerFile.active.get(unit=we3).folder_name == "WE30_Schmidt"
+    assert TenantFile.active.get(unit=we3).folder_name == "WE30"
+    assert any("Akte(n) der Einheit umbenannt" in m.message for m in resp.context["messages"])
+
+
+def test_kuenftige_gruppe_erhaelt_eigene_akte(objekt_mit_sollzahl, drive):
+    """Laufender und kuenftiger Eigentuemer (angekuendigter Wechsel) sind zwei Gruppen mit zwei Akten; der Platzhalter
+    geht an die heute geltende Gruppe."""
+    obj = objekt_mit_sollzahl
+    ensure_placeholder_units(obj, 3)
+    we2 = Unit.active.get(object=obj, unit_label_normalized="WE2")
+    heute = timezone.localdate()
+    jetzt = Owner.objects.create(
+        type="natural_person", first_name="Ida", last_name="Jetzt", search_name="JETZT IDA"
+    )
+    spaeter = Owner.objects.create(
+        type="natural_person", first_name="Sam", last_name="Spaeter", search_name="SPAETER SAM"
+    )
+    store.set("owner_file.create_folders_eagerly", False, user=None, reason="Test ohne Hook")
+    party_services.create_assignment(
+        owner=jetzt, unit=we2, valid_from=date(2020, 1, 1), valid_to=heute + timedelta(days=60)
+    )
+    party_services.create_assignment(
+        owner=spaeter, unit=we2, valid_from=heute + timedelta(days=61), valid_to=None
+    )
+    store.set("owner_file.create_folders_eagerly", True, user=None, reason="Test")
+    assert not OwnerFile.active.filter(unit=we2).exists()
+    ensure_unit_files(obj)
+    akten = {a.folder_name: a for a in OwnerFile.active.filter(unit=we2)}
+    assert set(akten) == {"WE02_Jetzt", "WE02_Spaeter"}
+    assert (
+        akten["WE02_Jetzt"].name_basis.get("adopted_placeholder") is None
+    )  # kein Platzhalter vorhanden gewesen

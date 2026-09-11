@@ -92,3 +92,23 @@ def test_ablage_wartet_ohne_zielstruktur(seeded, data_dir, drive, pdf_factory, r
     job.refresh_from_db()
     doc.refresh_from_db()
     assert job.status == JobStatus.DONE and doc.drive_file_id
+
+
+def test_google_dokument_geht_ohne_download_in_die_pruefung(objekt, drive, run_all):
+    """Google-Dokumente sind nicht herunterladbar; sie duerfen nicht als Fehler enden, sondern gehen in die Pruefung."""
+    from apps.documents.models import Document
+    from apps.drive import takeover
+    from apps.review.models import ReviewCase
+
+    ordner = drive.add_folder(drive.root_id, "Alt Google")
+    gdoc = drive.add_file(ordner, "Protokoll", b"", mime_type="application/vnd.google-apps.document")
+    folder = drive.get(ordner)
+    result = takeover.register_files(
+        objekt, takeover.collect_files(drive, folder, recursive=False, limit=50), source_folder=folder
+    )
+    assert result.registered == 1
+    run_all(objekt)
+    doc = Document.objects.get(drive_file_id=gdoc)
+    assert doc.status == "review" and doc.sha256 is None
+    assert ReviewCase.objects.filter(document=doc, case_subtype="unsupported_format").exists()
+    assert not [op for op in drive.ops if op[0] == "download" and op[1] == gdoc]

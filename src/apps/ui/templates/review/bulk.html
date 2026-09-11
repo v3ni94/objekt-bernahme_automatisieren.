@@ -13,7 +13,7 @@
 {% for r in rows %}<tr class="{% if r.case_id in exclude %}grau{% elif r.state == 'rot' %}rot{% elif r.state == 'gelb' %}gelb{% endif %}">
 <td><input type="checkbox" name="exclude" value="{{ r.case_id }}" style="width:auto" {% if r.case_id in exclude %}checked{% endif %}> <a href="{% url 'review_detail' r.case_id %}" class="klein">Fall {{ r.case_id }}</a></td>
 <td>{{ r.document }}</td><td>{% if r.page_from %}{{ r.page_from }} bis {{ r.page_to }}{% endif %}</td>
-<td>{{ r.owner|default:"" }}{% if r.state != 'gruen' %}<br><select name="row_{{ r.case_id }}_assignment_id" style="width:200px"><option value="">Kandidat wählen</option>{% for u in units %}{% endfor %}</select>{% endif %}</td>
+<td>{{ r.owner|default:"" }}{% if r.state != 'gruen' %}<br><select name="row_{{ r.case_id }}_assignment_id" style="width:200px"><option value="">Kandidat wählen</option>{% for k in r.candidates %}<option value="{{ k.assignment_id }}">{{ k.owner }}, {{ k.unit }}{% if k.valid_from %} ab {{ k.valid_from }}{% endif %}</option>{% endfor %}</select>{% endif %}</td>
 <td>{{ r.unit|default:"" }}{% if not r.unit %}<br><select name="row_{{ r.case_id }}_unit_id" style="width:160px"><option value="">Einheit wählen</option>{% for u in units %}<option value="{{ u.id }}">{{ u.label }}</option>{% endfor %}</select>{% endif %}</td>
 <td class="mono klein">{{ r.folder_name|default:"" }} {% if r.folder_name %}{% if r.folder_exists %}<span class="ampel gruen">vorhanden</span>{% else %}<span class="ampel grau">wird angelegt</span>{% endif %}{% endif %}</td>
 <td>{{ r.target.subfolder|default:"" }}</td><td>{{ r.target.document_type|default:"" }}</td><td>{{ r.target.period_year|default:"" }}</td>

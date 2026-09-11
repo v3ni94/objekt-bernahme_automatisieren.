@@ -401,6 +401,20 @@ def unit_edit(request, pk: int):
                 after=a,
             )
         messages.success(request, f"Einheit {unit.unit_label} gespeichert.")
+        if "unit_label" in a or "unit_type" in a:
+            from apps.drive.tasks import trigger_unit_folders
+            from apps.parties.unit_files import rename_unit_files
+
+            renamed = rename_unit_files(
+                unit
+            )  # Akten-Vorlage: Platzhalter und benannte Akten folgen dem Kuerzel
+            if renamed:
+                folder_hint = _UNIT_FOLDER_HINTS.get(
+                    trigger_unit_folders(unit.object_id, user_id=request.user.pk)
+                )
+                messages.info(
+                    request, f"{renamed} Akte(n) der Einheit umbenannt. {folder_hint or ''}".strip()
+                )
         return redirect("object_detail", pk=unit.object_id)
     return render(
         request,

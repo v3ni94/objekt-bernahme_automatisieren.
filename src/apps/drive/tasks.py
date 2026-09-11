@@ -60,7 +60,17 @@ def reconcile_object_task(
     return result
 
 
+WRITE_LOCK_SECONDS = 600
+
+
+def _write_lock_key(object_id: int) -> str:
+    """Dieselbe Sperre wie die Ablage (file_to_drive): kein zweiter Schreiber legt gleichzeitig Ordner im Objekt an."""
+    return f"drive:write:{object_id}"
+
+
 def _unit_folders_after_reconcile(obj: ManagedObject, adapter, user) -> dict | None:
+    from django.core.cache import cache
+
     from apps.config import store
 
     if not store.get("owner_file.create_folders_eagerly", False):
@@ -69,12 +79,19 @@ def _unit_folders_after_reconcile(obj: ManagedObject, adapter, user) -> dict | N
     from apps.drive.folders import FolderError, ensure_unit_folders
     from apps.parties.unit_files import ensure_unit_files
 
+    lock = _write_lock_key(obj.pk)
+    if not cache.add(lock, "unit-folders", timeout=WRITE_LOCK_SECONDS):
+        # Ablage schreibt gerade im Objekt: Aktenordner als eigenen Auftrag nachziehen statt doppelt anzulegen
+        ensure_unit_folders_task.apply_async(args=[obj.pk, getattr(user, "pk", None)], countdown=30)
+        return {"deferred": True}
     try:
         files = ensure_unit_files(obj)
         return {**files, **ensure_unit_folders(obj, drive=adapter, user=user)}
     except (FolderError, DriveError) as exc:
         logger.warning("Aktenordner für Objekt %s nicht vollständig angelegt: %s", obj.pk, exc)
         return {"error": str(exc)[:300]}
+    finally:
+        cache.delete(lock)
 
 
 @shared_task(name="drive.reconcile_all", queue="io")
@@ -183,10 +200,14 @@ def trigger_object_folders(
     return "queued"
 
 
-@shared_task(name="drive.ensure_unit_folders", queue="io")
-def ensure_unit_folders_task(object_id: int, user_id: int | None = None) -> dict:
+@shared_task(name="drive.ensure_unit_folders", queue="io", bind=True, max_retries=30)
+def ensure_unit_folders_task(self, object_id: int, user_id: int | None = None) -> dict:
     """Akten-Vorlage in Drive fuer ein Objekt: Akten je Einheit als Datensaetze sicherstellen, Ordner unter 05 und
-    04 anlegen oder bestaetigen, Namen abgleichen (Platzhalter WE01 wird nach Zuordnung zu WE01_Mustermann)."""
+    04 anlegen oder bestaetigen, Namen abgleichen (Platzhalter WE01 wird nach Zuordnung zu WE01_Mustermann).
+    Laeuft unter der Objekt-Schreibsperre; ist sie belegt oder antwortet Drive mit einem Fehler, wird der Auftrag
+    spaeter wiederholt (kein Ordner doppelt, keine stille Luecke)."""
+    from django.core.cache import cache
+
     from apps.accounts.models import User
     from apps.drive.adapter import DriveError
     from apps.drive.folders import FolderError, ensure_unit_folders
@@ -199,18 +220,36 @@ def ensure_unit_folders_task(object_id: int, user_id: int | None = None) -> dict
     if adapter is None:
         return {"ok": False, "reason": "not_connected"}
     user = User.objects.filter(pk=user_id).first() if user_id else None
-    files = ensure_unit_files(obj)
+    lock = _write_lock_key(object_id)
+    if not cache.add(lock, "unit-folders", timeout=WRITE_LOCK_SECONDS):
+        raise self.retry(countdown=20)
     try:
+        files = ensure_unit_files(obj)
         stats = ensure_unit_folders(obj, drive=adapter, user=user)
     except FolderError as exc:
-        return {"ok": False, "reason": str(exc), **files}
+        # Struktur fehlt (kein Ordnerabgleich): Hinweis im Log, der Abgleich zieht die Akten nach
+        logger.warning("Aktenordner für Objekt %s: %s", object_id, exc)
+        return {"ok": False, "reason": str(exc)[:300]}
     except DriveError as exc:
-        logger.warning("Aktenordner für Objekt %s: Drive-Fehler %s", object_id, exc)
-        return {
-            "ok": False,
-            "reason": f"Drive-Fehler {exc.status or ''} {exc.reason or ''}: {exc}"[:300],
-            **files,
-        }
+        logger.warning(
+            "Aktenordner für Objekt %s: Drive-Fehler %s (Versuch %s)", object_id, exc, self.request.retries
+        )
+        if self.request.retries < 5:
+            raise self.retry(countdown=60 * (self.request.retries + 1), exc=exc) from exc
+        record(
+            "drive.create_folder",
+            entity_type="object",
+            entity_id=object_id,
+            object_id=object_id,
+            actor_type="system",
+            after={
+                "result": "unit_folders_failed",
+                "error": f"{exc.status or ''} {exc.reason or ''} {exc}"[:300],
+            },
+        )
+        return {"ok": False, "reason": f"Drive-Fehler {exc.status or ''} {exc.reason or ''}: {exc}"[:300]}
+    finally:
+        cache.delete(lock)
     return {"ok": True, **files, **stats}
 
 
