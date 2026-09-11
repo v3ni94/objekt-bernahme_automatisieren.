@@ -4,7 +4,7 @@ Stand: 10.09.2026. Definition aus Fachentwurf G Abschnitt 12 und Umsetzungsplan 
 
 | Nr. | Test | Erwartung (Kurzfassung) | Vorbereitung im Repository | Ergebnis auf dem VPS | Datum, Durchführender | Nachweis |
 |---|---|---|---|---|---|---|
-| T1 | Frischer Checkout | Alle Dienste `healthy` in 3 min, HTTPS mit gültigem Zertifikat, HTTP leitet um | `scripts/deploy.sh`, `docker-compose.yml`, docs/betrieb/deployment.md | ausstehend | | `docker compose ps`, `curl -I`, `openssl` |
+| T1 | Frischer Checkout | Alle Dienste `healthy` in 3 min, HTTPS mit gültigem Zertifikat, HTTP leitet um | `scripts/deploy.sh`, `docker-compose.yml`, docs/betrieb/deployment.md | teilweise am 11.09.2026: alle acht Dienste `healthy` (Anwendungsdienste binnen 11 Sekunden nach dem Start), HTTP leitet global auf HTTPS um (Traefik), Anwendung antwortet über HTTPS mit 200; **Zertifikat offen**, Let's Encrypt scheitert an der DNS-Zweitprüfung | 11.09.2026, Deploy-Workflow | Workflow-Lauf `first-run`, Bereitschaftsabfrage `/readyz/` |
 | T2 | Kein Host-Port | Nur Traefik veröffentlicht 80 und 443 | Compose ohne `ports:` an Anwendungsdiensten | ausstehend | | Ausgaben |
 | T3 | Isolation `data` | Kein Weg ins Internet aus `db` und `redis` | Netz `data` mit `internal: true` | ausstehend | | Ausgabe |
 | T4 | Serverneustart | Lauf wird fortgesetzt, keine Doppelverarbeitung, Sweeper im Log | Jobs mit Idempotenzschlüssel (B-03), Sweeper beim Start (M5) | ausstehend | | Abfrage, Log |
@@ -17,7 +17,7 @@ Stand: 10.09.2026. Definition aus Fachentwurf G Abschnitt 12 und Umsetzungsplan 
 | T11 | Logging | JSON je Zeile, keine IBAN in Logs | JSON-Logs mit Maskierung (M1), Prüfabfrage | ausstehend | | Ausgaben |
 | T12 | Sicherheitseinstellungen Host | Root- und Passwort-Login aus, UFW 22, 80, 443, unattended-upgrades, Zeitzone Europe/Berlin | docs/betrieb.md Abschnitt 1.4 | ausstehend | | Ausgaben |
 | T13 | Login und Rollen | TOTP-Einrichtung erzwungen, Zugriff verweigert mit `auth.denied` | Login mit TOTP-Pflicht, Rollen (M1) | ausstehend | | Bildschirmfoto, Abfrage |
-| T14 | Healthcheck-Endpunkte | `/healthz/` nur `ok`, `/readyz/` ohne Token 401 | Endpunkte (M1) | ausstehend | | Ausgaben |
+| T14 | Healthcheck-Endpunkte | `/healthz/` nur `ok`, `/readyz/` ohne Token 401 | Endpunkte (M1) | teilweise am 11.09.2026: `/healthz/` antwortet mit 200, `/readyz/` mit Token liefert den vollständigen Befund (Datenbank, Schema mit 50 Migrationen, Redis, Speicher); Prüfung ohne Token steht aus | 11.09.2026, Deploy-Workflow | Aktion `smoke` |
 
 ## Prüfabfragen
 
