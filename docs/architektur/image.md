@@ -2,6 +2,10 @@
 
 Stand: 10.09.2026 (M1). Ein Dockerfile (`docker/app.Dockerfile`) mit zwei Zielen (Beschluss B-44), dazu das Backup-Image und das temporäre Mess-Image für M0. Versionen werden nicht als Fakt genannt; Basis-Images und Paketstände sind zum Umsetzungszeitpunkt zu prüfen und über die Lockfiles festgeschrieben.
 
+## Virtuelle Umgebungen und Pfade
+
+Jedes Ziel hat eine eigene Builder-Stufe, die das Venv unter genau dem Pfad anlegt, unter dem es im Laufzeit-Image liegt (`/opt/venv`). Grund: Die Startskripte im Venv (`gunicorn`, `celery`) tragen den Pfad ihres Interpreters fest in der ersten Zeile. Wird ein Venv unter `/opt/venv-web` gebaut und danach nach `/opt/venv` kopiert, zeigt dieser Pfad ins Leere; die Shell meldet beim Start `gunicorn: not found` und der Container läuft in eine Neustartschleife (Exit 127). Aufgefallen bei der Erstinstallation am 11.09.2026. Beide Ziele prüfen ihre Startskripte deshalb zur Bauzeit (`gunicorn --version`, `celery --version`); ein solcher Fehler bricht seitdem den Build ab.
+
 ## Grundsatz aus M0
 
 Je Image genau ein Python-Interpreter mit einem Lockfile. Eine Mischung aus pip-installierten und paketierten Python-Bibliotheken (Pillow, pikepdf) hat in der Entwicklungsumgebung ocrmypdf unbenutzbar gemacht. Deshalb kommen im Ziel `worker` Tesseract, Ghostscript, qpdf und poppler aus dem Betriebssystem, alle Python-Pakete (ocrmypdf, pikepdf, Pillow) aus dem Lockfile in einer eigenen virtuellen Umgebung.

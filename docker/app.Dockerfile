@@ -7,14 +7,21 @@
 ARG PYTHON_IMAGE=python:3.12-slim-bookworm
 
 # ---------------------------------------------------------------- Builder: Abhaengigkeiten kompilieren
-FROM ${PYTHON_IMAGE} AS builder
+# Je Ziel eine eigene Stufe, die das Venv unter genau dem Pfad anlegt, unter dem es spaeter liegt (/opt/venv).
+# Die Startskripte im Venv (gunicorn, celery) tragen den Pfad ihres Interpreters fest im Shebang; wird das Venv
+# unter einem anderen Pfad gebaut und danach verschoben, meldet die Shell im Betrieb "not found" (Exit 127).
+FROM ${PYTHON_IMAGE} AS builder-base
 ENV PIP_NO_CACHE_DIR=1 PIP_DISABLE_PIP_VERSION_CHECK=1
 RUN apt-get update && apt-get install -y --no-install-recommends \
       build-essential pkg-config libmariadb-dev \
  && rm -rf /var/lib/apt/lists/*
 COPY requirements-web.lock.txt requirements-worker.lock.txt /tmp/
-RUN python -m venv /opt/venv-web && /opt/venv-web/bin/pip install -r /tmp/requirements-web.lock.txt
-RUN python -m venv /opt/venv-worker && /opt/venv-worker/bin/pip install -r /tmp/requirements-worker.lock.txt
+
+FROM builder-base AS builder-web
+RUN python -m venv /opt/venv && /opt/venv/bin/pip install -r /tmp/requirements-web.lock.txt
+
+FROM builder-base AS builder-worker
+RUN python -m venv /opt/venv && /opt/venv/bin/pip install -r /tmp/requirements-worker.lock.txt
 
 # ---------------------------------------------------------------- Gemeinsame Laufzeitbasis
 FROM ${PYTHON_IMAGE} AS runtime-base
@@ -35,11 +42,12 @@ RUN chmod +x /usr/local/bin/entrypoint.sh
 
 # ---------------------------------------------------------------- Ziel web
 FROM runtime-base AS web
-COPY --from=builder /opt/venv-web /opt/venv
+COPY --from=builder-web /opt/venv /opt/venv
 # Statische Dateien zur Bauzeit sammeln; die Bauzeit-Settings brauchen keine Geheimnisse und keine Datenbank.
 # manage.py check laedt die URL-Konfiguration und damit alle Ansichten: ein Paket, das im Web-Venv fehlt,
 # bricht den Build ab und nicht erst die erste Anfrage im Betrieb.
-RUN DJANGO_SETTINGS_MODULE=objektakte.settings.build python manage.py check \
+RUN gunicorn --version \
+ && DJANGO_SETTINGS_MODULE=objektakte.settings.build python manage.py check \
  && DJANGO_SETTINGS_MODULE=objektakte.settings.build python manage.py collectstatic --noinput \
  && chown -R app:app /app/staticfiles
 USER app
@@ -64,8 +72,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       *) echo "Unbekannte TESSDATA_VARIANT ${TESSDATA_VARIANT}" && exit 1 ;; \
     esac \
  && ls -l "$TD/deu.traineddata"
-COPY --from=builder /opt/venv-worker /opt/venv
+COPY --from=builder-worker /opt/venv /opt/venv
 ENV OMP_THREAD_LIMIT=1
+# Startskripte des Venv pruefen (fangen einen falschen Shebang-Pfad zur Bauzeit statt im Betrieb)
+RUN celery --version && python -c "import ocrmypdf, pdfplumber, sklearn"
 USER app
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 CMD ["celery", "-A", "objektakte", "worker", "-Q", "ocr", "--concurrency", "1"]
