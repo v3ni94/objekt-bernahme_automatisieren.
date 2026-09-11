@@ -237,10 +237,10 @@ PY
   deploy-tests)
     # Deployment-Tests T2, T3, T11 und T14 (docs/betrieb/deployment-test.md), nur lesend
     dom="$(envval APP_DOMAIN)"
-    echo "T2 Host-Ports der Anwendungsdienste (erwartet: keine):"
-    docker compose ps --format '  {{.Name}} {{.Publishers}}' | sed 's/\[\]/keine/'
-    echo "  Veroeffentlichte Ports aller Container auf dem Host (erwartet: nur fremde Anwendungen):"
-    docker ps --format '  {{.Names}} {{.Ports}}' | grep -E '0\.0\.0\.0|:::' || echo "  keine"
+    echo "T2 Auf dem Host veroeffentlichte Ports der Anwendungscontainer (erwartet: keine; EXPOSE ohne Veroeffentlichung zaehlt nicht):"
+    docker ps --format '  {{.Names}} {{.Ports}}' | grep '^  objektakte-' | grep -E '0\.0\.0\.0|:::' || echo "  keine"
+    echo "  Veroeffentlichte Ports aller uebrigen Container (fremde Anwendungen, Traefik im Host-Netz erscheint nicht):"
+    docker ps --format '  {{.Names}} {{.Ports}}' | grep -v '^  objektakte-' | grep -E '0\.0\.0\.0|:::' || echo "  keine"
     echo "T3 Isolation des Netzes data (erwartet: BLOCKIERT):"
     docker compose exec -T db bash -c 'timeout 5 bash -c "exec 3<>/dev/tcp/1.1.1.1/443" 2>/dev/null && echo "  db: ERREICHBAR" || echo "  db: BLOCKIERT"'
     docker compose exec -T redis sh -c 'timeout 5 wget -q -T 5 -O /dev/null https://1.1.1.1 2>/dev/null && echo "  redis: ERREICHBAR" || echo "  redis: BLOCKIERT"'

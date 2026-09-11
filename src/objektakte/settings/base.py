@@ -218,6 +218,9 @@ CELERY_RESULT_BACKEND = None
 CELERY_TASK_ACKS_LATE = True
 CELERY_TASK_REJECT_ON_WORKER_LOST = True
 CELERY_WORKER_PREFETCH_MULTIPLIER = 1
+# Celery ersetzt sonst beim Start den Root-Logger durch sein Textformat; Meldungen der Worker waeren dann kein
+# JSON je Zeile (T11) und die IBAN-Maskierung des JSON-Formatters griffe nicht. Django konfiguriert LOGGING.
+CELERY_WORKER_HIJACK_ROOT_LOGGER = False
 CELERY_TASK_DEFAULT_QUEUE = "io"
 CELERY_TASK_QUEUES = {
     name: {"exchange": name, "routing_key": name} for name in ("ocr", "classify", "ai", "io", "lists")
