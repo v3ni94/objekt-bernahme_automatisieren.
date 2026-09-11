@@ -97,6 +97,9 @@ x-worker-healthcheck: &worker-healthcheck
   timeout: 10s
   retries: 3
   start_period: 90s
+  # Waehrend der Startphase haeufiger pruefen, sonst wartet der erste Check ein volles Intervall
+  # und das Deployment laeuft in seine Zeitgrenze (Docker Engine ab 25, Compose-Spezifikation).
+  start_interval: 10s
 
 services:
 
@@ -483,6 +486,7 @@ services:
       timeout: 10s
       retries: 3
       start_period: 2m
+      start_interval: 10s
     depends_on:
       db:
         condition: service_healthy

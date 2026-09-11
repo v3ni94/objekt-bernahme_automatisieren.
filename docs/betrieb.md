@@ -854,6 +854,8 @@ secrets:
 
 ### 3.6 Erläuterungen zu den Entscheidungen in der Datei
 
+Healthchecks tragen `start_interval`: Ohne diese Angabe führt Docker den ersten Test erst nach einem vollen `interval` aus. Der Sicherungsdienst prüft regulär nur alle fünf Minuten, wäre nach einem Deployment also minutenlang `starting` und würde die Wartezeit in `scripts/deploy.sh` überschreiten (beobachtet bei der Erstinstallation am 11.09.2026). Mit `start_interval: 10s` prüft Docker während der Startphase häufiger; die Wartezeit im Deployment liegt bei 300 Sekunden.
+
 | Stelle | Entscheidung | Begründung |
 |---|---|---|
 | Zwei Images `objektakte/web` und `objektakte/worker` aus einem Dockerfile | `web` und `beat` ohne OCR-Binärdateien, die drei Worker und `classifier` mit | Beschluss B-44. Beide Ziele teilen Code und Lockfile; ein Build-Lauf erzeugt beide. |

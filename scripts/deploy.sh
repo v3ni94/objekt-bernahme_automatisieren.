@@ -18,8 +18,11 @@ mkdir -p "$DEPLOY_DIR"
 
 wait_healthy() {   # wait_healthy <sekunden> [dienst ...]
   local end=$((SECONDS + $1)); shift
+  local offen last=""
   while [ "$SECONDS" -lt "$end" ]; do
-    if ! docker compose ps --format '{{.Name}} {{.Health}}' "$@" | grep -vqE ' healthy$'; then return 0; fi
+    offen="$(docker compose ps --format '{{.Name}} {{.Health}}' "$@" | grep -vE ' healthy$' || true)"
+    [ -z "$offen" ] && return 0
+    if [ "$offen" != "$last" ]; then echo "warte auf: $(echo "$offen" | awk '{print $1}' | tr '\n' ' ')"; last="$offen"; fi
     sleep 5
   done
   docker compose ps "$@"; echo "Healthchecks nicht gruen"; return 1
@@ -62,8 +65,9 @@ docker compose run --rm --no-deps -T web app-grants-sql \
 # 6. Container wechseln
 docker compose up -d --remove-orphans
 
-# 7. Auf Healthchecks warten (ANNAHME AB27: hoechstens 3 min)
-wait_healthy 180
+# 7. Auf Healthchecks warten. Der Sicherungsdienst prueft regulaer nur alle fuenf Minuten; waehrend der
+# Startphase greift start_interval, die Grenze liegt trotzdem hoeher als die urspruenglichen 3 min (AB27).
+wait_healthy 300
 
 # 8. Smoke-Test ueber Traefik (TLS, Anwendung)
 curl -fsS --retry 6 --retry-delay 10 -o /dev/null -w 'healthz %{http_code} tls %{ssl_verify_result}\n' "https://${APP_DOMAIN}/healthz/"
