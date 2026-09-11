@@ -71,7 +71,11 @@ done
 for n in google_client_secret openai_api_key anthropic_api_key smtp_password backup_age_recipient rclone.conf hvm_signature.jpg; do
   [ -f "$n" ] || : > "$n"
 done
-chmod 600 "$BASE"/secrets/*; chown root:root "$BASE"/secrets/*
+# Rechte 0444 mit Eigentuemer root: Docker Compose bindet die Dateien unveraendert in die Container ein
+# (uid, gid und mode aus der Compose-Datei gelten nur im Swarm-Modus). Die Dienste laufen unprivilegiert
+# (web und worker als APP_UID, db und redis als ihre Image-Nutzer) und koennen 0600-Dateien nicht lesen.
+# Auf dem Host schuetzt das Verzeichnis: /srv/objektakte/secrets ist 0700 und gehoert root.
+chown root:root "$BASE"/secrets/*; chmod 444 "$BASE"/secrets/*
 echo "   Leer und spaeter zu fuellen: google_client_secret, openai_api_key, anthropic_api_key, smtp_password, backup_age_recipient, rclone.conf, hvm_signature.jpg"
 echo "   Die Schluessel (iban_key, iban_hmac_key, token_key, totp_key, app_secret_key, db_root_password) gehoeren zusaetzlich in den Passwortmanager (V-21)."
 

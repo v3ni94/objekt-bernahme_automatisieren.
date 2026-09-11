@@ -1003,7 +1003,7 @@ Hinweis zur Bezeichnung: Eine vollständige Verbindungs-URL enthielte das Passwo
 
 ### 3.8 Secrets anlegen
 
-Dateien unter `/srv/objektakte/secrets/`, je eine Zeile ohne Zeilenumbruch (`printf`, nicht `echo`). Kryptografische Schlüssel werden zufällig erzeugt; Client-Secret und API-Schlüssel stammen aus den Anbieterkonsolen und werden direkt auf dem Server eingetragen, nie per E-Mail oder Chat übertragen (V-07, V-13).
+Dateien unter `/srv/objektakte/secrets/`, je eine Zeile ohne Zeilenumbruch (`printf`, nicht `echo`). Dateirechte 0444 mit Eigentümer root: Docker Compose bindet die Dateien unverändert in die Container ein, die Felder `uid`, `gid` und `mode` der Compose-Datei gelten nur im Swarm-Modus. Die Dienste laufen unprivilegiert (`web` und die Worker als `APP_UID`, `db` und `redis` als ihre Image-Nutzer) und könnten 0600-Dateien nicht lesen. Auf dem Host schützt das Verzeichnis: `/srv/objektakte/secrets` ist 0700 und gehört root. Kryptografische Schlüssel werden zufällig erzeugt; Client-Secret und API-Schlüssel stammen aus den Anbieterkonsolen und werden direkt auf dem Server eingetragen, nie per E-Mail oder Chat übertragen (V-07, V-13).
 
 | Datei | Inhalt | Erzeugung | Verwendet von |
 |---|---|---|---|
@@ -1039,7 +1039,7 @@ done
 for n in google_client_secret openai_api_key anthropic_api_key smtp_password backup_age_recipient rclone.conf hvm_signature.jpg; do
   [ -f "$n" ] || sudo touch "$n"
 done
-sudo chmod 600 /srv/objektakte/secrets/*; sudo chown root:root /srv/objektakte/secrets/*
+sudo chown root:root /srv/objektakte/secrets/*; sudo chmod 444 /srv/objektakte/secrets/*
 ls -l /srv/objektakte/secrets
 ```
 

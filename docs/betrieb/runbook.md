@@ -38,3 +38,4 @@ Stand: 10.09.2026 (M15, Umsetzungsplan 2.19 Schritt 3). Störungsfälle mit Erke
 | Alarm-E-Mail ausgeblieben | Statusseite Alarmbedingungen zeigt aktiv, aber keine Mail | `ALERTS_ENABLED`, `ALERT_EMAIL_TO`, `SMTP_*` in `.env` und Secret `smtp_password` prüfen; Beat-Task `status.check_alerts` läuft alle fünf Minuten | Wiederholsperre sechs Stunden je Bedingung; Log des Beat-Containers |
 
 Kontakt und Zeitfenster für Deployments: Frage F27 (docs/umsetzungsplan.md).
+| Container startet mit `PermissionError` auf `/run/secrets/...` | Dienst bleibt unhealthy, Log zeigt Errno 13 auf eine Datei unter `/run/secrets` | Rechte der Secret-Dateien prüfen: `ls -l /srv/objektakte/secrets`; Sollzustand `-r--r--r-- root root` (docs/betrieb.md 3.8), korrigieren mit `sudo chmod 444 /srv/objektakte/secrets/*`, danach Dienst neu starten | Ursache meist manuell angelegte Dateien mit 0600; das Verzeichnis selbst bleibt 0700 und schützt auf dem Host |

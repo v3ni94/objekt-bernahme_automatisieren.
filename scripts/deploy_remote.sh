@@ -11,6 +11,9 @@
 #   deploy <branch>           Deployment (scripts/deploy.sh)
 #   rollback                  vorherige Version (scripts/rollback.sh)
 #   create-admin <branch> <email>  Admin anlegen; Startpasswort nur in /home/deploy/admin-startpasswort.txt
+#   db-status <branch>        Datenbankkonten und Tabellenzahl anzeigen (nur lesend)
+#   db-reset <branch>         Datenverzeichnis der Datenbank leeren und neu initialisieren; bricht ab,
+#                             sobald ein Schema vorhanden ist (Schutz gegen Datenverlust)
 # Jede andere Eingabe wird abgewiesen.
 set -euo pipefail
 cd /opt/objektakte
@@ -78,6 +81,29 @@ case "$ACTION" in
     ensure_network
     docker compose config --quiet && echo "Compose-Datei mit dieser .env gueltig"
     ;;
+  db-status)
+    docker compose exec -T db sh -c 'mariadb -uroot -p"$(cat /run/secrets/db_root_password)" -N -e "
+      SELECT CONCAT(\"Konto: \", user) FROM mysql.user WHERE user LIKE \"app_%\" ORDER BY user;
+      SELECT CONCAT(\"Tabellen in $MARIADB_DATABASE: \", COUNT(*)) FROM information_schema.tables WHERE table_schema = \"$MARIADB_DATABASE\";"'
+    ;;
+  db-reset)
+    TABLES="$(docker compose exec -T db sh -c 'mariadb -uroot -p"$(cat /run/secrets/db_root_password)" -N -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = \"$MARIADB_DATABASE\" AND table_name = \"django_migrations\""' 2>/dev/null | tr -d '[:space:]')"
+    if [ "${TABLES:-1}" != "0" ]; then
+      echo "Abbruch: Die Datenbank enthaelt bereits ein Schema (django_migrations vorhanden oder nicht pruefbar)."
+      echo "Ein Zuruecksetzen wuerde Daten loeschen und ist nur vor der ersten erfolgreichen Migration vorgesehen."
+      exit 2
+    fi
+    echo "Datenbank ist ohne Schema; Datenverzeichnis wird geleert und neu initialisiert."
+    docker compose stop db
+    docker compose run --rm --no-deps --user 0 --entrypoint sh db -c 'rm -rf /var/lib/mysql/* /var/lib/mysql/.[!.]* 2>/dev/null; ls -A /var/lib/mysql | wc -l'
+    docker compose up -d db
+    for i in 1 2 3 4 5 6 7 8 9 10 11 12; do
+      sleep 10
+      state="$(docker compose ps db --format '{{.Health}}' 2>/dev/null)"
+      [ "$state" = "healthy" ] && { echo "Datenbank neu initialisiert und healthy"; break; }
+    done
+    docker compose ps db
+    ;;
   create-admin)
     [ -n "${ARG:-}" ] || { echo "E-Mail fehlt"; exit 2; }
     PW="$(openssl rand -base64 18)"
@@ -85,5 +111,5 @@ case "$ACTION" in
     umask 077; printf 'Startpasswort fuer %s: %s\n' "$ARG" "$PW" > /home/deploy/admin-startpasswort.txt
     echo "Startpasswort liegt auf dem Server in /home/deploy/admin-startpasswort.txt (nach dem ersten Login loeschen: shred -u)."
     ;;
-  *) echo "Nur check, pull, befund, env-init, first-run, deploy, rollback oder create-admin erlaubt"; exit 2 ;;
+  *) echo "Nur check, pull, befund, env-init, db-status, db-reset, first-run, deploy, rollback oder create-admin erlaubt"; exit 2 ;;
 esac
