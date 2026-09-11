@@ -94,6 +94,14 @@ case "$ACTION" in
     echo "Mit Zertifikatspruefung:"
     curl -fsS -o /dev/null -w '  HTTPS %{http_code} tls %{ssl_verify_result}\n' --max-time 10 "https://${dom}/healthz/" \
       || echo "  Zertifikat nicht gueltig"
+    echo "Bereitschaft im Container (unabhaengig von Traefik):"
+    docker compose exec -T web python -c "
+import json, urllib.request
+tok = open('/run/secrets/readyz_token').read().strip()
+req = urllib.request.Request('http://127.0.0.1:8000/readyz/', headers={'Authorization': 'Bearer ' + tok})
+with urllib.request.urlopen(req, timeout=10) as r:
+    print(' ', r.status, json.dumps(json.loads(r.read().decode()), ensure_ascii=False)[:500])
+" 2>&1 | sed 's/^/  /' || echo "  Bereitschaftspruefung fehlgeschlagen"
     echo "Traefik-Meldungen:"
     docker logs "$(docker ps --filter name=traefik --format '{{.Names}}' | head -1)" --tail 40 2>&1 \
       | grep -iE 'acme|certificate|objektakte' | tail -15 | sed 's/^/  /' || echo "  keine Meldungen"

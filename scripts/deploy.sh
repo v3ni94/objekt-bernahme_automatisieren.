@@ -69,7 +69,28 @@ docker compose up -d --remove-orphans
 # Startphase greift start_interval, die Grenze liegt trotzdem hoeher als die urspruenglichen 3 min (AB27).
 wait_healthy 300
 
-# 8. Smoke-Test ueber Traefik (TLS, Anwendung)
+# 8. Laufenden Stand festschreiben, bevor geprueft wird: die Container laufen bereits auf der neuen
+# Version, deshalb muss der Rollback-Stand auch dann stimmen, wenn nur der Smoke-Test scheitert.
+[ "$CUR_TAG" != none ] && echo "$CUR_TAG" > "$DEPLOY_DIR/previous"
+echo "$NEW_TAG" > "$DEPLOY_DIR/current"
+for img in web worker backup; do
+  docker tag "objektakte/$img:$NEW_TAG" "objektakte/$img:current"
+  [ "$CUR_TAG" != none ] && docker tag "objektakte/$img:$CUR_TAG" "objektakte/$img:previous"
+done
+printf '%s\t%s\t%s\t%s\t%s\n' "$(date -Is)" "$NEW_TAG" "$CUR_TAG" "$(whoami)" "$($FIRST_RUN && echo FIRST-RUN || echo DEPLOY)" >> "$DEPLOY_DIR/tags.log"
+sed -i "s/^IMAGE_TAG=.*/IMAGE_TAG=$NEW_TAG/" .env
+
+# 9. Innerer Zustand der Anwendung (unabhaengig von Traefik und Zertifikat)
+echo "Bereitschaft der Anwendung im Container:"
+docker compose exec -T web python -c "
+import json, urllib.request
+tok = open('/run/secrets/readyz_token').read().strip()
+req = urllib.request.Request('http://127.0.0.1:8000/readyz/', headers={'Authorization': 'Bearer ' + tok})
+with urllib.request.urlopen(req, timeout=10) as r:
+    print(' ', r.status, json.dumps(json.loads(r.read().decode()), ensure_ascii=False)[:400])
+" || echo "  Bereitschaftspruefung fehlgeschlagen"
+
+# 10. Smoke-Test ueber Traefik (TLS, Anwendung)
 # Traefik fordert das Zertifikat erst an, wenn die Domain zum ersten Mal angefragt wird, und liefert bis
 # dahin sein Platzhalterzertifikat. curl wiederholt bei einem Zertifikatsfehler nicht von selbst, deshalb
 # hier eine eigene Schleife (bis zu drei Minuten). Getrennt ausgewiesen: Antwort der Anwendung und Zertifikat.
@@ -94,17 +115,7 @@ curl -fsS -o /dev/null -w 'healthz %{http_code} tls %{ssl_verify_result}\n' "htt
 curl -fsS "https://${APP_DOMAIN}/readyz/" \
   -H "Authorization: Bearer $(docker compose exec -T web cat /run/secrets/readyz_token 2>/dev/null || echo none)" | head -c 400; echo
 
-# 9. Tags fortschreiben
-[ "$CUR_TAG" != none ] && echo "$CUR_TAG" > "$DEPLOY_DIR/previous"
-echo "$NEW_TAG" > "$DEPLOY_DIR/current"
-for img in web worker backup; do
-  docker tag "objektakte/$img:$NEW_TAG" "objektakte/$img:current"
-  [ "$CUR_TAG" != none ] && docker tag "objektakte/$img:$CUR_TAG" "objektakte/$img:previous"
-done
-printf '%s\t%s\t%s\t%s\t%s\n' "$(date -Is)" "$NEW_TAG" "$CUR_TAG" "$(whoami)" "$($FIRST_RUN && echo FIRST-RUN || echo DEPLOY)" >> "$DEPLOY_DIR/tags.log"
-sed -i "s/^IMAGE_TAG=.*/IMAGE_TAG=$NEW_TAG/" .env
-
-# 10. Alte Images aufraeumen, die letzten N behalten (current, previous, dev bleiben)
+# 11. Alte Images aufraeumen, die letzten N behalten (current, previous, dev bleiben)
 KEEP=${IMAGE_KEEP:-5}
 for img in web worker backup; do
   docker images "objektakte/$img" --format '{{.Tag}} {{.CreatedAt}}' \
