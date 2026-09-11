@@ -824,7 +824,10 @@ def file_to_drive(job: ProcessingJob) -> dict:
                     job.object, payload["category"], payload.get("subfolder"), drive=drive
                 )
         except FolderError as exc:
-            raise RetryableError(str(exc)) from exc
+            # Zielstruktur fehlt noch (Objektordner oder Hauptordner nicht registriert): der Ordnerabgleich laeuft
+            # oder ist zu starten. Warten statt Fehlversuch, damit uebernommene Bestandsdateien nicht auf error
+            # laufen, bevor die Struktur steht (Altbestand, 11.09.2026).
+            raise DeferJob(f"Ablageziel noch nicht vorhanden: {exc}", seconds=120) from exc
         if doc.source == "drive_existing" or (doc.drive_file_id and doc.source == "moved_in"):
             node = drive.get(doc.drive_file_id)
             if node is None:

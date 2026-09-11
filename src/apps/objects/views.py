@@ -91,7 +91,13 @@ def object_list(request):
 
 @permission_required("objects.write")
 def object_create(request):
-    form = ObjectForm(request.POST or None)
+    # Vorbelegung aus der Altbestand-Tabelle (Objektnummer und Bezeichnung aus dem Ordnernamen)
+    initial = {
+        k: v
+        for k, v in (("object_number", request.GET.get("nummer")), ("name", request.GET.get("name")))
+        if v
+    }
+    form = ObjectForm(request.POST or None, initial=initial or None)
     if request.method == "POST" and form.is_valid():
         with transaction.atomic():
             obj = form.save(commit=False)
@@ -105,6 +111,9 @@ def object_create(request):
                 request=request,
                 after=model_to_dict(obj),
             )
+        from apps.drive.takeover import link_sources_for_object
+
+        linked_sources = link_sources_for_object(obj)  # Altbestand: Quellordner mit dieser Nummer binden
         # Akten-Vorlage vor der Ordneranlage: der Abgleich legt danach auch die Aktenordner an
         file_hint, _ = _prepare_unit_files(obj, user=request.user)
         # H 3.5, CR 2: Der Objektordner in Drive entsteht unmittelbar mit dem Objekt. Der Abgleich laeuft als
@@ -122,6 +131,11 @@ def object_create(request):
                 after={"dry_run": False, "trigger": "object_create"},
             )
         messages.success(request, f"Objekt {obj.object_number} angelegt.")
+        if linked_sources:
+            messages.info(
+                request,
+                f"{linked_sources} Altbestand-Ordner mit dieser Objektnummer zugeordnet; „Aufarbeiten“ unter Altbestand.",
+            )
         if file_hint:
             messages.info(request, file_hint)
         hint = _FOLDER_HINTS.get(outcome)

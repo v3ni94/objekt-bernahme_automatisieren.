@@ -664,6 +664,30 @@ Modell `drive.OAuthToken`. o auth tokens.
 
 Constraints und Indizes: `uq_oauth_provider_account`, `ck_oauth_mode`, `ck_oauth_status`
 
+### takeover_sources
+
+Modell `drive.TakeoverSource`. takeover sources.
+
+| Spalte | Typ | Null | Verweis oder Wertevorrat |
+|---|---|---|---|
+| id | bigint AUTO_INCREMENT | nein |  |
+| created_at | datetime(6) | nein |  |
+| updated_at | datetime(6) | nein |  |
+| drive_folder_id | varchar(128) | nein |  |
+| name | varchar(255) | ja |  |
+| detected_object_number | varchar(8) | ja |  |
+| object_id | bigint | ja | → objects.id |
+| status | varchar(16) | nein | new, linked, done, failed |
+| files_registered | integer UNSIGNED | nein |  |
+| files_skipped | integer UNSIGNED | nein |  |
+| last_run_id | integer UNSIGNED | ja |  |
+| resolved_at | datetime(6) | ja |  |
+| taken_at | datetime(6) | ja |  |
+| last_error | varchar(500) | ja |  |
+| created_by | bigint | ja | → users.id |
+
+Constraints und Indizes: `ck_takeover_sources_status`
+
 ### import_batches
 
 Modell `imports.ImportBatch`. import batchs.
@@ -1614,6 +1638,8 @@ Celery-Queues aus den Settings: `ai`, `classify`, `io`, `lists`, `ocr`
 | drive.create_folder | Ordner in Drive angelegt |
 | drive.upload | Datei nach Drive hochgeladen |
 | drive.takeover | Bestand aus Drive-Ordner übernommen |
+| drive.takeover_source_add | Altbestand-Ordner in die Tabelle aufgenommen |
+| drive.takeover_source_remove | Altbestand-Ordner aus der Tabelle entfernt |
 | document.ingest | Dokument hochgeladen (Upload in die Verarbeitung) |
 | processing.start | Verarbeitungslauf angefordert |
 | processing.sweep | Sweeper manuell ausgeführt |

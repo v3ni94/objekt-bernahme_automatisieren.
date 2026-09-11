@@ -15,6 +15,7 @@
   <nav aria-label="Hauptnavigation">
     <a href="{% url 'object_list' %}" class="{% if NAV_ACTIVE == 'objekte' %}aktiv{% endif %}">Objekte</a>
     <a href="{% url 'owner_list' %}" class="{% if NAV_ACTIVE == 'eigentuemer' %}aktiv{% endif %}">Eigentümer</a>
+    {% if user|has_perm:"objects.write" %}<a href="{% url 'takeover_sources' %}" class="{% if NAV_ACTIVE == 'altbestand' %}aktiv{% endif %}">Altbestand</a>{% endif %}
     <a href="{% url 'review_list' %}" class="{% if NAV_ACTIVE == 'review' %}aktiv{% endif %}">Review Center</a>
     <a href="{% url 'search' %}" class="{% if NAV_ACTIVE == 'suche' %}aktiv{% endif %}">Suche</a>
     <a href="{% url 'report_overview' %}" class="{% if NAV_ACTIVE == 'berichte' %}aktiv{% endif %}">Berichte</a>

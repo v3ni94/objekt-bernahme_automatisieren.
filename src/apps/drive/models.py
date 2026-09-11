@@ -286,3 +286,54 @@ class OAuthToken(TimestampedModel):
 
     def __str__(self) -> str:
         return f"{self.provider} {self.account_email} ({self.status})"
+
+
+class TakeoverStatus(models.TextChoices):
+    NEW = "new", "neu"
+    LINKED = "linked", "Objekt zugeordnet"
+    DONE = "done", "übernommen"
+    FAILED = "failed", "fehlgeschlagen"
+
+
+class TakeoverSource(TimestampedModel):
+    """Altbestand (Auftrag 11.09.2026): Quellordner der bisherigen Ablage, die ordnerweise in Objekte uebernommen
+    werden. Eine Zeile je Drive-Ordner, eindeutig ueber die Folder-ID; die Tabelle ist Arbeitsliste und Nachweis.
+    In Drive wird nichts geloescht, Dateien werden von der Verarbeitung nur verschoben."""
+
+    drive_folder_id = models.CharField(max_length=128, unique=True)
+    name = models.CharField(max_length=255, null=True, blank=True)
+    detected_object_number = models.CharField(max_length=8, null=True, blank=True)
+    object = models.ForeignKey(
+        "objects.ManagedObject",
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        db_column="object_id",
+        related_name="takeover_sources",
+    )
+    status = models.CharField(max_length=16, choices=TakeoverStatus.choices, default=TakeoverStatus.NEW)
+    files_registered = models.PositiveIntegerField(default=0)
+    files_skipped = models.PositiveIntegerField(default=0)
+    last_run_id = models.PositiveIntegerField(null=True, blank=True)
+    resolved_at = models.DateTimeField(null=True, blank=True)
+    taken_at = models.DateTimeField(null=True, blank=True)
+    last_error = models.CharField(max_length=500, null=True, blank=True)
+    created_by = models.ForeignKey(
+        USER, null=True, blank=True, on_delete=models.SET_NULL, db_column="created_by", related_name="+"
+    )
+
+    class Meta:
+        db_table = "takeover_sources"
+        ordering = ["id"]
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(status__in=TakeoverStatus.values), name="ck_takeover_sources_status"
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"Altbestand {self.name or self.drive_folder_id}"
+
+    @property
+    def numeric(self) -> int | None:
+        return int(self.detected_object_number) if self.detected_object_number else None

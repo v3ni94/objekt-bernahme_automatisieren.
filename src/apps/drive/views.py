@@ -342,3 +342,153 @@ def _takeover_register(request, obj, adapter, folder):
     for note in result.notes:
         messages.info(request, note)
     return redirect(f"{request.path}?ordner={folder.id}")
+
+
+# ---------------------------------------------------------------- Altbestand-Tabelle (11.09.2026)
+def _altbestand_zurueck():
+    return redirect("takeover_sources")
+
+
+@permission_required("objects.write")
+def takeover_sources(request):
+    """Tabelle der Quellordner aus der bisherigen Ablage: aufnehmen (Links einfuegen), Namen und Objektnummern
+    aufloesen, je Zeile „Aufarbeiten“ (alle Dateien samt Unterordnern in das Zielobjekt) oder entfernen."""
+    from apps.drive import takeover
+    from apps.drive.models import TakeoverSource, TakeoverStatus
+
+    rows = takeover.sorted_sources(TakeoverSource.objects.select_related("object"))
+    counts = {
+        "total": len(rows),
+        "unresolved": sum(1 for r in rows if r.resolved_at is None),
+        "open": sum(1 for r in rows if r.object_id is None),
+        "done": sum(1 for r in rows if r.status == TakeoverStatus.DONE),
+        "failed": sum(1 for r in rows if r.status == TakeoverStatus.FAILED),
+    }
+    return render(
+        request,
+        "drive/takeover_sources.html",
+        {
+            "rows": rows,
+            "counts": counts,
+            "connected": oauth.token_status().get("status") == "active",
+            "limit": takeover.max_files(),
+        },
+    )
+
+
+@permission_required("objects.write")
+@require_POST
+def takeover_source_add(request):
+    from apps.drive import takeover
+
+    refs = takeover.parse_folder_refs(request.POST.get("links", ""))
+    if not refs:
+        messages.warning(request, "Keine Ordner-ID oder kein Drive-Link erkannt.")
+        return _altbestand_zurueck()
+    created, existing = takeover.add_sources(refs, user=request.user)
+    record(
+        "drive.takeover_source_add",
+        entity_type="takeover_source",
+        request=request,
+        after={"created": len(created), "existing": existing},
+    )
+    resolved = failed = 0
+    adapter = oauth.get_adapter()
+    if adapter is not None and created:
+        try:
+            for src in created:
+                if takeover.resolve_source(src, adapter):
+                    resolved += 1
+                else:
+                    failed += 1
+        except DriveError as exc:
+            messages.warning(request, f"Namen konnten nicht vollständig gelesen werden: {exc}")
+    text = f"{len(created)} Ordner aufgenommen, {existing} waren bereits in der Tabelle."
+    if created:
+        text += (
+            f" Aufgelöst: {resolved}, nicht gefunden: {failed}."
+            if adapter
+            else " Namen folgen nach dem Verbinden mit Google Drive."
+        )
+    messages.success(request, text)
+    return _altbestand_zurueck()
+
+
+@permission_required("objects.write")
+@require_POST
+def takeover_source_resolve(request):
+    from apps.drive import takeover
+    from apps.drive.models import TakeoverSource
+
+    adapter = oauth.get_adapter()
+    if adapter is None:
+        messages.error(request, "Keine Google-Verbindung.")
+        return _altbestand_zurueck()
+    qs = (
+        TakeoverSource.objects.all()
+        if request.POST.get("alle")
+        else TakeoverSource.objects.filter(resolved_at__isnull=True)
+    )
+    ok = failed = 0
+    try:
+        for src in qs:
+            if takeover.resolve_source(src, adapter):
+                ok += 1
+            else:
+                failed += 1
+    except DriveError as exc:
+        messages.error(request, f"Drive-Fehler: {exc}")
+    messages.success(request, f"{ok} Ordner aufgelöst, {failed} nicht gefunden.")
+    return _altbestand_zurueck()
+
+
+@permission_required("objects.write")
+@require_POST
+def takeover_source_run(request, pk: int):
+    from apps.drive import takeover
+    from apps.drive.models import TakeoverSource
+
+    src = get_object_or_404(TakeoverSource, pk=pk)
+    adapter = oauth.get_adapter()
+    if adapter is None:
+        messages.error(request, "Keine Google-Verbindung.")
+        return _altbestand_zurueck()
+    try:
+        result = takeover.run_source(src, adapter, user=request.user, request=request)
+    except takeover.TakeoverError as exc:
+        messages.error(request, f"„{src.name or src.drive_folder_id}“: {exc}")
+        return _altbestand_zurueck()
+    except DriveError as exc:
+        messages.error(request, f"Drive-Fehler bei „{src.name or src.drive_folder_id}“: {exc}")
+        return _altbestand_zurueck()
+    obj = src.object
+    if result.registered:
+        messages.success(
+            request,
+            f"{result.registered} Datei(en) aus „{src.name}“ in Objekt {obj.object_number} übernommen; "
+            f"Lauf {result.run_id} legt sie in der neuen Struktur ab. Der Quellordner bleibt bestehen.",
+        )
+    else:
+        messages.info(request, f"„{src.name}“: keine neue Datei zu übernehmen.")
+    for note in result.notes:
+        messages.info(request, note)
+    return _altbestand_zurueck()
+
+
+@permission_required("objects.write")
+@require_POST
+def takeover_source_remove(request, pk: int):
+    from apps.drive.models import TakeoverSource
+
+    src = get_object_or_404(TakeoverSource, pk=pk)
+    record(
+        "drive.takeover_source_remove",
+        entity_type="takeover_source",
+        entity_id=src.pk,
+        object_id=src.object_id,
+        request=request,
+        before={"drive_folder_id": src.drive_folder_id, "name": src.name, "status": src.status},
+    )
+    src.delete()
+    messages.success(request, "Zeile aus der Tabelle entfernt. In Drive wurde nichts verändert.")
+    return _altbestand_zurueck()

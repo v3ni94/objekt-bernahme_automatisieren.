@@ -62,3 +62,33 @@ def test_belegte_schreibsperre_ist_wartegrund_kein_fehlversuch(objekt, stammdate
     job.refresh_from_db()
     doc.refresh_from_db()
     assert job.status == JobStatus.DONE and doc.drive_file_id
+
+
+def test_ablage_wartet_ohne_zielstruktur(seeded, data_dir, drive, pdf_factory, run_all):
+    """Objekt ohne Ordnerabgleich (Altbestand vor dem Objektordner): die Ablage wartet, statt nach drei Versuchen
+    auf error zu laufen; nach dem Abgleich wird abgelegt."""
+    from apps.objects.models import ManagedObject
+
+    from .conftest import reconcile
+
+    obj = ManagedObject.objects.create(
+        object_number="777",
+        city="Wartestadt",
+        street="Weg",
+        house_number="1",
+        management_type="weg",
+        is_test=True,
+    )
+    pdf = pdf_factory("z.pdf", [page_lines("Z", 1, 1)])
+    doc, run = ingest.ingest_upload(obj, filename="z.pdf", data=pdf.read_bytes())
+    run_all(obj)
+    doc.refresh_from_db()
+    job = ProcessingJob.objects.get(document=doc, job_type=JobType.FILE_TO_DRIVE)
+    assert doc.status != "error" and job.status == JobStatus.PENDING and job.attempt_count == 0
+    assert job.last_error.startswith("wartet: Ablageziel noch nicht vorhanden")
+    reconcile(obj, drive)
+    ProcessingJob.objects.filter(pk=job.pk).update(next_attempt_at=timezone.now())
+    run_all(obj)
+    job.refresh_from_db()
+    doc.refresh_from_db()
+    assert job.status == JobStatus.DONE and doc.drive_file_id

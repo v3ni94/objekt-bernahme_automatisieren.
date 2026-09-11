@@ -83,6 +83,7 @@ Actions, Workflow `Deploy`, Run workflow; Eingaben Branch, Aktion und (nur für 
 | `deploy-tests` | Deployment-Tests T2 (Host-Ports), T3 (Isolation `data`), T11 (Logs ohne IBAN, JSON), T14 (`/healthz/`, `/readyz/` ohne Token) | nichts |
 | `doc-status` | Dokumente je Objekt und Status, offene und fehlgeschlagene Jobs, Läufe; ohne Dateinamen und Personendaten | nichts |
 | `config-set` | Konfigurationswert aus dem Katalog setzen, Argument `schluessel=wert` (Wert als JSON: `true`, `5`, `"text"`); gleiche Validierung und gleicher Protokolleintrag (`setting.update`) wie im Admin-Formular, Grund „Deploy-Workflow config-set“ | app_settings |
+| `altbestand-import` | Quellordner aus `db/seeds/altbestand_ordner.txt` in die Altbestand-Tabelle aufnehmen (Doppelte werden erkannt), Namen und Objektnummern aus Drive lesen, vorhandene Objekte zuordnen; idempotent | takeover_sources |
 | `db-reset` | Datenverzeichnis der Datenbank leeren und neu initialisieren; bricht ab, sobald `django_migrations` vorhanden oder nicht prüfbar ist | Datenverzeichnis der Datenbank |
 | `first-run` | Erstinstallation `scripts/deploy.sh --first-run <branch>` (Images bauen, db und redis starten, Migration, Seeds, Rechte, alle Dienste, Smoke-Test) | alles |
 | `deploy` | Deployment `scripts/deploy.sh <branch>` | alles |

@@ -159,7 +159,7 @@ def ensure_owner_folder_task(owner_file_id: int) -> dict:
 
 
 def trigger_object_folders(
-    object_id: int, *, user_id: int | None = None, trigger: str = "object_create"
+    object_id: int, *, user_id: int | None = None, trigger: str = "object_create", force: bool = False
 ) -> str:
     """Objektordner samt Unterstruktur direkt nach der Objektanlage erzeugen (Ausfuehrungslauf, kein Probelauf).
 
@@ -169,7 +169,7 @@ def trigger_object_folders(
     """
     from apps.config import store
 
-    if not store.get("drive.create_folders_on_object_create", True):
+    if not force and not store.get("drive.create_folders_on_object_create", True):
         return "disabled"
     if oauth.token_status().get("status") != "active":
         return "not_connected"

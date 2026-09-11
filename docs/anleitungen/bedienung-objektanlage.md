@@ -113,6 +113,18 @@ Liegen die Unterlagen eines Objekts noch in der alten Ordnerstruktur (außerhalb
 
 Was nicht passiert: Es wird nichts gelöscht. Die Quellordner bleiben stehen (nach der Übernahme leer). Verknüpfungen werden übersprungen, weil das Original an anderer Stelle liegt. Eine Datei, die bereits einem Objekt zugeordnet ist, zeigt die Seite mit dem Hinweis „in Objekt …“ und übernimmt sie nicht erneut.
 
+### 3.2 Altbestand: alte Objektordner ordnerweise aufarbeiten
+
+Für die Übernahme der bisherigen Ablage führt die Anwendung unter „Altbestand“ (Hauptnavigation) eine Tabelle der Quellordner.
+
+1. „Ordner aufnehmen“: Drive-Links oder Ordner-IDs einfügen, je Zeile einen. Doppelte werden erkannt und nicht erneut aufgenommen. Die Anwendung liest Name und Objektnummer (führende Ziffernfolge im Ordnernamen) aus Drive und ordnet ein vorhandenes Objekt automatisch zu (0623 und 623 sind dasselbe Objekt).
+2. Fehlt das Objekt, führt „Objekt anlegen“ in der Zeile zum vorbelegten Formular (Nummer und Bezeichnung aus dem Ordnernamen). Verwaltungsart und Stammdaten ergänzen, speichern; der Ordner ist danach zugeordnet und der Objektordner mit der neuen Struktur wird angelegt.
+3. „Aufarbeiten“ in der Zeile: alle Dateien des Ordners samt Unterordnern werden in das Objekt übernommen, ein Verarbeitungslauf startet. Die Kette liest jede Datei, erkennt Inhalt und Zuordnung und verschiebt sie in den passenden Ordner der neuen Struktur; Eigentümer- und Mieterakten entstehen dabei nach der Akten-Vorlage. Der Quellordner bleibt bestehen (nach der Übernahme leer), es wird nichts gelöscht.
+4. Die Zeile zeigt Übernommen (Anzahl, übersprungene Dateien in Klammern), Status und den Lauf. Fortschritt und Fälle wie gewohnt unter „Dokumente und Verarbeitung“ und im Review Center.
+5. „Entfernen“ nimmt nur die Zeile aus der Tabelle; in Drive ändert sich nichts.
+
+Hinweise: Ein zweites „Aufarbeiten“ übernimmt nur neue Dateien, bereits registrierte werden übersprungen. Fehlt der Objektordner noch, wird er angelegt und die Ablage wartet, bis er steht (Job zeigt „wartet: Ablageziel noch nicht vorhanden“). Mehr als `drive.takeover_max_files` Dateien in einem Ordner: Grenze in der Konfiguration anheben oder Unterordner einzeln über „Bestand aus Drive übernehmen“ holen. Liegt der alte Ordner direkt im Wurzelordner und trägt die Objektnummer, übernimmt ihn der Ordnerabgleich als Objektordner und inventarisiert seinen Inhalt ohnehin; „Aufarbeiten“ übernimmt dann nur, was noch fehlt.
+
 ## 4. Eigentümer- oder Mieterliste importieren
 
 Angenommene Formate: Excel, CSV, PDF (digital und gescannt), Exporte aus Immoware24; für Domus liegt noch keine Beispieldatei vor (F11), dieses Profil ist nur manuell wählbar. Nichts wird ohne Bestätigung übernommen.

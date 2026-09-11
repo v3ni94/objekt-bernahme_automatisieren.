@@ -23,6 +23,8 @@
 #   deploy-tests <branch>     Deployment-Tests T2, T3, T11, T14 (nur lesend)
 #   doc-status <branch>       Dokumente je Objekt und Status, offene und fehlgeschlagene Jobs (nur lesend)
 #   config-set <branch> <schluessel=wert>  Konfigurationswert setzen (Wert als JSON: true, 5, "text"); Audit
+#   altbestand-import <branch>  Quellordner aus db/seeds/altbestand_ordner.txt in die Altbestand-Tabelle
+#                             aufnehmen (ohne Doppelte) und Namen aus Drive lesen
 # Jede andere Eingabe wird abgewiesen.
 set -euo pipefail
 cd /opt/objektakte
@@ -297,5 +299,9 @@ store.set(key, value, reason="Deploy-Workflow config-set")
 print(f"{key}: {before!r} -> {store.get(key)!r}")
 PY
     ;;
-  *) echo "Nur check, pull, befund, env-init, ps, logs, smoke, cert-retry, db-status, db-reset, first-run, deploy, rollback, create-admin, oauth-check, deploy-tests, doc-status oder config-set erlaubt"; exit 2 ;;
+  altbestand-import)
+    # Quellordner der bisherigen Ablage in die Altbestand-Tabelle aufnehmen; idempotent, nur Folder-IDs und Namen
+    docker compose exec -T web python manage.py altbestand_import --aufloesen
+    ;;
+  *) echo "Nur check, pull, befund, env-init, ps, logs, smoke, cert-retry, db-status, db-reset, first-run, deploy, rollback, create-admin, oauth-check, deploy-tests, doc-status, config-set oder altbestand-import erlaubt"; exit 2 ;;
 esac

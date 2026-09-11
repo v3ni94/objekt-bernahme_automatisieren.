@@ -31,6 +31,8 @@ AUDIT_ACTIONS: dict[str, str] = {
     "drive.create_folder": "Ordner in Drive angelegt",
     "drive.upload": "Datei nach Drive hochgeladen",
     "drive.takeover": "Bestand aus Drive-Ordner übernommen",
+    "drive.takeover_source_add": "Altbestand-Ordner in die Tabelle aufgenommen",
+    "drive.takeover_source_remove": "Altbestand-Ordner aus der Tabelle entfernt",
     "document.ingest": "Dokument hochgeladen (Upload in die Verarbeitung)",
     "processing.start": "Verarbeitungslauf angefordert",
     "processing.sweep": "Sweeper manuell ausgeführt",

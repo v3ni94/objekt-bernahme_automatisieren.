@@ -136,6 +136,7 @@ def register_files(
     source_folder: DriveNode,
     user=None,
     request=None,
+    extra: dict | None = None,
 ) -> TakeoverResult:
     """Dateien als Bestandsdokumente des Objekts registrieren und die Verarbeitung anstossen.
 
@@ -204,6 +205,7 @@ def register_files(
                 "registered": result.registered,
                 "skipped_registered": result.skipped_registered,
                 "skipped_shortcuts": result.skipped_shortcuts,
+                **(extra or {}),
             },
         )
         if active_run is not None:
@@ -222,3 +224,178 @@ def register_files(
 
 def max_files() -> int:
     return int(store.get("drive.takeover_max_files", 500))
+
+
+# ---------------------------------------------------------------- Altbestand-Tabelle (Quellordner)
+def parse_folder_refs(text: str) -> list[str]:
+    """Alle Ordner-IDs aus einem eingefuegten Text (Links oder IDs, durch Leerraum, Komma oder Semikolon getrennt),
+    ohne Doppelte, in Eingabereihenfolge."""
+    ids: list[str] = []
+    for raw in re.split(r"[\s,;]+", text or ""):
+        fid = parse_folder_ref(raw)
+        if fid and fid not in ids:
+            ids.append(fid)
+    return ids
+
+
+def add_sources(refs: list[str], *, user=None) -> tuple[list, int]:
+    """Quellordner in die Tabelle aufnehmen; vorhandene Folder-IDs werden nicht doppelt angelegt."""
+    from apps.drive.models import TakeoverSource
+
+    created = []
+    existing = 0
+    for fid in refs:
+        src, made = TakeoverSource.objects.get_or_create(drive_folder_id=fid, defaults={"created_by": user})
+        if made:
+            created.append(src)
+        else:
+            existing += 1
+    return created, existing
+
+
+def _number_config() -> dict:
+    return {
+        "digits_min": int(store.get("drive.object_number_digits_min", 2)),
+        "digits_max": int(store.get("drive.object_number_digits_max", 6)),
+        "separators": tuple(store.get("drive.object_number_separators", [" ", "_", ",", ".", "-"])),
+    }
+
+
+def link_source(src) -> bool:
+    """Zielobjekt ueber den Zahlenwert der erkannten Objektnummer zuordnen (0623 gleich 623), wenn noch offen."""
+    from apps.drive.models import TakeoverStatus
+
+    if src.object_id is not None or not src.detected_object_number:
+        return False
+    obj = ManagedObject.active.filter(object_number_numeric=int(src.detected_object_number)).first()
+    if obj is None:
+        return False
+    src.object = obj
+    if src.status == TakeoverStatus.NEW:
+        src.status = TakeoverStatus.LINKED
+    return True
+
+
+def link_sources_for_object(obj: ManagedObject) -> int:
+    """Nach Objektanlage: offene Quellordner mit derselben Nummer an das Objekt binden."""
+    from apps.drive.models import TakeoverSource
+
+    count = 0
+    for src in TakeoverSource.objects.filter(object__isnull=True, detected_object_number__isnull=False):
+        if src.numeric == obj.object_number_numeric and link_source(src):
+            src.save(update_fields=["object", "status", "updated_at"])
+            count += 1
+    return count
+
+
+def resolve_source(src, drive: DriveAdapter) -> bool:
+    """Ordnername aus Drive lesen, Objektnummer erkennen, Zielobjekt zuordnen. False, wenn der Ordner fehlt."""
+    from apps.drive.object_numbers import parse_object_number
+
+    node = drive.get(src.drive_folder_id)
+    if node is None or node.trashed or not node.is_folder:
+        src.last_error = (
+            "Ordner in Drive nicht gefunden"
+            if node is None
+            else (
+                "Ordner liegt im Papierkorb"
+                if node.trashed
+                else "Die ID gehört zu einer Datei, nicht zu einem Ordner"
+            )
+        )
+        src.save(update_fields=["last_error", "updated_at"])
+        return False
+    src.name = node.name[:255]
+    match = parse_object_number(node.name, **_number_config())
+    src.detected_object_number = match.normalized if match else None
+    src.resolved_at = timezone.now()
+    src.last_error = None
+    link_source(src)
+    src.save(
+        update_fields=[
+            "name",
+            "detected_object_number",
+            "resolved_at",
+            "last_error",
+            "object",
+            "status",
+            "updated_at",
+        ]
+    )
+    return True
+
+
+def sorted_sources(sources) -> list:
+    """Anzeige: nach Objektnummer (Zahlenwert), dann Name; Zeilen ohne Nummer am Ende."""
+    return sorted(
+        sources, key=lambda s: (s.numeric is None, s.numeric or 0, (s.name or s.drive_folder_id).casefold())
+    )
+
+
+def run_source(src, drive: DriveAdapter, *, user=None, request=None) -> TakeoverResult:
+    """„Aufarbeiten“: alle Dateien des Quellordners samt Unterordnern in das Zielobjekt uebernehmen. Fehlt die
+    Zielstruktur des Objekts in Drive, wird der Ordnerabgleich angestossen; die Ablage wartet, bis er steht."""
+    from apps.drive.models import DriveNode as DriveNodeRow
+    from apps.drive.models import NodeKind, NodeStatus, TakeoverStatus
+
+    if src.object_id is None:
+        link_source(src)
+        if src.object_id is None:
+            raise TakeoverError(
+                "Kein Zielobjekt. Erst das Objekt anlegen oder die Objektnummer im Ordnernamen prüfen."
+            )
+        src.save(update_fields=["object", "status", "updated_at"])
+    obj = src.object
+    if obj.deleted_at is not None:
+        raise TakeoverError(f"Objekt {obj.object_number} ist archiviert; erst wiederherstellen.")
+    folder = drive.get(src.drive_folder_id)
+    if folder is None or folder.trashed or not folder.is_folder:
+        src.last_error = "Ordner in Drive nicht gefunden"
+        src.status = TakeoverStatus.FAILED
+        src.save(update_fields=["last_error", "status", "updated_at"])
+        raise TakeoverError(src.last_error)
+    if src.name != folder.name:
+        src.name = folder.name[:255]
+    try:
+        entries = collect_files(drive, folder, recursive=True, limit=max_files())
+    except TakeoverError as exc:
+        src.last_error = str(exc)[:500]
+        src.status = TakeoverStatus.FAILED
+        src.save(update_fields=["name", "last_error", "status", "updated_at"])
+        raise
+    result = register_files(
+        obj, entries, source_folder=folder, user=user, request=request, extra={"source_id": src.pk}
+    )
+    structure = DriveNodeRow.objects.filter(
+        object=obj, node_kind=NodeKind.OBJECT_ROOT, status=NodeStatus.ACTIVE
+    ).exists()
+    if not structure:
+        from apps.drive.tasks import trigger_object_folders
+
+        outcome = trigger_object_folders(
+            obj.pk, user_id=getattr(user, "pk", None), trigger="takeover", force=True
+        )
+        result.notes.append(
+            "Der Objektordner mit der neuen Struktur wird jetzt angelegt; die Ablage wartet, bis er steht."
+            if outcome == "queued"
+            else f"Objektordner fehlt noch und konnte nicht angestoßen werden ({outcome}); Ordnerabgleich von Hand starten."
+        )
+    src.files_registered += result.registered
+    src.files_skipped += result.skipped_registered + result.skipped_shortcuts
+    src.last_run_id = result.run_id or src.last_run_id
+    src.taken_at = timezone.now()
+    src.status = TakeoverStatus.DONE
+    src.last_error = None
+    src.save(
+        update_fields=[
+            "name",
+            "files_registered",
+            "files_skipped",
+            "last_run_id",
+            "taken_at",
+            "status",
+            "last_error",
+            "updated_at",
+        ]
+    )
+    return result

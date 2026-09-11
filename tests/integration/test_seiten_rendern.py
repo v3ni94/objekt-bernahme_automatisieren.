@@ -23,6 +23,7 @@ SEITEN = [
     "settings_list",
     "user_list",
     "drive_admin",
+    "takeover_sources",
 ]
 
 

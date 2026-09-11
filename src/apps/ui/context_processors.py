@@ -16,6 +16,7 @@ NAV_SECTIONS = (
     ("/protokoll/", "protokoll"),
     ("/konfiguration/", "konfiguration"),
     ("/nutzer/", "nutzer"),
+    ("/verwaltung/altbestand/", "altbestand"),
     ("/verwaltung/drive/", "drive"),
     ("/konto/", "konto"),
 )
