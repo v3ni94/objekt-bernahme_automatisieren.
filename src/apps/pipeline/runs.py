@@ -15,10 +15,10 @@ from django.db.models import Count
 from django.utils import timezone
 
 from apps.config import store
-from apps.documents.models import Document
+from apps.documents.models import Document, DocumentPage
 from apps.pipeline.jobs import enqueue, idempotency_key, send
 from apps.pipeline.models import JobStatus, JobType, ProcessingJob, ProcessingRun, RunStatus, RunType
-from apps.review.models import ReviewCase
+from apps.review.models import CaseStatus, ReviewCase
 
 logger = logging.getLogger(__name__)
 SERIAL_TYPES = (RunType.FULL, RunType.INCREMENTAL)
@@ -81,10 +81,43 @@ def schedule_runs() -> list[int]:
     return started
 
 
+def restart_status(doc: Document) -> str:
+    """Wiedereinstieg eines Dokuments mit Status error: so spaet wie moeglich, damit vorhandene Ergebnisse
+    (Hash, erkannte Seitentexte) nicht erneut berechnet werden. Seiten vorhanden -> ocr_done, Hash vorhanden ->
+    hashed, sonst von vorn."""
+    if doc.sha256 and DocumentPage.objects.filter(document=doc).exists():
+        return "ocr_done"
+    if doc.sha256:
+        return "hashed"
+    return "registered"
+
+
+def reset_failed_documents(run: ProcessingRun) -> int:
+    """Dokumente im Status error wieder in die Kette nehmen (Abbruch durch Umgebungsfehler, etwa fehlende
+    Datenbankrechte oder Drive nicht erreichbar). Der Fall job_failed im Review Center wird als erledigt
+    geschlossen; scheitert der neue Versuch, entsteht mit dem neuen Job ein neuer Fall."""
+    reset = 0
+    for doc in Document.objects.filter(object=run.object, deleted_at__isnull=True, status="error"):
+        doc.status = restart_status(doc)
+        doc.error_message = None
+        doc.save(update_fields=["status", "error_message", "updated_at"])
+        ReviewCase.objects.filter(
+            document=doc, case_subtype="job_failed", status__in=[CaseStatus.OPEN, CaseStatus.IN_PROGRESS]
+        ).update(
+            status=CaseStatus.RESOLVED,
+            resolved_at=timezone.now(),
+            resolution={"action": "reprocess", "run_id": run.pk, "restart_status": doc.status},
+        )
+        reset += 1
+    return reset
+
+
 def dispatch_run(run: ProcessingRun) -> int:
-    """Reiht die offenen Jobs des Objekts ein; Dokumente ohne Job erhalten den passenden Startjob."""
+    """Reiht die offenen Jobs des Objekts ein; Dokumente ohne Job erhalten den passenden Startjob.
+    Dokumente im Status error werden zuvor zurueckgesetzt (reset_failed_documents)."""
     obj = run.object
     count = 0
+    reset_failed_documents(run)
     for doc in Document.objects.filter(
         object=obj, deleted_at__isnull=True, status__in=["registered", "hashed", "ocr_done"]
     ):

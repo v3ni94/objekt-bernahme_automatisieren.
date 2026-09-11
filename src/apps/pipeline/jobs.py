@@ -65,6 +65,16 @@ class SkipJob(Exception):
         self.reason = reason
 
 
+class DeferJob(Exception):
+    """Voraussetzung fehlt (etwa keine Google-Verbindung): Job wartet, ohne einen Versuch zu verbrauchen.
+    Anders als RetryableError endet das nie in failed; der Job bleibt pending, bis die Voraussetzung da ist."""
+
+    def __init__(self, reason: str, seconds: int = 600):
+        super().__init__(reason)
+        self.reason = reason
+        self.seconds = seconds
+
+
 def worker_id() -> str:
     return f"{os.environ.get('SERVICE_NAME', 'worker')}@{socket.gethostname()}:{os.getpid()}"
 
@@ -207,6 +217,21 @@ def skip(job: ProcessingJob, reason: str) -> None:
     _event(job, JobStatus.RUNNING, JobStatus.SKIPPED, reason)
 
 
+def defer(job: ProcessingJob, exc: DeferJob) -> None:
+    """Zurueck nach pending mit Wartezeit; der Reservierungszaehler wird zurueckgenommen, damit die Wartezeit auf
+    eine fehlende Voraussetzung nicht als Fehlversuch zaehlt (max_attempts bleibt fuer echte Fehler)."""
+    job.status = JobStatus.PENDING
+    job.locked_by = None
+    job.next_attempt_at = timezone.now() + timedelta(seconds=exc.seconds)
+    job.attempt_count = max(0, job.attempt_count - 1)
+    job.last_error = f"wartet: {exc.reason}"[:2000]
+    job.save(
+        update_fields=["status", "locked_by", "next_attempt_at", "attempt_count", "last_error", "updated_at"]
+    )
+    _event(job, JobStatus.RUNNING, JobStatus.PENDING, f"wartet {exc.seconds} s: {exc.reason}")
+    send(job, countdown=exc.seconds)
+
+
 def fail(job: ProcessingJob, exc: BaseException, *, retryable: bool) -> None:
     job.last_error = f"{type(exc).__name__}: {exc}"[:2000]
     job.error_class = type(exc).__name__[:80]
@@ -288,6 +313,10 @@ def job_task(job_type: str) -> Callable:
             except SkipJob as exc:
                 skip(job, exc.reason)
                 return {"job_id": job_id, "skipped": exc.reason}
+            except DeferJob as exc:
+                logger.info("Job %s wartet auf Voraussetzung: %s", job_id, exc.reason)
+                defer(job, exc)
+                return {"job_id": job_id, "deferred": exc.reason}
             except RetryableError as exc:
                 logger.warning("Job %s vorübergehend fehlgeschlagen: %s", job_id, exc)
                 fail(job, exc, retryable=True)

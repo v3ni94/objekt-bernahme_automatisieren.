@@ -1,6 +1,6 @@
 # Bedienungsanleitung: Anmeldung, Objektanlage, Ordnerabgleich, Import, Verarbeitung, Listen, Vollständigkeit, Nachforderung, Suche
 
-Stand: 10.09.2026 (M15). Gliederung nach Fachentwurf H Abschnitt 8. Jedes Kapitel enthält den Ablauf in nummerierten Schritten und einen Abschnitt „Wenn etwas nicht klappt“. Die Anleitung nennt Schaltflächen und Felder mit ihrer tatsächlichen Beschriftung in der Anwendung. Bildschirmfotos folgen, sobald die Anwendung auf dem Server läuft; sie werden ohne reale Daten aufgenommen. Das Review Center ist in docs/anleitungen/bedienung-review-center.md beschrieben, die Konfiguration in docs/anleitungen/admin-konfiguration.md.
+Stand: 11.09.2026 (M15, ergänzt um Ordneranlage, Archiv, Wiederaufnahme). Gliederung nach Fachentwurf H Abschnitt 8. Jedes Kapitel enthält den Ablauf in nummerierten Schritten und einen Abschnitt „Wenn etwas nicht klappt“. Die Anleitung nennt Schaltflächen und Felder mit ihrer tatsächlichen Beschriftung in der Anwendung. Bildschirmfotos folgen, sobald die Anwendung auf dem Server läuft; sie werden ohne reale Daten aufgenommen. Das Review Center ist in docs/anleitungen/bedienung-review-center.md beschrieben, die Konfiguration in docs/anleitungen/admin-konfiguration.md.
 
 Adresse der Anwendung: `https://uebernahme.muellerhv.de` (nach dem Produktivstart). Die Hauptnavigation zeigt: Objekte, Eigentümer, Review Center, Suche, Berichte, Status, Protokoll (nur mit Recht), Konfiguration, Nutzer (nur Admin), Google Drive (nur Admin), Konto.
 
@@ -69,6 +69,16 @@ Wenn etwas nicht klappt:
 - Objektnummer bereits vergeben: die Nummer wird über ihren Zahlenwert verglichen (0623 und 623 sind dasselbe Objekt). Bestehendes Objekt öffnen statt neu anlegen.
 - Datenstatus „unvollständig“ an Einheit oder Eigentümer: Pflichtfelder fehlen oder stammen aus einem unsicheren Import; in der Zeile „Bearbeiten“ und ergänzen.
 
+Objekt archivieren und wiederherstellen:
+
+1. Objektansicht, „Archivieren“. Die Anwendung verlangt den zweiten Faktor erneut (Step-up), einen Grund und die Bestätigung, dass nichts gelöscht wird.
+2. Das Objekt verschwindet aus der Objektliste, aus der Suche nach aktiven Objekten und aus den nächtlichen Läufen (Ordnerabgleich, Vollständigkeit, Listen). Einheiten, Eigentümer, Zuordnungen, Dokumente, Fälle und das Protokoll bleiben vollständig erhalten.
+3. In Drive wird nichts gelöscht, verschoben oder umbenannt. Der Objektordner bleibt, wo er ist. Die Anwendung besitzt keine Löschfunktion für Drive; eine spätere Umsortierung (etwa bei einer Migration) wäre ein bewusster, protokollierter Schritt.
+4. Archivieren ist nicht möglich, solange ein Verarbeitungslauf wartet oder läuft; erst abwarten, dann archivieren.
+5. Objektliste, „Archiv“: zeigt archivierte Objekte mit Datum, Bearbeiter und Grund. „Wiederherstellen“ holt das Objekt zurück und setzt den Status auf „aktiv“ (danach prüfen). Ist die Objektnummer inzwischen an ein anderes aktives Objekt vergeben, lehnt die Anwendung die Wiederherstellung ab.
+
+Beides steht im Protokoll (`object.archive`, `object.restore`) mit Grund und Drive-Ordner.
+
 ## 3. Ordnerabgleich
 
 Voraussetzung: Google Drive ist verbunden (Admin: Google Drive, „Verbindung“ mit dem Konto `ablage@muellerhv.de`, dann Wurzelordner 01_Daten „Pfad auflösen“ und „Wurzel bestätigen“). Der Abgleich legt fehlende Ordner an und benennt den Altordner in `06_Sonstiges` um; er löscht nie.
@@ -130,6 +140,21 @@ Wenn etwas nicht klappt:
 - Dokument im Status Fehler: Fehlertext in der Dokumentansicht lesen (verschlüsselte oder beschädigte Datei, Größenlimit). Datei prüfen und erneut hochladen.
 - Viele Dokumente in 06/01_Unklar: normal in der Kaltstartphase; die Fälle werden im Review Center entschieden und trainieren das Modell. Stufe 3 (KI) läuft nur, wenn sie freigegeben und konfiguriert ist.
 - „KI nicht verfügbar“ oder „Kostenlimit erreicht“ als Grund: Admin prüft Statusseite und Konfiguration; nach Behebung Neubewertung über das Kommando `ai_reclassify` (Runbook).
+
+Wohin ein Dokument gelangt, wenn es nicht zugeordnet werden kann:
+
+| Befund | Ablage in Drive | Fall im Review Center | Bedeutung |
+|---|---|---|---|
+| Keine Kategorie erreicht die Schwelle | `06_Sonstiges/01_Unklar` | ja, Typ „unklar“ mit Vorschlag | Dokument gehört zum Objekt, Art nicht sicher erkannt |
+| Erkannt, aber Regel verlangt Sichtung | `06_Sonstiges/02_Manuelle_Pruefung` | ja | zum Beispiel Datei zu groß, Format nicht lesbar |
+| Gleicher Inhalt schon vorhanden | `06_Sonstiges/03_Dubletten` | ja, mit Verweis auf das Original | keine zweite OCR, keine zweite Ablage im Fachordner |
+| Anderes Objekt oder kein Objektbezug | `06_Sonstiges/04_Nicht_objektbezogen` | ja, mit Vorschlag „in Objekt … übernehmen“ | erkannte fremde Objektnummer, Werbung, Privates |
+
+Jedes angenommene Dokument wird also abgelegt, auch ohne sichere Zuordnung; die Ablage in `06_Sonstiges` ist der Auffangbereich, der Fall im Review Center die Aufgabe, es nachzuordnen. Nichts bleibt unabgelegt liegen, nichts wird verworfen.
+
+Fehlgeschlagene Dokumente: Bricht ein Verarbeitungsschritt endgültig ab (Status „Fehler“, Fall „job_failed“), nimmt der nächste Klick auf „Verarbeitung starten“ diese Dokumente automatisch wieder auf. Der Wiedereinstieg erfolgt so spät wie möglich (vorhandene Hashes und erkannte Seitentexte werden nicht neu berechnet), der Fall wird als erledigt geschlossen. Scheitert es erneut, entsteht ein neuer Fall mit der neuen Fehlermeldung.
+
+Ohne Google-Verbindung: Die Verarbeitung läuft bis zur Entscheidung durch, die Ablage in Drive wartet dann („wartet: Keine Google-Verbindung für die Ablage“ in den offenen Jobs) und prüft alle zehn Minuten erneut. Das Dokument bleibt „klassifiziert“ oder „in Prüfung“, es geht nicht auf „Fehler“. Sobald ein Admin die Verbindung herstellt, wird ohne weiteres Zutun abgelegt.
 
 ## 6. Listen (Eigentümer- und Mieterliste)
 

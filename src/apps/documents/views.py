@@ -135,7 +135,14 @@ def processing_start(request, pk: int):
             request, f"Für dieses Objekt ist bereits Lauf {existing.pk} {existing.get_status_display()}."
         )
         return redirect("document_list", pk=obj.pk)
+    failed_before = Document.objects.filter(object=obj, deleted_at__isnull=True, status="error").count()
     run = start_run(obj, run_type=run_type, dry_run=dry_run, user=request.user)
+    if failed_before:
+        messages.info(
+            request,
+            f"{failed_before} zuvor fehlgeschlagene(s) Dokument(e) werden erneut verarbeitet; "
+            "die zugehörigen Fälle im Review Center sind als erledigt geschlossen.",
+        )
     record(
         "processing.start",
         entity_type="processing_run",

@@ -79,8 +79,11 @@ def heartbeats() -> dict:
 
 def backup_status() -> dict:
     path: Path = settings.OBJEKTAKTE["DATA_DIR"] / "backup" / "status.json"
-    if not path.exists():
-        return {"ok": False, "status": "keine status.json"}
+    try:
+        if not path.exists():
+            return {"ok": False, "status": "keine status.json"}
+    except OSError as exc:  # Verzeichnis nicht betretbar (Rechte): Befund statt Serverfehler
+        return {"ok": False, "status": "status.json nicht lesbar", "error": exc.__class__.__name__}
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
         age_h = (time.time() - path.stat().st_mtime) / 3600

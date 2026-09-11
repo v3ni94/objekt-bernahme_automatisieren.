@@ -55,7 +55,8 @@ echo "== 2. Verzeichnisse unter $BASE"
 mkdir -p "$BASE"/{db,redis,transit,work,ocr-cache,previews,models,lists,requests,imports,exports,backup/db,backup/volumes,backup/config,secrets,deploy}
 chown -R "$APP_UID:$APP_UID" "$BASE"/{transit,work,ocr-cache,previews,models,lists,requests,imports,exports}
 chmod 750 "$BASE"/{transit,work,ocr-cache,previews,models,lists,requests,imports,exports}
-chmod 700 "$BASE/secrets" "$BASE/backup"
+chmod 700 "$BASE/secrets" "$BASE"/backup/{db,volumes,config}
+chmod 711 "$BASE/backup"   # web liest nur status.json: betretbar, nicht auflistbar; Sicherungen bleiben 700
 chown "$DEPLOY_USER:$DEPLOY_USER" "$BASE/deploy" && chmod 750 "$BASE/deploy"
 mkdir -p /opt/objektakte && chown -R "$DEPLOY_USER:$DEPLOY_USER" /opt/objektakte
 ls -la "$BASE" | sed 's/^/   /'

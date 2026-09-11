@@ -227,7 +227,7 @@ Gilt für Ubuntu 24.04 LTS (CR 0.1). Reihenfolge einhalten: erst den Schlüssel-
 | 10 | Journal begrenzen | `/etc/systemd/journald.conf`: `SystemMaxUse=500M` (ANNAHME AB22); `sudo systemctl restart systemd-journald` | `journalctl --disk-usage` |
 | 11 | Swap, falls `[S]` gleich 0 (ANNAHME AB9: 2 GiB) | `sudo fallocate -l 2G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile && echo '/swapfile none swap sw 0 0' \| sudo tee -a /etc/fstab` | `free -h` zeigt Swap |
 | 12 | fail2ban für SSH (optional, geringer Aufwand) | `sudo apt install -y fail2ban`, Standard-Jail `sshd` | `sudo fail2ban-client status sshd` |
-| 13 | Dateirechte der Konfiguration | `chmod 600 .env`, `sudo chmod 700 /srv/objektakte/secrets`, `sudo chmod 700 /srv/objektakte/backup` | `ls -la` |
+| 13 | Dateirechte der Konfiguration | `chmod 600 .env`, `sudo chmod 700 /srv/objektakte/secrets`, `sudo chmod 711 /srv/objektakte/backup` (betretbar für `status.json`, nicht auflistbar), `sudo chmod 700 /srv/objektakte/backup/{db,volumes,config}` | `ls -la` |
 | 14 | sudo mit Passwort, kein `NOPASSWD` | Standard belassen | `sudo -l` |
 | 15 | Ungenutzte Dienste | `sudo ss -tulpen` prüfen, nicht benötigte Dienste mit `systemctl disable --now [dienst]` abschalten | erneutes `ss` |
 
@@ -312,7 +312,8 @@ sudo mkdir -p /srv/objektakte/{db,redis,transit,work,ocr-cache,previews,models,l
 # Verzeichnisse der Anwendungscontainer gehoeren APP_UID (ANNAHME AB1: 10001)
 sudo chown -R 10001:10001 /srv/objektakte/{transit,work,ocr-cache,previews,models,lists,requests,imports,exports}
 sudo chmod 750 /srv/objektakte/{transit,work,ocr-cache,previews,models,lists,requests,imports,exports}
-sudo chmod 700 /srv/objektakte/secrets /srv/objektakte/backup
+sudo chmod 700 /srv/objektakte/secrets /srv/objektakte/backup/{db,volumes,config}
+sudo chmod 711 /srv/objektakte/backup   # web liest status.json (644); Sicherungen bleiben unter 700
 sudo chown deploy:deploy /srv/objektakte/deploy && sudo chmod 750 /srv/objektakte/deploy
 # db und redis: die Images setzen ihre eigenen Nutzer, deshalb hier keine chown-Vorgabe
 ls -la /srv/objektakte

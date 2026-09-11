@@ -22,6 +22,7 @@ from apps.pipeline import ocr as ocr_mod
 from apps.pipeline import storage
 from apps.pipeline.entities import build_gazetteer, extract_page, match_iban_owners
 from apps.pipeline.jobs import (
+    DeferJob,
     RetryableError,
     SkipJob,
     enqueue,
@@ -108,7 +109,7 @@ def _download(doc: Document, target_dir: Path) -> Path:
 
         adapter = oauth.get_adapter()
         if adapter is None:
-            raise RetryableError("Keine Google-Verbindung für den Download")
+            raise DeferJob("Keine Google-Verbindung für den Download")
         target = target_dir / ("original" + Path(doc.current_name).suffix.lower())
         adapter.download(doc.drive_file_id, target)
         return target
@@ -774,7 +775,9 @@ def file_to_drive(job: ProcessingJob) -> dict:
         raise SkipJob("no_drive_file")
     drive = oauth.get_adapter()
     if drive is None:
-        raise RetryableError("Keine Google-Verbindung für die Ablage")
+        # Kein Fehlversuch: das Dokument bleibt klassifiziert und wartet, bis die Verbindung steht (B-10, kein
+        # Datenverlust). Mit RetryableError stuende es nach drei Versuchen faelschlich auf error.
+        raise DeferJob("Keine Google-Verbindung für die Ablage")
     lock_key = f"drive:write:{job.object_id}"
     if not cache.add(lock_key, job.pk, timeout=600):
         raise RetryableError("Drive-Schreibsperre des Objekts belegt")

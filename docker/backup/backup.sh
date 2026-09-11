@@ -61,5 +61,6 @@ jq -n --arg ts "$TS" --arg st "$STATUS" --arg warn "$WARN" --arg off "$OFFSITE" 
       --argjson size "$(du -sb /backup | cut -f1)" \
       '{last_run:$ts,status:$st,warnings:$warn,offsite:$off,duration_s:$dur,total_bytes:$size}' > /backup/status.json.tmp
 mv /backup/status.json.tmp /backup/status.json
+chmod 644 /backup/status.json
 echo "backup ${TS}: ${STATUS}${WARN:+ (Warnungen:$WARN)} offsite=${OFFSITE}"
 [ "$STATUS" = ok ]
