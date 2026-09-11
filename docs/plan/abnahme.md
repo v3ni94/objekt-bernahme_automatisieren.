@@ -20,7 +20,7 @@ Stand: 11.09.2026 (M15, Umsetzungsplan 2.19 Schritt 8; Punkt 1 nach der Erstinst
 | Vollständige Testsuite in der CI | GitHub Actions, Workflow `CI` je Commit | läuft; Ergebnis des jeweils letzten Laufs in docs/plan/status.md |
 | Grep leer | `scripts/check_no_legacy_names.sh` | leer (10.09.2026) |
 | PII-Prüfung der Dokumentation leer | `scripts/check_no_pii.sh` mit `PII_CSV_DIR` auf die Stammdaten-CSV | in der Entwicklungsumgebung ohne CSV übersprungen; Dokumentation verwendet ausschließlich die synthetischen Namen und Objektnummern aus tests/ (Mustermann, Beispiel, Altmuster, Neumuster; 623, 624, 625, 631, 700) |
-| Deployment-Tests T1 bis T14 protokolliert | docs/betrieb/deployment-test.md | T1, T2, T3, T14 bestanden (11.09.2026), T11 teilweise, T4 bis T10, T12, T13 ausstehend |
+| Deployment-Tests T1 bis T14 protokolliert | docs/betrieb/deployment-test.md | T1, T2, T3, T11, T14 bestanden (11.09.2026), T4 bis T10, T12, T13 ausstehend |
 | Restore-Probe aus der jüngsten Sicherung | Protokoll nach G 7.4 | ausstehend (T6); Skript `restore.sh` und Ablauf in docs/betrieb.md; auf dem Server durchführbar, sobald die erste nächtliche Sicherung vorliegt |
 | Einweisung der Anwender, Nutzeranlage, TOTP | Nutzerliste (V-20), Termine | ausstehend |
 | Lizenzabschnitt | docs/architektur/lizenzen.md | vorhanden; Prüfung nach F29 nur bei Weitergabe |
