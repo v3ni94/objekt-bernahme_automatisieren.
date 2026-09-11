@@ -12,6 +12,8 @@ import pytest
 from django.core.management import call_command
 from django.db import connection
 
+from apps.config.management.commands import grants_sql as GRANTS
+
 pytestmark = pytest.mark.django_db
 
 
@@ -46,3 +48,20 @@ def test_tabellenrechte_fuer_alle_tabellen_und_append_only():
     assert not any("`users` TO 'app_ro'" in z for z in zeilen)
     assert not any("`owners` TO 'app_ro'" in z for z in zeilen)
     assert zeilen[-1] == "FLUSH PRIVILEGES;"
+
+
+def test_worker_darf_die_von_ihm_neu_aufgebauten_tabellen_leeren():
+    """Jobs ersetzen Seiten, Entitaeten und Verknuepfungen vollstaendig; ohne DELETE bricht der Job mit 1142 ab."""
+    zeilen = _sql()
+    for tabelle in GRANTS.WORKER_DELETE:
+        treffer = [z for z in zeilen if f"`{tabelle}` TO 'app_worker'@'%'" in z]
+        assert treffer, f"kein Recht fuer app_worker auf {tabelle}"
+        assert all("DELETE" in z for z in treffer), f"DELETE fehlt fuer app_worker auf {tabelle}: {treffer}"
+    # Gegenprobe: Tabellen ohne Neuaufbau bleiben ohne DELETE, damit das Rechtemodell eng bleibt.
+    for tabelle in ("documents", "processing_runs", "audit_events"):
+        for z in [z for z in zeilen if f"`{tabelle}` TO 'app_worker'@'%'" in z]:
+            assert "DELETE" not in z, z
+
+
+def test_jede_loeschbare_tabelle_ist_auch_schreibbar():
+    assert GRANTS.WORKER_DELETE <= GRANTS.WORKER_WRITE

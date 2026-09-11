@@ -1055,7 +1055,7 @@ Das MariaDB-Image legt beim ersten Start die Datenbank und den Nutzer `MARIADB_U
 |---|---|---|
 | `app_migrate` | DDL und DML auf der Datenbank `objektakte` (CREATE, ALTER, DROP, INDEX, REFERENCES, TRIGGER, alle DML) | `deploy.sh` Schritt Migration, Seeds |
 | `app_rw` | DML auf allen Fachtabellen; auf `audit_events` und `iban_access_log` nur INSERT und SELECT | `web`, `beat` |
-| `app_worker` | SELECT auf Stammdaten und Kataloge; INSERT und UPDATE auf Verarbeitungs-, Dokument-, Review-Fall- und Protokolltabellen; INSERT auf `audit_events`; kein Schreibrecht auf `owners`, `units`, `owner_unit_assignments`, `tenants`, `leases`, `users`, `app_settings` | `worker`, `worker-nlp`, `worker-io`, `classifier` |
+| `app_worker` | SELECT auf Stammdaten und Kataloge; INSERT und UPDATE auf Verarbeitungs-, Dokument-, Review-Fall- und Protokolltabellen; zusätzlich DELETE auf den Tabellen, deren Inhalt ein Job vollständig neu aufbaut (`document_pages`, `document_entities`, `document_owner_links`, `document_tenant_links`, `completeness_findings`, `drive_sync_actions`, `import_rows`); INSERT auf `audit_events`; kein Schreibrecht auf `owners`, `units`, `owner_unit_assignments`, `tenants`, `leases`, `users`, `app_settings` | `worker`, `worker-nlp`, `worker-io`, `classifier` |
 | `app_backup` | SELECT, SHOW VIEW, TRIGGER, LOCK TABLES, EVENT (zum Umsetzungszeitpunkt gegen die Dokumentation von `mariadb-dump` prüfen) | `backup` |
 | `app_ro` | SELECT auf Fachtabellen ohne Chiffratspalten | Auswertungen, Support |
 

@@ -3,6 +3,7 @@
 Regeln:
 - app_rw (web, beat): SELECT, INSERT, UPDATE, DELETE auf allen Tabellen; auf append-only Tabellen nur SELECT, INSERT
 - app_worker: SELECT auf allen Tabellen; INSERT, UPDATE auf Verarbeitungs-, Dokument-, Review-Fall- und Protokolltabellen;
+  zusaetzlich DELETE auf den Tabellen, deren Inhalt ein Job vollstaendig neu aufbaut (WORKER_DELETE);
   INSERT auf audit_events; kein Schreibrecht auf Stammdaten, Nutzer und Konfiguration
 - app_ro: SELECT auf allen Tabellen ohne Chiffratspalten (Tabellen mit Chiffraten werden ausgelassen)
 deploy.sh fuehrt die Ausgabe nach jeder Migration als root aus; GRANT ist idempotent.
@@ -40,6 +41,18 @@ WORKER_WRITE = {
     "classifier_models",
 }
 WORKER_INSERT_ONLY = {"audit_events"}
+# Tabellen, deren Inhalt ein Job je Dokument oder Lauf vollstaendig ersetzt: der alte Bestand wird geloescht und
+# unmittelbar neu geschrieben. Ohne DELETE bricht der Job ab (Fehler 1142), weil sonst die Eindeutigkeit von
+# Seite und Dokument verletzt wuerde. Wiederaufnahme nach Abbruch setzt genau dieses Verhalten voraus.
+WORKER_DELETE = {
+    "document_pages",  # pipeline.merge_pages
+    "document_entities",  # pipeline.extract_entities
+    "document_owner_links",  # classification.decide und review.bulk_execute, jeweils Status suggested
+    "document_tenant_links",  # dito
+    "completeness_findings",  # requirements.engine, veraltete Befunde
+    "drive_sync_actions",  # drive.reconcile, Aktionen eines verworfenen Plans
+    "import_rows",  # imports.services, Neuaufbau einer Stapeldatei
+}
 # Tabellen mit Chiffraten: kein Lesezugriff fuer app_ro
 ENCRYPTED = {"oauth_tokens", "mfa_authenticator", "owners", "tenants", "users"}
 
@@ -69,7 +82,10 @@ class Command(BaseCommand):
             if t in WORKER_INSERT_ONLY:
                 lines.append(f"GRANT SELECT, INSERT ON `{db}`.`{t}` TO 'app_worker'@'%';")
             elif t in WORKER_WRITE:
-                lines.append(f"GRANT SELECT, INSERT, UPDATE ON `{db}`.`{t}` TO 'app_worker'@'%';")
+                rights_worker = (
+                    "SELECT, INSERT, UPDATE, DELETE" if t in WORKER_DELETE else "SELECT, INSERT, UPDATE"
+                )
+                lines.append(f"GRANT {rights_worker} ON `{db}`.`{t}` TO 'app_worker'@'%';")
             else:
                 lines.append(f"GRANT SELECT ON `{db}`.`{t}` TO 'app_worker'@'%';")
             if t not in ENCRYPTED:
