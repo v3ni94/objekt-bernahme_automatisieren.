@@ -9,6 +9,7 @@ import json
 import logging
 import shutil
 import time
+from datetime import timedelta
 from pathlib import Path
 
 from celery import shared_task
@@ -950,12 +951,29 @@ def sweep() -> dict:
 
     result = sweep_stale_jobs()
     result["orphans_removed"] = remove_orphan_work_dirs()
+    result["sync_runs_aborted"] = abort_stale_sync_runs()
     from apps.pipeline.models import ProcessingRun, RunStatus
 
     for run in ProcessingRun.objects.filter(status=RunStatus.RUNNING):
         maybe_finish_run(run)
     result["runs_started"] = len(schedule_runs())
     return result
+
+
+STALE_SYNC_RUN_HOURS = 2
+
+
+def abort_stale_sync_runs() -> int:
+    """Ordnerabgleiche, die seit Stunden auf „läuft“ stehen (Worker abgebrochen, fruehere Fassung ohne Abfang
+    unerwarteter Fehler), als fehlgeschlagen abschliessen, damit die Liste den wahren Zustand zeigt."""
+    from apps.drive.models import DriveSyncRun
+
+    grenze = timezone.now() - timedelta(hours=STALE_SYNC_RUN_HOURS)
+    return DriveSyncRun.objects.filter(status="running", started_at__lt=grenze).update(
+        status="failed",
+        finished_at=timezone.now(),
+        error_message=f"Abbruch: Lauf ohne Ende nach {STALE_SYNC_RUN_HOURS} Stunden (Sweeper)",
+    )
 
 
 def remove_orphan_work_dirs() -> int:

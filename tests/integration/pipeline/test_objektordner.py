@@ -166,3 +166,30 @@ def test_temporaerdateien_werden_uebersprungen(client_as, clerk_user, objekt, dr
         "Vertrag.pdf"
     ]
     assert any("3 Temporär- oder Systemdatei(en) übersprungen" in m.message for m in resp.context["messages"])
+
+
+def test_sweeper_schliesst_haengende_abgleiche(seeded):
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from apps.pipeline.tasks import abort_stale_sync_runs
+
+    obj = ManagedObject.objects.create(
+        object_number="778",
+        city="Altstadt",
+        street="Weg",
+        house_number="2",
+        management_type="weg",
+        is_test=True,
+    )
+    alt = DriveSyncRun.objects.create(
+        object=obj, dry_run=False, status="running", started_at=timezone.now() - timedelta(hours=5)
+    )
+    frisch = DriveSyncRun.objects.create(
+        object=obj, dry_run=False, status="running", started_at=timezone.now()
+    )
+    assert abort_stale_sync_runs() == 1
+    alt.refresh_from_db()
+    frisch.refresh_from_db()
+    assert alt.status == "failed" and "Sweeper" in alt.error_message and frisch.status == "running"
