@@ -69,6 +69,26 @@ def _prepare_unit_files(obj: ManagedObject, *, user, force: bool = False) -> tup
     )
 
 
+def waiting_job_reasons(obj) -> list[dict]:
+    """Wartende Jobs mit Grund (DeferJob), damit der Anwender sieht, worauf die Verarbeitung wartet."""
+    from apps.pipeline.models import JobStatus, ProcessingJob
+
+    rows = (
+        ProcessingJob.objects.filter(object=obj, status=JobStatus.PENDING, last_error__startswith="wartet")
+        .values("job_type", "last_error")
+        .annotate(c=Count("id"))
+        .order_by("-c")
+    )
+    return [
+        {
+            "job_type": r["job_type"],
+            "reason": r["last_error"].removeprefix("wartet:").strip(),
+            "count": r["c"],
+        }
+        for r in rows
+    ]
+
+
 def _changes(before: dict, after: dict) -> tuple[dict, dict]:
     keys = [k for k in after if before.get(k) != after.get(k)]
     return {k: before.get(k) for k in keys}, {k: after.get(k) for k in keys}
@@ -186,6 +206,48 @@ def object_edit(request, pk: int):
         "objects/form.html",
         {"form": form, "title": f"Objekt {obj.object_number} bearbeiten", "object": obj},
     )
+
+
+@permission_required("objects.write")
+@require_POST
+def object_set_root(request, pk: int):
+    """Objektordner in Drive festlegen (Ordner-ID oder Link), etwa wenn der Abgleich mehrere Ordner mit der Nummer
+    fand; schliesst offene Faelle „Objektnummer doppelt“ und stoesst den Abgleich an."""
+    from apps.drive import oauth
+    from apps.drive.adapter import DriveError
+    from apps.drive.object_root import ObjectRootError, set_object_root
+
+    obj = get_object_or_404(ManagedObject.active, pk=pk)
+    adapter = oauth.get_adapter()
+    if adapter is None:
+        messages.error(request, "Keine Google-Verbindung.")
+        return redirect("object_detail", pk=obj.pk)
+    try:
+        result = set_object_root(
+            obj, request.POST.get("ordner", ""), drive=adapter, user=request.user, request=request
+        )
+    except ObjectRootError as exc:
+        messages.error(request, str(exc))
+        return redirect("object_detail", pk=obj.pk)
+    except DriveError as exc:
+        messages.error(request, f"Drive-Fehler: {exc}")
+        return redirect("object_detail", pk=obj.pk)
+    messages.success(
+        request,
+        f"„{result['folder'].name}“ ist jetzt der Objektordner"
+        + (
+            f", {result['cases_closed']} Fall (Objektnummer doppelt) erledigt"
+            if result["cases_closed"]
+            else ""
+        )
+        + ". "
+        + (
+            "Der Ordnerabgleich legt die Struktur an; wartende Ablagen laufen weiter."
+            if result["reconcile"] == "queued"
+            else f"Ordnerabgleich nicht angestoßen ({result['reconcile']}); unter Ordnerabgleiche ausführen."
+        ),
+    )
+    return redirect("object_detail", pk=obj.pk)
 
 
 @permission_required("objects.write")
@@ -341,11 +403,15 @@ def object_detail(request, pk: int):
     )
     files = OwnerFile.active.filter(object=obj).select_related("unit").order_by("folder_name")
     tenant_files = TenantFile.active.filter(object=obj).select_related("unit").order_by("folder_name")
+    from apps.drive.object_root import open_structure_case
+
     return render(
         request,
         "objects/detail.html",
         {
             "object": obj,
+            "structure_case": open_structure_case(obj),
+            "waiting_jobs": waiting_job_reasons(obj),
             "units": units,
             "current": current,
             "reference": reference,

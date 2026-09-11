@@ -282,6 +282,10 @@ def reconcile_object(
     except DriveError as exc:
         run.error_message = f"Drive-Fehler {exc.status or ''} {exc.reason or ''}: {exc}"[:2000]
         return _finish(run, plan, status="failed", executed=not dry_run)
+    except Exception as exc:  # noqa: BLE001  Befund 11.09.2026: Datenbankfehler liess Lauf 6 dauerhaft "running"
+        logger.exception("Ordnerabgleich %s Objekt %s abgebrochen", run.pk, obj.pk)
+        run.error_message = f"Abbruch: {type(exc).__name__}: {exc}"[:2000]
+        return _finish(run, plan, status="failed", executed=not dry_run)
 
 
 def _plan(

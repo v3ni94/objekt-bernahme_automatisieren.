@@ -2,7 +2,7 @@
 
 Stand: 11.09.2026, erzeugt aus `src/apps/config/catalog.json` und `db/seeds/app_settings.json` (Definition of Done CR 14: Namensmuster Objektordner, Unterstruktur, Schwellwerte, Duplikat-Option, KI-Provider, Aufbewahrungsfristen). Änderungen erfolgen in der Anwendung unter Konfiguration (Recht `settings.write`), jede Änderung steht im Audit (`setting.update`). Werte wirken ohne Neustart; Ausnahmen stehen in der Spalte Wirkung. Seed-Werte sind Vorschläge (ANNAHME), sofern die Quelle nichts anderes sagt.
 
-Schlüssel: 119 in 18 Gruppen.
+Schlüssel: 120 in 18 Gruppen.
 
 ## Google Drive und Objektordner (`drive.*`)
 
@@ -10,6 +10,7 @@ Schlüssel: 119 in 18 Gruppen.
 |---|---|---|---|---|---|
 | `drive.backoff` | object | `{"base_s": 1, "factor": 2, "max_s": 64, "attempts": 8}` | Exponentieller Backoff: base_s, factor, max_s, attempts | ANNAHME A15 | object |
 | `drive.create_folders_on_object_create` | boolean | `true` | Objektordner samt Unterstruktur direkt beim Anlegen eines Objekts in Drive erzeugen; bei `false` nur über den Ordnerabgleich von Hand | CR 2, Entscheidung 11.09.2026 | boolean |
+| `drive.takeover_ignore_patterns` | list | `["*.tmp", "*.TMP", "~$*", "Thumbs.db", "desktop.ini", ".DS_Store", "*.lnk"]` | Dateinamenmuster, die bei der Übernahme aus Drive übersprungen werden (Temporär- und Systemdateien) | Befund 11.09.2026 | array |
 | `drive.takeover_max_files` | integer | `500` | Höchstzahl Dateien je Übernahme aus einem Drive-Ordner (mit Unterordnern); größere Bestände ordnerweise übernehmen | Entscheidung 11.09.2026 | min 10, max 10000 |
 | `drive.legacy_conflict_rename_pattern` | string | `leer` | Umbenennungsmuster für einen Altordner, wenn Alt- und Zielordner gleichzeitig existieren; leer bedeutet Review-Fall | Frage F24 | ['string', 'null'] |
 | `drive.legacy_folder_aliases` | object | siehe db/seeds/app_settings.json (Altbezeichnung nur dort) | Zuordnung Zielordner zu Altbezeichnungen, die beim Abgleich umbenannt werden (CR 9.3); einzige Fundstelle der Altbezeichnung | CR 9.3, Befund 6.4 | object |

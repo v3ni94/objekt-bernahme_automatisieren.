@@ -82,3 +82,20 @@ def test_neue_modelltabelle_erhaelt_rechte_auch_ohne_sichtbarkeit(monkeypatch):
     call_command("grants_sql", stdout=out)
     text = out.getvalue()
     assert "`takeover_sources` TO 'app_rw'@'%'" in text and "GRANT SELECT ON" in text
+
+
+def test_worker_darf_akten_und_objektordner_schreiben():
+    """decide legt Eigentuemer- und Mieterakten an, der Ordnerabgleich schreibt den Objektordner an das Objekt;
+    beides laeuft im Worker (Befund 11.09.2026: INSERT denied auf owner_files)."""
+    out = StringIO()
+    call_command("grants_sql", stdout=out)
+    text = out.getvalue()
+    db = connection.settings_dict["NAME"]
+    for tabelle in (
+        "owner_files",
+        "owner_file_assignments",
+        "tenant_files",
+        "tenant_file_assignments",
+        "objects",
+    ):
+        assert f"GRANT SELECT, INSERT, UPDATE ON `{db}`.`{tabelle}` TO 'app_worker'@'%';" in text, tabelle

@@ -8,6 +8,7 @@ Objekts. Nichts wird geloescht: Quellordner bleiben stehen, eine Datei wird nur 
 
 from __future__ import annotations
 
+import fnmatch
 import re
 from dataclasses import dataclass, field
 
@@ -39,9 +40,26 @@ class FileEntry:
     path: str
     registered_in: str | None = None  # Objektnummer, wenn die Datei bereits einem Objekt gehoert
 
+    ignored: bool = False
+
     @property
     def selectable(self) -> bool:
-        return self.registered_in is None and not self.node.is_shortcut
+        return self.registered_in is None and not self.node.is_shortcut and not self.ignored
+
+
+DEFAULT_IGNORE = ["*.tmp", "*.TMP", "~$*", "Thumbs.db", "desktop.ini", ".DS_Store", "*.lnk"]
+
+
+def ignore_patterns() -> list[str]:
+    return list(store.get("drive.takeover_ignore_patterns", DEFAULT_IGNORE) or [])
+
+
+def is_ignored(name: str, patterns: list[str] | None = None) -> bool:
+    """Temporaer- und Systemdateien (Word-Sicherungen, Explorer-Reste) sind kein Aktenbestand."""
+    return any(
+        fnmatch.fnmatchcase(name, p) or fnmatch.fnmatchcase(name.lower(), p.lower())
+        for p in (patterns or ignore_patterns())
+    )
 
 
 @dataclass
@@ -49,6 +67,7 @@ class TakeoverResult:
     registered: int = 0
     skipped_registered: int = 0
     skipped_shortcuts: int = 0
+    skipped_ignored: int = 0
     run_id: int | None = None
     document_ids: list[int] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
@@ -94,7 +113,13 @@ def list_folder(drive: DriveAdapter, folder_id: str) -> tuple[list[DriveNode], l
     folders = [c for c in children if c.is_folder]
     files = [c for c in children if not c.is_folder]
     registered = _registered_map([f.id for f in files])
-    return folders, [FileEntry(node=f, path=f.name, registered_in=registered.get(f.id)) for f in files]
+    patterns = ignore_patterns()
+    return folders, [
+        FileEntry(
+            node=f, path=f.name, registered_in=registered.get(f.id), ignored=is_ignored(f.name, patterns)
+        )
+        for f in files
+    ]
 
 
 def collect_files(
@@ -170,10 +195,14 @@ def _register_locked(obj, entries, result, *, source_folder, user, request, extr
             run_type__in=(RunType.FULL, RunType.INCREMENTAL),
             dry_run=False,
         ).first()
+        patterns = ignore_patterns()
         for e in entries:
             node = e.node
             if node.is_shortcut:
                 result.skipped_shortcuts += 1
+                continue
+            if is_ignored(node.name, patterns):
+                result.skipped_ignored += 1
                 continue
             if node.id in registered:
                 result.skipped_registered += 1
@@ -230,6 +259,7 @@ def _register_locked(obj, entries, result, *, source_folder, user, request, extr
                 "registered": result.registered,
                 "skipped_registered": result.skipped_registered,
                 "skipped_shortcuts": result.skipped_shortcuts,
+                "skipped_ignored": result.skipped_ignored,
                 **(extra or {}),
             },
         )
@@ -248,6 +278,10 @@ def _register_locked(obj, entries, result, *, source_folder, user, request, extr
         )
     if result.skipped_registered:
         result.notes.append(f"{result.skipped_registered} Datei(en) waren bereits einem Objekt zugeordnet.")
+    if result.skipped_ignored:
+        result.notes.append(
+            f"{result.skipped_ignored} Temporär- oder Systemdatei(en) übersprungen (drive.takeover_ignore_patterns)."
+        )
     return result
 
 
@@ -410,7 +444,7 @@ def run_source(src, drive: DriveAdapter, *, user=None, request=None) -> Takeover
             else f"Objektordner fehlt noch und konnte nicht angestoßen werden ({outcome}); Ordnerabgleich von Hand starten."
         )
     src.files_registered += result.registered
-    src.files_skipped += result.skipped_registered + result.skipped_shortcuts
+    src.files_skipped += result.skipped_registered + result.skipped_shortcuts + result.skipped_ignored
     src.last_run_id = result.run_id or src.last_run_id
     src.taken_at = timezone.now()
     src.status = TakeoverStatus.DONE

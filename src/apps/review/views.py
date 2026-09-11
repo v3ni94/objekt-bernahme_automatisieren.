@@ -225,6 +225,19 @@ def case_action(request, pk: int):
         elif action == "reopen":
             services.reopen(case, request.user, reason=request.POST.get("reason"), request=request)
             messages.info(request, "Fall wiedereröffnet.")
+        elif action == "choose_folder":
+            result = services.choose_object_folder(
+                case, request.user, request.POST.get("folder_id", ""), request=request
+            )
+            messages.success(
+                request,
+                f"„{result['folder'].name}“ ist jetzt der Objektordner. "
+                + (
+                    "Der Ordnerabgleich legt die Struktur an, wartende Ablagen laufen weiter."
+                    if result["reconcile"] == "queued"
+                    else f"Ordnerabgleich konnte nicht angestoßen werden ({result['reconcile']}); in der Objektansicht ausführen."
+                ),
+            )
         elif action == "merge":
             original = get_object_or_404(Document, pk=request.POST.get("original_id"))
             services.merge_duplicate(case, request.user, original, request=request)

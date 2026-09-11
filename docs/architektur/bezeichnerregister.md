@@ -1540,6 +1540,7 @@ Celery-Queues aus den Settings: `ai`, `classify`, `io`, `lists`, `ocr`
 | drive.resumable_threshold_bytes | drive | integer | `5242880` |
 | drive.root_drive_id | drive | string | `null` |
 | drive.root_folder_id | drive | string | `null` |
+| drive.takeover_ignore_patterns | drive | list | `["*.tmp", "*.TMP", "~$*", "Thumbs.db", "desktop.ini", ".DS_Store", "*.lnk"]` |
 | drive.takeover_max_files | drive | integer | `500` |
 | drive.upload_chunk_bytes | drive | integer | `8388608` |
 | import.column_confidence_min | import | decimal | `0.8` |
@@ -1621,6 +1622,7 @@ Celery-Queues aus den Settings: `ai`, `classify`, `io`, `lists`, `ocr`
 | setting.seed | Konfigurationswert durch Seed überschrieben |
 | object.create | Objekt angelegt |
 | object.update | Objekt geändert |
+| object.drive_root_set | Objektordner in Drive festgelegt |
 | object.archive | Objekt archiviert (Soft-Delete, Drive unverändert) |
 | object.restore | Objekt aus dem Archiv zurückgeholt |
 | unit.create | Einheit angelegt |

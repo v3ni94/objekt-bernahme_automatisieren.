@@ -41,6 +41,19 @@
       }
     },
     {
+      "key": "drive.takeover_ignore_patterns",
+      "category": "drive",
+      "value_type": "list",
+      "description": "Dateinamenmuster, die bei der Übernahme aus Drive übersprungen werden (Temporär- und Systemdateien)",
+      "source": "Befund 11.09.2026 (Objekt 82: Word-Temporärdateien im Altbestand)",
+      "schema": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    {
       "key": "drive.takeover_max_files",
       "category": "drive",
       "value_type": "integer",

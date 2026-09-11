@@ -39,6 +39,15 @@ WORKER_WRITE = {
     "import_rows",
     "training_samples",
     "classifier_models",
+    # Akten entstehen auch im Worker: decide (Eigentuemer- und Mieterakte bei der Ablage, F 6.3) und die
+    # Akten-Vorlage nach dem Ordnerabgleich (ensure_unit_files). Befund 11.09.2026: decide scheiterte mit
+    # "INSERT command denied ... owner_files", sobald ein Dokument einer Eigentuemergruppe zugeordnet wurde.
+    "owner_files",
+    "owner_file_assignments",
+    "tenant_files",
+    "tenant_file_assignments",
+    # Ordnerabgleich im Worker schreibt den erkannten Objektordner an das Objekt
+    "objects",
 }
 WORKER_INSERT_ONLY = {"audit_events"}
 # Tabellen, deren Inhalt ein Job je Dokument oder Lauf vollstaendig ersetzt: der alte Bestand wird geloescht und

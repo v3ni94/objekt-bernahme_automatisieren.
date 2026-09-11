@@ -97,7 +97,7 @@ Für alle Objekte gemeinsam läuft der Abgleich als Kommando auf dem Server (doc
 Wenn etwas nicht klappt:
 
 - Kein Objektordner gefunden: Nummer und Wurzelordner prüfen; der Abgleich sucht über die Objektnummer im Ordnernamen. Ohne Treffer plant er die Anlage.
-- Mehrere Ordner mit derselben Nummer: Fall „Objektnummer doppelt“ im Review Center; der Abgleich schreibt erst nach der Entscheidung.
+- Mehrere Ordner mit derselben Nummer (etwa „82 …“ und „082 …“): Fall „Objektnummer doppelt“ im Review Center, der Abgleich legt nichts an und die Ablage wartet. Objektansicht und Dokumentseite zeigen den Hinweis mit Sprung in den Fall. Dort „Als Objektordner verwenden“ beim richtigen Ordner, oder in der Objektansicht „Objektordner festlegen“ mit Ordner-ID oder Drive-Link. Danach läuft der Abgleich mit diesem Ordner, legt die Struktur an, und die wartenden Ablagen setzen von selbst fort. Der andere Ordner bleibt unverändert und kann über den Altbestand übernommen werden.
 - Google Drive zeigt „widerrufen“ oder die Statusseite ist rot: der Admin autorisiert unter Google Drive neu; wartende Schreibjobs laufen danach weiter.
 - Ratenlimit (403, 429): nichts tun, die Anwendung wiederholt mit Wartezeit.
 
@@ -111,7 +111,7 @@ Liegen die Unterlagen eines Objekts noch in der alten Ordnerstruktur (außerhalb
 4. Die Dateien werden als Bestandsdokumente registriert und ein Verarbeitungslauf startet. Die Kette liest jede Datei, erkennt Inhalt und Zuordnung und verschiebt sie in den passenden Ordner der neuen Struktur (Elternwechsel, kein Kopieren). Der Herkunftspfad steht am Dokument.
 5. Fortschritt auf der Dokumentseite; unklare Dateien landen unter 06_Sonstiges mit Fall im Review Center und werden dort zugeordnet.
 
-Was nicht passiert: Es wird nichts gelöscht. Die Quellordner bleiben stehen (nach der Übernahme leer). Verknüpfungen werden übersprungen, weil das Original an anderer Stelle liegt. Eine Datei, die bereits einem Objekt zugeordnet ist, zeigt die Seite mit dem Hinweis „in Objekt …“ und übernimmt sie nicht erneut.
+Was nicht passiert: Es wird nichts gelöscht. Die Quellordner bleiben stehen (nach der Übernahme leer). Verknüpfungen werden übersprungen, weil das Original an anderer Stelle liegt. Temporär- und Systemdateien (`*.tmp`, `~$…`, `Thumbs.db`, Muster in `drive.takeover_ignore_patterns`) werden nicht übernommen. Alte Word- und Excel-Dateien (`.doc`, `.xls`, `.pub`) kann die Anwendung nicht lesen; sie landen als „nicht unterstütztes Format“ im Review Center und werden dort von Hand zugeordnet. Eine Datei, die bereits einem Objekt zugeordnet ist, zeigt die Seite mit dem Hinweis „in Objekt …“ und übernimmt sie nicht erneut.
 
 ### 3.2 Altbestand: alte Objektordner ordnerweise aufarbeiten
 

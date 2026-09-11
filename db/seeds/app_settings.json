@@ -2,6 +2,7 @@
   "drive.root_folder_id": null,
   "drive.root_drive_id": null,
   "drive.create_folders_on_object_create": true,
+  "drive.takeover_ignore_patterns": ["*.tmp", "*.TMP", "~$*", "Thumbs.db", "desktop.ini", ".DS_Store", "*.lnk"],
   "drive.takeover_max_files": 500,
   "drive.object_folder_name_pattern": "{number} {city}, {street} {house_number}",
   "drive.object_number_digits_min": 2,

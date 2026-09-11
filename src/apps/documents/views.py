@@ -51,6 +51,11 @@ def document_list(request, pk: int):
     }
     progress = refresh_progress(obj)
     runs = ProcessingRun.objects.filter(object=obj).order_by("-created_at")[:10]
+    from apps.drive.object_root import open_structure_case
+    from apps.objects.views import waiting_job_reasons
+
+    structure_case = open_structure_case(obj)
+    waiting_jobs = waiting_job_reasons(obj)
     open_jobs = (
         ProcessingJob.objects.filter(object=obj, status__in=[JobStatus.PENDING, JobStatus.RUNNING])
         .values("job_type", "status")
@@ -81,6 +86,8 @@ def document_list(request, pk: int):
             "progress": progress,
             "runs": [(r, queue_position(r)) for r in runs],
             "open_jobs": open_jobs,
+            "structure_case": structure_case,
+            "waiting_jobs": waiting_jobs,
             "can_ingest": user_has_permission(request.user, "documents.ingest"),
         },
     )

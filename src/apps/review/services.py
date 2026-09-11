@@ -1409,3 +1409,40 @@ def start_import(case: ReviewCase, user, *, import_kind: str | None = None, requ
     if created:
         parse_batch_task.delay(batch.pk)
     return batch
+
+
+def choose_object_folder(case: ReviewCase, user, folder_id: str, *, request=None) -> dict:
+    """Fall „Objektnummer doppelt“: einen der Kandidaten als Objektordner festlegen. Der Ordnerabgleich laeuft danach
+    mit diesem Ordner, die wartende Ablage setzt fort (Befund 11.09.2026, Objekt 82)."""
+    from apps.drive import oauth
+    from apps.drive.object_root import ObjectRootError, set_object_root
+
+    if case.case_type != CaseType.DUPLICATE_OBJECT_NUMBER or case.object_id is None:
+        raise ReviewError("Ordnerwahl gibt es nur bei Fällen zur Objektnummer")
+    if case.status in (CaseStatus.RESOLVED, CaseStatus.DISMISSED):
+        raise ReviewError("Fall ist bereits erledigt")
+    ids = {c.get("drive_file_id") for c in (case.candidates or [])}
+    if folder_id not in ids:
+        raise ReviewError("Der gewählte Ordner gehört nicht zu den Kandidaten dieses Falls")
+    adapter = oauth.get_adapter()
+    if adapter is None:
+        raise ReviewError("Keine Google-Verbindung")
+    try:
+        result = set_object_root(case.object, folder_id, drive=adapter, user=user, request=request, case=case)
+    except ObjectRootError as exc:
+        raise ReviewError(str(exc)) from exc
+    ReviewDecision.objects.create(
+        review_case=case,
+        document=None,
+        decision_type=DecisionType.CORRECT,
+        decided_by=user,
+        decided_at=timezone.now(),
+        before_state={"candidates": case.candidates},
+        after_state={
+            "folder_id": folder_id,
+            "folder_name": result["folder"].name,
+            "reconcile": result["reconcile"],
+        },
+        system_was_correct=None,
+    )
+    return result
