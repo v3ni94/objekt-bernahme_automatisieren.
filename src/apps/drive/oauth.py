@@ -3,7 +3,7 @@
 Parameter: access_type offline, prompt consent, include_granted_scopes false, state an die Admin-Sitzung gebunden, PKCE.
 Nur das Konto DRIVE_ACCOUNT_EMAIL wird akzeptiert. Access- und Refresh-Token liegen mit TOKEN_KEY verschluesselt in
 oauth_tokens (storage_mode db). Refresh serialisiert ueber Redis-Lock drive:token:refresh; invalid_grant setzt revoked.
-Ablauf, Flow-Erzeugung und Userinfo-Abruf sind injizierbar, damit Tests ohne Google laufen.
+Ablauf, Flow-Erzeugung und Kontoabfrage sind injizierbar, damit Tests ohne Google laufen.
 """
 
 from __future__ import annotations
@@ -28,7 +28,9 @@ logger = logging.getLogger(__name__)
 DRIVE_SCOPE = "https://www.googleapis.com/auth/drive"
 TOKEN_URI = "https://oauth2.googleapis.com/token"  # noqa: S105 (Endpunkt, kein Geheimnis)
 AUTH_URI = "https://accounts.google.com/o/oauth2/auth"
-USERINFO_URI = "https://www.googleapis.com/oauth2/v3/userinfo"
+# Kontoabfrage ueber die Drive-Schnittstelle: funktioniert mit dem Drive-Bereich allein. Der Userinfo-Endpunkt
+# verlangt einen Identitaetsbereich (openid, email) und antwortete mit dem reinen Drive-Token 401 (Befund 11.09.2026).
+ABOUT_URI = "https://www.googleapis.com/drive/v3/about?fields=user(emailAddress,displayName)"
 SESSION_KEY = "drive_oauth"
 PROVIDER = "google"
 cipher = FieldCipher("token")
@@ -122,12 +124,14 @@ def default_token_exchange(code: str, verifier: str) -> dict:
 
 
 def default_userinfo(access_token: str) -> dict:
+    """Konto des Tokens ueber Drive about.get ermitteln; Rueckgabe wie Userinfo mit den Schluesseln email und name."""
     import requests
 
-    resp = requests.get(USERINFO_URI, headers={"Authorization": f"Bearer {access_token}"}, timeout=30)
+    resp = requests.get(ABOUT_URI, headers={"Authorization": f"Bearer {access_token}"}, timeout=30)
     if resp.status_code != 200:
-        raise OAuthRejected(f"Userinfo antwortete {resp.status_code}")
-    return resp.json()
+        raise OAuthRejected(f"Kontoabfrage über Drive antwortete {resp.status_code}")
+    user = (resp.json() or {}).get("user") or {}
+    return {"email": user.get("emailAddress", ""), "name": user.get("displayName", "")}
 
 
 def handle_callback(
