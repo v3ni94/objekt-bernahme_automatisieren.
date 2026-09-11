@@ -57,6 +57,11 @@ class Command(BaseCommand):
             # Ohne Verbindung (z. B. Vorschau) aus dem Modellregister ableiten
             tables = sorted({m._meta.db_table for m in apps.get_models()} | {"django_migrations"})
         lines = [f"-- erzeugt von grants_sql fuer Datenbank {db}; idempotent"]
+        # Das Image legt app_rw mit allen Rechten auf die Datenbank an; diese werden hier durch Tabellenrechte
+        # ersetzt. REVOKE bricht mit Fehler 1141 ab, wenn kein datenbankweites Recht (mehr) existiert, also ab
+        # dem zweiten Lauf. Ein vorangestelltes GRANT stellt sicher, dass immer genau ein solches Recht besteht;
+        # es wird unmittelbar danach mit entzogen, sodass am Ende nur die Tabellenrechte gelten.
+        lines.append(f"GRANT SELECT ON `{db}`.* TO 'app_rw'@'%';")
         lines.append(f"REVOKE ALL PRIVILEGES ON `{db}`.* FROM 'app_rw'@'%';")
         for t in tables:
             rights_rw = "SELECT, INSERT" if t in APPEND_ONLY else "SELECT, INSERT, UPDATE, DELETE"
