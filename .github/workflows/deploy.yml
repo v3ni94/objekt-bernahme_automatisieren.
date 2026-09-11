@@ -16,7 +16,7 @@ on:
         required: true
         default: "check"
         type: choice
-        options: ["check", "pull", "befund", "env-init", "ps", "logs", "smoke", "cert-retry", "db-status", "db-reset", "first-run", "deploy", "rollback", "create-admin"]
+        options: ["check", "pull", "befund", "env-init", "ps", "logs", "smoke", "cert-retry", "db-status", "db-reset", "first-run", "deploy", "rollback", "create-admin", "oauth-check", "deploy-tests", "doc-status"]
       argument:
         description: "Nur fuer create-admin (E-Mail) und logs (Dienstname, leer = alle Anwendungsdienste)"
         required: false
@@ -56,5 +56,19 @@ jobs:
           test -n "$DEPLOY_USER" || { echo "Secret DEPLOY_USER fehlt"; exit 1; }
           case "$BRANCH" in *[!A-Za-z0-9._/-]*) echo "unzulaessiger Branchname"; exit 1;; esac
           case "$ARGUMENT" in *[!A-Za-z0-9@._+-]*) echo "unzulaessiges Argument"; exit 1;; esac
-          ssh -i ~/.ssh/id_deploy -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o BatchMode=yes \
-            -o ServerAliveInterval=30 -o LogLevel=VERBOSE "$DEPLOY_USER@$DEPLOY_HOST" "$ACTION $BRANCH $ARGUMENT"
+          # Der Verbindungsaufbau zum Server scheitert gelegentlich mit "Connection timed out" (Exit 255),
+          # obwohl sshd laeuft; die Aktion selbst wurde dann nie gestartet. Nur dieser Fall wird bis zu
+          # dreimal wiederholt. Ein anderer Exit-Code stammt vom Server und wird nicht wiederholt, damit
+          # ein Deployment nicht doppelt anlaeuft.
+          for versuch in 1 2 3; do
+            set +e
+            ssh -i ~/.ssh/id_deploy -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o BatchMode=yes \
+              -o ConnectTimeout=25 -o ServerAliveInterval=30 -o LogLevel=VERBOSE \
+              "$DEPLOY_USER@$DEPLOY_HOST" "$ACTION $BRANCH $ARGUMENT"
+            rc=$?
+            set -e
+            [ "$rc" -ne 255 ] && exit "$rc"
+            echo "Verbindungsaufbau fehlgeschlagen (Versuch $versuch von 3), neuer Versuch in 20 s"
+            sleep 20
+          done
+          echo "Server ueber SSH nicht erreichbar (dreimal Verbindungsabbruch)"; exit 255

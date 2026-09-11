@@ -9,7 +9,7 @@ Stand: 10.09.2026. Zwei getrennte Schlüsselpaare, zwei Richtungen. SFTP wird ni
 | VPS holt Code von GitHub | Deploy Key (nur Lesen) | privater Teil unter `~deploy/.ssh/github_deploy`, öffentlicher Teil im Repository unter Settings, Deploy keys | `git fetch` und `git pull` in `scripts/deploy.sh` |
 | GitHub Actions löst Deployment aus | Aktionsschlüssel | privater Teil als Repository-Secret `DEPLOY_SSH_KEY`, öffentlicher Teil in `~deploy/.ssh/authorized_keys` mit `command=`-Einschränkung | Workflow `.github/workflows/deploy.yml` ruft `scripts/deploy_remote.sh` auf |
 
-Der Aktionsschlüssel kann auf dem Server ausschließlich `deploy <branch>`, `rollback` oder `check` auslösen (erzwungenes Kommando, kein Terminal, keine Weiterleitungen). Ein kompromittierter Schlüssel erlaubt damit kein Arbeiten auf dem Server.
+Der Aktionsschlüssel kann auf dem Server ausschließlich die in der Tabelle unten genannten Aktionen auslösen (erzwungenes Kommando, kein Terminal, keine Weiterleitungen). Ein kompromittierter Schlüssel erlaubt damit kein Arbeiten auf dem Server.
 
 ## Kurzweg: `scripts/bootstrap_vps.sh`
 
@@ -79,6 +79,9 @@ Actions, Workflow `Deploy`, Run workflow; Eingaben Branch, Aktion und (nur für 
 | `cert-retry` | Web-Container neu aufbauen, damit Traefik den Router neu aufnimmt und ein Zertifikat anfordert; wartet bis zu drei Minuten. Höchstens einmal je Stunde, Let's Encrypt begrenzt fehlgeschlagene Validierungen auf fünf je Stunde und Name | Web-Container |
 | `logs` | letzte 40 Logzeilen; ohne Argument die der Anwendungsdienste, sonst der genannte Dienst | nichts |
 | `db-status` | Datenbankkonten und Tabellenzahl anzeigen | nichts |
+| `oauth-check` | Konfiguration der Google-Verbindung ohne Geheimnisse (Client-ID gekürzt, Secret nur Länge und Präfix, Redirect, Konto, Wurzelordner, Token-Status) und Probe der Client-Zugangsdaten gegen den Token-Endpunkt: `invalid_client` heißt Client-ID und Secret passen nicht zusammen, `invalid_grant` heißt in Ordnung | nichts |
+| `deploy-tests` | Deployment-Tests T2 (Host-Ports), T3 (Isolation `data`), T11 (Logs ohne IBAN, JSON), T14 (`/healthz/`, `/readyz/` ohne Token) | nichts |
+| `doc-status` | Dokumente je Objekt und Status, offene und fehlgeschlagene Jobs, Läufe; ohne Dateinamen und Personendaten | nichts |
 | `db-reset` | Datenverzeichnis der Datenbank leeren und neu initialisieren; bricht ab, sobald `django_migrations` vorhanden oder nicht prüfbar ist | Datenverzeichnis der Datenbank |
 | `first-run` | Erstinstallation `scripts/deploy.sh --first-run <branch>` (Images bauen, db und redis starten, Migration, Seeds, Rechte, alle Dienste, Smoke-Test) | alles |
 | `deploy` | Deployment `scripts/deploy.sh <branch>` | alles |

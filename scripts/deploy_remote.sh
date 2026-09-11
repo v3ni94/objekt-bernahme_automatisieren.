@@ -19,6 +19,9 @@
 #   db-status <branch>        Datenbankkonten und Tabellenzahl anzeigen (nur lesend)
 #   db-reset <branch>         Datenverzeichnis der Datenbank leeren und neu initialisieren; bricht ab,
 #                             sobald ein Schema vorhanden ist (Schutz gegen Datenverlust)
+#   oauth-check <branch>      Google-Verbindung: Konfiguration ohne Geheimnisse und Probe der Client-Zugangsdaten
+#   deploy-tests <branch>     Deployment-Tests T2, T3, T11, T14 (nur lesend)
+#   doc-status <branch>       Dokumente je Objekt und Status, offene und fehlgeschlagene Jobs (nur lesend)
 # Jede andere Eingabe wird abgewiesen.
 set -euo pipefail
 cd /opt/objektakte
@@ -194,5 +197,87 @@ with urllib.request.urlopen(req, timeout=10) as r:
     umask 077; printf 'Startpasswort fuer %s: %s\n' "$ARG" "$PW" > /home/deploy/admin-startpasswort.txt
     echo "Startpasswort liegt auf dem Server in /home/deploy/admin-startpasswort.txt (nach dem ersten Login loeschen: shred -u)."
     ;;
-  *) echo "Nur check, pull, befund, env-init, ps, logs, smoke, cert-retry, db-status, db-reset, first-run, deploy, rollback oder create-admin erlaubt"; exit 2 ;;
+  oauth-check)
+    # Konfiguration der Google-Verbindung pruefen, ohne Geheimnisse auszugeben, und die Client-Zugangsdaten
+    # gegen den Token-Endpunkt proben: invalid_client heisst Client-ID und Secret passen nicht zusammen,
+    # invalid_grant heisst die Zugangsdaten sind in Ordnung (nur der absichtlich ungueltige Probe-Token wird abgelehnt).
+    docker compose exec -T web python manage.py shell <<'PY'
+import json, urllib.error, urllib.parse, urllib.request
+from apps.config import store
+from apps.drive import oauth
+try:
+    cfg = oauth.client_config()["web"]
+except Exception as exc:
+    print("Konfiguration unvollstaendig:", exc)
+    raise SystemExit(0)
+cid, sec = cfg["client_id"], cfg["client_secret"]
+print(f"Client-ID: {cid[:14]}... ({len(cid)} Zeichen, Projektnummer {cid.split('-')[0]})")
+print(f"Secret: {sec[:7]}... ({len(sec)} Zeichen)")
+print("Redirect:", cfg["redirect_uris"])
+print("DRIVE_ACCOUNT_EMAIL:", oauth.account_email() or "(leer)")
+print("drive.root_folder_id:", store.get("drive.root_folder_id") or "(leer)")
+print("Token in der Datenbank:", oauth.token_status().get("status"))
+data = urllib.parse.urlencode({"client_id": cid, "client_secret": sec, "grant_type": "refresh_token", "refresh_token": "probe"}).encode()
+try:
+    urllib.request.urlopen(urllib.request.Request(oauth.TOKEN_URI, data=data), timeout=15)
+    print("PROBE: unerwartet erfolgreich")
+except urllib.error.HTTPError as e:
+    body = json.loads(e.read().decode() or "{}")
+    err = body.get("error")
+    if err == "invalid_client":
+        print("PROBE: Google lehnt Client-ID oder Secret ab (invalid_client). Beide Werte aus derselben JSON-Datei des Clients setzen, Dienste mit --force-recreate neu starten.")
+    elif err == "invalid_grant":
+        print("PROBE: Client-Zugangsdaten in Ordnung (Google meldet nur den erwarteten invalid_grant der Probe). Ein 401 beim Verbinden haette dann eine andere Ursache.")
+    else:
+        print("PROBE:", e.code, err, body.get("error_description"))
+except Exception as exc:
+    print("PROBE nicht moeglich:", exc)
+PY
+    ;;
+  deploy-tests)
+    # Deployment-Tests T2, T3, T11 und T14 (docs/betrieb/deployment-test.md), nur lesend
+    dom="$(envval APP_DOMAIN)"
+    echo "T2 Host-Ports der Anwendungsdienste (erwartet: keine):"
+    docker compose ps --format '  {{.Name}} {{.Publishers}}' | sed 's/\[\]/keine/'
+    echo "  Veroeffentlichte Ports aller Container auf dem Host (erwartet: nur fremde Anwendungen):"
+    docker ps --format '  {{.Names}} {{.Ports}}' | grep -E '0\.0\.0\.0|:::' || echo "  keine"
+    echo "T3 Isolation des Netzes data (erwartet: BLOCKIERT):"
+    docker compose exec -T db bash -c 'timeout 5 bash -c "exec 3<>/dev/tcp/1.1.1.1/443" 2>/dev/null && echo "  db: ERREICHBAR" || echo "  db: BLOCKIERT"'
+    docker compose exec -T redis sh -c 'timeout 5 wget -q -T 5 -O /dev/null https://1.1.1.1 2>/dev/null && echo "  redis: ERREICHBAR" || echo "  redis: BLOCKIERT"'
+    echo "T11 Logs (erwartet: 0 IBAN-Treffer, Anwendungsmeldungen als JSON):"
+    n=$(docker compose logs --no-color --tail 2000 web worker worker-nlp worker-io beat 2>/dev/null | grep -cE 'DE[0-9]{2}[0-9 ]{18,}' || true)
+    echo "  IBAN-Treffer: $n"
+    j=$(docker compose logs --no-color --tail 2000 worker 2>/dev/null | grep -c '| {"ts"' || true)
+    echo "  JSON-Zeilen im Worker-Log (Stichprobe): $j"
+    echo "T14 Healthcheck-Endpunkte:"
+    curl -s -o /dev/null -w '  /healthz/ %{http_code} (erwartet 200)\n' --max-time 10 "https://${dom}/healthz/"
+    echo "  /healthz/ Inhalt: $(curl -s --max-time 10 "https://${dom}/healthz/")"
+    curl -s -o /dev/null -w '  /readyz/ ohne Token %{http_code} (erwartet 401)\n' --max-time 10 "https://${dom}/readyz/"
+    ;;
+  doc-status)
+    # Dokumente je Objekt und Status, offene und fehlgeschlagene Jobs; keine Dateinamen, keine Personendaten
+    docker compose exec -T web python manage.py shell <<'PY'
+from django.db.models import Count
+from apps.documents.models import Document
+from apps.objects.models import ManagedObject
+from apps.pipeline.models import ProcessingJob, ProcessingRun
+for obj in ManagedObject.objects.order_by("object_number_numeric"):
+    rows = Document.objects.filter(object=obj, deleted_at__isnull=True).values("status").annotate(c=Count("id")).order_by("status")
+    stat = ", ".join(f"{r['status']}={r['c']}" for r in rows) or "keine Dokumente"
+    arch = " (archiviert)" if obj.deleted_at else ""
+    drive = "Drive-Ordner zugeordnet" if obj.drive_root_folder_id else "kein Drive-Ordner"
+    print(f"Objekt {obj.object_number}{arch}: {stat}; {drive}")
+offen = ProcessingJob.objects.filter(status__in=["pending", "running"]).values("job_type", "status").annotate(c=Count("id"))
+print("Jobs offen:", ", ".join(f"{r['job_type']}/{r['status']}={r['c']}" for r in offen) or "keine")
+fehl = ProcessingJob.objects.filter(status="failed").values("job_type").annotate(c=Count("id"))
+print("Jobs fehlgeschlagen:", ", ".join(f"{r['job_type']}={r['c']}" for r in fehl) or "keine")
+for j in ProcessingJob.objects.filter(status="failed").order_by("-id")[:5]:
+    print(f"  Fehler {j.job_type} Job {j.pk}: {(j.last_error or '')[:160]}")
+for j in ProcessingJob.objects.filter(status="pending", last_error__startswith="wartet").order_by("-id")[:3]:
+    print(f"  wartet {j.job_type} Job {j.pk}: {(j.last_error or '')[:120]}")
+laeufe = ProcessingRun.objects.values("status").annotate(c=Count("id"))
+print("Laeufe:", ", ".join(f"{r['status']}={r['c']}" for r in laeufe) or "keine")
+PY
+    ;;
+  *) echo "Nur check, pull, befund, env-init, ps, logs, smoke, cert-retry, db-status, db-reset, first-run, deploy, rollback, create-admin, oauth-check, deploy-tests oder doc-status erlaubt"; exit 2 ;;
 esac
