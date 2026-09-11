@@ -16,9 +16,9 @@ on:
         required: true
         default: "check"
         type: choice
-        options: ["check", "pull", "befund", "env-init", "ps", "logs", "smoke", "cert-retry", "db-status", "db-reset", "first-run", "deploy", "rollback", "create-admin", "oauth-check", "deploy-tests", "doc-status"]
+        options: ["check", "pull", "befund", "env-init", "ps", "logs", "smoke", "cert-retry", "db-status", "db-reset", "first-run", "deploy", "rollback", "create-admin", "oauth-check", "deploy-tests", "doc-status", "config-set"]
       argument:
-        description: "Nur fuer create-admin (E-Mail) und logs (Dienstname, leer = alle Anwendungsdienste)"
+        description: "Nur fuer create-admin (E-Mail), logs (Dienstname, leer = alle Anwendungsdienste) und config-set (schluessel=wert)"
         required: false
         default: ""
 
@@ -55,7 +55,7 @@ jobs:
           test -n "$DEPLOY_HOST" || { echo "Secret DEPLOY_HOST fehlt"; exit 1; }
           test -n "$DEPLOY_USER" || { echo "Secret DEPLOY_USER fehlt"; exit 1; }
           case "$BRANCH" in *[!A-Za-z0-9._/-]*) echo "unzulaessiger Branchname"; exit 1;; esac
-          case "$ARGUMENT" in *[!A-Za-z0-9@._+-]*) echo "unzulaessiges Argument"; exit 1;; esac
+          case "$ARGUMENT" in *[!A-Za-z0-9@._+=-]*) echo "unzulaessiges Argument"; exit 1;; esac
           # Der Verbindungsaufbau zum Server scheitert gelegentlich mit "Connection timed out" (Exit 255),
           # obwohl sshd laeuft; die Aktion selbst wurde dann nie gestartet. Nur dieser Fall wird bis zu
           # dreimal wiederholt. Ein anderer Exit-Code stammt vom Server und wird nicht wiederholt, damit

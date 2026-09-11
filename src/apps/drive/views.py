@@ -257,3 +257,88 @@ def sync_run_export(request, pk: int, fmt: str):
     if not str(path.resolve()).startswith(str(settings.OBJEKTAKTE["DATA_DIR"].resolve())):
         raise Http404
     return FileResponse(open(path, "rb"), as_attachment=True, filename=path.name)
+
+
+# ---------------------------------------------------------------- Bestand aus Drive uebernehmen (11.09.2026)
+@permission_required("objects.write")
+def object_takeover(request, pk: int):
+    """Vorhandene Ordnerstruktur durchsehen (Wurzelordner abwaerts oder beliebiger Ordner per ID oder Link) und
+    Dateien in das Objekt uebernehmen: ausgewaehlte Dateien, alle Dateien des Ordners oder mit Unterordnern.
+    Die Dateien bleiben in Drive und werden von der Verarbeitung in die neue Struktur verschoben."""
+    from apps.drive import takeover
+
+    obj = get_object_or_404(ManagedObject.active, pk=pk)
+    adapter = oauth.get_adapter()
+    root_id = store.get("drive.root_folder_id")
+    if adapter is None:
+        messages.error(request, "Keine Google-Verbindung. Der Admin verbindet Google Drive unter Verwaltung.")
+        return redirect("document_list", pk=obj.pk)
+    ref = request.POST.get("folder") if request.method == "POST" else request.GET.get("ordner")
+    folder_id = takeover.parse_folder_ref(ref or "") or root_id
+    if not folder_id:
+        messages.error(request, "Kein Startordner: Wurzelordner setzen oder eine Ordner-ID eingeben.")
+        return redirect("document_list", pk=obj.pk)
+    try:
+        folder = adapter.get(folder_id)
+        if folder is None or not folder.is_folder or folder.trashed:
+            messages.error(request, "Der angegebene Ordner wurde in Drive nicht gefunden.")
+            return redirect("object_takeover", pk=obj.pk)
+        if request.method == "POST" and request.POST.get("mode"):
+            return _takeover_register(request, obj, adapter, folder)
+        folders, files = takeover.list_folder(adapter, folder_id)
+        crumbs = takeover.breadcrumb(adapter, folder, root_id)
+    except DriveError as exc:
+        messages.error(request, f"Drive-Fehler: {exc}")
+        return redirect("document_list", pk=obj.pk)
+    return render(
+        request,
+        "drive/takeover.html",
+        {
+            "object": obj,
+            "folder": folder,
+            "crumbs": crumbs,
+            "folders": folders,
+            "files": files,
+            "selectable": sum(1 for f in files if f.selectable),
+            "is_root": folder.id == root_id,
+            "limit": takeover.max_files(),
+        },
+    )
+
+
+def _takeover_register(request, obj, adapter, folder):
+    from apps.drive import takeover
+
+    mode = request.POST.get("mode")
+    limit = takeover.max_files()
+    try:
+        if mode == "selected":
+            ids = set(request.POST.getlist("files"))
+            if not ids:
+                messages.warning(request, "Keine Datei ausgewählt.")
+                return redirect(f"{request.path}?ordner={folder.id}")
+            entries = takeover.collect_files(adapter, folder, recursive=False, limit=limit, only_ids=ids)
+        elif mode in ("folder", "recursive"):
+            entries = takeover.collect_files(adapter, folder, recursive=(mode == "recursive"), limit=limit)
+        else:
+            messages.error(request, "Unbekannte Aktion.")
+            return redirect(f"{request.path}?ordner={folder.id}")
+    except takeover.TakeoverError as exc:
+        messages.error(request, str(exc))
+        return redirect(f"{request.path}?ordner={folder.id}")
+    if not entries:
+        messages.warning(request, f"Im Ordner „{folder.name}“ liegen keine Dateien.")
+        return redirect(f"{request.path}?ordner={folder.id}")
+    result = takeover.register_files(obj, entries, source_folder=folder, user=request.user, request=request)
+    if result.registered:
+        messages.success(
+            request,
+            f"{result.registered} Datei(en) aus „{folder.name}“ in Objekt {obj.object_number} übernommen; "
+            f"Lauf {result.run_id} verarbeitet sie und legt sie in der neuen Struktur ab. "
+            "Die Quellordner bleiben bestehen, es wird nichts gelöscht.",
+        )
+    else:
+        messages.info(request, "Keine neue Datei übernommen.")
+    for note in result.notes:
+        messages.info(request, note)
+    return redirect(f"{request.path}?ordner={folder.id}")

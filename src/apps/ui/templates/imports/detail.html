@@ -3,7 +3,7 @@
 <p class="klein">Objekt <a href="{% url 'object_detail' object.pk %}">{{ object.object_number }} {{ object.name|default:"" }}</a> · Profil {{ batch.parser_profile }}{% if mapping.sheet %} · Blatt {{ mapping.sheet }}{% endif %} · Status {{ batch.get_status_display }} · SHA-256 <span class="mono">{{ batch.source_sha256|slice:":16" }}…</span></p>
 <div class="raster">
 <div class="karte"><h2>Zähler</h2><table>
-<tr><td>Zeilen gesamt</td><td>{{ batch.rows_total|default_if_none:"–" }}</td></tr>
+<tr><td>Zeilen gesamt</td><td>{{ batch.rows_total|default_if_none:"keine Angabe" }}</td></tr>
 <tr><td>sicher (eingelesen)</td><td>{{ counts.parsed }}</td></tr><tr><td>unsicher</td><td>{{ counts.uncertain }}</td></tr>
 <tr><td>übernommen</td><td>{{ counts.committed }}</td></tr><tr><td>abgelehnt</td><td>{{ counts.rejected }}</td></tr><tr><td>Dubletten</td><td>{{ counts.duplicate }}</td></tr></table>
 {% if batch.error_message %}<p class="warnung">{{ batch.error_message }}</p>{% endif %}

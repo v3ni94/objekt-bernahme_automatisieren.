@@ -4,7 +4,7 @@
 <div class="raster">
 <div class="karte"><h2>Bewertung</h2>
 <table><tr><td>Status</td><td>{% if summary.status == "complete" %}<span class="ampel gruen">vollständig</span>{% elif summary.status == "mostly_complete" %}<span class="ampel gelb">weitgehend vollständig</span>{% elif summary.status == "incomplete" %}<span class="ampel rot">unvollständig</span>{% else %}<span class="ampel grau">noch nicht bewertet</span>{% endif %}</td></tr>
-<tr><td>Erfüllungsgrad</td><td>{% if summary.ratio is not None %}{% widthratio summary.ratio 1 100 %} %{% else %}–{% endif %}</td></tr>
+<tr><td>Erfüllungsgrad</td><td>{% if summary.ratio is not None %}{% widthratio summary.ratio 1 100 %} %{% else %}offen{% endif %}</td></tr>
 <tr><td>Positionen</td><td>{% if summary.counts %}erfüllt {{ summary.counts.fulfilled }}, teilweise {{ summary.counts.partial }}, fehlt {{ summary.counts.missing }}, nicht anwendbar {{ summary.counts.not_applicable }}{% endif %}</td></tr>
 <tr><td>Einheiten</td><td>{% if summary.unit_counts %}vollständig {{ summary.unit_counts.complete }}, teilweise {{ summary.unit_counts.partial }}, unvollständig {{ summary.unit_counts.incomplete }}, nicht bewertbar {{ summary.unit_counts.not_evaluable }}{% endif %}</td></tr>
 <tr><td>Übernahmezeitraum</td><td>{{ period.start|date:"d.m.Y" }} bis {{ period.end|date:"d.m.Y" }}, Wirtschaftsjahre {{ period.years|join:", " }}{% if period.provisional %} <span class="ampel grau">vorläufig, Stichtag in der Zukunft</span>{% endif %}</td></tr>

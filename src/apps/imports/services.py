@@ -1251,6 +1251,32 @@ def _commit_tenant(batch, row, unit, shared, person, user, targets, prov) -> Non
             source_import_row=row,
         )
         targets.append({"type": "tenant_unit_assignment", "id": a.pk, "created": True})
+        _name_tenant_file(unit, a, user)
+
+
+def _name_tenant_file(unit, assignment, user) -> None:
+    """Akten-Vorlage (11.09.2026): Mieterakte der Einheit erhaelt mit der Zuordnung ihren Namen; ohne Vorlage
+    (Schalter aus, kein Platzhalter) entsteht keine Akte durch den Import."""
+    from apps.config import store
+    from apps.parties.models import TenantFile
+
+    placeholder = TenantFile.active.filter(
+        unit=unit, file_kind="unit_tenant", file_assignments__isnull=True
+    ).exists()
+    if not placeholder and not store.get("owner_file.create_folders_eagerly", False):
+        return
+    from apps.drive.tasks import trigger_unit_folders
+    from apps.parties.unit_files import tenant_file_for_assignments
+
+    # Mitmieter derselben Quellzeile teilen das Mietverhaeltnis (H 6.9) und damit die Akte
+    group = (
+        list(TenantUnitAssignment.active.filter(unit=unit, lease=assignment.lease).select_related("tenant"))
+        if assignment.lease_id
+        else [assignment]
+    )
+    tenant_file_for_assignments(unit, group or [assignment])
+    user_id = getattr(user, "pk", None)
+    transaction.on_commit(lambda: trigger_unit_folders(unit.object_id, user_id=user_id))
 
 
 def _date(value):

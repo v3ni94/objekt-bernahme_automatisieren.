@@ -2,12 +2,12 @@
 {% block content %}<h1>Objekt {{ object.object_number }} {{ object.name|default:"" }}{% if object.is_test %} <span class="ampel grau">Test</span>{% endif %}</h1>
 <div class="raster">
 <div class="karte"><h2>Stammdaten</h2>
-<table><tr><td>Adresse</td><td>{{ object.address|default:"–" }}</td></tr><tr><td>Verwaltungsart</td><td>{{ object.get_management_type_display }}</td></tr><tr><td>Status</td><td>{{ object.get_status_display }}</td></tr>
+<table><tr><td>Adresse</td><td>{{ object.address|default:"keine Angabe" }}</td></tr><tr><td>Verwaltungsart</td><td>{{ object.get_management_type_display }}</td></tr><tr><td>Status</td><td>{{ object.get_status_display }}</td></tr>
 <tr><td>Übernahmezeitraum</td><td>{% if object.takeover_from %}{{ object.takeover_from|date:"d.m.Y" }}{% endif %}{% if object.takeover_to %} bis {{ object.takeover_to|date:"d.m.Y" }}{% endif %}</td></tr>
-<tr><td>Wirtschaftsjahr ab Monat</td><td>{{ object.fiscal_year_start_month|default:"–" }}</td></tr><tr><td>Sollzahl Einheiten</td><td>{{ object.expected_unit_count|default:"–" }}</td></tr>
-<tr><td>Vorverwaltung</td><td>{{ object.previous_manager_name|default:"–" }}{% if object.previous_manager_city %}, {{ object.previous_manager_postal_code|default:"" }} {{ object.previous_manager_city }}{% endif %}</td></tr>
+<tr><td>Wirtschaftsjahr ab Monat</td><td>{{ object.fiscal_year_start_month|default:"keine Angabe" }}</td></tr><tr><td>Sollzahl Einheiten</td><td>{{ object.expected_unit_count|default:"keine Angabe" }}</td></tr>
+<tr><td>Vorverwaltung</td><td>{{ object.previous_manager_name|default:"keine Angabe" }}{% if object.previous_manager_city %}, {{ object.previous_manager_postal_code|default:"" }} {{ object.previous_manager_city }}{% endif %}</td></tr>
 <tr><td>Drive-Ordner</td><td class="mono">{{ object.drive_root_folder_name|default:"noch nicht zugeordnet" }}{% if object.drive_root_folder_id %} <span class="klein">{{ object.drive_root_folder_id }}</span>{% endif %}</td></tr></table>
-<p><a href="{% url 'sync_run_list' object.pk %}">Ordnerabgleiche</a> · <a href="{% url 'document_list' object.pk %}">Dokumente und Verarbeitung</a> · <a href="{% url 'completeness' object.pk %}">Vollständigkeit</a> · <a href="{% url 'request_list' object.pk %}">Nachforderungen</a> · <a href="{% url 'list_overview' object.pk %}">Listen</a></p>
+<p><a href="{% url 'sync_run_list' object.pk %}">Ordnerabgleiche</a> · <a href="{% url 'document_list' object.pk %}">Dokumente und Verarbeitung</a> · {% if can_write %}<a href="{% url 'object_takeover' object.pk %}">Bestand aus Drive übernehmen</a> · {% endif %}<a href="{% url 'completeness' object.pk %}">Vollständigkeit</a> · <a href="{% url 'request_list' object.pk %}">Nachforderungen</a> · <a href="{% url 'list_overview' object.pk %}">Listen</a></p>
 {% if can_write %}<p><a class="knopf" href="{% url 'object_edit' object.pk %}">Bearbeiten</a> <a class="knopf" href="{% url 'object_archive' object.pk %}">Archivieren</a></p>{% endif %}</div>
 <div class="karte"><h2>Wer war Eigentümer am Stichtag</h2>
 <form method="get" class="filter inline"><input type="date" name="stichtag" value="{{ reference|date:'Y-m-d' }}"><button type="submit">Anzeigen</button></form>
@@ -24,7 +24,13 @@
 <table class="voll"><thead><tr><th>Einheit</th><th>Eigentümer</th><th>Von</th><th>Bis</th><th>Anteil</th><th>Datenstatus</th><th></th></tr></thead><tbody>
 {% for a in assignments %}<tr><td class="mono">{{ a.unit.unit_label }}</td><td>{{ a.owner }}</td><td>{% if a.valid_from %}{{ a.valid_from|date:"d.m.Y" }}{% else %}<span class="klein">unbekannt</span>{% endif %}</td><td>{% if a.valid_to %}{{ a.valid_to|date:"d.m.Y" }}{% else %}<span class="ampel gruen">aktuell</span>{% endif %}</td><td>{{ a.share|default:"" }}</td><td>{{ a.get_data_status_display }}</td><td>{% if can_master and not a.valid_to %}<a href="{% url 'assignment_end' a.pk %}">Beenden (Eigentümerwechsel)</a>{% endif %}</td></tr>
 {% empty %}<tr><td colspan="7">Noch keine Zuordnungen.</td></tr>{% endfor %}</tbody></table></div>
-<div class="karte"><h2>Eigentümerakten ({{ owner_files|length }})</h2><p class="klein">Akten entstehen mit der ersten Ablage oder auf Anforderung (owner_file.create_folders_eagerly), Drive-Ordner ab M4.</p>
+<div class="raster">
+<div class="karte"><h2>Eigentümerakten ({{ owner_files|length }})</h2><p class="klein">Je Einheit eine Akte unter 05_Eigentümerakte. Platzhalter tragen nur das Einheitenkürzel (WE01) und erhalten mit der Zuordnung den Eigentümernamen; ein in Drive von Hand vergebener Name bleibt.</p>
+{% if can_write %}<form method="post" action="{% url 'object_unit_files' object.pk %}" class="inline">{% csrf_token %}<button type="submit">Akten anlegen</button></form>{% endif %}
 <table class="voll"><thead><tr><th>Ordnername</th><th>Art</th><th>Einheit</th><th>Status</th></tr></thead><tbody>
 {% for f in owner_files %}<tr><td class="mono">{{ f.folder_name }}</td><td>{{ f.get_file_kind_display }}</td><td>{{ f.unit.unit_label|default:"" }}</td><td>{{ f.status }}</td></tr>{% empty %}<tr><td colspan="4">Noch keine Akten.</td></tr>{% endfor %}</tbody></table></div>
+<div class="karte"><h2>Mieterakten ({{ tenant_files|length }})</h2><p class="klein">Je Einheit eine Akte unter 04_Mieterakte; Mieterdokumente werden dort abgelegt. Der Name folgt dem Mieter, sobald er zugeordnet ist.</p>
+<table class="voll"><thead><tr><th>Ordnername</th><th>Einheit</th><th>Status</th></tr></thead><tbody>
+{% for f in tenant_files %}<tr><td class="mono">{{ f.folder_name }}</td><td>{{ f.unit.unit_label|default:"" }}</td><td>{{ f.status }}</td></tr>{% empty %}<tr><td colspan="3">Noch keine Akten.</td></tr>{% endfor %}</tbody></table></div>
+</div>
 {% endblock %}

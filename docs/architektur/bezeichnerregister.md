@@ -1516,6 +1516,7 @@ Celery-Queues aus den Settings: `ai`, `classify`, `io`, `lists`, `ocr`
 | drive.resumable_threshold_bytes | drive | integer | `5242880` |
 | drive.root_drive_id | drive | string | `null` |
 | drive.root_folder_id | drive | string | `null` |
+| drive.takeover_max_files | drive | integer | `500` |
 | drive.upload_chunk_bytes | drive | integer | `8388608` |
 | import.column_confidence_min | import | decimal | `0.8` |
 | import.column_synonyms | import | object | `{"unit_label": ["WE", "Einheit", "Whg", "Wohnung", "Nr", "Nr.", "VE", "VE-Beschreibung"...` |
@@ -1546,7 +1547,7 @@ Celery-Queues aus den Settings: `ai`, `classify`, `io`, `lists`, `ocr`
 | ocr.two_phase_enabled | ocr | boolean | `false` |
 | ocr.two_phase_head_pages | ocr | integer | `3` |
 | owner_file.collision_suffix_mode | owner_file | string | `"year_then_counter"` |
-| owner_file.create_folders_eagerly | owner_file | boolean | `false` |
+| owner_file.create_folders_eagerly | owner_file | boolean | `true` |
 | owner_file.legal_form_tokens | owner_file | list | `["GmbH", "AG", "KG", "GmbH & Co. KG", "UG", "e.V.", "GbR", "OHG", "eG", "SE", "mbH", "h...` |
 | owner_file.name_max_length | owner_file | integer | `100` |
 | owner_file.name_max_names | owner_file | integer | `3` |
@@ -1600,6 +1601,7 @@ Celery-Queues aus den Settings: `ai`, `classify`, `io`, `lists`, `ocr`
 | object.restore | Objekt aus dem Archiv zurückgeholt |
 | unit.create | Einheit angelegt |
 | unit.update | Einheit geändert |
+| unit_files.prepare | Akten je Einheit vorbereitet |
 | owner.create | Eigentümer angelegt |
 | owner.update | Eigentümer geändert |
 | assignment.create | Zuordnung Eigentümer zu Einheit angelegt |
@@ -1611,6 +1613,7 @@ Celery-Queues aus den Settings: `ai`, `classify`, `io`, `lists`, `ocr`
 | drive.move | Datei in Drive verschoben |
 | drive.create_folder | Ordner in Drive angelegt |
 | drive.upload | Datei nach Drive hochgeladen |
+| drive.takeover | Bestand aus Drive-Ordner übernommen |
 | document.ingest | Dokument hochgeladen (Upload in die Verarbeitung) |
 | processing.start | Verarbeitungslauf angefordert |
 | processing.sweep | Sweeper manuell ausgeführt |

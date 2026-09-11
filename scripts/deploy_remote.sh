@@ -22,6 +22,7 @@
 #   oauth-check <branch>      Google-Verbindung: Konfiguration ohne Geheimnisse und Probe der Client-Zugangsdaten
 #   deploy-tests <branch>     Deployment-Tests T2, T3, T11, T14 (nur lesend)
 #   doc-status <branch>       Dokumente je Objekt und Status, offene und fehlgeschlagene Jobs (nur lesend)
+#   config-set <branch> <schluessel=wert>  Konfigurationswert setzen (Wert als JSON: true, 5, "text"); Audit
 # Jede andere Eingabe wird abgewiesen.
 set -euo pipefail
 cd /opt/objektakte
@@ -55,7 +56,7 @@ ensure_network() {
   fi
 }
 case "$BRANCH" in *[!A-Za-z0-9._/-]*|*..*|"") case "$ACTION" in rollback|check) ;; *) echo "Branch fehlt oder unzulaessig"; exit 2 ;; esac ;; esac
-case "${ARG:-}" in *[!A-Za-z0-9@._+-]*) echo "Argument unzulaessig"; exit 2 ;; esac
+case "${ARG:-}" in *[!A-Za-z0-9@._+=-]*) echo "Argument unzulaessig"; exit 2 ;; esac
 echo "$(date -Is) $ACTION ${BRANCH:-} ${ARG:-} von ${SSH_CLIENT:-unbekannt}" >> "$LOG"
 case "$ACTION" in
   deploy)    ensure_github_hostkey; ensure_network; exec scripts/deploy.sh "$BRANCH" ;;
@@ -279,5 +280,22 @@ laeufe = ProcessingRun.objects.values("status").annotate(c=Count("id"))
 print("Laeufe:", ", ".join(f"{r['status']}={r['c']}" for r in laeufe) or "keine")
 PY
     ;;
-  *) echo "Nur check, pull, befund, env-init, ps, logs, smoke, cert-retry, db-status, db-reset, first-run, deploy, rollback, create-admin, oauth-check, deploy-tests oder doc-status erlaubt"; exit 2 ;;
+  config-set)
+    # Konfigurationswert aus dem Katalog setzen, Argument schluessel=wert; der Wert wird als JSON gelesen
+    # (true, false, 5, "text"), sonst als Zeichenkette. Validierung und Audit (setting.update) wie im Admin-Formular.
+    case "${ARG:-}" in *=*) ;; *) echo "Argument schluessel=wert fehlt"; exit 2 ;; esac
+    docker compose exec -T -e CFG_ARG="$ARG" web python manage.py shell <<'PY'
+import json, os
+from apps.config import store
+key, _, raw = os.environ["CFG_ARG"].partition("=")
+try:
+    value = json.loads(raw)
+except json.JSONDecodeError:
+    value = raw
+before = store.get(key)
+store.set(key, value, reason="Deploy-Workflow config-set")
+print(f"{key}: {before!r} -> {store.get(key)!r}")
+PY
+    ;;
+  *) echo "Nur check, pull, befund, env-init, ps, logs, smoke, cert-retry, db-status, db-reset, first-run, deploy, rollback, create-admin, oauth-check, deploy-tests, doc-status oder config-set erlaubt"; exit 2 ;;
 esac

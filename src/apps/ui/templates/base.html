@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
 <title>{% block title %}{{ APP_NAME }}{% endblock %}</title>
 <link rel="stylesheet" href="{% static 'css/app.css' %}">
 </head>
@@ -11,25 +12,25 @@
 <header class="kopf">
   <div class="marke"><strong>{{ APP_NAME }}</strong> <span class="sub">{{ APP_OWNER }}</span></div>
   {% if user.is_authenticated %}
-  <nav>
-    <a href="{% url 'object_list' %}">Objekte</a>
-    <a href="{% url 'owner_list' %}">Eigentümer</a>
-    <a href="{% url 'review_list' %}">Review Center</a>
-    <a href="{% url 'search' %}">Suche</a>
-    <a href="{% url 'report_overview' %}">Berichte</a>
-    <a href="{% url 'status_page' %}">Status</a>
-    {% if user|has_perm:"audit.read_own" or user|has_perm:"audit.read_all" %}<a href="{% url 'audit_list' %}">Protokoll</a>{% endif %}
-    <a href="{% url 'settings_list' %}">Konfiguration</a>
-    {% if user|has_perm:"users.manage" %}<a href="{% url 'user_list' %}">Nutzer</a>{% endif %}
-    {% if user|has_perm:"drive.connect" %}<a href="{% url 'drive_admin' %}">Google Drive</a>{% endif %}
-    <a href="{% url 'mfa_index' %}">Konto</a>
+  <nav aria-label="Hauptnavigation">
+    <a href="{% url 'object_list' %}" class="{% if NAV_ACTIVE == 'objekte' %}aktiv{% endif %}">Objekte</a>
+    <a href="{% url 'owner_list' %}" class="{% if NAV_ACTIVE == 'eigentuemer' %}aktiv{% endif %}">Eigentümer</a>
+    <a href="{% url 'review_list' %}" class="{% if NAV_ACTIVE == 'review' %}aktiv{% endif %}">Review Center</a>
+    <a href="{% url 'search' %}" class="{% if NAV_ACTIVE == 'suche' %}aktiv{% endif %}">Suche</a>
+    <a href="{% url 'report_overview' %}" class="{% if NAV_ACTIVE == 'berichte' %}aktiv{% endif %}">Berichte</a>
+    <a href="{% url 'status_page' %}" class="{% if NAV_ACTIVE == 'status' %}aktiv{% endif %}">Status</a>
+    {% if user|has_perm:"audit.read_own" or user|has_perm:"audit.read_all" %}<a href="{% url 'audit_list' %}" class="{% if NAV_ACTIVE == 'protokoll' %}aktiv{% endif %}">Protokoll</a>{% endif %}
+    <a href="{% url 'settings_list' %}" class="{% if NAV_ACTIVE == 'konfiguration' %}aktiv{% endif %}">Konfiguration</a>
+    {% if user|has_perm:"users.manage" %}<a href="{% url 'user_list' %}" class="{% if NAV_ACTIVE == 'nutzer' %}aktiv{% endif %}">Nutzer</a>{% endif %}
+    {% if user|has_perm:"drive.connect" %}<a href="{% url 'drive_admin' %}" class="{% if NAV_ACTIVE == 'drive' %}aktiv{% endif %}">Google Drive</a>{% endif %}
+    <a href="{% url 'mfa_index' %}" class="{% if NAV_ACTIVE == 'konto' %}aktiv{% endif %}">Konto</a>
     <form method="post" action="{% url 'account_logout' %}" class="inline">{% csrf_token %}<button class="link">Abmelden</button></form>
     <span class="nutzer">{{ user.display_name }} ({{ user.role.name }})</span>
   </nav>
   {% endif %}
 </header>
 <main class="inhalt">
-  {% if messages %}<ul class="meldungen">{% for m in messages %}<li class="{{ m.tags }}">{{ m }}</li>{% endfor %}</ul>{% endif %}
+  {% if messages %}<ul class="meldungen" role="status">{% for m in messages %}<li class="{{ m.tags }}">{{ m }}</li>{% endfor %}</ul>{% endif %}
   {% block content %}{% endblock %}
 </main>
 <footer class="fuss">{{ APP_OWNER }} · Version {{ IMAGE_TAG }}</footer>

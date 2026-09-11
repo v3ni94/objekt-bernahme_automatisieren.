@@ -1,6 +1,6 @@
 {% extends "base.html" %}{% load perms %}{% block title %}Abgleich {{ run.pk }} · {{ APP_NAME }}{% endblock %}
 {% block content %}<h1>Ordnerabgleich {{ run.pk }} {% if run.dry_run %}(Probelauf){% else %}(Ausführung){% endif %}</h1>
-<p class="klein">Objekt <a href="{% url 'object_detail' object.pk %}">{{ object.object_number }} {{ object.name|default:"" }}</a> · {{ run.started_at|date:"d.m.Y H:i" }} · Status {{ run.get_status_display }} · Treffer {{ run.root_matches|default_if_none:"–" }} · Dateien vorher {{ run.file_count_before|default_if_none:"–" }}, nachher {{ run.file_count_after|default_if_none:"–" }} · no_changes {{ run.no_changes|default_if_none:"–" }}
+<p class="klein">Objekt <a href="{% url 'object_detail' object.pk %}">{{ object.object_number }} {{ object.name|default:"" }}</a> · {{ run.started_at|date:"d.m.Y H:i" }} · Status {{ run.get_status_display }} · Treffer {{ run.root_matches|default_if_none:"offen" }} · Dateien vorher {{ run.file_count_before|default_if_none:"offen" }}, nachher {{ run.file_count_after|default_if_none:"offen" }} · no_changes {{ run.no_changes|default_if_none:"offen" }}
 · <a href="{% url 'sync_run_json' run.pk %}">JSON</a> · <a href="{% url 'sync_run_export' run.pk 'xlsx' %}">Excel</a> · <a href="{% url 'sync_run_list' object.pk %}">alle Läufe</a></p>
 {% if run.error_message %}<p class="warnung">{{ run.error_message }}</p>{% endif %}
 <div class="karte"><h2>Planliste</h2>

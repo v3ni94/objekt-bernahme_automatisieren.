@@ -47,12 +47,34 @@ def reconcile_object_task(
     if adapter is None:
         return {"run_id": failed.pk, "status": failed.status}
     run = reconcile_object(obj, drive=adapter, dry_run=dry_run, user=user, trigger=trigger)
-    return {
+    result = {
         "run_id": run.pk,
         "status": run.status,
         "actions_executed": run.actions_executed,
         "no_changes": run.no_changes,
     }
+    if not dry_run and run.status == "done" and trigger != "bulk":
+        # Akten-Vorlage: nach dem Objektordner folgen die Akten je Einheit (Eigentuemer unter 05, Mieter unter 04).
+        # Der Sammellauf bleibt davon frei; dort zaehlt die Ordnerstruktur, nicht die Akten.
+        result["unit_folders"] = _unit_folders_after_reconcile(obj, adapter, user)
+    return result
+
+
+def _unit_folders_after_reconcile(obj: ManagedObject, adapter, user) -> dict | None:
+    from apps.config import store
+
+    if not store.get("owner_file.create_folders_eagerly", False):
+        return None
+    from apps.drive.adapter import DriveError
+    from apps.drive.folders import FolderError, ensure_unit_folders
+    from apps.parties.unit_files import ensure_unit_files
+
+    try:
+        files = ensure_unit_files(obj)
+        return {**files, **ensure_unit_folders(obj, drive=adapter, user=user)}
+    except (FolderError, DriveError) as exc:
+        logger.warning("Aktenordner für Objekt %s nicht vollständig angelegt: %s", obj.pk, exc)
+        return {"error": str(exc)[:300]}
 
 
 @shared_task(name="drive.reconcile_all", queue="io")
@@ -157,5 +179,70 @@ def trigger_object_folders(
         reconcile_object_task.delay(object_id, False, user_id, trigger)
     except Exception:  # Broker nicht erreichbar: Anlage bleibt gueltig, Ordner spaeter ueber den Abgleich
         logger.exception("Ordneranlage für Objekt %s konnte nicht angestoßen werden", object_id)
+        return "error"
+    return "queued"
+
+
+@shared_task(name="drive.ensure_unit_folders", queue="io")
+def ensure_unit_folders_task(object_id: int, user_id: int | None = None) -> dict:
+    """Akten-Vorlage in Drive fuer ein Objekt: Akten je Einheit als Datensaetze sicherstellen, Ordner unter 05 und
+    04 anlegen oder bestaetigen, Namen abgleichen (Platzhalter WE01 wird nach Zuordnung zu WE01_Mustermann)."""
+    from apps.accounts.models import User
+    from apps.drive.adapter import DriveError
+    from apps.drive.folders import FolderError, ensure_unit_folders
+    from apps.parties.unit_files import ensure_unit_files
+
+    obj = ManagedObject.active.filter(pk=object_id).first()
+    if obj is None:
+        return {"ok": False, "reason": "object_missing"}
+    adapter = oauth.get_adapter()
+    if adapter is None:
+        return {"ok": False, "reason": "not_connected"}
+    user = User.objects.filter(pk=user_id).first() if user_id else None
+    files = ensure_unit_files(obj)
+    try:
+        stats = ensure_unit_folders(obj, drive=adapter, user=user)
+    except FolderError as exc:
+        return {"ok": False, "reason": str(exc), **files}
+    except DriveError as exc:
+        logger.warning("Aktenordner für Objekt %s: Drive-Fehler %s", object_id, exc)
+        return {
+            "ok": False,
+            "reason": f"Drive-Fehler {exc.status or ''} {exc.reason or ''}: {exc}"[:300],
+            **files,
+        }
+    return {"ok": True, **files, **stats}
+
+
+UNIT_FOLDER_DEBOUNCE_SECONDS = 15
+
+
+def trigger_unit_folders(object_id: int, *, user_id: int | None = None, force: bool = False) -> str:
+    """Aktenordner eines Objekts nachziehen (nach Zuordnung, Import oder Knopf „Akten anlegen").
+
+    Entprellt je Objekt: innerhalb von UNIT_FOLDER_DEBOUNCE_SECONDS wird nur ein Auftrag eingereiht, der mit
+    derselben Verzoegerung startet und dann alle bis dahin geaenderten Akten in einem Durchgang behandelt. Ohne
+    force gilt der Schalter owner_file.create_folders_eagerly. Rueckgabe wie trigger_object_folders.
+    """
+    from django.core.cache import cache
+
+    from apps.config import store
+
+    if not force and not store.get("owner_file.create_folders_eagerly", False):
+        return "disabled"
+    if oauth.token_status().get("status") != "active":
+        return "not_connected"
+    if not store.get("drive.root_folder_id"):
+        return "no_root"
+    key = f"drive:unit-folders:{object_id}"
+    if not cache.add(key, "1", timeout=UNIT_FOLDER_DEBOUNCE_SECONDS):
+        return "debounced"
+    try:
+        ensure_unit_folders_task.apply_async(
+            args=[object_id, user_id], countdown=UNIT_FOLDER_DEBOUNCE_SECONDS
+        )
+    except Exception:  # Broker nicht erreichbar: Akten sind gespeichert, Ordner folgen mit dem Abgleich
+        logger.exception("Aktenordner für Objekt %s konnten nicht eingereiht werden", object_id)
+        cache.delete(key)
         return "error"
     return "queued"

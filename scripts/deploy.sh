@@ -56,7 +56,9 @@ fi
 
 # 5. Migration mit dem neuen Image; alte Container laufen weiter (rueckwaertskompatibel)
 docker compose run --rm --no-deps web app-migrate
-if $FIRST_RUN; then docker compose run --rm --no-deps web app-seed; fi
+# Seeds bei jedem Deployment: idempotent, legt neue Katalogschluessel, Regeln und Textbausteine an und
+# ueberschreibt keine im Admin geaenderten Werte (Test "zweiter Lauf ohne Aenderung").
+docker compose run --rm --no-deps web app-seed
 
 # 5b. Tabellenrechte nachziehen (B-43): SQL aus dem Modellregister, als root ausgefuehrt
 docker compose run --rm --no-deps -T web app-grants-sql \

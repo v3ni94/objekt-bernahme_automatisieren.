@@ -4,7 +4,6 @@ Review-Entscheidung."""
 
 from __future__ import annotations
 
-from apps.config import store
 from apps.drive.naming import OwnerFileNamingConfig, OwnerNameInput, OwnerNamePart, build_owner_folder_name
 from apps.parties.models import Owner, OwnerFile, OwnerFileAssignment, OwnerUnitAssignment
 
@@ -25,6 +24,13 @@ def owner_file_for_assignments(unit, assignments: list[OwnerUnitAssignment]) -> 
         for a in assignments:
             OwnerFileAssignment.objects.get_or_create(assignment=a, defaults={"owner_file": linked})
         return linked
+    from apps.parties.unit_files import adopt_owner_placeholder
+
+    adopted = adopt_owner_placeholder(
+        unit, assignments
+    )  # Akten-Vorlage: Platzhalter WE01 wird zur benannten Akte
+    if adopted is not None:
+        return adopted
     cfg = OwnerFileNamingConfig.from_settings()
     owners = [a.owner for a in assignments]
     inp = OwnerNameInput(
@@ -46,8 +52,8 @@ def owner_file_for_assignments(unit, assignments: list[OwnerUnitAssignment]) -> 
     )
     for a in assignments:
         OwnerFileAssignment.objects.get_or_create(assignment=a, defaults={"owner_file": akte})
-    if store.get("owner_file.create_folders_eagerly", False):
-        pass  # Anlage in Drive erfolgt in file_to_drive (verzoegert, F 6.3); eager nur ueber den Abgleich
+    # Der Drive-Ordner entsteht mit der ersten Ablage (file_to_drive, F 6.3) oder, mit
+    # owner_file.create_folders_eagerly, ueber ensure_unit_folders nach Zuordnung und Ordnerabgleich.
     return akte
 
 

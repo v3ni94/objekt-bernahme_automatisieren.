@@ -42,6 +42,8 @@ Voraussetzung: Objektnummer und Stammdaten aus dem Übernahmevertrag beziehungsw
 
 Mit dem Speichern beginnt die Anwendung, den Objektordner in Drive anzulegen: Objektordner nach dem Namensmuster aus der Konfiguration und darunter die Hauptordner 01 bis 06 mit den Unterordnern von 06. Der Vorgang läuft als Auftrag im Hintergrund, die Meldung „Der Objektordner wird in Drive angelegt" erscheint sofort, der Ordner selbst nach wenigen Sekunden. Den Verlauf zeigt die Objektansicht unter Ordnerabgleiche.
 
+Akten-Vorlage: Ist die Sollzahl Einheiten eingetragen, legt die Anwendung mit dem Speichern die Einheiten WE 1 bis WE n als Platzhalter an (Datenstatus unvollständig) und je Einheit eine Eigentümerakte und eine Mieterakte. Die Akten heißen zunächst nur nach dem Einheitenkürzel (WE01, WE02, ...). Sobald der Objektordner steht, entstehen in Drive die Aktenordner: unter `05_Eigentümerakte` je Einheit ein Ordner mit den elf Unterordnern, unter `04_Mieterakte` je Einheit ein Ordner. Alle Ordner sind damit vorhanden, auch wenn sie leer sind. Wird später ein Eigentümer oder Mieter zugeordnet (von Hand oder per Import), erhält die Akte ihren Namen nach dem Namensschema (zum Beispiel `WE01_Mustermann`) und der Ordner in Drive wird umbenannt. Umbenannt wird nur ein Ordner, der noch den von der Anwendung vergebenen Namen trägt; ein in Drive von Hand vergebener Name bleibt bestehen. Die Bezeichnung der Einheit (WE 1) lässt sich in der Einheitenzeile mit „Bearbeiten“ anpassen, die Stammdaten der Einheit ebenso. Ohne Sollzahl oder bei später ergänzten Einheiten holt „Akten anlegen“ in der Objektansicht die Vorlage nach. Wer die Vorlage nicht will, setzt `owner_file.create_folders_eagerly` auf `false`; dann entsteht eine Akte erst mit der ersten Ablage.
+
 Besteht in Drive schon ein Ordner mit derselben Objektnummer, übernimmt die Anwendung diesen und legt keinen zweiten an. Sind mehrere Ordner mit derselben Nummer vorhanden oder liegt ein Treffer im Papierkorb, entsteht ein Fall im Review Center und es wird nichts angelegt.
 
 Anstelle der Ordneranlage erscheint ein Hinweis, wenn eine Voraussetzung fehlt:
@@ -98,6 +100,18 @@ Wenn etwas nicht klappt:
 - Mehrere Ordner mit derselben Nummer: Fall „Objektnummer doppelt“ im Review Center; der Abgleich schreibt erst nach der Entscheidung.
 - Google Drive zeigt „widerrufen“ oder die Statusseite ist rot: der Admin autorisiert unter Google Drive neu; wartende Schreibjobs laufen danach weiter.
 - Ratenlimit (403, 429): nichts tun, die Anwendung wiederholt mit Wartezeit.
+
+### 3.1 Bestand aus anderen Drive-Ordnern übernehmen
+
+Liegen die Unterlagen eines Objekts noch in der alten Ordnerstruktur (außerhalb des neuen Objektordners), holt „Bestand aus Drive übernehmen“ sie in das Objekt. Voraussetzung: Google Drive ist verbunden, das Objekt ist angelegt und der Ordnerabgleich hat den Objektordner erzeugt.
+
+1. Objektansicht oder Dokumentseite, „Bestand aus Drive übernehmen“. Die Seite zeigt den Wurzelordner mit Unterordnern und Dateien.
+2. Ordner für Ordner anklicken; der Pfad oben zeigt, wo man steht. Ein beliebiger Ordner lässt sich auch über seine ID oder den Drive-Link öffnen.
+3. Übernehmen: einzelne Dateien ankreuzen und „Ausgewählte übernehmen“, „Alle freien Dateien dieses Ordners übernehmen“ oder „Ordner mit allen Unterordnern übernehmen“ (Höchstzahl je Vorgang `drive.takeover_max_files`, Vorgabe 500; größere Bestände ordnerweise).
+4. Die Dateien werden als Bestandsdokumente registriert und ein Verarbeitungslauf startet. Die Kette liest jede Datei, erkennt Inhalt und Zuordnung und verschiebt sie in den passenden Ordner der neuen Struktur (Elternwechsel, kein Kopieren). Der Herkunftspfad steht am Dokument.
+5. Fortschritt auf der Dokumentseite; unklare Dateien landen unter 06_Sonstiges mit Fall im Review Center und werden dort zugeordnet.
+
+Was nicht passiert: Es wird nichts gelöscht. Die Quellordner bleiben stehen (nach der Übernahme leer). Verknüpfungen werden übersprungen, weil das Original an anderer Stelle liegt. Eine Datei, die bereits einem Objekt zugeordnet ist, zeigt die Seite mit dem Hinweis „in Objekt …“ und übernimmt sie nicht erneut.
 
 ## 4. Eigentümer- oder Mieterliste importieren
 
@@ -232,7 +246,9 @@ KPI lesen: Der Anteil 06 brutto ist der Anteil der Dokumente, die der letzte Lau
 |---|---|
 | Objektordner | Ordner des Objekts in Drive unter 01_Daten, erkannt über die Objektnummer im Namen |
 | Hauptordner | die sechs Ordner je Objekt (01 bis 06), 05_Eigentümerakte und 06_Sonstiges eingeschlossen |
-| Eigentümerakte | Unterordner je Eigentümergruppe in 05 mit fester Unterstruktur |
+| Eigentümerakte | Unterordner je Einheit und Eigentümergruppe in 05 mit fester Unterstruktur; als Platzhalter nur mit Einheitenkürzel (WE01), nach Zuordnung mit Namen |
+| Mieterakte | Unterordner je Einheit in 04; Mieterdokumente werden dort abgelegt, der Name folgt dem Mieter |
+| Akten-Vorlage | Einheiten aus der Sollzahl und beide Akten je Einheit werden mit dem Objekt angelegt, die Ordner in Drive sofort; Schalter `owner_file.create_folders_eagerly` |
 | Zuordnung | Eigentümer zu Einheit mit Zeitraum (Von, Bis) |
 | Stichtag | Datum, für das die Eigentümerschaft abgefragt wird |
 | Fall | offener Punkt im Review Center, immer mit Fallart |

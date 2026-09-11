@@ -1,6 +1,6 @@
 {% extends "base.html" %}{% load perms %}{% block title %}Dokumente Objekt {{ object.object_number }} · {{ APP_NAME }}{% endblock %}
 {% block content %}<h1>Dokumente und Verarbeitung: Objekt {{ object.object_number }} {{ object.name|default:"" }}</h1>
-<p><a href="{% url 'object_detail' object.pk %}">Zurück zum Objekt</a></p>
+<p><a href="{% url 'object_detail' object.pk %}">Zurück zum Objekt</a>{% if can_ingest %} · <a href="{% url 'object_takeover' object.pk %}">Bestand aus Drive übernehmen</a>{% endif %}</p>
 <div class="raster">
 <div class="karte"><h2>Fortschritt</h2>
 <table><tr><td>Dokumente gesamt</td><td>{{ progress.documents_total }}</td></tr>
@@ -15,8 +15,9 @@
 <tr><td>Offene Review-Fälle</td><td>{{ progress.review_open }}</td></tr></table>
 {% if open_jobs %}<p class="klein">Offene Jobs: {% for j in open_jobs %}{{ j.job_type }} {{ j.status }} {{ j.c }}{% if not forloop.last %}, {% endif %}{% endfor %}</p>{% endif %}
 {% if can_ingest %}<p><a class="knopf" href="{% url 'document_upload' object.pk %}">Dokumente hochladen</a>
-{% if progress.documents_error %}<p class="klein">{{ progress.documents_error }} Dokument(e) im Status Fehler werden mit „Verarbeitung starten“ automatisch wieder aufgenommen; die Verarbeitung setzt beim letzten erreichten Schritt fort.</p>{% endif %}
-<form method="post" action="{% url 'processing_start' object.pk %}" class="inline">{% csrf_token %}<input type="hidden" name="run_type" value="incremental"><button type="submit">Verarbeitung starten</button></form>
+{% if progress.documents_error %}<p class="klein">{{ progress.documents_error }} Dokument(e) im Status Fehler. „Erneut versuchen“ nimmt sie wieder auf; die Verarbeitung setzt beim letzten erreichten Schritt fort (bereits erkannte Seiten werden nicht erneut gelesen).</p>
+<form method="post" action="{% url 'processing_start' object.pk %}" class="inline">{% csrf_token %}<input type="hidden" name="run_type" value="incremental"><button type="submit">Erneut versuchen ({{ progress.documents_error }})</button></form>
+{% else %}<form method="post" action="{% url 'processing_start' object.pk %}" class="inline">{% csrf_token %}<input type="hidden" name="run_type" value="incremental"><button type="submit">Verarbeitung starten</button></form>{% endif %}
 <form method="post" action="{% url 'processing_start' object.pk %}" class="inline">{% csrf_token %}<input type="hidden" name="run_type" value="full"><input type="hidden" name="dry_run" value="1"><button type="submit">Pipeline-Dry-Run (nur Plan)</button></form></p>{% endif %}</div>
 <div class="karte"><h2>Läufe</h2>
 <table class="voll"><thead><tr><th>Nr.</th><th>Art</th><th>Status</th><th>Warteposition</th><th>Dokumente</th><th>Seiten</th><th>Seiten je Minute</th><th>Start</th><th>Ende</th></tr></thead><tbody>

@@ -82,6 +82,7 @@ Actions, Workflow `Deploy`, Run workflow; Eingaben Branch, Aktion und (nur für 
 | `oauth-check` | Konfiguration der Google-Verbindung ohne Geheimnisse (Client-ID gekürzt, Secret nur Länge und Präfix, Redirect, Konto, Wurzelordner, Token-Status) und Probe der Client-Zugangsdaten gegen den Token-Endpunkt: `invalid_client` heißt Client-ID und Secret passen nicht zusammen, `invalid_grant` heißt in Ordnung | nichts |
 | `deploy-tests` | Deployment-Tests T2 (Host-Ports), T3 (Isolation `data`), T11 (Logs ohne IBAN, JSON), T14 (`/healthz/`, `/readyz/` ohne Token) | nichts |
 | `doc-status` | Dokumente je Objekt und Status, offene und fehlgeschlagene Jobs, Läufe; ohne Dateinamen und Personendaten | nichts |
+| `config-set` | Konfigurationswert aus dem Katalog setzen, Argument `schluessel=wert` (Wert als JSON: `true`, `5`, `"text"`); gleiche Validierung und gleicher Protokolleintrag (`setting.update`) wie im Admin-Formular, Grund „Deploy-Workflow config-set“ | app_settings |
 | `db-reset` | Datenverzeichnis der Datenbank leeren und neu initialisieren; bricht ab, sobald `django_migrations` vorhanden oder nicht prüfbar ist | Datenverzeichnis der Datenbank |
 | `first-run` | Erstinstallation `scripts/deploy.sh --first-run <branch>` (Images bauen, db und redis starten, Migration, Seeds, Rechte, alle Dienste, Smoke-Test) | alles |
 | `deploy` | Deployment `scripts/deploy.sh <branch>` | alles |

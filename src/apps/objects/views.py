@@ -16,9 +16,10 @@ from django.views.decorators.http import require_POST
 
 from apps.accounts.permissions import permission_required, user_has_permission
 from apps.audit.services import record
+from apps.config import store
 from apps.objects.forms import ArchiveForm, ObjectForm, UnitForm
 from apps.objects.models import ManagedObject, ObjectStatus, Unit
-from apps.parties.models import OwnerFile, OwnerUnitAssignment
+from apps.parties.models import OwnerFile, OwnerUnitAssignment, TenantFile
 from apps.parties.services import owners_at
 
 # Rueckmeldung der Ordneranlage an den Anwender; "disabled" bleibt ohne Hinweis, weil bewusst abgeschaltet.
@@ -32,6 +33,40 @@ _FOLDER_HINTS = {
     ),
     "error": "Die Ordneranlage konnte nicht eingereiht werden. Ordnerabgleich später von Hand starten.",
 }
+_UNIT_FOLDER_HINTS = {
+    "queued": "Die Aktenordner werden in Drive angelegt und benannt. Der Verlauf steht im Protokoll.",
+    "debounced": "Die Aktenordner werden bereits nachgezogen.",
+    "not_connected": "Ohne Google-Verbindung bleiben die Akten vorerst ohne Drive-Ordner.",
+    "no_root": "Der Wurzelordner ist nicht gesetzt; die Akten bleiben vorerst ohne Drive-Ordner.",
+    "error": "Die Aktenordner konnten nicht eingereiht werden. Später „Akten anlegen“ erneut ausführen.",
+}
+
+
+def _prepare_unit_files(obj: ManagedObject, *, user, force: bool = False) -> tuple[str | None, dict]:
+    """Akten-Vorlage (11.09.2026): Einheiten aus der Sollzahl als Platzhalter WE 1 bis WE n, je Einheit eine
+    Eigentuemer- und eine Mieterakte. Ohne force nur mit Schalter owner_file.create_folders_eagerly.
+    Rueckgabe: Hinweis fuer den Anwender (None, wenn nichts entstand) und Zahlen fuer das Protokoll."""
+    if not force and not store.get("owner_file.create_folders_eagerly", False):
+        return None, {}
+    from apps.parties.unit_files import ensure_placeholder_units, ensure_unit_files
+
+    created = ensure_placeholder_units(obj, obj.expected_unit_count or 0, user=user)
+    stats = ensure_unit_files(obj)
+    counts = {"units_created": len(created), **stats}
+    parts = []
+    if created:
+        parts.append(f"{len(created)} Einheiten WE 1 bis WE {len(created)} als Platzhalter angelegt")
+    if stats["owner_files"] or stats["tenant_files"]:
+        parts.append(
+            f"{stats['owner_files']} Eigentümerakten und {stats['tenant_files']} Mieterakten vorbereitet"
+        )
+    if not parts:
+        return None, counts
+    return (
+        ", ".join(parts)
+        + ". Die Aktennamen folgen den Eigentümern und Mietern, sobald diese zugeordnet sind.",
+        counts,
+    )
 
 
 def _changes(before: dict, after: dict) -> tuple[dict, dict]:
@@ -70,6 +105,8 @@ def object_create(request):
                 request=request,
                 after=model_to_dict(obj),
             )
+        # Akten-Vorlage vor der Ordneranlage: der Abgleich legt danach auch die Aktenordner an
+        file_hint, _ = _prepare_unit_files(obj, user=request.user)
         # H 3.5, CR 2: Der Objektordner in Drive entsteht unmittelbar mit dem Objekt. Der Abgleich laeuft als
         # Job, damit die Anlage nicht an der Antwortzeit oder an einem Drive-Fehler haengt.
         from apps.drive.tasks import trigger_object_folders
@@ -85,6 +122,8 @@ def object_create(request):
                 after={"dry_run": False, "trigger": "object_create"},
             )
         messages.success(request, f"Objekt {obj.object_number} angelegt.")
+        if file_hint:
+            messages.info(request, file_hint)
         hint = _FOLDER_HINTS.get(outcome)
         if hint:
             (messages.info if outcome == "queued" else messages.warning)(request, hint)
@@ -117,12 +156,54 @@ def object_edit(request, pk: int):
 
         request_generation(obj.pk, "masterdata_change", user_id=request.user.pk)
         messages.success(request, f"Objekt {obj.object_number} gespeichert.")
+        file_hint, _ = _prepare_unit_files(
+            obj, user=request.user
+        )  # Sollzahl nachgetragen: Platzhalter folgen
+        if file_hint:
+            from apps.drive.tasks import trigger_unit_folders
+
+            messages.info(request, file_hint)
+            folder_hint = _UNIT_FOLDER_HINTS.get(trigger_unit_folders(obj.pk, user_id=request.user.pk))
+            if folder_hint:
+                messages.info(request, folder_hint)
         return redirect("object_detail", pk=obj.pk)
     return render(
         request,
         "objects/form.html",
         {"form": form, "title": f"Objekt {obj.object_number} bearbeiten", "object": obj},
     )
+
+
+@permission_required("objects.write")
+@require_POST
+def object_unit_files(request, pk: int):
+    """Knopf „Akten anlegen“: Einheiten aus der Sollzahl, je Einheit Eigentuemer- und Mieterakte, Ordner in Drive
+    nachziehen. Wirkt unabhaengig vom Schalter, weil ausdruecklich angefordert; nichts wird geloescht."""
+    from apps.drive.tasks import trigger_unit_folders
+
+    obj = get_object_or_404(ManagedObject.active, pk=pk)
+    if not Unit.active.filter(object=obj).exists() and not obj.expected_unit_count:
+        messages.warning(
+            request, "Keine Einheiten vorhanden. Sollzahl Einheiten eintragen oder Einheiten anlegen."
+        )
+        return redirect("object_detail", pk=obj.pk)
+    file_hint, counts = _prepare_unit_files(obj, user=request.user, force=True)
+    outcome = trigger_unit_folders(obj.pk, user_id=request.user.pk, force=True)
+    record(
+        "unit_files.prepare",
+        entity_type="object",
+        entity_id=obj.pk,
+        object_id=obj.pk,
+        request=request,
+        after={**counts, "drive": outcome},
+    )
+    messages.success(
+        request, file_hint or "Alle Einheiten haben bereits eine Eigentümer- und eine Mieterakte."
+    )
+    hint = _UNIT_FOLDER_HINTS.get(outcome)
+    if hint:
+        (messages.info if outcome in ("queued", "debounced") else messages.warning)(request, hint)
+    return redirect("object_detail", pk=obj.pk)
 
 
 @permission_required("objects.write")
@@ -245,6 +326,7 @@ def object_detail(request, pk: int):
         .order_by("unit__unit_label_normalized", "valid_from")
     )
     files = OwnerFile.active.filter(object=obj).select_related("unit").order_by("folder_name")
+    tenant_files = TenantFile.active.filter(object=obj).select_related("unit").order_by("folder_name")
     return render(
         request,
         "objects/detail.html",
@@ -256,6 +338,7 @@ def object_detail(request, pk: int):
             "stichtag": stichtag,
             "assignments": assignments,
             "owner_files": files,
+            "tenant_files": tenant_files,
             "can_write": user_has_permission(request.user, "objects.write"),
             "can_master": user_has_permission(request.user, "masterdata.write"),
         },

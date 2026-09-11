@@ -41,6 +41,18 @@
       }
     },
     {
+      "key": "drive.takeover_max_files",
+      "category": "drive",
+      "value_type": "integer",
+      "description": "Höchstzahl Dateien je Übernahme aus einem Drive-Ordner (mit Unterordnern)",
+      "source": "Entscheidung 11.09.2026",
+      "schema": {
+        "type": "integer",
+        "minimum": 10,
+        "maximum": 10000
+      }
+    },
+    {
       "key": "drive.object_folder_name_pattern",
       "category": "drive",
       "value_type": "string",
@@ -386,8 +398,8 @@
       "key": "owner_file.create_folders_eagerly",
       "category": "owner_file",
       "value_type": "boolean",
-      "description": "Aktenordner sofort für alle Einheiten anlegen statt bei erster Ablage",
-      "source": "Frage F24",
+      "description": "Akten-Vorlage: je Einheit Eigentümer- und Mieterakte als Platzhalter (WE01) mit Ordnern in Drive anlegen, Einheiten aus der Sollzahl vorbelegen, Akten bei Zuordnung umbenennen; false: Akte erst bei erster Ablage",
+      "source": "Frage F24, Entscheidung 11.09.2026",
       "schema": {
         "type": "boolean"
       }

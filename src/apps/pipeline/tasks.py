@@ -737,6 +737,24 @@ def decide_task(job: ProcessingJob) -> dict:
     }
     if dry_run or decision.physical_category is None or not decision.move_allowed:
         return result
+    tenant_file_id = None
+    if decision.physical_category == "04":
+        # Akten-Vorlage: Mieterdokumente in die Mieterakte der Einheit; ohne Akte (Schalter aus) flach in 04
+        from apps.parties.unit_files import tenant_file_for_document
+
+        akte = tenant_file_for_document(
+            job.object,
+            decision.tenant_ids,
+            ctx.unit_ids,
+            create=bool(store.get("owner_file.create_folders_eagerly", False)),
+        )
+        tenant_file_id = akte.pk if akte is not None else None
+        if tenant_file_id:
+            from apps.documents.models import DocumentTenantLink
+
+            DocumentTenantLink.objects.filter(
+                document=doc, classification=final, tenant_file__isnull=True
+            ).update(tenant_file_id=tenant_file_id)
     enqueue(
         JobType.FILE_TO_DRIVE,
         job.object,
@@ -749,6 +767,7 @@ def decide_task(job: ProcessingJob) -> dict:
             "owner_file_id": next((link.owner_file_id for link in decision.links if link.primary), None)
             or decision.physical_owner_file_id,
             "link_subfolder": next((link.subfolder for link in decision.links if link.primary), None),
+            "tenant_file_id": tenant_file_id,
         },
     )
     return result
@@ -762,10 +781,15 @@ def file_to_drive(job: ProcessingJob) -> dict:
 
     from apps.audit.services import record
     from apps.drive import oauth
-    from apps.drive.folders import FolderError, ensure_category_folder, ensure_owner_folder
+    from apps.drive.folders import (
+        FolderError,
+        ensure_category_folder,
+        ensure_owner_folder,
+        ensure_tenant_folder,
+    )
     from apps.drive.models import DriveNode as DriveNodeRow
     from apps.drive.models import NodeStatus
-    from apps.parties.models import OwnerFile
+    from apps.parties.models import OwnerFile, TenantFile
 
     doc = job.document
     payload = job.payload or {}
@@ -791,6 +815,10 @@ def file_to_drive(job: ProcessingJob) -> dict:
                 rows = ensure_owner_folder(akte, drive=drive)
                 sub_code = payload.get("subfolder") or payload.get("link_subfolder")
                 target = next((r for r in rows if r.subfolder_id and r.subfolder.code == sub_code), rows[0])
+            elif payload.get("category") == "04" and payload.get("tenant_file_id"):
+                target = ensure_tenant_folder(
+                    TenantFile.objects.get(pk=payload["tenant_file_id"]), drive=drive
+                )
             else:
                 target = ensure_category_folder(
                     job.object, payload["category"], payload.get("subfolder"), drive=drive

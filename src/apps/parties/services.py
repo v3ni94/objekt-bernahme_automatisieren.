@@ -138,7 +138,41 @@ def create_assignment(
             total = sum((a.share or Decimal("0")) for a in owners_for_period(unit, probe, probe))
             if total > Decimal("1"):
                 warning = total
+        _name_owner_file(unit, assignment, user)
     return AssignmentResult(assignment, warning)
+
+
+def _name_owner_file(unit: Unit, assignment: OwnerUnitAssignment, user) -> None:
+    """Akten-Vorlage (11.09.2026): Die Eigentuemerakte der Einheit erhaelt mit der Zuordnung ihren Namen
+    (Platzhalter WE01 wird zu WE01_Mustermann). Ohne Vorlage (Schalter owner_file.create_folders_eagerly aus und
+    keine Platzhalterakte) bleibt es bei der Anlage der Akte mit der ersten Ablage (F 6.3)."""
+    from apps.config import store
+    from apps.parties.models import OwnerFile
+
+    placeholder = OwnerFile.active.filter(
+        unit=unit, file_kind="unit_owner", file_assignments__isnull=True
+    ).exists()
+    if not placeholder and not store.get("owner_file.create_folders_eagerly", False):
+        return
+    from apps.classification.ownerfiles import owner_file_for_assignments
+    from apps.parties.unit_files import refresh_owner_file_name
+
+    group = list(
+        OwnerUnitAssignment.active.filter(
+            unit=unit, valid_from=assignment.valid_from, valid_to=assignment.valid_to
+        ).select_related("owner")
+    )
+    existed = OwnerFile.active.filter(unit=unit, file_kind="unit_owner").exists()
+    akte = owner_file_for_assignments(unit, group)
+    if not existed and not (akte.name_basis or {}).get("adopted_placeholder"):
+        # mit der Zuordnung angelegt (kein Platzhalter): der Name bleibt von der Anwendung gefuehrt und folgt der Gruppe
+        akte.name_basis = {**(akte.name_basis or {}), "managed_name": True}
+        akte.save(update_fields=["name_basis", "updated_at"])
+    refresh_owner_file_name(akte, unit, group)
+    from apps.drive.tasks import trigger_unit_folders
+
+    user_id = getattr(user, "pk", None)
+    transaction.on_commit(lambda: trigger_unit_folders(unit.object_id, user_id=user_id))
 
 
 def end_assignment(assignment: OwnerUnitAssignment, valid_to: date, *, user=None) -> OwnerUnitAssignment:

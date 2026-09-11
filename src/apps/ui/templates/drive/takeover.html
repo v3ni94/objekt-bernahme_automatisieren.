@@ -1,0 +1,22 @@
+{% extends "base.html" %}{% block title %}Bestand übernehmen · Objekt {{ object.object_number }} · {{ APP_NAME }}{% endblock %}
+{% block content %}<h1>Bestand aus Drive übernehmen: Objekt {{ object.object_number }} {{ object.name|default:"" }}</h1>
+<p><a href="{% url 'document_list' object.pk %}">Dokumente und Verarbeitung</a> · <a href="{% url 'object_detail' object.pk %}">Zum Objekt</a></p>
+<p class="hinweis">Ordner für Ordner durchsehen und Dateien in dieses Objekt übernehmen. Die Verarbeitung erkennt Inhalt und Zuordnung und verschiebt jede Datei in den passenden Ordner der neuen Struktur. Quellordner bleiben stehen, es wird nichts gelöscht; Dateien, die keinem Ziel zugeordnet werden können, landen unter 06_Sonstiges und erscheinen im Review Center.</p>
+<div class="karte">
+<p class="pfad">{% for c in crumbs %}{% if not forloop.last %}<a href="?ordner={{ c.id }}">{{ c.name }}</a> / {% else %}<strong>{{ c.name }}</strong>{% endif %}{% endfor %}{% if not is_root %} · <a href="{% url 'object_takeover' object.pk %}">Zum Wurzelordner</a>{% endif %}</p>
+<form method="get" class="filter inline"><input type="text" name="ordner" size="60" placeholder="Ordner-ID oder Drive-Link"><button type="submit">Ordner öffnen</button></form>
+<p class="klein">Beliebigen Ordner über seine ID oder den Drive-Link öffnen, auch außerhalb des Wurzelordners (das technische Konto muss ihn sehen können).</p>
+</div>
+<div class="raster">
+<div class="karte"><h2>Unterordner ({{ folders|length }})</h2>
+<table class="voll"><thead><tr><th>Name</th><th></th></tr></thead><tbody>
+{% for f in folders %}<tr><td><a href="?ordner={{ f.id }}">{{ f.name }}</a></td><td class="mono klein">{{ f.id }}</td></tr>{% empty %}<tr><td colspan="2">Keine Unterordner.</td></tr>{% endfor %}</tbody></table>
+<form method="post">{% csrf_token %}<input type="hidden" name="folder" value="{{ folder.id }}"><input type="hidden" name="mode" value="recursive"><button type="submit" onclick="return confirm('Alle Dateien dieses Ordners samt Unterordnern (höchstens {{ limit }}) in Objekt {{ object.object_number }} übernehmen?')">Ordner mit allen Unterordnern übernehmen</button></form></div>
+<div class="karte"><h2>Dateien ({{ files|length }})</h2>
+<form method="post">{% csrf_token %}<input type="hidden" name="folder" value="{{ folder.id }}">
+<table class="voll"><thead><tr><th></th><th>Name</th><th>Typ</th><th>Größe</th><th>Geändert</th><th>Stand</th></tr></thead><tbody>
+{% for e in files %}<tr><td>{% if e.selectable %}<input type="checkbox" name="files" value="{{ e.node.id }}">{% endif %}</td><td>{{ e.node.name }}</td><td class="klein">{{ e.node.mime_type }}</td><td class="klein">{% if e.node.size %}{{ e.node.size|filesizeformat }}{% endif %}</td><td class="klein">{{ e.node.modified_time|slice:":10" }}</td><td>{% if e.registered_in %}<span class="ampel grau">in Objekt {{ e.registered_in }}</span>{% elif e.node.is_shortcut %}<span class="ampel grau">Verknüpfung</span>{% else %}<span class="ampel gruen">frei</span>{% endif %}</td></tr>
+{% empty %}<tr><td colspan="6">Keine Dateien in diesem Ordner.</td></tr>{% endfor %}</tbody></table>
+{% if selectable %}<p><button type="submit" name="mode" value="selected">Ausgewählte übernehmen</button> <button type="submit" name="mode" value="folder">Alle {{ selectable }} freien Dateien dieses Ordners übernehmen</button></p>{% endif %}
+</form></div>
+</div>{% endblock %}

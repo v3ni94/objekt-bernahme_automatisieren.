@@ -10,6 +10,7 @@ Schlüssel: 118 in 18 Gruppen.
 |---|---|---|---|---|---|
 | `drive.backoff` | object | `{"base_s": 1, "factor": 2, "max_s": 64, "attempts": 8}` | Exponentieller Backoff: base_s, factor, max_s, attempts | ANNAHME A15 | object |
 | `drive.create_folders_on_object_create` | boolean | `true` | Objektordner samt Unterstruktur direkt beim Anlegen eines Objekts in Drive erzeugen; bei `false` nur über den Ordnerabgleich von Hand | CR 2, Entscheidung 11.09.2026 | boolean |
+| `drive.takeover_max_files` | integer | `500` | Höchstzahl Dateien je Übernahme aus einem Drive-Ordner (mit Unterordnern); größere Bestände ordnerweise übernehmen | Entscheidung 11.09.2026 | min 10, max 10000 |
 | `drive.legacy_conflict_rename_pattern` | string | `leer` | Umbenennungsmuster für einen Altordner, wenn Alt- und Zielordner gleichzeitig existieren; leer bedeutet Review-Fall | Frage F24 | ['string', 'null'] |
 | `drive.legacy_folder_aliases` | object | siehe db/seeds/app_settings.json (Altbezeichnung nur dort) | Zuordnung Zielordner zu Altbezeichnungen, die beim Abgleich umbenannt werden (CR 9.3); einzige Fundstelle der Altbezeichnung | CR 9.3, Befund 6.4 | object |
 | `drive.max_requests_per_second` | integer | `5` | Clientseitige Ratenbegrenzung je Prozess | ANNAHME A15 | min 1, max 50 |
@@ -37,7 +38,7 @@ Schlüssel: 118 in 18 Gruppen.
 | Schlüssel | Typ | Seed | Bedeutung | Quelle | Wertebereich |
 |---|---|---|---|---|---|
 | `owner_file.collision_suffix_mode` | string | `"year_then_counter"` | Suffix bei Namenskollision | Vorschlag F | year_then_counter, counter |
-| `owner_file.create_folders_eagerly` | boolean | `false` | Aktenordner sofort für alle Einheiten anlegen statt bei erster Ablage | Frage F24 | boolean |
+| `owner_file.create_folders_eagerly` | boolean | `true` | Akten-Vorlage: je Einheit Eigentümer- und Mieterakte als Platzhalter (WE01) mit Ordnern in Drive anlegen, Einheiten aus der Sollzahl vorbelegen, Akten bei Zuordnung umbenennen; false: Akte erst bei erster Ablage | Frage F24, Entscheidung 11.09.2026 | boolean |
 | `owner_file.legal_form_tokens` | list | `["GmbH", "AG", "KG", "GmbH & Co. KG", "UG", "e.V.", "GbR", "OHG", "eG", "SE",...` | Rechtsformkürzel, die aus Firmennamen entfernt werden | Vorschlag F | array |
 | `owner_file.name_max_length` | integer | `100` | Höchstlänge eines Aktennamens | ANNAHME A16 | min 20, max 255 |
 | `owner_file.name_max_names` | integer | `3` | Höchstzahl Namen im Aktennamen, danach Überlaufsuffix | CR 4 | min 1, max 5 |
