@@ -14,6 +14,8 @@ AUDIT_ACTIONS: dict[str, str] = {
     "setting.seed": "Konfigurationswert durch Seed überschrieben",
     "object.create": "Objekt angelegt",
     "object.update": "Objekt geändert",
+    "object.archive": "Objekt archiviert (Soft-Delete, Drive unverändert)",
+    "object.restore": "Objekt aus dem Archiv zurückgeholt",
     "unit.create": "Einheit angelegt",
     "unit.update": "Einheit geändert",
     "owner.create": "Eigentümer angelegt",

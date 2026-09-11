@@ -1,7 +1,7 @@
 {% extends "base.html" %}{% block title %}Objekte · {{ APP_NAME }}{% endblock %}
 {% block content %}<h1>Objekte</h1>
 <div class="karte"><form method="get" class="filter inline"><input type="search" name="q" value="{{ q }}" placeholder="Nummer, Bezeichnung, Ort"><button type="submit">Suchen</button></form>
-{% if can_write %} <a class="knopf" href="{% url 'object_create' %}">Objekt anlegen</a>{% endif %}</div>
+{% if can_write %} <a class="knopf" href="{% url 'object_create' %}">Objekt anlegen</a> <a href="{% url 'object_archive_list' %}">Archiv</a>{% endif %}</div>
 <table class="voll"><thead><tr><th>Nummer</th><th>Bezeichnung</th><th>Adresse</th><th>Verwaltungsart</th><th>Status</th><th>Einheiten</th><th>Übernahme</th></tr></thead><tbody>
 {% for o in objects %}<tr><td class="mono"><a href="{% url 'object_detail' o.pk %}">{{ o.object_number }}</a>{% if o.is_test %} <span class="ampel grau">Test</span>{% endif %}</td><td>{{ o.name|default:"" }}</td><td>{{ o.address }}</td><td>{{ o.get_management_type_display }}</td><td>{{ o.get_status_display }}</td><td>{{ o.unit_count }}{% if o.expected_unit_count %} / {{ o.expected_unit_count }}{% endif %}</td><td>{% if o.takeover_from %}{{ o.takeover_from|date:"d.m.Y" }}{% endif %}{% if o.takeover_to %} bis {{ o.takeover_to|date:"d.m.Y" }}{% endif %}</td></tr>
 {% empty %}<tr><td colspan="7">Keine Objekte.</td></tr>{% endfor %}</tbody></table>{% endblock %}

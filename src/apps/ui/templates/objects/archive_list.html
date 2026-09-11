@@ -1,0 +1,8 @@
+{% extends "base.html" %}{% block title %}Archivierte Objekte · {{ APP_NAME }}{% endblock %}
+{% block content %}<h1>Archivierte Objekte</h1>
+<div class="karte"><a href="{% url 'object_list' %}">Zurück zu den aktiven Objekten</a></div>
+<table class="voll"><thead><tr><th>Nummer</th><th>Bezeichnung</th><th>Adresse</th><th>Archiviert am</th><th>Durch</th><th>Grund</th><th>Drive-Ordner</th><th></th></tr></thead><tbody>
+{% for o in objects %}<tr><td class="mono">{{ o.object_number }}{% if o.is_test %} <span class="ampel grau">Test</span>{% endif %}</td><td>{{ o.name|default:"" }}</td><td>{{ o.address }}</td><td>{{ o.deleted_at|date:"d.m.Y H:i" }}</td><td>{{ o.deleted_by|default:"" }}</td><td>{{ o.delete_reason|default:"" }}</td><td class="mono klein">{{ o.drive_root_folder_name|default:"" }}</td>
+<td><form method="post" action="{% url 'object_restore' o.pk %}" class="inline">{% csrf_token %}<button type="submit">Wiederherstellen</button></form></td></tr>
+{% empty %}<tr><td colspan="8">Keine archivierten Objekte.</td></tr>{% endfor %}</tbody></table>
+<p class="hinweis">Archivierte Objekte bleiben mit allen Daten erhalten; ihre Drive-Ordner sind unverändert. Eine Wiederherstellung setzt den Status auf „aktiv“ und ist nur möglich, wenn die Objektnummer nicht inzwischen an ein anderes aktives Objekt vergeben wurde.</p>{% endblock %}

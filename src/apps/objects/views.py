@@ -4,17 +4,20 @@ from __future__ import annotations
 
 from datetime import date
 
+from allauth.account.decorators import reauthentication_required
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
 from django.db.models import Count, Q
 from django.forms.models import model_to_dict
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
+from django.views.decorators.http import require_POST
 
 from apps.accounts.permissions import permission_required, user_has_permission
 from apps.audit.services import record
-from apps.objects.forms import ObjectForm, UnitForm
-from apps.objects.models import ManagedObject, Unit
+from apps.objects.forms import ArchiveForm, ObjectForm, UnitForm
+from apps.objects.models import ManagedObject, ObjectStatus, Unit
 from apps.parties.models import OwnerFile, OwnerUnitAssignment
 from apps.parties.services import owners_at
 
@@ -120,6 +123,105 @@ def object_edit(request, pk: int):
         "objects/form.html",
         {"form": form, "title": f"Objekt {obj.object_number} bearbeiten", "object": obj},
     )
+
+
+@permission_required("objects.write")
+@reauthentication_required
+def object_archive(request, pk: int):
+    """Objekt archivieren: Soft-Delete (deleted_at, deleted_by, delete_reason), Status archiviert. Einheiten,
+    Eigentuemer, Dokumente und Protokoll bleiben; in Drive wird nichts geloescht oder verschoben (D 1 Nr. 6).
+    Waehrend eines laufenden oder wartenden Verarbeitungslaufs nicht moeglich, damit kein Job ins Leere schreibt."""
+    from apps.pipeline.models import ProcessingRun, RunStatus
+
+    obj = get_object_or_404(ManagedObject.active, pk=pk)
+    offen = ProcessingRun.objects.filter(
+        object=obj, status__in=[RunStatus.PENDING, RunStatus.RUNNING]
+    ).count()
+    form = ArchiveForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        if offen:
+            messages.error(
+                request, f"Objekt {obj.object_number} hat {offen} offene(n) Verarbeitungslauf; erst abwarten."
+            )
+            return redirect("object_detail", pk=obj.pk)
+        before = {"status": obj.status, "deleted_at": None}
+        with transaction.atomic():
+            obj.deleted_at = timezone.now()
+            obj.deleted_by = request.user
+            obj.delete_reason = form.cleaned_data["reason"]
+            obj.status = ObjectStatus.ARCHIVED
+            obj.save(update_fields=["deleted_at", "deleted_by", "delete_reason", "status", "updated_at"])
+            record(
+                "object.archive",
+                entity_type="object",
+                entity_id=obj.pk,
+                object_id=obj.pk,
+                request=request,
+                before=before,
+                after={
+                    "status": obj.status,
+                    "deleted_at": obj.deleted_at.isoformat(),
+                    "reason": obj.delete_reason,
+                    "drive_root_folder_id": obj.drive_root_folder_id,
+                },
+            )
+        messages.success(
+            request,
+            f"Objekt {obj.object_number} archiviert. Es erscheint nicht mehr in den Listen; "
+            "Daten und Drive-Ordner bleiben erhalten.",
+        )
+        return redirect("object_archive_list")
+    return render(
+        request,
+        "objects/archive_form.html",
+        {"object": obj, "form": form, "open_runs": offen, "title": f"Objekt {obj.object_number} archivieren"},
+    )
+
+
+@permission_required("objects.write")
+def object_archive_list(request):
+    objects = (
+        ManagedObject.objects.filter(deleted_at__isnull=False)
+        .select_related("deleted_by")
+        .order_by("-deleted_at")
+    )
+    return render(request, "objects/archive_list.html", {"objects": objects})
+
+
+@permission_required("objects.write")
+@reauthentication_required
+@require_POST
+def object_restore(request, pk: int):
+    """Archiviertes Objekt zurueckholen: deleted_at leeren, Status aktiv. Die Objektnummer darf inzwischen nicht
+    an ein anderes aktives Objekt vergeben sein (Eindeutigkeit ueber active_key)."""
+    obj = get_object_or_404(ManagedObject.objects.filter(deleted_at__isnull=False), pk=pk)
+    if ManagedObject.active.filter(object_number_numeric=obj.object_number_numeric).exists():
+        messages.error(
+            request,
+            f"Objektnummer {obj.object_number} ist inzwischen an ein aktives Objekt vergeben; "
+            "Wiederherstellung nicht möglich.",
+        )
+        return redirect("object_archive_list")
+    before = {"status": obj.status, "deleted_at": obj.deleted_at.isoformat(), "reason": obj.delete_reason}
+    with transaction.atomic():
+        obj.deleted_at = None
+        obj.deleted_by = None
+        obj.delete_reason = None
+        obj.status = ObjectStatus.ACTIVE
+        obj.save(update_fields=["deleted_at", "deleted_by", "delete_reason", "status", "updated_at"])
+        record(
+            "object.restore",
+            entity_type="object",
+            entity_id=obj.pk,
+            object_id=obj.pk,
+            request=request,
+            before=before,
+            after={"status": obj.status, "deleted_at": None},
+        )
+    messages.success(
+        request, f"Objekt {obj.object_number} wiederhergestellt. Status steht auf aktiv, bitte prüfen."
+    )
+    return redirect("object_detail", pk=obj.pk)
 
 
 @login_required

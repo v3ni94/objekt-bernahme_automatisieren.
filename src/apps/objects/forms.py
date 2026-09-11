@@ -173,3 +173,16 @@ class UnitForm(forms.ModelForm):
         if commit:
             unit.save()
         return unit
+
+
+class ArchiveForm(forms.Form):
+    """Archivieren eines Objekts: Soft-Delete mit Begruendung (Fachentwurf D 1 Nr. 6). Drive bleibt unberuehrt."""
+
+    reason = forms.CharField(
+        label="Grund",
+        max_length=255,
+        widget=forms.TextInput(attrs={"placeholder": "z. B. Verwaltung beendet zum 31.12.2026"}),
+    )
+    confirm = forms.BooleanField(
+        label="Ich habe verstanden: Das Objekt verschwindet aus den Listen, alle Daten bleiben erhalten, in Drive wird nichts gelöscht."
+    )
