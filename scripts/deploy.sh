@@ -75,12 +75,17 @@ wait_healthy 300
 # Version, deshalb muss der Rollback-Stand auch dann stimmen, wenn nur der Smoke-Test scheitert.
 [ "$CUR_TAG" != none ] && echo "$CUR_TAG" > "$DEPLOY_DIR/previous"
 echo "$NEW_TAG" > "$DEPLOY_DIR/current"
-for img in web worker backup; do
-  docker tag "objektakte/$img:$NEW_TAG" "objektakte/$img:current"
-  [ "$CUR_TAG" != none ] && docker tag "objektakte/$img:$CUR_TAG" "objektakte/$img:previous"
-done
 printf '%s\t%s\t%s\t%s\t%s\n' "$(date -Is)" "$NEW_TAG" "$CUR_TAG" "$(whoami)" "$($FIRST_RUN && echo FIRST-RUN || echo DEPLOY)" >> "$DEPLOY_DIR/tags.log"
 sed -i "s/^IMAGE_TAG=.*/IMAGE_TAG=$NEW_TAG/" .env
+for img in web worker backup; do
+  docker tag "objektakte/$img:$NEW_TAG" "objektakte/$img:current"
+  # Das vorherige Image kann fehlen (Befund Deploy-Lauf 81: Backup-Images teilen sich den Erstellzeitpunkt, die
+  # Aufraeumung hatte den Tag entfernt). Dann bleibt der bisherige previous-Tag stehen, der Deploy bricht nicht ab.
+  if [ "$CUR_TAG" != none ]; then
+    docker tag "objektakte/$img:$CUR_TAG" "objektakte/$img:previous" \
+      || echo "Hinweis: objektakte/$img:$CUR_TAG nicht mehr vorhanden, previous-Tag unveraendert"
+  fi
+done
 
 # 9. Innerer Zustand der Anwendung (unabhaengig von Traefik und Zertifikat)
 echo "Bereitschaft der Anwendung im Container:"
@@ -117,11 +122,14 @@ curl -fsS -o /dev/null -w 'healthz %{http_code} tls %{ssl_verify_result}\n' "htt
 curl -fsS "https://${APP_DOMAIN}/readyz/" \
   -H "Authorization: Bearer $(docker compose exec -T web cat /run/secrets/readyz_token 2>/dev/null || echo none)" | head -c 400; echo
 
-# 11. Alte Images aufraeumen, die letzten N behalten (current, previous, dev bleiben)
+# 11. Alte Images aufraeumen: die letzten N Deployments aus tags.log behalten, dazu die Staende aus current und
+# previous sowie die Aliasse. Nicht nach Erstellzeitpunkt sortieren: unveraenderte Images (Backup) tragen fuer
+# mehrere Tags denselben Zeitpunkt, die Reihenfolge waere zufaellig und traf den aktuellen Tag (Deploy-Lauf 81).
 KEEP=${IMAGE_KEEP:-5}
+KEEP_TAGS="$( { awk -F'\t' '{print $2}' "$DEPLOY_DIR/tags.log" 2>/dev/null | tail -n "$KEEP"; cat "$DEPLOY_DIR/current" "$DEPLOY_DIR/previous" 2>/dev/null; echo current; echo previous; echo dev; } | grep -v '^$' | sort -u | paste -sd'|' -)"
 for img in web worker backup; do
-  docker images "objektakte/$img" --format '{{.Tag}} {{.CreatedAt}}' \
-    | grep -vE '^(current|previous|dev) ' | sort -k2 -r | tail -n +$((KEEP + 1)) | awk '{print $1}' \
+  docker images "objektakte/$img" --format '{{.Tag}}' \
+    | grep -vE "^(${KEEP_TAGS})$" \
     | xargs -r -I{} docker rmi "objektakte/$img:{}" || true
 done
 echo "Deployment $NEW_TAG abgeschlossen"
