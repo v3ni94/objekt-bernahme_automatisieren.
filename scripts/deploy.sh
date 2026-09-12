@@ -15,30 +15,20 @@ envval() { grep -E "^$1=" .env | head -1 | cut -d= -f2- | awk '{print $1}'; }
 APP_DOMAIN=$(envval APP_DOMAIN)
 [ -n "$APP_DOMAIN" ] || { echo "APP_DOMAIN fehlt in .env"; exit 1; }
 mkdir -p "$DEPLOY_DIR"
-# Optionale Secrets (Paperless-ngx, 12.09.2026): leere Platzhalterdatei, falls nicht vorhanden, damit Compose die
-# Secrets einbinden kann; den Inhalt setzt der Admin (docs/betrieb/paperless-sync.md). Leer bedeutet: Anbindung aus.
-# Rechte wie die uebrigen Secrets (0444, root), sonst koennen die unprivilegierten Container sie nicht lesen.
-FEHLENDE_SECRETS=""
+# Optionale Secrets (Paperless-ngx, 12.09.2026): leere Platzhalterdatei anlegen, falls das von hier aus moeglich ist
+# (sudo ohne Passwort oder beschreibbares Verzeichnis). Das Verzeichnis gehoert root mit 0700; der Deploy-Nutzer kann
+# das Vorhandensein sonst nicht pruefen. Fehlt eine Datei tatsaechlich, bricht docker compose beim Start mit einer
+# klaren Meldung ab. Rechte wie die uebrigen Secrets (0444, root), sonst koennen die Container sie nicht lesen.
 for s in paperless_token paperless_webhook_token; do
   f="/srv/objektakte/secrets/$s"
-  if [ ! -e "$f" ] && ! sudo -n test -e "$f" 2>/dev/null; then
-    if sudo -n install -m 0444 -o root -g root /dev/null "$f" 2>/dev/null; then
-      echo "Secret-Platzhalter angelegt: $s (leer, Anbindung aus)"
-    elif [ -w /srv/objektakte/secrets ] && install -m 0444 /dev/null "$f" 2>/dev/null; then
-      echo "Secret-Platzhalter angelegt: $s (leer, Anbindung aus)"
-    else
-      FEHLENDE_SECRETS="$FEHLENDE_SECRETS $f"
-    fi
+  if sudo -n true 2>/dev/null; then
+    sudo -n test -e "$f" || { sudo -n install -m 0444 -o root -g root /dev/null "$f" && echo "Secret-Platzhalter angelegt: $s (leer, Anbindung aus)"; }
+  elif [ -w /srv/objektakte/secrets ]; then
+    [ -e "$f" ] || { install -m 0444 /dev/null "$f" && echo "Secret-Platzhalter angelegt: $s (leer, Anbindung aus)"; }
+  else
+    echo "Hinweis: $f ist fuer $(whoami) nicht pruefbar (Verzeichnis nur fuer root lesbar). Fehlt die Datei, meldet docker compose das beim Start; anlegen als root: install -m 0444 -o root -g root /dev/null $f"
   fi
 done
-if [ -n "$FEHLENDE_SECRETS" ]; then
-  echo "Abbruch vor dem Container-Bau: Secret-Dateien fehlen und koennen ohne Root-Rechte nicht angelegt werden."
-  echo "  Einmalig als root ausfuehren (leer bedeutet: Anbindung aus, docs/betrieb/paperless-sync.md):"
-  for f in $FEHLENDE_SECRETS; do
-    echo "    install -m 0444 -o root -g root /dev/null $f"
-  done
-  exit 1
-fi
 
 wait_healthy() {   # wait_healthy <sekunden> [dienst ...]
   local end=$((SECONDS + $1)); shift

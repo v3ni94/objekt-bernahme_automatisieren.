@@ -81,8 +81,10 @@ case "$ACTION" in
     for s in paperless_token paperless_webhook_token; do
       if sudo -n test -e "/srv/objektakte/secrets/$s" 2>/dev/null || [ -e "/srv/objektakte/secrets/$s" ]; then
         echo "  Secret-Datei $s: vorhanden"
+      elif sudo -n true 2>/dev/null || [ -r /srv/objektakte/secrets ]; then
+        echo "  Secret-Datei $s: fehlt (deploy legt sie leer an)"
       else
-        echo "  Secret-Datei $s: fehlt (deploy legt sie an, sofern sudo ohne Passwort moeglich ist)"
+        echo "  Secret-Datei $s: von $(whoami) nicht pruefbar (Verzeichnis nur fuer root lesbar)"
       fi
     done
     # Nur Vorhandensein und Alter, nie der Inhalt: Workflow-Logs sind fuer jeden mit Repository-Zugang lesbar.
