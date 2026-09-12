@@ -35,6 +35,7 @@ class Stage3Outcome:
     message: str | None = None
     call_id: int | None = None
     reasoning: str | None = None
+    lease: dict | None = None  # Vertragsdaten eines Mieterdokuments (12.09.2026), lokal abgeglichen
 
 
 def unit_label_patterns(obj) -> list[str]:
@@ -151,6 +152,7 @@ def run_stage3(
             "mentioned_parties_count": len(r.mentioned_parties),
             "fallback_used": result.fallback_used,
             "attempts": result.attempts,
+            "lease_extracted": bool(r.lease and not r.lease.empty),
         },
         is_final=False,
     )
@@ -166,6 +168,7 @@ def run_stage3(
         result.fallback_used,
         call_id=result.call.pk if result.call else None,
         reasoning=r.reasoning,
+        lease=r.lease.model_dump() if r.lease and not r.lease.empty else None,
     )
 
 

@@ -14,6 +14,7 @@ from datetime import date
 
 from django.core.cache import cache
 from django.db import IntegrityError, transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from apps.audit.services import record
@@ -522,5 +523,15 @@ def tenant_file_for_document(
     if not create:
         return TenantFile.active.filter(unit=unit, file_kind="unit_tenant").order_by("id").first()
     if assignment is not None:
-        return tenant_file_for_assignments(unit, [assignment])
+        # Mitmieter desselben Mietverhaeltnisses (oder weitere erkannte Mieter der Einheit) teilen die Akte (H 6.9)
+        group = list(
+            TenantUnitAssignment.active.filter(unit=unit)
+            .filter(
+                Q(tenant_id__in=tenant_ids)
+                | (Q(lease_id=assignment.lease_id) if assignment.lease_id else Q(pk=assignment.pk))
+            )
+            .select_related("tenant")
+            .order_by("valid_from", "id")
+        )
+        return tenant_file_for_assignments(unit, group or [assignment])
     return tenant_file_for_unit(unit)

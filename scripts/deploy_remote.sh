@@ -298,6 +298,40 @@ wartend = ProcessingJob.objects.filter(status="pending", last_error__startswith=
 for w in wartend:
     print(f"wartend {w['job_type']} x{w['c']}: {w['last_error'][:160]}")
 PY
+    # Mit Objektnummer als Argument: je Dokument Klassifikation, Stufen, Entitaeten (nur Zaehler) und Faelle.
+    # Keine Dateinamen, keine Personennamen (Protokoll liegt bei GitHub).
+    if [ -n "${ARG:-}" ]; then
+      docker compose exec -T -e OBJ_NR="$ARG" web python manage.py shell <<'PY'
+import os
+from collections import Counter
+from apps.documents.models import Document, DocumentClassification, DocumentEntity
+from apps.objects.models import ManagedObject, Unit
+from apps.parties.models import OwnerFile, Tenant, TenantFile, TenantUnitAssignment
+from apps.review.models import ReviewCase
+nr = os.environ["OBJ_NR"]
+obj = ManagedObject.objects.filter(object_number=nr).first()
+if obj is None and nr.isdigit():
+    obj = ManagedObject.objects.filter(object_number_numeric=int(nr)).first()
+if obj is None:
+    print(f"Objekt {nr} nicht gefunden")
+else:
+    print(f"Objekt {obj.object_number}: {obj.management_type}, Soll {obj.expected_unit_count}, Einheiten {Unit.active.filter(object=obj).count()}, "
+          f"Mieterzuordnungen {TenantUnitAssignment.active.filter(unit__object=obj).count()}, "
+          f"Eigentuemerakten {OwnerFile.active.filter(object=obj).count()} ({', '.join(sorted(set(OwnerFile.active.filter(object=obj).values_list('file_kind', flat=True))))}), "
+          f"Mieterakten {TenantFile.active.filter(object=obj).count()}")
+    for d in Document.objects.filter(object=obj, deleted_at__isnull=True).select_related("subfolder", "document_type").order_by("id"):
+        final = DocumentClassification.objects.filter(document=d, is_final=True).order_by("-id").first()
+        ents = Counter(DocumentEntity.objects.filter(document=d).values_list("entity_type", flat=True))
+        matched = DocumentEntity.objects.filter(document=d, matched_tenant_id__isnull=False).count()
+        cases = list(ReviewCase.objects.filter(document=d).values_list("case_type", "case_subtype", "status"))
+        ext = (d.current_name or "").rsplit(".", 1)[-1].lower()[:5]
+        sub = d.subfolder.code if d.subfolder else "-"
+        typ = d.document_type.code if d.document_type else "-"
+        print(f"  Dok {d.pk} .{ext} S{d.page_count or 0} {d.status} {d.category_id or '-'}/{sub} {typ} "
+              f"conf={d.final_confidence} stufe={final.stage if final else '-'} prov={final.provider if final else '-'} "
+              f"ent={dict(ents)} mieter_treffer={matched} faelle={[f'{c[0]}/{c[1]}:{c[2]}' for c in cases]}")
+PY
+    fi
     ;;
   config-set)
     # Konfigurationswert aus dem Katalog setzen, Argument schluessel=wert; der Wert wird als JSON gelesen

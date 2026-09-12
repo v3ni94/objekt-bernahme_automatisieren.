@@ -10,6 +10,7 @@ import hashlib
 import json
 from dataclasses import asdict, dataclass, field
 from datetime import date, timedelta
+from decimal import Decimal, InvalidOperation
 
 from django.db import transaction
 from django.db.models import Count, Q
@@ -229,6 +230,7 @@ class Target:
     new_assignment_from: date | None = None
     new_assignment_to: date | None = None
     reason: str | None = None
+    new_tenant: dict | None = None  # „Mieter aus Dokument anlegen“ (12.09.2026), Felder nt_*
 
     def as_dict(self) -> dict:
         d = asdict(self)
@@ -265,7 +267,35 @@ class Target:
             new_assignment_from=_date("new_assignment_from"),
             new_assignment_to=_date("new_assignment_to"),
             reason=(data.get("reason") or "").strip() or None,
+            new_tenant=cls._new_tenant_from_post(data),
         )
+
+    @staticmethod
+    def _new_tenant_from_post(data) -> dict | None:
+        if data.get("nt_create") != "1":
+            return None
+        fields = (
+            "kind",
+            "salutation",
+            "first_name",
+            "last_name",
+            "company_name",
+            "unit_id",
+            "unit_label",
+            "start_date",
+            "end_date",
+            "base_rent",
+            "utilities_prepayment",
+            "heating_prepayment",
+            "deposit_amount",
+        )
+        nt = {k: ((data.get(f"nt_{k}") or "").strip() or None) for k in fields}
+        co = {
+            k: ((data.get(f"nt2_{k}") or "").strip() or None)
+            for k in ("salutation", "first_name", "last_name")
+        }
+        nt["co_tenant"] = co if co["last_name"] else None
+        return nt
 
 
 def proposal_target(case: ReviewCase) -> Target:
@@ -322,6 +352,162 @@ def proposal_target(case: ReviewCase) -> Target:
     return t
 
 
+def _validate_new_tenant(nt: dict) -> list[str]:
+    errors: list[str] = []
+    if not (nt.get("last_name") or nt.get("company_name")):
+        errors.append("Nachname oder Firma des neuen Mieters angeben")
+    if not (nt.get("unit_id") or nt.get("unit_label")):
+        errors.append("Einheit wählen oder Bezeichnung der neuen Einheit angeben")
+    for key in ("start_date", "end_date"):
+        if nt.get(key):
+            try:
+                date.fromisoformat(nt[key])
+            except ValueError:
+                errors.append(f"Datum {key} im Format JJJJ-MM-TT eingeben")
+    for key in ("base_rent", "utilities_prepayment", "heating_prepayment", "deposit_amount"):
+        if nt.get(key):
+            try:
+                Decimal(str(nt[key]).replace(",", "."))
+            except (InvalidOperation, ValueError):
+                errors.append(f"Betrag {key} ist keine Zahl")
+    return errors
+
+
+def unit_from_label(obj, label: str, *, user=None):
+    """Einheit zu einer Bezeichnung aus dem Dokument: vorhandene Einheit ueber den Vergleichsschluessel, sonst neu
+    (unabhaengig von der Sollzahl, 12.09.2026); Datenstatus unvollstaendig, bis Stammdaten folgen."""
+    from apps.audit.services import record
+    from apps.objects.units import parse_unit_label
+
+    mapping = store.get("units.type_prefix_mapping", {}) or None
+    parsed = parse_unit_label(label, mapping)
+    existing = Unit.active.filter(object=obj, unit_label_normalized=parsed.label_normalized).first()
+    if existing is not None:
+        return existing
+    unit = Unit.objects.create(
+        object=obj,
+        unit_label=parsed.label[:80],
+        unit_label_normalized=parsed.label_normalized[:80],
+        unit_number=parsed.number,
+        unit_type=parsed.unit_type or "apartment",
+        location=parsed.rest[:120] if parsed.rest else None,
+        data_status="incomplete",
+    )
+    record(
+        "unit.create",
+        entity_type="unit",
+        entity_id=unit.pk,
+        object_id=obj.pk,
+        actor=user,
+        after={"unit_label": unit.unit_label, "source": "review_tenant_from_document"},
+    )
+    return unit
+
+
+def _party_kwargs(nt: dict, *, co: bool = False) -> dict:
+    src = nt["co_tenant"] if co else nt
+    company = None if co else nt.get("company_name")
+    kind = (
+        "legal_entity"
+        if (nt.get("kind") == "legal_entity" and not co) or (company and not src.get("last_name"))
+        else "natural_person"
+    )
+    if kind == "legal_entity":
+        return {
+            "type": "legal_entity",
+            "company_name": company,
+            "search_name": party_services.search_name(
+                type="legal_entity", first_name=None, last_name=None, company_name=company
+            ),
+        }
+    return {
+        "type": "natural_person",
+        "salutation": src.get("salutation"),
+        "first_name": src.get("first_name"),
+        "last_name": src.get("last_name"),
+        "search_name": party_services.search_name(
+            type="natural_person",
+            first_name=src.get("first_name"),
+            last_name=src.get("last_name"),
+            company_name=None,
+        ),
+    }
+
+
+def _dec_or_none(value):
+    if value in (None, ""):
+        return None
+    return Decimal(str(value).replace(",", "."))
+
+
+def create_tenant_from_document(obj, doc: Document, target: Target, user, *, request=None) -> dict:
+    """Bestaetigter Vorschlag „Mieter aus Dokument anlegen“ (12.09.2026): Mieter (und Mitmieter), Einheit (vorhanden
+    oder neu), Mietverhaeltnis und Zuordnung mit dem Dokument als Quelle. Ergebnis fuer Verknuepfung und Akte."""
+    from apps.audit.services import record
+    from apps.parties.models import Lease, Tenant, TenantUnitAssignment
+
+    nt = target.new_tenant or {}
+    unit = (
+        Unit.objects.get(pk=int(nt["unit_id"]), object=obj)
+        if nt.get("unit_id")
+        else unit_from_label(obj, nt["unit_label"], user=user)
+    )
+    start = date.fromisoformat(nt["start_date"]) if nt.get("start_date") else None
+    end = date.fromisoformat(nt["end_date"]) if nt.get("end_date") else None
+    base_rent = _dec_or_none(nt.get("base_rent"))
+    lease = Lease.objects.create(
+        object=obj,
+        start_date=start,
+        end_date=end,
+        base_rent=base_rent,
+        utilities_prepayment=_dec_or_none(nt.get("utilities_prepayment")),
+        heating_prepayment=_dec_or_none(nt.get("heating_prepayment")),
+        deposit_amount=_dec_or_none(nt.get("deposit_amount")),
+        deposit_type="unknown",
+        rent_adjustment_type="unknown",
+        data_status="confirmed" if (start and base_rent is not None) else "incomplete",
+        source_document=doc,
+        notes=f"Aus Dokument {doc.pk} ({(doc.current_name or '')[:60]}) im Review Center übernommen",
+    )
+    tenants = [Tenant.objects.create(data_status="confirmed", **_party_kwargs(nt))]
+    if nt.get("co_tenant"):
+        tenants.append(Tenant.objects.create(data_status="confirmed", **_party_kwargs(nt, co=True)))
+    assignments = []
+    for tenant in tenants:
+        assignments.append(
+            TenantUnitAssignment.objects.create(
+                tenant=tenant,
+                unit=unit,
+                lease=lease,
+                role="tenant",
+                valid_from=start,
+                valid_to=end,
+                data_status="confirmed",
+                confirmed_by=user,
+                confirmed_at=timezone.now(),
+                source_document=doc,
+            )
+        )
+    record(
+        "review.create_tenant",
+        entity_type="tenant",
+        entity_id=tenants[0].pk,
+        object_id=obj.pk,
+        request=request,
+        actor=user,
+        after={
+            "tenant_ids": [t.pk for t in tenants],
+            "unit_id": unit.pk,
+            "unit_label": unit.unit_label,
+            "lease_id": lease.pk,
+            "document_id": doc.pk,
+            "start_date": start.isoformat() if start else None,
+            "base_rent": str(base_rent) if base_rent is not None else None,
+        },
+    )
+    return {"tenants": tenants, "unit": unit, "lease": lease, "assignments": assignments}
+
+
 def validate(case: ReviewCase, target: Target) -> tuple[list[str], list[str]]:
     """Fehler blockieren, Warnungen werden mit der Entscheidung protokolliert (CR 7 Zusatzpruefung 5)."""
     errors: list[str] = []
@@ -349,7 +535,10 @@ def validate(case: ReviewCase, target: Target) -> tuple[list[str], list[str]]:
         if not target.unit_id and not target.unit_unknown:
             errors.append("Einheit wählen oder ausdrücklich als unbekannt kennzeichnen")
     if target.category == "04" and not target.tenant_id:
-        errors.append("Mieter wählen")
+        if not target.new_tenant:
+            errors.append("Mieter wählen oder aus dem Dokument anlegen")
+        else:
+            errors.extend(_validate_new_tenant(target.new_tenant))
     if target.category == "06":
         if not target.subfolder:
             errors.append("Unterordner in 06_Sonstiges wählen")
@@ -500,6 +689,12 @@ def apply_decision(
         )
         decision_type = DecisionType.CONFIRM if system_correct else DecisionType.CORRECT
         segment = bool(case.page_from)
+        created_tenant = None
+        if target.category == "04" and target.new_tenant and not target.tenant_id and obj is not None:
+            created_tenant = create_tenant_from_document(obj, doc, target, user, request=request)
+            target.tenant_id = created_tenant["tenants"][0].pk
+            target.unit_id = created_tenant["unit"].pk
+            decision_type = DecisionType.ASSIGN_TENANT
         subfolder = (
             DocumentSubfolder.objects.filter(category_id=target.category, code=target.subfolder).first()
             if target.subfolder
@@ -610,20 +805,36 @@ def apply_decision(
             link.created_by = user
             link.save()
         if target.category == "04" and target.tenant_id:
+            from apps.parties.unit_files import tenant_file_for_document
+
             DocumentTenantLink.objects.filter(document=doc, status="suggested").delete()
-            DocumentTenantLink.objects.update_or_create(
-                document=doc,
-                tenant_id=target.tenant_id,
-                link_kind="whole_document",
-                defaults={
-                    "unit_id": target.unit_id,
-                    "confidence": 1.0,
-                    "status": "confirmed",
-                    "classification": final,
-                    "confirmed_by": user,
-                    "confirmed_at": timezone.now(),
-                },
+            tenant_ids = [target.tenant_id] + (
+                [t.pk for t in created_tenant["tenants"][1:]] if created_tenant else []
             )
+            akte = tenant_file_for_document(
+                obj,
+                tenant_ids,
+                [target.unit_id] if target.unit_id else [],
+                create=created_tenant is not None
+                or bool(store.get("owner_file.create_folders_eagerly", False)),
+            )
+            physical["tenant_file_id"] = akte.pk if akte is not None else None
+            for tenant_id in tenant_ids:
+                DocumentTenantLink.objects.update_or_create(
+                    document=doc,
+                    tenant_id=tenant_id,
+                    link_kind="whole_document",
+                    defaults={
+                        "unit_id": target.unit_id,
+                        "lease": created_tenant["lease"] if created_tenant else None,
+                        "tenant_file": akte,
+                        "confidence": 1.0,
+                        "status": "confirmed",
+                        "classification": final,
+                        "confirmed_by": user,
+                        "confirmed_at": timezone.now(),
+                    },
+                )
         # Fall und Entscheidung
         case.status = CaseStatus.RESOLVED
         case.resolved_by = user
@@ -702,9 +913,16 @@ def apply_decision(
                     "subfolder": target.subfolder,
                     "owner_file_id": physical.get("owner_file_id"),
                     "link_subfolder": target.subfolder,
+                    "tenant_file_id": physical.get("tenant_file_id"),
                 },
             )
         hooks.request_regeneration(obj.pk, bulk_key=bulk_key)
+        if created_tenant is not None:
+            # neue Mieterakte braucht ihren Ordner in Drive, bevor die Verschiebung dorthin laeuft
+            from apps.drive.tasks import trigger_unit_folders
+
+            user_id = getattr(user, "pk", None)
+            transaction.on_commit(lambda: trigger_unit_folders(obj.pk, user_id=user_id, force=True))
     return decision
 
 

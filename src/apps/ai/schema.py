@@ -79,6 +79,28 @@ class Period(BaseModel):
     document_date: str | None = None
 
 
+class LeaseBlock(BaseModel):
+    """Vertragsdaten eines Mieterdokuments (12.09.2026): Grundlage fuer den Vorschlag „Mieter aus Dokument anlegen“.
+    Namen wie im Text; der Abgleich und die Anlage erfolgen lokal nach Bestaetigung."""
+
+    model_config = ConfigDict(extra="forbid")
+    tenant_names: list[str] = Field(default_factory=list)
+    unit: str | None = None
+    start_date: str | None = None
+    end_date: str | None = None
+    base_rent: float | None = None
+    utilities_prepayment: float | None = None
+    heating_prepayment: float | None = None
+    deposit_amount: float | None = None
+    total_rent: float | None = None
+
+    @property
+    def empty(self) -> bool:
+        return not (
+            self.tenant_names or self.unit or self.start_date or self.base_rent or self.deposit_amount
+        )
+
+
 class ClassificationResult(BaseModel):
     """Antwort der Stufe 3, strikt (additionalProperties false), Codes nach B-12."""
 
@@ -92,6 +114,7 @@ class ClassificationResult(BaseModel):
     mentioned_parties: list[str] = Field(default_factory=list)
     confidence: float = Field(ge=0, le=1)
     reasoning: str = Field(max_length=400)
+    lease: LeaseBlock | None = None
 
     @field_validator("category")
     @classmethod
@@ -116,6 +139,7 @@ def response_json_schema() -> dict:
             "mentioned_parties",
             "confidence",
             "reasoning",
+            "lease",
         ],
         "properties": {
             "object_related": {"type": "boolean"},
@@ -137,6 +161,32 @@ def response_json_schema() -> dict:
             "mentioned_parties": {"type": "array", "items": {"type": "string"}},
             "confidence": {"type": "number", "minimum": 0, "maximum": 1},
             "reasoning": {"type": "string", "maxLength": 400},
+            "lease": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": [
+                    "tenant_names",
+                    "unit",
+                    "start_date",
+                    "end_date",
+                    "base_rent",
+                    "utilities_prepayment",
+                    "heating_prepayment",
+                    "deposit_amount",
+                    "total_rent",
+                ],
+                "properties": {
+                    "tenant_names": {"type": "array", "items": {"type": "string"}},
+                    "unit": {"type": ["string", "null"]},
+                    "start_date": {"type": ["string", "null"]},
+                    "end_date": {"type": ["string", "null"]},
+                    "base_rent": {"type": ["number", "null"]},
+                    "utilities_prepayment": {"type": ["number", "null"]},
+                    "heating_prepayment": {"type": ["number", "null"]},
+                    "deposit_amount": {"type": ["number", "null"]},
+                    "total_rent": {"type": ["number", "null"]},
+                },
+            },
         },
     }
 

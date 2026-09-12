@@ -969,7 +969,7 @@ Modell `parties.OwnerFile`. owner files.
 | object_id | bigint | nein | → objects.id |
 | unit_id | bigint | ja | → units.id |
 | owner_id | bigint | ja | → owners.id |
-| file_kind | varchar(16) | nein | unit_owner, unknown_unit, unassigned |
+| file_kind | varchar(16) | nein | unit_owner, object_owner, unknown_unit, unassigned |
 | folder_name | varchar(255) | nein |  |
 | name_basis | json | ja |  |
 | status | varchar(16) | nein |  |
@@ -1486,6 +1486,7 @@ Celery-Queues aus den Settings: `ai`, `classify`, `io`, `lists`, `ocr`
 | Schlüssel | Kategorie | Typ | Seed |
 |---|---|---|---|
 | ai.chars_per_token | ai | decimal | `3.5` |
+| ai.extract_lease_facts | ai | boolean | `true` |
 | ai.max_input_tokens | ai | integer | `3000` |
 | ai.monthly_budget_eur | ai | object | `{"openai": null, "anthropic": null}` |
 | ai.price_list | ai | object | `{"version": "nicht-festgelegt", "models": {}}` |

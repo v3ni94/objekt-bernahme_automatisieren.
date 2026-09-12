@@ -26,7 +26,7 @@ from apps.documents.models import (
     DocumentType,
 )
 from apps.imports.models import ImportKind
-from apps.objects.models import ManagedObject
+from apps.objects.models import ManagedObject, Unit
 from apps.pipeline.previews import preview_path
 from apps.review import services
 from apps.review.models import CaseStatus, CaseType, ReviewCase, ReviewSavedFilter
@@ -124,6 +124,20 @@ def case_detail(request, pk: int):
             period_suggestion = build_context(doc, entities=ctx_entities).period
         except Exception:  # Kontext ist Hilfe, kein Muss
             period_suggestion = None
+    lease_facts = (case.context or {}).get("lease_facts") if isinstance(case.context, dict) else None
+    lease_unit_id = None
+    if lease_facts and obj is not None:
+        lease_unit_id = lease_facts.get("unit_id")
+        if not lease_unit_id and lease_facts.get("unit_hint"):
+            from apps.objects.units import normalize_label
+
+            lease_unit_id = (
+                Unit.active.filter(
+                    object=obj, unit_label_normalized=normalize_label(lease_facts["unit_hint"])
+                )
+                .values_list("pk", flat=True)
+                .first()
+            )
     return render(
         request,
         "review/detail.html",
@@ -132,6 +146,12 @@ def case_detail(request, pk: int):
             "document": doc,
             "object": obj,
             "target": target,
+            "lease_facts": lease_facts,
+            "lease_unit_id": lease_unit_id,
+            "lease_tenant": (lease_facts or {}).get("tenants", [None])[0] if lease_facts else None,
+            "lease_co_tenant": (lease_facts or {}).get("tenants", [None, None])[1]
+            if lease_facts and len(lease_facts.get("tenants") or []) > 1
+            else None,
             "pages": pages,
             "previews": {p.page_no: preview_path(doc.pk, p.page_no).exists() for p in pages} if doc else {},
             "entities": ctx_entities[:200],

@@ -2,7 +2,7 @@
 
 Stand: 11.09.2026, erzeugt aus `src/apps/config/catalog.json` und `db/seeds/app_settings.json` (Definition of Done CR 14: Namensmuster Objektordner, Unterstruktur, Schwellwerte, Duplikat-Option, KI-Provider, Aufbewahrungsfristen). Änderungen erfolgen in der Anwendung unter Konfiguration (Recht `settings.write`), jede Änderung steht im Audit (`setting.update`). Werte wirken ohne Neustart; Ausnahmen stehen in der Spalte Wirkung. Seed-Werte sind Vorschläge (ANNAHME), sofern die Quelle nichts anderes sagt.
 
-Schlüssel: 121 in 18 Gruppen.
+Schlüssel: 122 in 18 Gruppen.
 
 ## Google Drive und Objektordner (`drive.*`)
 
@@ -107,6 +107,7 @@ Schlüssel: 121 in 18 Gruppen.
 | `ai.provider_order` | list | `["openai", "anthropic"]` | Reihenfolge Primär und Fallback | Frage F17 | array |
 | `ai.providers` | object | `{"openai": {"enabled": false, "model": null, "endpoint": null, "region": null...` | Je Provider: enabled, model, endpoint, region, timeout_s, max_attempts, cost_limit_eur_per_object; enabled erst nach AVV-Freigabe | CR 0.1, ANNAHME A17, Frage F17 | object |
 | `ai.reclassify_enabled` | boolean | `false` | Nachklassifikationslauf für Dokumente in 06/01_Unklar mit Grund KI nicht verfügbar oder Kostenlimit (manuell über Kommando ai_reclassify, zeitgesteuert nach F17) | E 4.2, F17 | boolean |
+| `ai.extract_lease_facts` | boolean | `true` | Mieterdokumente ohne bekannten Mieter zusätzlich an Stufe 3 geben, damit die KI Mieter, Einheit, Mietbeginn, Miete und Kaution für den Vorschlag „Mieter aus Dokument anlegen“ liest (nur bei aktiviertem Provider; ohne KI Textregeln) | Entscheidung 12.09.2026 | boolean |
 | `ai.store_masked_prompts` | boolean | `false` | Maskierte Prompts zur Fehlersuche speichern | Frage F17 | boolean |
 | `ai.wall_budget_s` | integer | `120` | Gesamtzeitbudget je Dokument für Stufe 3 | ANNAHME A17 | min 5 |
 

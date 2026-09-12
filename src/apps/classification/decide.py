@@ -691,13 +691,20 @@ def _decide_core(
             base.kpi_misc = True
             base.move_allowed = not existing
         elif not base.tenant_ids:
+            # Mieter unbekannt (12.09.2026): Vertragsdaten aus dem Text (und Stufe 3) als Vorschlag „Mieter aus
+            # Dokument anlegen“; Stammdaten entstehen erst mit der Bestaetigung im Review Center (CR 15).
+            facts = lease_facts_for(ctx, s3)
             base.cases.append(
                 CasePlan(
                     CaseType.UNCLEAR,
                     "tenant_unknown",
                     top,
-                    None,
-                    {"reason": "Mieterdokument ohne bekannten Mieter", "candidates": ctx.owner_candidates},
+                    {"action": "create_tenant"} if not facts.empty else None,
+                    {
+                        "reason": "Mieterdokument ohne bekannten Mieter",
+                        "candidates": ctx.owner_candidates,
+                        "lease_facts": facts.as_dict(),
+                    },
                 )
             )
             base.move_allowed = not existing
@@ -744,6 +751,17 @@ def _decide_core(
             base.kpi_misc, base.kpi_misc_adjusted = True, False
         base.move_allowed = not existing
     return base
+
+
+def lease_facts_for(ctx: DocContext, s3=None):
+    """Vertragsdaten aus allen gelesenen Seiten, eigene Firmen ausgeschlossen, Einheit aus dem Entitaetenabgleich;
+    das Stufe-3-Ergebnis (lease) ergaenzt Luecken und ersetzt die Namen."""
+    from apps.classification.leasefacts import extract_lease_facts, facts_from_stage3
+
+    text = "\n".join(ctx.pages[p] for p in sorted(ctx.pages)) if ctx.pages else ctx.text
+    own = list(store.get("classification.own_company_names", []) or [])
+    facts = extract_lease_facts(text, exclude_names=own, unit_id=ctx.unit_ids[0] if ctx.unit_ids else None)
+    return facts.merge(facts_from_stage3(getattr(s3, "lease", None)))
 
 
 def _batch_key(doc: Document, decision: Decision, plan: CasePlan, run) -> str:

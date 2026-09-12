@@ -579,5 +579,6 @@
     "models": {}
   },
   "ai.reclassify_enabled": false,
+  "ai.extract_lease_facts": true,
   "requests.attachment_threshold": 25
 }

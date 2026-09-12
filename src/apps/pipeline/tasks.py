@@ -622,6 +622,16 @@ def classify(job: ProcessingJob) -> dict:
     combined = combine(s1, s2, ner_support=bool(ctx.owner_ids or ctx.unit_ids))
     # Sperren (Ausweiskopie, Kategorie 01) prueft classify_ai ueber stage3_allowed und protokolliert den Grund im Fall
     stage3 = stage2.stage3_enabled() and combined.stage3_required
+    if (
+        not stage3
+        and combined.category == "04"
+        and not ctx.tenant_ids
+        and stage2.stage3_enabled()
+        and bool(store.get("ai.extract_lease_facts", True))
+    ):
+        # Mieterdokument ohne bekannten Mieter (12.09.2026): Stufe 3 liest die Vertragsdaten (Mieter, Einheit,
+        # Beginn, Miete, Kaution) fuer den Vorschlag „Mieter aus Dokument anlegen“, auch wenn die Kategorie sicher ist.
+        stage3 = True
     payload = {
         "stage1": {
             "category": s1.category,
@@ -716,6 +726,7 @@ def classify_ai(job: ProcessingJob) -> dict:
         "message": outcome.message,
         "call_id": outcome.call_id,
         "reasoning": outcome.reasoning,
+        "lease": outcome.lease,
     }
     enqueue(
         JobType.DECIDE,

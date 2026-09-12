@@ -1613,6 +1613,16 @@
       "schema": {
         "type": "boolean"
       }
+    },
+    {
+      "key": "ai.extract_lease_facts",
+      "category": "ai",
+      "value_type": "boolean",
+      "description": "Mieterdokumente ohne bekannten Mieter zusätzlich an Stufe 3 geben, damit die KI Mieter, Einheit, Mietbeginn, Miete und Kaution für den Vorschlag „Mieter aus Dokument anlegen“ liest (nur bei aktiviertem Provider; ohne KI liest die Anwendung die Werte mit Textregeln)",
+      "source": "Entscheidung 12.09.2026",
+      "schema": {
+        "type": "boolean"
+      }
     }
   ]
 }
