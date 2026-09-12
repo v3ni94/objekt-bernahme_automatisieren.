@@ -746,7 +746,7 @@ def test_verwaltungsseite_mit_pruefung_und_rechten(
     assert resp.status_code == 302 and resp["Location"] == reverse("sync_admin")
     meta = services.connection_meta()
     assert meta["ok"] is True and meta["checked_at"] != vorher and meta["missing"] == []
-    assert {"server_info", "list_tags", "list_custom_fields"} <= set(paperless.call_names())
+    assert {"server_info", "find_tag", "find_custom_field"} <= set(paperless.call_names())
     assert "create_tag" not in paperless.call_names() and "create_custom_field" not in paperless.call_names()
     assert AuditEvent.objects.filter(action="sync.paperless_check", user_id=admin_user.pk).exists()
     # fehlendes Feld: Pruefung meldet es, Einrichten legt es an

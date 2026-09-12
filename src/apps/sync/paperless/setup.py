@@ -61,10 +61,18 @@ def check(*, user=None, create: bool = False, request=None) -> SetupState:
         services.set_cursor(SyncSystem.PAPERLESS, services.CONNECTION_CURSOR, None, state.as_meta())
         return state
     names = config.field_names()
+    wanted_fields = (
+        ("uuid", names.uuid),
+        ("object", names.object),
+        ("status", names.status),
+        ("drive", names.drive),
+    )
     try:
         info = client.server_info()
-        tags = list(client.list_tags())
-        fields = list(client.list_custom_fields())
+        # gezielte Namenssuche: die vollstaendigen Listen (mit Dokumentzaehlern) sind auf grossen Instanzen
+        # teuer und liefen am 12.09.2026 in ein 502 des vorgeschalteten Webservers
+        tag = client.find_tag(names.tag)
+        found = {key: client.find_custom_field(name) for key, name in wanted_fields}
     except Exception as exc:  # jede Fehlerklasse des Clients wird als Befund gemeldet, nie verschluckt
         state = _failed_state(f"Verbindung fehlgeschlagen: {type(exc).__name__}: {exc}"[:500])
         services.set_cursor(SyncSystem.PAPERLESS, services.CONNECTION_CURSOR, None, state.as_meta())
@@ -78,19 +86,13 @@ def check(*, user=None, create: bool = False, request=None) -> SetupState:
         return state
     can_write = create and config.mode() != config.MODE_READONLY
     created: list[str] = []
-    tag = _by_name(tags, names.tag)
     if tag is None and can_write:
         tag = client.create_tag(names.tag)
         created.append(f"tag:{names.tag}")
     field_ids: dict[str, int] = {}
     missing: list[str] = []
-    for key, name in (
-        ("uuid", names.uuid),
-        ("object", names.object),
-        ("status", names.status),
-        ("drive", names.drive),
-    ):
-        row = _by_name(fields, name)
+    for key, name in wanted_fields:
+        row = found.get(key)
         if row is None and can_write:
             row = client.create_custom_field(name, FIELD_TYPES[key])
             created.append(f"field:{name}")

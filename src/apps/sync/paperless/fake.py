@@ -630,6 +630,20 @@ class FakePaperless:
         self._record("list_tags")
         return [deepcopy(t) for t in self.tags.values()]
 
+    def find_tag(self, name: str) -> dict | None:
+        self._record("find_tag", name)
+        wanted = name.strip().casefold()
+        return next((deepcopy(t) for t in self.tags.values() if t["name"].strip().casefold() == wanted), None)
+
+    def find_custom_field(self, name: str) -> dict | None:
+        self._record("find_custom_field", name)
+        if not self.features.get("custom_fields"):
+            raise PaperlessNotFound("Paperless GET /api/custom_fields/: HTTP 404", status_code=404)
+        wanted = name.strip().casefold()
+        return next(
+            (deepcopy(f) for f in self.custom_fields.values() if f["name"].strip().casefold() == wanted), None
+        )
+
     def create_tag(self, name: str, **extra: Any) -> dict:
         self._record("create_tag", name)
         return self._create_named(self.tags, "tag", name, **extra)
@@ -653,6 +667,11 @@ class FakePaperless:
     def create_document_type(self, name: str) -> dict:
         self._record("create_document_type", name)
         return self._create_named(self.document_types, "document_type", name)
+
+    def get_correspondent(self, correspondent_id: int) -> dict | None:
+        self._record("get_correspondent", correspondent_id)
+        row = self.correspondents.get(int(correspondent_id))
+        return deepcopy(row) if row else None
 
     def list_correspondents(self) -> list[dict]:
         self._record("list_correspondents")

@@ -53,16 +53,16 @@ def correspondent_name(client, remote: dict) -> str | None:
         return None
     now = time.monotonic()
     stale = not _CORRESPONDENTS_LOADED_AT or now - _CORRESPONDENTS_LOADED_AT[0] > CORRESPONDENT_CACHE_S
-    if cid not in _CORRESPONDENTS or stale:
-        try:
-            rows = list(client.list_correspondents())
-        except Exception:  # Name ist ein Hilfsmerkmal, kein Pflichtschritt
-            return _CORRESPONDENTS.get(cid)
+    if stale:
         _CORRESPONDENTS.clear()
-        _CORRESPONDENTS.update(
-            {int(r["id"]): str(r.get("name") or "") for r in rows if r.get("id") is not None}
-        )
         _CORRESPONDENTS_LOADED_AT[:] = [now]
+    if cid not in _CORRESPONDENTS:
+        # Einzelabruf je Kennung: die vollstaendige Liste traegt Dokumentzaehler und ist auf grossen Instanzen teuer
+        try:
+            row = client.get_correspondent(cid)
+        except Exception:  # Name ist ein Hilfsmerkmal, kein Pflichtschritt
+            row = None
+        _CORRESPONDENTS[cid] = str((row or {}).get("name") or "")
     return _CORRESPONDENTS.get(cid) or None
 
 

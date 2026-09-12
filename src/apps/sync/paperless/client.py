@@ -728,6 +728,30 @@ class PaperlessClient:
     def list_tags(self) -> list[dict]:
         return self._list_all("/api/tags/")
 
+    def _find_named(self, path: str, name: str) -> dict | None:
+        """Sucht einen Stammdateneintrag ueber den Namensfilter name__iexact (kleine Antwort, ohne die
+        Dokumentzaehler der vollstaendigen Liste, die auf grossen Instanzen in Zeitueberschreitungen laeuft).
+        Ignoriert der Server den Filter, wird die vollstaendige Liste gelesen."""
+        wanted = name.strip().casefold()
+        payload = self._get_json(path, params={"name__iexact": name, "page_size": 10, "page": 1})
+        results = payload.get("results", payload) if isinstance(payload, dict) else payload
+        rows = list(results or [])
+        for row in rows:
+            if str(row.get("name", "")).strip().casefold() == wanted:
+                return row
+        total = payload.get("count") if isinstance(payload, dict) else None
+        if isinstance(total, int) and total > len(rows):
+            for row in self._list_all(path):
+                if str(row.get("name", "")).strip().casefold() == wanted:
+                    return row
+        return None
+
+    def find_tag(self, name: str) -> dict | None:
+        return self._find_named("/api/tags/", name)
+
+    def find_custom_field(self, name: str) -> dict | None:
+        return self._find_named("/api/custom_fields/", name)
+
     def create_tag(self, name: str, **extra: Any) -> dict:
         response = self._request("POST", "/api/tags/", json_body={"name": name, **extra})
         return self._json(response, "/api/tags/")
@@ -744,6 +768,13 @@ class PaperlessClient:
 
     def list_document_types(self) -> list[dict]:
         return self._list_all("/api/document_types/")
+
+    def get_correspondent(self, correspondent_id: int) -> dict | None:
+        """Ein Korrespondent ueber seine Kennung (kleine Antwort statt der vollstaendigen Liste)."""
+        try:
+            return self._get_json(f"/api/correspondents/{int(correspondent_id)}/")
+        except PaperlessNotFound:
+            return None
 
     def list_correspondents(self) -> list[dict]:
         return self._list_all("/api/correspondents/")

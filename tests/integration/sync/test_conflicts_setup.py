@@ -94,7 +94,7 @@ def test_check_legt_im_modus_readonly_nichts_an(paperless, admin_user, monkeypat
     assert state.field_ids == {} and state.tag_id is None
     assert state.server_version == leer.server_version and state.api_version == leer.api_version
     assert _erzeugte(leer) == [] and leer.tags == {} and leer.custom_fields == {}
-    assert leer.call_names() == ["server_info", "list_tags", "list_custom_fields"]
+    assert leer.call_names() == ["server_info", "find_tag"] + ["find_custom_field"] * 4
     befund = _verbindungsbefund()
     assert befund["ok"] is False and set(befund["missing"]) == set(state.missing)
     assert befund["field_ids"] == {} and befund["tag_id"] is None
@@ -167,7 +167,7 @@ def test_check_richtet_im_modus_pilot_tag_und_felder_ein(paperless, admin_user, 
     leer.reset_calls()
     state2 = setup.check(user=admin_user, create=True)
     assert state2.ok is True and state2.field_ids == erwartet and state2.tag_id == state.tag_id
-    assert leer.call_names() == ["server_info", "list_tags", "list_custom_fields"]
+    assert leer.call_names() == ["server_info", "find_tag"] + ["find_custom_field"] * 4
     assert len(leer.tags) == 1 and len(leer.custom_fields) == 4
     assert _verbindungsbefund()["field_ids"] == erwartet
     assert AuditEvent.objects.filter(action="sync.paperless_setup").count() == einrichtungen_vorher + 1
