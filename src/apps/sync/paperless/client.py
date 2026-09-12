@@ -47,6 +47,8 @@ MASKED = "Token ***"
 # Wiederholungsstrategien je Aufruf
 RETRY_FULL = "full"  # 429, 5xx und Verbindungsfehler
 RETRY_RATE_LIMIT_ONLY = "rate_limit_only"  # nur 429; Uploads
+PROBE_MAX_SECONDS = 10.0  # Zeitlimit je Zusatzabfrage (Schema, Status, ui_settings): Verbindung und Inhalt
+PROBE_MAX_BYTES = 8_000_000
 
 
 @dataclass(frozen=True)
@@ -253,9 +255,11 @@ class PaperlessClient:
         headers: dict | None = None,
         retry: str = RETRY_FULL,
         accept_status: tuple[int, ...] = (),
+        timeout: float | None = None,
     ) -> requests.Response:
         """Fuehrt einen Aufruf mit Zeitlimit aus und wiederholt nach Strategie; wirft die Fehlerklassen."""
         url = self._url(path)
+        timeout_s = self.timeout_s if timeout is None else min(self.timeout_s, timeout)
         attempt = 0
         while True:
             attempt += 1
@@ -270,7 +274,7 @@ class PaperlessClient:
                     files=files,
                     json=json_body,
                     headers=self._headers(headers),
-                    timeout=self.timeout_s,
+                    timeout=timeout_s,
                     verify=self.verify_tls,
                     stream=stream,
                     allow_redirects=False,
@@ -411,10 +415,22 @@ class PaperlessClient:
         )
         return self._server_info
 
-    def _probe(self, path: str, *, params: dict | None = None) -> Any:
-        """GET ohne Wiederholung; None bei 404, 403 oder unlesbarer Antwort (Endpunkt fehlt oder ist gesperrt)."""
+    def _probe(
+        self,
+        path: str,
+        *,
+        params: dict | None = None,
+        max_seconds: float = PROBE_MAX_SECONDS,
+        max_bytes: int = PROBE_MAX_BYTES,
+    ) -> Any:
+        """GET ohne Wiederholung; None bei 404, 403 oder unlesbarer Antwort (Endpunkt fehlt oder ist gesperrt).
+        Der Inhalt wird gestreamt und bei Ueberschreiten von Gesamtzeit oder Groesse verworfen: das OpenAPI-Schema
+        (/api/schema/) erzeugt Paperless erst bei Abruf und liefert es auf kleinen Servern sehr langsam aus; ohne
+        diese Grenze haengt der Verbindungstest minutenlang (Beobachtung vom 12.09.2026)."""
         try:
-            response = self._request("GET", path, params=params, retry=RETRY_RATE_LIMIT_ONLY)
+            response = self._request(
+                "GET", path, params=params, stream=True, retry=RETRY_RATE_LIMIT_ONLY, timeout=max_seconds
+            )
         except PaperlessNotFound:
             return None
         except PaperlessAuthError as exc:
@@ -423,8 +439,36 @@ class PaperlessClient:
             return None
         except PaperlessUnavailable:
             return None
+        started = time.monotonic()
+        chunks: list[bytes] = []
+        size = 0
         try:
-            return response.json()
+            iterator = (
+                response.iter_content(chunk_size=65536)
+                if hasattr(response, "iter_content")
+                else [response.content]
+            )
+            for chunk in iterator:
+                if not chunk:
+                    continue
+                size += len(chunk)
+                chunks.append(chunk)
+                if size > max_bytes or time.monotonic() - started > max_seconds:
+                    logger.warning(
+                        "paperless GET %s verworfen: %d Byte nach %.1f s (Grenze %d Byte, %.0f s)",
+                        path,
+                        size,
+                        time.monotonic() - started,
+                        max_bytes,
+                        max_seconds,
+                    )
+                    _close_quietly(response)
+                    return None
+        except Exception:
+            _close_quietly(response)
+            return None
+        try:
+            return json.loads(b"".join(chunks))
         except Exception:
             return None
 
