@@ -1024,6 +1024,7 @@ Dateien unter `/srv/objektakte/secrets/`, je eine Zeile ohne Zeilenumbruch (`pri
 | `totp_key` | AES-256-Schlüssel TOTP-Geheimnisse | `openssl rand -base64 32` | `web` |
 | `google_client_secret` | OAuth-Client-Secret | Google Cloud Console (Abschnitt 7.5) | `web`, `worker-io`, `beat` |
 | `openai_api_key`, `anthropic_api_key` | API-Schlüssel | Anbieterkonsolen (V-13) | `worker-io` |
+| `paperless_token`, `paperless_webhook_token` | API-Token eines eigenen Paperless-Benutzers und gemeinsames Geheimnis der Webhook-Kopfzeile (leer, wenn die Anbindung aus ist; docs/betrieb/paperless-sync.md) | Paperless-ngx (Token), `openssl rand -hex 32` (Webhook) | `web`, `worker-io` |
 | `hvm_signature.jpg` | Unterschriftsbild der Geschäftsführung (JPEG 247 x 64 aus der CI) für freigegebene Nachforderungen; fehlt die Datei, bleibt der Platz frei | vom Auftraggeber übergeben, nie im Repository | `web`, `worker-io` (Pfad `HVM_SIGNATURE_PATH`) |
 | `smtp_password` | SMTP-Passwort für Alarmierung (leer, wenn deaktiviert) | Mailanbieter (V-23) | `beat`, `web` |
 | `readyz_token` | Bearer-Token für `/readyz/` und Smoke-Test | `openssl rand -hex 32` | `web`, `deploy.sh` |
@@ -1039,7 +1040,7 @@ done
 [ -f app_secret_key ] || printf '%s' "$(openssl rand -base64 48)" | sudo tee app_secret_key >/dev/null
 [ -f readyz_token ]   || printf '%s' "$(openssl rand -hex 32)"    | sudo tee readyz_token >/dev/null
 # Platzhalter fuer optionale Secrets, damit Compose die Dateien findet
-for n in google_client_secret openai_api_key anthropic_api_key smtp_password backup_age_recipient rclone.conf hvm_signature.jpg; do
+for n in google_client_secret openai_api_key anthropic_api_key paperless_token paperless_webhook_token smtp_password backup_age_recipient rclone.conf hvm_signature.jpg; do
   [ -f "$n" ] || sudo touch "$n"
 done
 sudo chown root:root /srv/objektakte/secrets/*; sudo chmod 444 /srv/objektakte/secrets/*
@@ -1769,7 +1770,7 @@ Einschätzung aus technischer Sicht; verbindliche Prüfung nur bei Weitergabe de
 | Klassifikations-Worker | `worker-nlp`, Variablen `NLP_CONCURRENCY`, `WORKER_NLP_CPUS`, `WORKER_NLP_MEM` | Fachentwurf E: `worker-classify`, `CLASSIFY_PROCESSES` | Umsetzungsplan B-13 und D.1; `docs/architektur.md` 4.1 und 4.4 verwenden dieselben Namen |
 | Queue-Namen | `ocr`, `classify`, `ai`, `io`, `lists` | Fachentwurf G: `cpu`, `io` | Umsetzungsplan B-13 |
 | Compose-Dateiname | `docker-compose.yml` | frühere Planfassung: `compose.yaml` | CR 0.1 Wortlaut; Umsetzungsplan 1.5 und `docs/architektur.md` 11 gleichlautend |
-| Secret-Namen | `db_root_password`, `db_app_password`, `db_worker_password`, `db_migrate_password`, `db_backup_password`, `db_ro_password`, `redis_password`, `app_secret_key`, `iban_key`, `iban_hmac_key`, `token_key`, `totp_key`, `google_client_secret`, `openai_api_key`, `anthropic_api_key`, `smtp_password`, `readyz_token`, `backup_age_recipient`, `rclone.conf` | frühere Planfassung D.5: `db_app_rw`, `db_app_worker`, `db_app_migrate`, `db_app_backup`, `django_secret_key`, `backup_public_key` | dieses Dokument (Abschnitt 3.8); Umsetzungsplan D.5 und `docs/architektur.md` 5.7 führen denselben Satz |
+| Secret-Namen | `db_root_password`, `db_app_password`, `db_worker_password`, `db_migrate_password`, `db_backup_password`, `db_ro_password`, `redis_password`, `app_secret_key`, `iban_key`, `iban_hmac_key`, `token_key`, `totp_key`, `google_client_secret`, `openai_api_key`, `anthropic_api_key`, `paperless_token`, `paperless_webhook_token`, `smtp_password`, `readyz_token`, `backup_age_recipient`, `rclone.conf` | frühere Planfassung D.5: `db_app_rw`, `db_app_worker`, `db_app_migrate`, `db_app_backup`, `django_secret_key`, `backup_public_key` | dieses Dokument (Abschnitt 3.8); Umsetzungsplan D.5 und `docs/architektur.md` 5.7 führen denselben Satz |
 | Datenbankverbindung in `.env` | `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_WORKER_USER`, `DB_MIGRATE_USER`, Passwörter aus `*_FILE` | frühere Planfassung D.5: `DATABASE_URL_WEB`, `DATABASE_URL_WORKER` | dieses Dokument; eine URL mit Passwort gehört nicht in `.env`, die Anwendung setzt die URL zusammen; Umsetzungsplan D.5 gleichlautend |
 | Verzeichnisse | 14 Verzeichnisse nach Abschnitt 3.3 | Fachentwurf G 2.1: 9 Verzeichnisse | Umsetzungsplan B-14 (Prüfberichte K03, K2-12, K3-05, K4-10) |
 | KI-Konfiguration in `.env` | nur `OPENAI_BASE_URL`, `ANTHROPIC_BASE_URL` | Fachentwurf G 4.2: Modell, Timeout, Budget in `.env` | Umsetzungsplan B-06 |

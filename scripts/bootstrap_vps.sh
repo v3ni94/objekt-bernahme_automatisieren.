@@ -69,7 +69,7 @@ for n in db_root_password db_app_password db_worker_password db_migrate_password
 done
 [ -s app_secret_key ] || printf '%s' "$(openssl rand -base64 48)" > app_secret_key
 [ -s readyz_token ]   || printf '%s' "$(openssl rand -hex 32)"    > readyz_token
-for n in google_client_secret openai_api_key anthropic_api_key smtp_password backup_age_recipient rclone.conf hvm_signature.jpg; do
+for n in google_client_secret openai_api_key anthropic_api_key paperless_token paperless_webhook_token smtp_password backup_age_recipient rclone.conf hvm_signature.jpg; do
   [ -f "$n" ] || : > "$n"
 done
 # Rechte 0444 mit Eigentuemer root: Docker Compose bindet die Dateien unveraendert in die Container ein
@@ -77,7 +77,7 @@ done
 # (web und worker als APP_UID, db und redis als ihre Image-Nutzer) und koennen 0600-Dateien nicht lesen.
 # Auf dem Host schuetzt das Verzeichnis: /srv/objektakte/secrets ist 0700 und gehoert root.
 chown root:root "$BASE"/secrets/*; chmod 444 "$BASE"/secrets/*
-echo "   Leer und spaeter zu fuellen: google_client_secret, openai_api_key, anthropic_api_key, smtp_password, backup_age_recipient, rclone.conf, hvm_signature.jpg"
+echo "   Leer und spaeter zu fuellen: google_client_secret, openai_api_key, anthropic_api_key, paperless_token, paperless_webhook_token, smtp_password, backup_age_recipient, rclone.conf, hvm_signature.jpg"
 echo "   Die Schluessel (iban_key, iban_hmac_key, token_key, totp_key, app_secret_key, db_root_password) gehoeren zusaetzlich in den Passwortmanager (V-21)."
 
 echo "== 4. SSH-Schluessel fuer GitHub"
