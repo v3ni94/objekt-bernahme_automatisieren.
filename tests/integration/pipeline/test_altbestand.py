@@ -197,3 +197,34 @@ def test_seed_datei_ohne_doppelte():
     zeilen = [z.strip() for z in text.splitlines() if z.strip()]
     ids = takeover.parse_folder_refs(text)
     assert len(zeilen) == 113 and len(ids) == 113 and len(set(ids)) == 113
+
+
+def test_aktualisieren_entfernt_geloeschte_und_papierkorb_ordner(client_as, clerk_user, altordner, drive):
+    """„Aktualisieren“ (12.09.2026): Ordner, die es in Drive nicht mehr gibt, verschwinden aus der Liste; ein Ordner,
+    den Drive gerade nicht liefert, bleibt mit Hinweis stehen. In Drive wird nichts veraendert."""
+    from apps.drive.adapter import TransientError
+
+    client = client_as(clerk_user)
+    client.post(
+        "/verwaltung/altbestand/aufnehmen/",
+        {"links": "\n".join([altordner["o623"], altordner["o700"], altordner["ohne"]])},
+    )
+    assert TakeoverSource.objects.count() == 3
+    del drive._entries[altordner["o700"]]  # in Drive endgueltig geloescht
+    drive.trash(altordner["ohne"])  # im Papierkorb
+    resp = client.post("/verwaltung/altbestand/aktualisieren/", follow=True)
+    assert resp.status_code == 200
+    assert set(TakeoverSource.objects.values_list("drive_folder_id", flat=True)) == {altordner["o623"]}
+    texte = [m.message for m in resp.context["messages"]]
+    assert any("3 Ordner geprüft, 1 aktualisiert, 2 nicht mehr in Drive vorhanden" in t for t in texte), texte
+    gruende = sorted(
+        e.after_state["reason"] for e in AuditEvent.objects.filter(action="drive.takeover_source_prune")
+    )
+    assert gruende == ["im Papierkorb", "in Drive gelöscht"]
+    # Voruebergehender Fehler: nichts wird entfernt
+    drive.inject("get", TransientError("Drive 503"), times=1)
+    resp = client.post("/verwaltung/altbestand/aktualisieren/", follow=True)
+    assert TakeoverSource.objects.count() == 1
+    src = TakeoverSource.objects.get()
+    assert src.last_error and src.last_error.startswith("Drive nicht erreichbar")
+    assert any("1 nicht lesbar" in m.message for m in resp.context["messages"])

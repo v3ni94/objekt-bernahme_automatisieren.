@@ -388,6 +388,49 @@ def resolve_source(src, drive: DriveAdapter) -> bool:
     return True
 
 
+def refresh_sources(drive: DriveAdapter, *, user=None, request=None) -> dict[str, int]:
+    """„Aktualisieren“: alle Quellordner neu aus Drive lesen. Ordner, die es nicht mehr gibt (geloescht oder im
+    Papierkorb), verschwinden aus der Tabelle; in Drive wird nichts veraendert. Ein voruebergehender Drive-Fehler
+    entfernt nichts, die Zeile behaelt einen Hinweis."""
+    from apps.drive.adapter import DriveError
+    from apps.drive.models import TakeoverSource
+
+    result = {"checked": 0, "updated": 0, "removed": 0, "errors": 0}
+    for src in TakeoverSource.objects.select_related("object").order_by("pk"):
+        result["checked"] += 1
+        try:
+            node = drive.get(src.drive_folder_id)
+        except DriveError as exc:
+            src.last_error = f"Drive nicht erreichbar: {exc}"[:500]
+            src.save(update_fields=["last_error", "updated_at"])
+            result["errors"] += 1
+            continue
+        if node is None or node.trashed:
+            record(
+                "drive.takeover_source_prune",
+                entity_type="takeover_source",
+                entity_id=src.pk,
+                object_id=src.object_id,
+                request=request,
+                actor=user,
+                before={
+                    "drive_folder_id": src.drive_folder_id,
+                    "name": src.name,
+                    "status": src.status,
+                    "files_registered": src.files_registered,
+                },
+                after={"reason": "in Drive gelöscht" if node is None else "im Papierkorb"},
+            )
+            src.delete()
+            result["removed"] += 1
+            continue
+        if resolve_source(src, drive):
+            result["updated"] += 1
+        else:
+            result["errors"] += 1
+    return result
+
+
 def sorted_sources(sources) -> list:
     """Anzeige: nach Objektnummer (Zahlenwert), dann Name; Zeilen ohne Nummer am Ende."""
     return sorted(

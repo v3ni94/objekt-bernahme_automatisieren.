@@ -15,6 +15,9 @@ urlpatterns = [
     path("verwaltung/altbestand/aufnehmen/", views.takeover_source_add, name="takeover_source_add"),
     path("verwaltung/altbestand/aufloesen/", views.takeover_source_resolve, name="takeover_source_resolve"),
     path(
+        "verwaltung/altbestand/aktualisieren/", views.takeover_source_refresh, name="takeover_source_refresh"
+    ),
+    path(
         "verwaltung/altbestand/<int:pk>/aufarbeiten/", views.takeover_source_run, name="takeover_source_run"
     ),
     path(

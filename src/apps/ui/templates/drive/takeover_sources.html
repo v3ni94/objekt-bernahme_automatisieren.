@@ -8,9 +8,9 @@
 <div class="karte"><h2>Namen und Objektnummern</h2>
 <p>{{ counts.unresolved }} Ordner ohne gelesenen Namen.</p>
 {% if connected %}<form method="post" action="{% url 'takeover_source_resolve' %}" class="inline">{% csrf_token %}<button type="submit">Offene auflösen</button></form>
-<form method="post" action="{% url 'takeover_source_resolve' %}" class="inline">{% csrf_token %}<input type="hidden" name="alle" value="1"><button type="submit" class="knopf">Alle neu lesen</button></form>
+<form method="post" action="{% url 'takeover_source_refresh' %}" class="inline" onsubmit="return confirm('Alle Ordner neu aus Drive lesen? Ordner, die gelöscht wurden oder im Papierkorb liegen, verschwinden aus der Liste. In Drive ändert sich nichts.')">{% csrf_token %}<button type="submit" class="knopf">Aktualisieren</button></form>
 {% else %}<p class="warnung">Keine Google-Verbindung; Namen und Übernahme sind erst danach möglich.</p>{% endif %}
-<p class="klein">Die Objektnummer wird als führende Ziffernfolge im Ordnernamen erkannt (0623 und 623 sind dasselbe Objekt). Gibt es das Objekt noch nicht, führt „Objekt anlegen“ zum vorbelegten Formular; danach ist der Ordner automatisch zugeordnet.</p></div>
+<p class="klein">„Aktualisieren“ liest alle Ordner neu; Ordner, die es in Drive nicht mehr gibt (gelöscht oder im Papierkorb), verschwinden aus der Liste. Die Objektnummer wird als führende Ziffernfolge im Ordnernamen erkannt (0623 und 623 sind dasselbe Objekt). Gibt es das Objekt noch nicht, führt „Objekt anlegen“ zum vorbelegten Formular; danach ist der Ordner automatisch zugeordnet.</p></div>
 </div>
 <div class="karte">
 <table class="voll"><thead><tr><th>Nr.</th><th>Ordner</th><th>Objekt</th><th>Übernommen</th><th>Status</th><th>Zuletzt</th><th></th></tr></thead><tbody>

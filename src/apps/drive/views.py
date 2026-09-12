@@ -455,6 +455,27 @@ def takeover_source_resolve(request):
 
 @permission_required("objects.write")
 @require_POST
+def takeover_source_refresh(request):
+    """Alle Quellordner neu lesen; geloeschte oder im Papierkorb liegende Ordner verschwinden aus der Tabelle."""
+    from apps.drive import takeover
+
+    adapter = oauth.get_adapter()
+    if adapter is None:
+        messages.error(request, "Keine Google-Verbindung.")
+        return _altbestand_zurueck()
+    r = takeover.refresh_sources(adapter, user=request.user, request=request)
+    text = (
+        f"{r['checked']} Ordner geprüft, {r['updated']} aktualisiert, "
+        f"{r['removed']} nicht mehr in Drive vorhanden und aus der Liste entfernt."
+    )
+    if r["errors"]:
+        text += f" {r['errors']} nicht lesbar, Zeile bleibt mit Hinweis stehen."
+    messages.success(request, text)
+    return _altbestand_zurueck()
+
+
+@permission_required("objects.write")
+@require_POST
 def takeover_source_run(request, pk: int):
     from apps.drive import takeover
     from apps.drive.models import TakeoverSource
