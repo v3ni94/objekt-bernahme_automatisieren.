@@ -1,5 +1,110 @@
 [
   {
+    "category_code": "02",
+    "code": "01",
+    "folder_name": "01_Objektstammdaten_und_Einheiten",
+    "display_name": "Objektstammdaten und Einheiten",
+    "sort_order": 1
+  },
+  {
+    "category_code": "02",
+    "code": "02",
+    "folder_name": "02_Grundstück_Rechte_und_Baulasten",
+    "display_name": "Grundstück, Rechte und Baulasten",
+    "sort_order": 2
+  },
+  {
+    "category_code": "02",
+    "code": "03",
+    "folder_name": "03_Bauunterlagen_Pläne_und_Flächen",
+    "display_name": "Bauunterlagen, Pläne und Flächen",
+    "sort_order": 3
+  },
+  {
+    "category_code": "02",
+    "code": "04",
+    "folder_name": "04_Energieausweis_und_Energetik",
+    "display_name": "Energieausweis und Energetik",
+    "sort_order": 4
+  },
+  {
+    "category_code": "02",
+    "code": "05",
+    "folder_name": "05_WEG_Grundlagen_und_Sondernutzungsrechte",
+    "display_name": "WEG-Grundlagen und Sondernutzungsrechte",
+    "sort_order": 5
+  },
+  {
+    "category_code": "02",
+    "code": "06",
+    "folder_name": "06_Beschlüsse_und_Eigentümerversammlungen",
+    "display_name": "Beschlüsse und Eigentümerversammlungen",
+    "sort_order": 6
+  },
+  {
+    "category_code": "02",
+    "code": "07",
+    "folder_name": "07_Hausordnung_und_Nutzungsregelungen",
+    "display_name": "Hausordnung und Nutzungsregelungen",
+    "sort_order": 7
+  },
+  {
+    "category_code": "02",
+    "code": "08",
+    "folder_name": "08_Versicherungen",
+    "display_name": "Versicherungen",
+    "sort_order": 8
+  },
+  {
+    "category_code": "02",
+    "code": "09",
+    "folder_name": "09_Versorger_und_Messdienste",
+    "display_name": "Versorger und Messdienste",
+    "sort_order": 9
+  },
+  {
+    "category_code": "02",
+    "code": "10",
+    "folder_name": "10_Dienstleistungs_und_Wartungsverträge",
+    "display_name": "Dienstleistungs- und Wartungsverträge",
+    "sort_order": 10
+  },
+  {
+    "category_code": "02",
+    "code": "11",
+    "folder_name": "11_Technik_Prüfungen_und_Wartungsberichte",
+    "display_name": "Technik, Prüfungen und Wartungsberichte",
+    "sort_order": 11
+  },
+  {
+    "category_code": "02",
+    "code": "12",
+    "folder_name": "12_Schließanlage_und_Zugangsorganisation",
+    "display_name": "Schließanlage und Zugangsorganisation",
+    "sort_order": 12
+  },
+  {
+    "category_code": "02",
+    "code": "13",
+    "folder_name": "13_Instandhaltung_Schäden_und_Gewährleistung",
+    "display_name": "Instandhaltung, Schäden und Gewährleistung",
+    "sort_order": 13
+  },
+  {
+    "category_code": "02",
+    "code": "14",
+    "folder_name": "14_Behörden_und_objektbezogene_Rechtsverfahren",
+    "display_name": "Behörden und objektbezogene Rechtsverfahren",
+    "sort_order": 14
+  },
+  {
+    "category_code": "02",
+    "code": "15",
+    "folder_name": "15_Übernahme_Fehlunterlagen_und_offene_Vorgänge",
+    "display_name": "Übernahme, Fehlunterlagen und offene Vorgänge",
+    "sort_order": 15
+  },
+  {
     "category_code": "05",
     "code": "01",
     "folder_name": "01_Stammdaten",

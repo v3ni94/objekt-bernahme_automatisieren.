@@ -15,7 +15,7 @@
   {
     "code": "teilungserklaerung",
     "category_code": "02",
-    "subfolder_code": null,
+    "subfolder_code": "05",
     "name": "Teilungserklärung",
     "requires_period": false,
     "requires_owner": false,
@@ -28,7 +28,7 @@
   {
     "code": "gemeinschaftsordnung",
     "category_code": "02",
-    "subfolder_code": null,
+    "subfolder_code": "05",
     "name": "Gemeinschaftsordnung",
     "requires_period": false,
     "requires_owner": false,
@@ -40,7 +40,7 @@
   {
     "code": "eigentuemerliste",
     "category_code": "02",
-    "subfolder_code": null,
+    "subfolder_code": "05",
     "name": "Vollständige Eigentümerliste",
     "requires_period": false,
     "requires_owner": false,
@@ -53,7 +53,7 @@
   {
     "code": "beschlusssammlung",
     "category_code": "02",
-    "subfolder_code": null,
+    "subfolder_code": "06",
     "name": "Beschlusssammlung",
     "requires_period": false,
     "requires_owner": false,
@@ -65,7 +65,7 @@
   {
     "code": "versammlungsprotokoll",
     "category_code": "02",
-    "subfolder_code": null,
+    "subfolder_code": "06",
     "name": "Versammlungsprotokoll",
     "requires_period": false,
     "requires_owner": false,
@@ -79,7 +79,7 @@
   {
     "code": "gebaeudeversicherung",
     "category_code": "02",
-    "subfolder_code": null,
+    "subfolder_code": "08",
     "name": "Gebäudeversicherung",
     "requires_period": false,
     "requires_owner": false,
@@ -93,7 +93,7 @@
   {
     "code": "energieausweis",
     "category_code": "02",
-    "subfolder_code": null,
+    "subfolder_code": "04",
     "name": "Energieausweis",
     "requires_period": false,
     "requires_owner": false,
@@ -105,7 +105,7 @@
   {
     "code": "dienstleistervertrag",
     "category_code": "02",
-    "subfolder_code": null,
+    "subfolder_code": "10",
     "name": "Dienstleistervertrag",
     "requires_period": false,
     "requires_owner": false,

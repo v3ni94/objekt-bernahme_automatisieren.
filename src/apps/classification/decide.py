@@ -611,7 +611,21 @@ def _decide_core(
         base.move_allowed = not existing
         return base
     if category in ("01", "02", "03"):
-        base.physical_category, base.physical_subfolder = category, None
+        # Unterordner der Stammakte (12.09.2026): aus Regel oder Stufe 3, sonst aus der Dokumentart; die physische
+        # Ablage folgt dem Unterordner (02/08_Versicherungen), ohne Unterordner flach im Hauptordner.
+        if (
+            base.subfolder is None
+            and dtype is not None
+            and dtype.subfolder_id
+            and dtype.category_id == category
+        ):
+            base.subfolder = dtype.subfolder.code
+        if (
+            base.subfolder
+            and not DocumentSubfolder.objects.filter(category_id=category, code=base.subfolder).exists()
+        ):
+            base.subfolder = None
+        base.physical_category, base.physical_subfolder = category, base.subfolder
         base.segments = find_segments(ctx, base.document_type)
         for seg in base.segments:
             unit_ids = _segment_entities(ctx, seg["page_from"], seg["page_to"], "unit_label")

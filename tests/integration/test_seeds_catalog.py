@@ -47,9 +47,15 @@ def test_katalog_wortgetreu(seeded):
         .values_list("folder_name", flat=True)
     )
     assert sub06 == ["01_Unklar", "02_Manuelle_Pruefung", "03_Dubletten", "04_Nicht_objektbezogen"]
-    assert (
-        DocumentSubfolder.objects.filter(category_id__in=["01", "02", "03", "04"]).count() == 0
-    )  # F10 offen
+    assert DocumentSubfolder.objects.filter(category_id__in=["01", "03", "04"]).count() == 0  # F10 offen
+    # Stammakte: 15 Unterordner nach der Checkliste der Geschaeftsfuehrung (12.09.2026), Namen wortgetreu
+    sub02 = list(
+        DocumentSubfolder.objects.filter(category_id="02")
+        .order_by("sort_order")
+        .values_list("folder_name", flat=True)
+    )
+    assert len(sub02) == 15 and sub02[0] == "01_Objektstammdaten_und_Einheiten"
+    assert sub02[7] == "08_Versicherungen" and sub02[-1] == "15_Übernahme_Fehlunterlagen_und_offene_Vorgänge"
 
 
 def test_dokumentunterarten_pflichtmetadaten(seeded):

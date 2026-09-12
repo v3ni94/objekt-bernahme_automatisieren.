@@ -50,7 +50,9 @@ def test_katalog_wortgetreu_aus_cr12(seeded):
     weg = list(CompletenessCheck.objects.filter(sort_order__lt=200).order_by("sort_order"))
     assert [c.name for c in weg] == CR12
     assert all(c.request_text_block is not None and c.category for c in weg)
-    assert CompletenessCheck.objects.filter(sort_order__gte=200).count() == 9  # Mietkatalog (Vorschlag H 3.6)
+    assert (
+        CompletenessCheck.objects.filter(sort_order__gte=200, sort_order__lt=300).count() == 9
+    )  # Mietkatalog (H 3.6)
 
 
 def test_zeitraumlogik(objekt):

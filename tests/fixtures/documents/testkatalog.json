@@ -340,7 +340,7 @@
    ],
    "expected": {
     "category": "02",
-    "subfolder": null,
+    "subfolder": "05",
     "document_type": "teilungserklaerung",
     "case_type": null,
     "period_year": null,
@@ -357,7 +357,7 @@
    ],
    "expected": {
     "category": "02",
-    "subfolder": null,
+    "subfolder": "06",
     "document_type": "versammlungsprotokoll",
     "case_type": null,
     "period_year": null,
@@ -379,7 +379,7 @@
    ],
    "expected": {
     "category": "02",
-    "subfolder": null,
+    "subfolder": "06",
     "document_type": "versammlungsprotokoll",
     "case_type": null,
     "period_year": null,
@@ -403,7 +403,7 @@
    ],
    "expected": {
     "category": "02",
-    "subfolder": null,
+    "subfolder": "06",
     "document_type": "beschlusssammlung",
     "case_type": null,
     "period_year": null,
@@ -419,7 +419,7 @@
    ],
    "expected": {
     "category": "02",
-    "subfolder": null,
+    "subfolder": "08",
     "document_type": "gebaeudeversicherung",
     "case_type": null,
     "period_year": null,
@@ -435,7 +435,7 @@
    ],
    "expected": {
     "category": "02",
-    "subfolder": null,
+    "subfolder": "04",
     "document_type": "energieausweis",
     "case_type": null,
     "period_year": null,
@@ -451,7 +451,7 @@
    ],
    "expected": {
     "category": "02",
-    "subfolder": null,
+    "subfolder": "10",
     "document_type": "dienstleistervertrag",
     "case_type": null,
     "period_year": null,

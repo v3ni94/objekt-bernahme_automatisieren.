@@ -83,6 +83,8 @@ Beides steht im Protokoll (`object.archive`, `object.restore`) mit Grund und Dri
 
 ## 3. Ordnerabgleich
 
+Unterordner der Stammakte: `02_Stammakte` hat seit dem 12.09.2026 fünfzehn Unterordner nach der Checkliste (01_Objektstammdaten_und_Einheiten bis 15_Übernahme_Fehlunterlagen_und_offene_Vorgänge). Der Ordnerabgleich legt sie bei jedem Objekt an; die Ablage sortiert Stammakten-Dokumente nach ihrer Dokumentart in den passenden Unterordner (Versicherungsschein in 08_Versicherungen, Wartungsprotokoll in 11_Technik_Prüfungen_und_Wartungsberichte, Wartungsvertrag in 10_Dienstleistungs_und_Wartungsverträge; Wartungsrechnungen bleiben in 03_Buchhaltung, Mietverträge in 04_Mieterakte, Eigentumsnachweise in 05_Eigentümerakte). Bereits flach in `02_Stammakte` abgelegte Dokumente bleiben liegen, bis sie im Review Center oder durch eine Neubewertung einem Unterordner zugeordnet werden. Für bestehende Objekte legt die Deploy-Aktion `reconcile-all` die neuen Unterordner in einem Lauf an.
+
 Voraussetzung: Google Drive ist verbunden (Admin: Google Drive, „Verbindung“ mit dem Konto `ablage@muellerhv.de`, dann Wurzelordner 01_Daten „Pfad auflösen“ und „Wurzel bestätigen“). Der Abgleich legt fehlende Ordner an und benennt den Altordner in `06_Sonstiges` um; er löscht nie.
 
 1. Objektansicht, Ordnerabgleiche, „Probelauf (Dry-Run)“. Der Probelauf liest nur.
@@ -208,6 +210,7 @@ Wenn etwas nicht klappt:
 3. Manuell schließen (Negativerklärung): in der Zeile Übersteuerung wählen, Grund eintragen, „Speichern“. Beispiel: die Vorverwaltung erklärt schriftlich, dass keine Sonderumlage beschlossen wurde. Die Übersteuerung ist mit Nutzer und Zeit protokolliert und bleibt bei der nächsten Bewertung bestehen.
 4. Zeitraum anpassen: Übernahmezeitraum und Wirtschaftsjahr im Objekt bearbeiten; die Neubewertung folgt automatisch.
 5. „Alle Prüfpositionen“ zeigt jede Position mit Ebene, Status, wirksamem Status und Übersteuerung.
+6. Sollbestand der Stammakte (Checkliste der Geschäftsführung vom 12.09.2026): Zusätzlich zu den Prüfpunkten aus CR 12 bewertet die Anwendung je Objekt die empfohlenen Unterlagen der Stammakte, getrennt nach Grundbestand (alle Verwaltungsarten), WEG, Mietverwaltung und SEV. Eine Position gilt als vorhanden, sobald ein bestätigtes Dokument einer zugehörigen Dokumentart im Objekt liegt; ein Dokument in Prüfung zählt als teilweise. Diese Positionen haben Empfehlungscharakter: sie zählen nicht in den Erfüllungsgrad, stehen als eigene Zeile „Sollbestand Stammakte“ in der Bewertung und werden erst in die Nachforderung aufgenommen, wenn sie in der Zeile angehakt sind. Statusangaben für die Übersteuerung: vorhanden und geprüft; vorhanden, aber unvollständig oder Aktualität ungeklärt (mit Grund); nicht anwendbar. Nicht zutreffende Positionen bitte als nicht anwendbar kennzeichnen, damit die Liste der offenen Punkte aussagekräftig bleibt.
 
 Wenn etwas nicht klappt:
 

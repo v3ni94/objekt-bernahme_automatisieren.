@@ -156,8 +156,8 @@ class CompletenessFinding(TimestampedModel):
             models.CheckConstraint(condition=Q(status__in=FindingStatus.values), name="ck_findings_status"),
             models.CheckConstraint(
                 condition=Q(manual_status__isnull=True)
-                | Q(manual_status__in=["fulfilled", "not_applicable"]),
-                name="ck_findings_manual",
+                | Q(manual_status__in=["fulfilled", "partial", "not_applicable"]),
+                name="ck_findings_manual",  # partial: unvollstaendig oder Aktualitaet ungeklaert (Checkliste 12.09.2026)
             ),
         ]
         indexes = [models.Index(fields=["object", "status"], name="ix_findings_status")]

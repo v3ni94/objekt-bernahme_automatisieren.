@@ -36,7 +36,18 @@ WEG_TYPES = ("weg", "weg_with_se")
 OWNER_LIST_KINDS = ("owner_list", "mixed")
 TENANT_LIST_KINDS = ("tenant_list", "mixed")
 PENDING_BATCH_STATUSES = ("uploaded", "parsed", "in_review", "partially_committed")
-MANUAL_STATUSES = (FindingStatus.FULFILLED, FindingStatus.NOT_APPLICABLE)
+# Manuelle Statusangaben nach der Checkliste (12.09.2026): vorhanden und geprueft, vorhanden aber unvollstaendig bzw.
+# Aktualitaet ungeklaert (teilweise, mit Grund), nicht anwendbar
+MANUAL_STATUSES = (FindingStatus.FULFILLED, FindingStatus.PARTIAL, FindingStatus.NOT_APPLICABLE)
+MANUAL_LABELS = {
+    FindingStatus.FULFILLED: "vorhanden und geprüft",
+    FindingStatus.PARTIAL: "vorhanden, aber unvollständig oder Aktualität ungeklärt",
+    FindingStatus.NOT_APPLICABLE: "nicht anwendbar",
+}
+CATALOG_CATEGORY = "stammakte"  # Sollbestand der Stammakte, generisch aus den Seeds bewertet
+CATALOG_HINT = (
+    "Sollbestand der Stammakte (Checkliste); trifft die Position nicht zu, als nicht anwendbar kennzeichnen"
+)
 NEGATIVE_PROOF_HINT = "Aufstellung oder Negativerklärung der Vorverwaltung erforderlich"
 
 M, P, F, NA = (
@@ -887,6 +898,23 @@ def evaluate_rental(d: Data, units: list[Unit], *, include_shared: bool = True) 
 
 
 # ---------------------------------------------------------------- Lauf mit Upsert (H 3.5)
+def evaluate_catalog(d: Data, checks: dict[str, CompletenessCheck]) -> list[Spec]:
+    """Sollbestand der Stammakte (Checkliste der Geschaeftsfuehrung vom 12.09.2026): eine Position je Pruefpunkt der
+    Kategorie stammakte auf Objektebene; erfuellt, wenn ein bestaetigtes Dokument einer Nachweisart vorliegt, teilweise
+    bei offener Pruefung im Review Center, sonst fehlt. Empfehlungscharakter: nicht anwendbare Positionen schliesst der
+    Sachbearbeiter manuell, die Positionen zaehlen nicht in den Erfuellungsgrad und stehen zunaechst nicht in der
+    Nachforderung (Kennzeichen recommendation)."""
+    out: list[Spec] = []
+    for check in sorted(checks.values(), key=lambda c: c.sort_order):
+        if check.category != CATALOG_CATEGORY or check.scope_type != ScopeType.OBJECT:
+            continue
+        docs = [doc for t in (check.evidence_document_types or []) for doc in d.docs_by_type.get(t, [])]
+        spec = _doc_spec(check.code, docs, missing_hint=CATALOG_HINT)
+        spec.details = {**spec.details, "recommendation": True}
+        out.append(spec)
+    return out
+
+
 def evaluate_object(
     obj: ManagedObject, *, today: date | None = None, trigger: str = "manual", user=None
 ) -> dict:
@@ -903,6 +931,7 @@ def evaluate_object(
         se_units = [u for u in d.units if u.se_managed]
         if se_units:
             specs.extend(evaluate_rental(d, se_units, include_shared=False))
+    specs.extend(evaluate_catalog(d, checks))
     by_key: dict[str, Spec] = {}
     for s in specs:
         if s.check_code not in checks:
@@ -934,6 +963,7 @@ def evaluate_object(
                         evidence_document_id=s.evidence_document_id,
                         evidence_link_id=s.evidence_link_id,
                         details=s.details,
+                        include_in_request=not s.details.get("recommendation"),
                         last_evaluated_at=now,
                     )
                 )
@@ -1008,14 +1038,19 @@ def summary(obj: ManagedObject) -> dict:
             "missing_by_category": {},
             "last_evaluated_at": None,
             "counts": {},
+            "catalog": {},
         }
     per_unit: dict[int, dict] = {}
     counts = {F: 0, P: 0, M: 0, NA: 0}
+    catalog = {F: 0, P: 0, M: 0, NA: 0}  # Sollbestand der Stammakte, getrennt gezaehlt (Empfehlung)
     missing_by_category: dict[str, int] = {}
     blocking_missing = False
     for f in findings:
         eff = effective_status(f)
         cons = _consequential(f)
+        if (f.details or {}).get("recommendation"):
+            catalog[eff] = catalog.get(eff, 0) + 1
+            continue
         if not cons:
             counts[eff] = counts.get(eff, 0) + 1
         if eff == M and not cons:
@@ -1067,6 +1102,7 @@ def summary(obj: ManagedObject) -> dict:
         "unit_counts": unit_counts,
         "missing_by_category": missing_by_category,
         "blocking_missing": blocking_missing,
+        "catalog": catalog,
         "last_evaluated_at": max(f.last_evaluated_at for f in findings),
     }
 

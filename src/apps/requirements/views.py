@@ -80,7 +80,7 @@ def completeness_view(request, pk: int):
             "rows": rows,
             "unit_rows": sorted(summary.get("units", {}).values(), key=lambda u: u["label"]),
             "can_write": user_has_permission(request.user, "demands.write"),
-            "statuses": engine.MANUAL_STATUSES,
+            "statuses": [(str(st), engine.MANUAL_LABELS[st]) for st in engine.MANUAL_STATUSES],
         },
     )
 

@@ -16,7 +16,7 @@ on:
         required: true
         default: "check"
         type: choice
-        options: ["check", "pull", "befund", "env-init", "ps", "logs", "smoke", "cert-retry", "db-status", "db-reset", "first-run", "deploy", "rollback", "create-admin", "oauth-check", "deploy-tests", "doc-status", "config-set", "altbestand-import"]
+        options: ["check", "pull", "befund", "env-init", "ps", "logs", "smoke", "cert-retry", "db-status", "db-reset", "first-run", "deploy", "rollback", "create-admin", "oauth-check", "deploy-tests", "doc-status", "config-set", "altbestand-import", "reconcile-all"]
       argument:
         description: "Nur fuer create-admin (E-Mail), logs (Dienstname, leer = alle Anwendungsdienste) und config-set (schluessel=wert)"
         required: false

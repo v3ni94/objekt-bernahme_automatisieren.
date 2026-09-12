@@ -78,7 +78,11 @@ def test_stufe3_liefert_vertragsdaten_fuer_den_vorschlag(welt, fake_oauth, run_a
         ("Jonas", "Beispielmieter"),
         ("Lea", "Beispielmieter"),
     ]
-    assert facts["unit_hint"] == "WE 2" and facts["base_rent"] == "650.00" and facts["deposit_amount"] == "1950.00"
+    assert (
+        facts["unit_hint"] == "WE 2"
+        and facts["base_rent"] == "650.00"
+        and facts["deposit_amount"] == "1950.00"
+    )
     assert case.proposed_action == {"action": "create_tenant"}
     # Datenminimierung bleibt: der Request traegt keine Stammdatennamen, die Antwort wird lokal verarbeitet
     sent = router.providers["openai"].sent[-1]["user"]
