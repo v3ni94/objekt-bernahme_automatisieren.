@@ -622,16 +622,20 @@ def classify(job: ProcessingJob) -> dict:
     combined = combine(s1, s2, ner_support=bool(ctx.owner_ids or ctx.unit_ids))
     # Sperren (Ausweiskopie, Kategorie 01) prueft classify_ai ueber stage3_allowed und protokolliert den Grund im Fall
     stage3 = stage2.stage3_enabled() and combined.stage3_required
+    stage3_purpose = None
     if (
         not stage3
         and combined.category == "04"
         and not ctx.tenant_ids
+        and job.object.management_type != "weg"  # reine WEG: Mieterdokumente gehen ohnehin in die Pruefung
         and stage2.stage3_enabled()
         and bool(store.get("ai.extract_lease_facts", True))
     ):
-        # Mieterdokument ohne bekannten Mieter (12.09.2026): Stufe 3 liest die Vertragsdaten (Mieter, Einheit,
-        # Beginn, Miete, Kaution) fuer den Vorschlag „Mieter aus Dokument anlegen“, auch wenn die Kategorie sicher ist.
+        # Mieterdokument ohne bekannten Mieter (12.09.2026): Stufe 3 liest nur die Vertragsdaten (Mieter, Einheit,
+        # Beginn, Miete, Kaution) fuer den Vorschlag „Mieter aus Dokument anlegen“; die sichere lokale Kategorie
+        # bleibt (Zweck lease_facts, keine Uebersteuerung durch die KI).
         stage3 = True
+        stage3_purpose = "lease_facts"
     payload = {
         "stage1": {
             "category": s1.category,
@@ -663,6 +667,7 @@ def classify(job: ProcessingJob) -> dict:
             "confidence": combined.confidence,
             "reason": combined.reason,
         },
+        "stage3_purpose": stage3_purpose,
     }
     next_type = JobType.CLASSIFY_AI if stage3 else JobType.DECIDE
     enqueue(
@@ -756,6 +761,9 @@ def decide_task(job: ProcessingJob) -> dict:
     ctx = build_context(doc)
     s1, s2 = _stage_results(job.payload or {})
     s3 = _stage3_result((job.payload or {}).get("stage3"))
+    if s3 is not None and s3.status == "ok" and (job.payload or {}).get("stage3_purpose") == "lease_facts":
+        # nur Vertragsdaten lesen: die Kategorie der KI wird nicht mit der lokalen Entscheidung verrechnet
+        s3.status = "lease_facts"
     dry_run = bool(job.run and job.run.dry_run)
     decision = decide_mod.decide(ctx, s1, s2, doc, s3=s3)
     final = decide_mod.persist(doc, ctx, s1, s2, decision, run=job.run, dry_run=dry_run)

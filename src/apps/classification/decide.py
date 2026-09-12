@@ -730,12 +730,18 @@ def _decide_core(
 
         akte = ensure_object_owner_file(obj)
         owners = object_owners(obj)
+        owner_ids = [o.pk for o in owners]
         base.physical_category, base.physical_subfolder = "05", base.subfolder
         base.physical_owner_file_id = akte.pk
-        if len(owners) == 1:
-            base.links = [
+        recognized = [oid for oid in ctx.owner_ids if oid in owner_ids]
+        foreign = [oid for oid in ctx.owner_ids if oid not in owner_ids]
+        ownership = base.document_type in OWNERSHIP_TYPES
+        targets = recognized or owner_ids
+
+        def _rental_links(status: str, confidence: float) -> list[LinkPlan]:
+            return [
                 LinkPlan(
-                    owners[0].pk,
+                    oid,
                     None,
                     None,
                     akte.pk,
@@ -743,12 +749,45 @@ def _decide_core(
                     base.document_type,
                     None,
                     None,
-                    1.0,
-                    "confirmed",
-                    primary=True,
+                    confidence,
+                    status,
+                    primary=(i == 0),
                 )
+                for i, oid in enumerate(targets)
             ]
-        base.move_allowed = True
+
+        if targets and not foreign and not ownership:
+            # Eigentuemer des Hauses bekannt und kein Widerspruch im Dokument: alle Eigentuemer verknuepfen
+            base.links = _rental_links("confirmed", 1.0 if (recognized or len(targets) == 1) else 0.9)
+            base.move_allowed = True
+            return base
+        # Kein Eigentuemer erfasst, fremder Eigentuemer erkannt oder Eigentumsnachweis: Pruefung im Review Center,
+        # Ablage bleibt in der Objektakte (Gegenpruefung 12.09.2026)
+        if not owner_ids:
+            subtype, reason = "no_owner_in_object", "Mietverwaltung ohne erfassten Eigentümer; Objektakte"
+        elif foreign:
+            subtype, reason = "owner_mismatch", "Erkannter Eigentümer ist nicht Eigentümer des Objekts"
+        else:
+            subtype, reason = (
+                "ownership_document",
+                "Eigentumsnachweis in der Mietverwaltung: Eigentümerwechsel prüfen",
+            )
+        base.links = _rental_links("suggested", 0.7) if targets else []
+        base.cases.append(
+            CasePlan(
+                CaseType.OWNER_CANDIDATES if owner_ids else CaseType.UNCLEAR,
+                subtype,
+                [{"owner_id": o.pk, "name": str(o)} for o in owners],
+                {"action": "assign_owner_and_unit"},
+                {
+                    "reason": reason,
+                    "owner_file_id": akte.pk,
+                    "owner_ids": list(ctx.owner_ids),
+                    "candidates": ctx.owner_candidates,
+                },
+            )
+        )
+        base.move_allowed = not existing
         return base
     # Kategorie 05: Zusatzpruefungen
     links, case = owner_checks(
@@ -767,15 +806,27 @@ def _decide_core(
     return base
 
 
+LEASE_TEXT_PAGES = 6
+LEASE_TEXT_MAX_CHARS = 60_000
+
+
 def lease_facts_for(ctx: DocContext, s3=None):
-    """Vertragsdaten aus allen gelesenen Seiten, eigene Firmen ausgeschlossen, Einheit aus dem Entitaetenabgleich;
-    das Stufe-3-Ergebnis (lease) ergaenzt Luecken und ersetzt die Namen."""
+    """Vertragsdaten aus den ersten Seiten (plus letzte Seite), eigene Firmen und erkannte Vermieter ausgeschlossen,
+    Einheit aus dem Entitaetenabgleich; das Stufe-3-Ergebnis (lease) ergaenzt Luecken und ersetzt die Namen.
+    Textumfang begrenzt (Gegenpruefung 12.09.2026: kein minutenlanger Regexlauf ueber Hunderte Seiten)."""
     from apps.classification.leasefacts import extract_lease_facts, facts_from_stage3
 
-    text = "\n".join(ctx.pages[p] for p in sorted(ctx.pages)) if ctx.pages else ctx.text
+    if ctx.pages:
+        nums = sorted(ctx.pages)
+        chosen = nums[:LEASE_TEXT_PAGES] + ([nums[-1]] if len(nums) > LEASE_TEXT_PAGES else [])
+        text = "\n".join(ctx.pages[p] or "" for p in chosen)
+    else:
+        text = ctx.text or ""
+    text = text[:LEASE_TEXT_MAX_CHARS]
     own = list(store.get("classification.own_company_names", []) or [])
     facts = extract_lease_facts(text, exclude_names=own, unit_id=ctx.unit_ids[0] if ctx.unit_ids else None)
-    return facts.merge(facts_from_stage3(getattr(s3, "lease", None)))
+    exclude = own + list(facts.landlord_names)
+    return facts.merge(facts_from_stage3(getattr(s3, "lease", None), exclude_names=exclude))
 
 
 def _batch_key(doc: Document, decision: Decision, plan: CasePlan, run) -> str:

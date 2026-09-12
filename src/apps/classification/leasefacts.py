@@ -35,17 +35,14 @@ TENANT_LABEL = re.compile(
     r"(?im)^[ \t]*(?:Mieter(?:in|/in|/-in|innen|partei)?|Name des Mieters|Name der Mieterin|Mietpartei)"
     r"[ \t]*[:\-–][ \t]*(.{3,140})$"
 )
-# "... – nachfolgend Mieter genannt –", "(im Folgenden „Mieter“)", "als Mieter"
-TENANT_DESIGNATION = re.compile(
-    r"(.{3,220}?)[\s,;(\-–]*(?:nachfolgend|nachstehend|im Folgenden|folgend|künftig|kuenftig|hiernach)"
-    r"\s+(?:auch\s+|kurz\s+|gemeinsam\s+)?[„\"“'‚]?\s*Mieter(?:in|innen|partei|seite)?\b",
-    re.IGNORECASE | re.DOTALL,
+# "... – nachfolgend Mieter genannt –", "(im Folgenden „Mieter“)": Markierung suchen, Abschnitt davor ausschneiden
+DESIGNATION = (
+    r"(?:nachfolgend|nachstehend|im Folgenden|folgend|künftig|kuenftig|hiernach)"
+    r"\s+(?:auch\s+|kurz\s+|gemeinsam\s+)?[„\"“'‚]?\s*"
 )
-LANDLORD_DESIGNATION = re.compile(
-    r"(.{3,220}?)[\s,;(\-–]*(?:nachfolgend|nachstehend|im Folgenden|folgend|künftig|kuenftig|hiernach)"
-    r"\s+(?:auch\s+|kurz\s+)?[„\"“'‚]?\s*Vermieter(?:in|seite)?\b",
-    re.IGNORECASE | re.DOTALL,
-)
+TENANT_MARK = re.compile(DESIGNATION + r"Mieter(?:in|innen|partei|seite)?\b", re.IGNORECASE)
+LANDLORD_MARK = re.compile(DESIGNATION + r"Vermieter(?:in|seite)?\b", re.IGNORECASE)
+DESIGNATION_WINDOW = 220
 LANDLORD_LABEL = re.compile(r"(?im)^[ \t]*Vermieter(?:in)?[ \t]*[:\-–][ \t]*(.{3,140})$")
 
 UNIT_PATTERNS = (
@@ -83,15 +80,16 @@ END_DATE = re.compile(
 )
 AMOUNT = r"(\d{1,3}(?:\.\d{3})+,\d{2}|\d+,\d{2}|\d{2,6}(?:,-|,--)?)\s*(?:€|EUR|Euro)"
 AMOUNT_LABELS = {
+    "deposit_amount": r"(?:Kaution|Mietsicherheit|Mietkaution|Sicherheitsleistung)",
     "base_rent": r"(?:Grundmiete|Kaltmiete|Nettokaltmiete|Netto-?Kaltmiete|Nettomiete|Mietzins|"
     r"monatliche\s+Miete|Miete\s+monatlich|Miete\s+\(kalt\)|Miete\s+kalt)",
     "utilities_prepayment": r"(?:Betriebskosten|Nebenkosten)(?:-?vorauszahlung|-?vorschuss|-?pauschale)?",
     "heating_prepayment": r"(?:Heizkosten|Heiz-?\s*und\s+Warmwasserkosten|Heizung)(?:-?vorauszahlung|-?vorschuss)?",
-    "deposit_amount": r"(?:Kaution|Mietsicherheit|Mietkaution|Sicherheitsleistung)",
     "total_rent": r"(?:Gesamtmiete|Bruttomiete|Warmmiete|Gesamtbetrag|Miete\s+gesamt|insgesamt)",
 }
+# Beschriftung endet an einer Wortgrenze (Kaltmiete, nicht Kaltmieten), Zwischenraum ohne Satzende (Gegenpruefung 12.09.2026)
 AMOUNT_RES = {
-    key: re.compile(label + r"[^\d€\n]{0,60}?" + AMOUNT, re.IGNORECASE)
+    key: re.compile(label + r"(?![a-zäöüß])[^\d€\n.;]{0,40}?" + AMOUNT, re.IGNORECASE)
     for key, label in AMOUNT_LABELS.items()
 }
 DEPOSIT_MULTIPLE = re.compile(
@@ -200,8 +198,9 @@ class LeaseFacts:
         if other is None or other.empty:
             return self
         merged = LeaseFacts(**{**asdict_shallow(self)})
-        if other.tenants:
-            merged.tenants = other.tenants
+        ki_tenants = filter_excluded(other.tenants, self.landlord_names) if other.tenants else []
+        if ki_tenants:
+            merged.tenants = ki_tenants
         for key in (
             "unit_hint",
             "start_date",
@@ -375,18 +374,23 @@ LANDLORD_TAG = re.compile(
 )
 
 
-def _clean_designation_chunk(chunk: str, *, role: str = "tenant") -> str:
-    """Den Abschnitt vor „nachfolgend Mieter“ (bzw. „Vermieter“) auf den Personenblock kuerzen: beim Mieter hinter der
-    letzten Vermieterbezeichnung, sonst hinter der letzten Leerzeile oder dem Wort „zwischen“."""
-    chunk = chunk.strip()
-    tags = list(LANDLORD_TAG.finditer(chunk)) if role == "tenant" else []
-    tag = tags[-1] if tags else None
-    if tag is not None:
-        chunk = chunk[tag.end() :]
-        chunk = re.sub(r"^[\s\-–,;:)“\"']*(?:und|sowie)?\s*", "", chunk)
-    else:
-        chunk = re.split(r"\n\s*\n|\bzwischen\b", chunk, flags=re.IGNORECASE)[-1]
-    return chunk[-220:]
+def _designation_chunks(text: str, mark: re.Pattern) -> list[str]:
+    """Abschnitte vor einer Bezeichnung („nachfolgend Mieter“): das Fenster davor, beim Mieter hinter der letzten
+    Vermieterbezeichnung, sonst hinter der letzten Leerzeile oder dem Wort „zwischen“."""
+    chunks: list[str] = []
+    for m in mark.finditer(text):
+        chunk = text[max(0, m.start() - DESIGNATION_WINDOW) : m.start()]
+        if mark is TENANT_MARK:
+            tags = list(LANDLORD_MARK.finditer(chunk))
+            if tags:
+                chunk = chunk[tags[-1].end() :]
+                chunk = re.sub(
+                    r"^[\s\-–,;:)“\"']*(?:genannt|bezeichnet)?[\s\-–,;:)“\"']*(?:und|sowie)?\s*", "", chunk
+                )
+                chunks.append(chunk)
+                continue
+        chunks.append(re.split(r"\n\s*\n|\bzwischen\b", chunk, flags=re.IGNORECASE)[-1])
+    return chunks
 
 
 def extract_tenants(text: str, *, exclude: list[str] | None = None) -> tuple[list[PartyGuess], list[str]]:
@@ -395,26 +399,30 @@ def extract_tenants(text: str, *, exclude: list[str] | None = None) -> tuple[lis
     landlords: list[str] = []
     for m in LANDLORD_LABEL.finditer(text):
         landlords.extend(p.last_name or p.company_name or "" for p in split_parties(m.group(1)))
-    for m in LANDLORD_DESIGNATION.finditer(text):
-        landlords.extend(
-            p.last_name or p.company_name or ""
-            for p in split_parties(_clean_designation_chunk(m.group(1), role="landlord"))
-        )
+    for chunk in _designation_chunks(text, LANDLORD_MARK):
+        landlords.extend(p.last_name or p.company_name or "" for p in split_parties(chunk))
     landlords = [n for n in landlords if n]
-    excluded = {n.casefold() for n in (exclude or [])} | {n.casefold() for n in landlords}
     tenants: list[PartyGuess] = []
     for m in TENANT_LABEL.finditer(text):
         tenants.extend(split_parties(m.group(1)))
     if not tenants:
-        for m in TENANT_DESIGNATION.finditer(text):
-            tenants.extend(split_parties(_clean_designation_chunk(m.group(1))))
-    tenants = [
-        t
-        for t in _dedupe(tenants)
-        if (t.last_name or t.company_name or "").casefold() not in excluded
-        and not any(ex and ex in (t.company_name or "").casefold() for ex in excluded)
-    ]
+        for chunk in _designation_chunks(text, TENANT_MARK):
+            tenants.extend(split_parties(chunk))
+    tenants = filter_excluded(_dedupe(tenants), list(exclude or []) + landlords)
     return tenants[:4], landlords[:4]
+
+
+def filter_excluded(parties: list[PartyGuess], exclude: list[str]) -> list[PartyGuess]:
+    """Eigene Firmen und erkannte Vermieter sind nie Mieter (auch nicht aus der KI-Antwort)."""
+    excluded = {n.casefold() for n in exclude if n}
+    out: list[PartyGuess] = []
+    for t in parties:
+        name = (t.last_name or t.company_name or "").casefold()
+        company = (t.company_name or "").casefold()
+        if name in excluded or any(ex and (ex in company or company and company in ex) for ex in excluded):
+            continue
+        out.append(t)
+    return out
 
 
 def extract_unit_hint(text: str) -> str | None:
@@ -455,18 +463,32 @@ def extract_unit_hint(text: str) -> str | None:
 
 
 def extract_amounts(text: str) -> dict[str, Decimal | None]:
+    """Betraege je Beschriftung; ein Betrag im Text zaehlt nur einmal (Kaution vor Miete vor Vorauszahlungen), damit
+    „Die Betriebskosten trägt der Mieter. Die Kaution beträgt 1.950,00 EUR“ nicht als Betriebskosten gelesen wird."""
     out: dict[str, Decimal | None] = {k: None for k in AMOUNT_LABELS}
-    for key, pattern in AMOUNT_RES.items():
+    used: set[tuple[int, int]] = set()
+    for key, pattern in AMOUNT_RES.items():  # Reihenfolge der Beschriftungen ist die Prioritaet
         for m in pattern.finditer(text):
+            span = m.span(1)
+            if span in used:
+                continue
             value = parse_amount(m.group(1))
             if value is not None:
                 out[key] = value
+                used.add(span)
                 break
     if out["deposit_amount"] is None and out["base_rent"] is not None:
         m = DEPOSIT_MULTIPLE.search(text)
         if m:
             factor = {"drei": 3, "3": 3, "zwei": 2, "2": 2}[m.group(1).lower()]
             out["deposit_amount"] = out["base_rent"] * factor
+    if (
+        out["base_rent"] is not None
+        and out["deposit_amount"] is not None
+        and out["deposit_amount"] > out["base_rent"] * 3
+    ):
+        # mehr als drei Kaltmieten sind gesetzlich nicht zulaessig: der Wert ist wahrscheinlich kein Kautionsbetrag
+        out["deposit_amount"] = None
     return out
 
 
@@ -500,8 +522,14 @@ def extract_lease_facts(
     )
 
 
-def facts_from_stage3(lease: dict | None) -> LeaseFacts | None:
-    """Antwortblock „lease“ der Stufe 3 in LeaseFacts uebersetzen (Namen wie im Text, Zahlen als Dezimal)."""
+def _bounded(value) -> Decimal | None:
+    dec = _dec(value)
+    return dec if dec is not None and 0 < dec < Decimal("1000000") else None
+
+
+def facts_from_stage3(lease: dict | None, *, exclude_names: list[str] | None = None) -> LeaseFacts | None:
+    """Antwortblock „lease“ der Stufe 3 in LeaseFacts uebersetzen (Namen wie im Text, Zahlen als Dezimal im
+    zulaessigen Bereich); eigene Firmen und erkannte Vermieter werden auch hier ausgeschlossen."""
     if not lease:
         return None
     tenants: list[PartyGuess] = []
@@ -511,15 +539,15 @@ def facts_from_stage3(lease: dict | None) -> LeaseFacts | None:
             party.confidence = 0.8
             tenants.append(party)
     facts = LeaseFacts(
-        tenants=_dedupe(tenants),
-        unit_hint=(lease.get("unit") or None),
+        tenants=filter_excluded(_dedupe(tenants), list(exclude_names or [])),
+        unit_hint=(str(lease.get("unit"))[:80] if lease.get("unit") else None),
         start_date=_iso(lease.get("start_date")),
         end_date=_iso(lease.get("end_date")),
-        base_rent=_dec(lease.get("base_rent")),
-        utilities_prepayment=_dec(lease.get("utilities_prepayment")),
-        heating_prepayment=_dec(lease.get("heating_prepayment")),
-        deposit_amount=_dec(lease.get("deposit_amount")),
-        total_rent=_dec(lease.get("total_rent")),
+        base_rent=_bounded(lease.get("base_rent")),
+        utilities_prepayment=_bounded(lease.get("utilities_prepayment")),
+        heating_prepayment=_bounded(lease.get("heating_prepayment")),
+        deposit_amount=_bounded(lease.get("deposit_amount")),
+        total_rent=_bounded(lease.get("total_rent")),
         source="stage3",
     )
     return None if facts.empty else facts

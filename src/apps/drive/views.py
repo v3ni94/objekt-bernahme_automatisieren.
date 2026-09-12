@@ -537,9 +537,13 @@ def takeover_source_cleanup(request, pk: int):
         messages.error(request, f"Drive-Fehler: {exc}")
         return _altbestand_zurueck()
     if posted and request.POST.get("action") == "ausfuehren" and not plan.blockers and plan.actionable:
-        result = takeover.run_cleanup(
-            src, adapter, plan, user=request.user, request=request, reason=request.POST.get("reason", "")
-        )
+        try:
+            result = takeover.run_cleanup(
+                src, adapter, plan, user=request.user, request=request, reason=request.POST.get("reason", "")
+            )
+        except takeover.TakeoverError as exc:
+            messages.error(request, str(exc))
+            return _altbestand_zurueck()
         text = (
             f"{result['files']} Dateien und {result['folders']} Ordner in den Papierkorb verschoben, "
             f"{result['documents']} Dubletten stillgelegt."
@@ -553,7 +557,13 @@ def takeover_source_cleanup(request, pk: int):
     return render(
         request,
         "drive/takeover_cleanup.html",
-        {"source": src, "plan": plan, "include_dubletten": include_dubletten},
+        {
+            "source": src,
+            "plan": plan,
+            "include_dubletten": include_dubletten,
+            "include_junk": include_junk,
+            "include_folders": include_folders,
+        },
     )
 
 

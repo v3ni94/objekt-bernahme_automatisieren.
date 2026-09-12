@@ -10,6 +10,7 @@ ueber apps.drive.naming, damit Platzhalter und endgueltige Namen demselben Schem
 
 from __future__ import annotations
 
+import time
 from datetime import date
 
 from django.core.cache import cache
@@ -163,7 +164,7 @@ def object_owners(obj) -> list:
     today = timezone.localdate()
     qs = OwnerUnitAssignment.active.filter(
         unit__object=obj, unit__deleted_at__isnull=True, owner__deleted_at__isnull=True
-    )
+    ).filter(Q(valid_from__isnull=True) | Q(valid_from__lte=today))
     qs = qs.filter(valid_to__isnull=True) | qs.filter(valid_to__gte=today)
     seen: dict[int, object] = {}
     for a in qs.select_related("owner").distinct().order_by("valid_from", "owner_id"):
@@ -205,18 +206,33 @@ def ensure_object_owner_file(obj) -> OwnerFile:
     Eigentuemern benennen, sobald welche zugeordnet sind."""
     akte = OwnerFile.active.filter(object=obj, file_kind="object_owner").order_by("id").first()
     if akte is None:
-        cfg = OwnerFileNamingConfig.from_settings()
+        # Sperre je Objekt: parallele decide-Jobs, Aktenordner-Aufgabe und Review duerfen nicht zwei Objektakten
+        # anlegen (Gegenpruefung 12.09.2026); wer die Sperre nicht bekommt, wartet kurz auf die Akte des anderen
+        lock_key = f"object-owner-file:{obj.pk}"
+        if not cache.add(lock_key, "1", timeout=30):
+            for _ in range(25):
+                time.sleep(0.2)
+                akte = OwnerFile.active.filter(object=obj, file_kind="object_owner").order_by("id").first()
+                if akte is not None:
+                    break
         try:
-            with transaction.atomic():
-                akte = OwnerFile.objects.create(
-                    object=obj,
-                    unit=None,
-                    file_kind="object_owner",
-                    folder_name=_unique_name(object_owner_placeholder(cfg), OwnerFile, obj),
-                    name_basis={"object_owner": True, "placeholder": True, "owners": []},
-                )
-        except IntegrityError:  # gleichzeitiger Aufruf hat die Akte angelegt
-            akte = OwnerFile.active.filter(object=obj, file_kind="object_owner").order_by("id").first()
+            if akte is None:
+                cfg = OwnerFileNamingConfig.from_settings()
+                try:
+                    with transaction.atomic():
+                        akte = OwnerFile.objects.create(
+                            object=obj,
+                            unit=None,
+                            file_kind="object_owner",
+                            folder_name=_unique_name(object_owner_placeholder(cfg), OwnerFile, obj),
+                            name_basis={"object_owner": True, "placeholder": True, "owners": []},
+                        )
+                except IntegrityError:  # gleichzeitiger Aufruf hat die Akte angelegt
+                    akte = (
+                        OwnerFile.active.filter(object=obj, file_kind="object_owner").order_by("id").first()
+                    )
+        finally:
+            cache.delete(lock_key)
     refresh_object_owner_file_name(akte, obj)
     return akte
 
@@ -224,18 +240,40 @@ def ensure_object_owner_file(obj) -> OwnerFile:
 def _retire_placeholders(model, obj, file_kind: str, reason: str) -> int:
     """Platzhalterakten, die die Verwaltungsart nicht vorsieht, stilllegen (Soft-Delete): nur ohne Zuordnung und ohne
     verknuepfte Dokumente. Ein bereits angelegter Ordner in Drive bleibt bestehen (es wird nie geloescht)."""
-    from apps.documents.models import DocumentOwnerLink, DocumentTenantLink
+    from apps.documents.models import Document, DocumentOwnerLink, DocumentTenantLink
+    from apps.pipeline.models import JobStatus, ProcessingJob
 
     retired = 0
     for akte in model.active.filter(object=obj, file_kind=file_kind, file_assignments__isnull=True):
         if not (akte.name_basis or {}).get("placeholder"):
             continue
-        linked = (
-            DocumentOwnerLink.objects.filter(owner_file=akte, deleted_at__isnull=True).exists()
-            if model is OwnerFile
-            else DocumentTenantLink.objects.filter(tenant_file=akte, deleted_at__isnull=True).exists()
-        )
-        if linked:
+        if model is OwnerFile:
+            linked = (
+                DocumentOwnerLink.objects.filter(owner_file=akte, deleted_at__isnull=True).exists()
+                or Document.objects.filter(
+                    Q(drive_node__owner_file=akte) | Q(target_drive_node__owner_file=akte),
+                    deleted_at__isnull=True,
+                ).exists()
+                or ProcessingJob.objects.filter(
+                    object=obj,
+                    status__in=[JobStatus.PENDING, JobStatus.RUNNING],
+                    payload__owner_file_id=akte.pk,
+                ).exists()
+            )
+        else:
+            linked = (
+                DocumentTenantLink.objects.filter(tenant_file=akte, deleted_at__isnull=True).exists()
+                or Document.objects.filter(
+                    Q(drive_node__tenant_file=akte) | Q(target_drive_node__tenant_file=akte),
+                    deleted_at__isnull=True,
+                ).exists()
+                or ProcessingJob.objects.filter(
+                    object=obj,
+                    status__in=[JobStatus.PENDING, JobStatus.RUNNING],
+                    payload__tenant_file_id=akte.pk,
+                ).exists()
+            )
+        if linked:  # Akte traegt Dokumente, Verknuepfungen oder eine anstehende Ablage: nie stilllegen
             continue
         akte.deleted_at = timezone.now()
         akte.delete_reason = reason[:255]

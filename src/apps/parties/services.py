@@ -189,6 +189,17 @@ def end_assignment(assignment: OwnerUnitAssignment, valid_to: date, *, user=None
         raise ValueError("Ende liegt vor dem Beginn")
     assignment.valid_to = valid_to
     assignment.save(update_fields=["valid_to", "updated_at"])
+    obj = assignment.unit.object
+    if obj.management_type == "rental":
+        # Eigentuemerakte des Objekts folgt dem Ende einer Zuordnung (Gegenpruefung 12.09.2026)
+        from apps.drive.tasks import trigger_unit_folders
+        from apps.parties.models import OwnerFile
+        from apps.parties.unit_files import ensure_object_owner_file
+
+        if OwnerFile.active.filter(object=obj, file_kind="object_owner").exists():
+            ensure_object_owner_file(obj)
+            user_id = getattr(user, "pk", None)
+            transaction.on_commit(lambda: trigger_unit_folders(obj.pk, user_id=user_id))
     return assignment
 
 

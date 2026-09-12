@@ -373,18 +373,15 @@ def resolve_source(src, drive: DriveAdapter) -> bool:
     src.detected_object_number = match.normalized if match else None
     src.resolved_at = timezone.now()
     src.last_error = None
+    before = (src.object_id, src.status)
     link_source(src)
-    src.save(
-        update_fields=[
-            "name",
-            "detected_object_number",
-            "resolved_at",
-            "last_error",
+    fields = ["name", "detected_object_number", "resolved_at", "last_error", "updated_at"]
+    if (src.object_id, src.status) != before:
+        fields += [
             "object",
             "status",
-            "updated_at",
-        ]
-    )
+        ]  # sonst koennte ein parallel gesetzter Stand (done) ueberschrieben werden
+    src.save(update_fields=fields)
     return True
 
 
@@ -413,6 +410,10 @@ class CleanupPlan:
     def actionable(self) -> bool:
         return bool(self.duplicates or self.junk or self.empty_folders or self.dubletten_folder)
 
+    @property
+    def file_count(self) -> int:
+        return len(self.duplicates) + len(self.junk) + len(self.dubletten_folder)
+
 
 def _protected_folder_ids() -> set[str]:
     """Ordner der neuen Struktur (registrierte Knoten) und Objektwurzeln werden nie in den Papierkorb verschoben."""
@@ -428,6 +429,22 @@ def _protected_folder_ids() -> set[str]:
     return ids
 
 
+def _original_reachable(doc, drive: DriveAdapter, obj, cache_: dict) -> tuple[bool, str]:
+    """Eine Dublette geht nur in den Papierkorb, wenn ihr Original im Objekt aktiv ist und in Drive erreichbar bleibt
+    (Gegenpruefung 12.09.2026: Original verschoben, fehlerhaft oder ohne Datei -> Dublette bleibt)."""
+    orig = doc.duplicate_of
+    if orig is None or orig.deleted_at is not None:
+        return False, "Dublette ohne aktives Original"
+    if orig.object_id != obj.pk:
+        return False, "Original gehört zu einem anderen Objekt"
+    if orig.status in ("moved_out", "error") or not orig.drive_file_id:
+        return False, f"Original nicht abgelegt (Status {orig.status})"
+    if orig.drive_file_id not in cache_:
+        node = drive.get(orig.drive_file_id)
+        cache_[orig.drive_file_id] = bool(node is not None and not node.trashed)
+    return (True, "") if cache_[orig.drive_file_id] else (False, "Original in Drive nicht erreichbar")
+
+
 def plan_cleanup(
     src,
     drive: DriveAdapter,
@@ -437,9 +454,9 @@ def plan_cleanup(
     include_dubletten: bool = False,
 ) -> CleanupPlan:
     """Aufraeumen nach der Aufarbeitung planen. In den Papierkorb: Dubletten (Dokumente mit Status duplicate im
-    Quellbaum), Temporaer- und Systemdateien (drive.takeover_ignore_patterns), danach leere Ordner (Kinder vor Eltern,
-    Quellordner zuletzt), wahlweise der Ordner 06/03_Dubletten des Objekts. Alles andere bleibt und schuetzt seinen
-    Ordner. Ordner der neuen Struktur sind tabu. Nichts wird endgueltig geloescht."""
+    Quellbaum, nur mit erreichbarem Original), Temporaer- und Systemdateien (drive.takeover_ignore_patterns), danach
+    leere Ordner (Kinder vor Eltern, Quellordner zuletzt), wahlweise der Ordner 06/03_Dubletten des Objekts. Alles
+    andere bleibt und schuetzt seinen Ordner. Ordner der neuen Struktur sind tabu. Nichts wird endgueltig geloescht."""
     from apps.drive.models import DriveNode as DriveNodeRow
     from apps.drive.models import NodeKind, NodeStatus, TakeoverStatus
     from apps.pipeline.models import JobStatus, ProcessingJob
@@ -465,10 +482,12 @@ def plan_cleanup(
         return plan
     patterns = ignore_patterns()
     protected = _protected_folder_ids()
+    limit = max_files()
     paths: dict[str, str] = {folder.id: folder.name}
     folders: list[str] = []  # Reihenfolge des Durchlaufs (Eltern vor Kindern)
     parent_of: dict[str, str] = {}
     keep: dict[str, int] = {}  # Ordner-ID -> verbleibende Dateien direkt darin
+    files: list[tuple[DriveNode, str, str]] = []  # (Knoten, Pfad, Elternordner)
     for node, path_ids in drive.walk(folder.id):
         parent = path_ids[-1]
         if node.is_folder:
@@ -479,22 +498,37 @@ def plan_cleanup(
             continue
         if node.trashed:
             continue
-        plan.total_files += 1
-        path = f"{paths.get(parent, '')}/{node.name}"
-        doc = (
-            Document.objects.filter(drive_file_id=node.id, deleted_at__isnull=True)
-            .select_related("object")
-            .first()
-        )
+        files.append((node, f"{paths.get(parent, '')}/{node.name}", parent))
+        if len(files) > limit:
+            plan.blockers.append(
+                f"Mehr als {limit} Dateien unterhalb des Quellordners; drive.takeover_max_files anpassen oder "
+                "Unterordner einzeln aufnehmen."
+            )
+            return plan
+    plan.total_files = len(files)
+    docs = {
+        d.drive_file_id: d
+        for d in Document.objects.filter(
+            drive_file_id__in=[n.id for n, _p, _e in files], deleted_at__isnull=True
+        ).select_related("object", "duplicate_of")
+    }
+    original_cache: dict[str, bool] = {}
+    for node, path, parent in files:
+        doc = docs.get(node.id)
         if doc is not None and doc.object_id != obj.pk:
             plan.remaining.append(
                 CleanupItem(node.id, path, f"gehört zu Objekt {doc.object.object_number}", doc.pk)
             )
         elif doc is not None and doc.status == "duplicate":
-            plan.duplicates.append(
-                CleanupItem(node.id, path, f"Dublette von Dokument {doc.duplicate_of_id or '?'}", doc.pk)
-            )
-            continue
+            ok, why = _original_reachable(doc, drive, obj, original_cache)
+            if ok:
+                plan.duplicates.append(
+                    CleanupItem(node.id, path, f"Dublette von Dokument {doc.duplicate_of_id}", doc.pk)
+                )
+                continue
+            plan.remaining.append(CleanupItem(node.id, path, why, doc.pk))
+        elif doc is None and node.is_google_doc:
+            plan.remaining.append(CleanupItem(node.id, path, "Google-Dokument, nicht registriert"))
         elif doc is None and is_ignored(node.name, patterns):
             if include_junk:
                 plan.junk.append(CleanupItem(node.id, path, "Temporär- oder Systemdatei"))
@@ -539,99 +573,174 @@ def plan_cleanup(
             .first()
         )
         if node is not None:
-            for child in drive.list_children(node.drive_file_id):
-                if child.is_folder or child.trashed:
+            children = [
+                c for c in drive.list_children(node.drive_file_id) if not c.is_folder and not c.trashed
+            ]
+            dubl = {
+                d.drive_file_id: d
+                for d in Document.objects.filter(
+                    drive_file_id__in=[c.id for c in children], deleted_at__isnull=True
+                ).select_related("duplicate_of")
+            }
+            for child in children:
+                doc = dubl.get(child.id)
+                if doc is None or doc.status != "duplicate" or doc.object_id != obj.pk:
                     continue
-                doc = Document.objects.filter(drive_file_id=child.id, deleted_at__isnull=True).first()
-                if doc is not None and doc.status == "duplicate" and doc.object_id == obj.pk:
+                ok, _why = _original_reachable(doc, drive, obj, original_cache)
+                if ok:
                     plan.dubletten_folder.append(
                         CleanupItem(child.id, f"06_Sonstiges/03_Dubletten/{child.name}", "Dublette", doc.pk)
                     )
     return plan
 
 
+def _trash_failed(obj, src, path: str, file_id: str, error: str, *, user, request) -> None:
+    record(
+        "drive.trash_failed",
+        entity_type="drive_file",
+        object_id=obj.pk,
+        request=request,
+        actor=user,
+        after={"drive_file_id": file_id, "path": path, "error": error[:300], "source_id": src.pk},
+    )
+
+
 def run_cleanup(
     src, drive: DriveAdapter, plan: CleanupPlan, *, user=None, request=None, reason: str = ""
 ) -> dict:
     """Plan ausfuehren: Dateien und Ordner in den Papierkorb (Ordner nur, wenn sie live noch leer sind), Dokumente der
-    Dubletten stilllegen, alles protokollieren (drive.trash). Ein Drive-Fehler je Eintrag wird gesammelt."""
+    Dubletten stilllegen (Drive-ID wird geloest, damit eine Wiederherstellung aus dem Papierkorb als neue Datei
+    erkannt wird), alles protokollieren (drive.trash, drive.trash_failed). Ein Fehler je Eintrag wird gesammelt, die
+    Datenbankaenderung je Eintrag ist eine Transaktion. Sperre je Objekt gegen parallele Uebernahme oder Aufraeumen."""
     from apps.drive.adapter import DriveError
     from apps.review.models import CaseStatus, ReviewCase
 
-    result = {"files": 0, "folders": 0, "documents": 0, "errors": [], "root_trashed": False}
     obj = src.object
-    for kind, items in (
-        ("duplicate", plan.duplicates),
-        ("junk", plan.junk),
-        ("duplicate", plan.dubletten_folder),
-    ):
-        for item in items:
+    lock_key = f"takeover:{obj.pk}"
+    if not cache.add(lock_key, "cleanup", timeout=600):
+        raise TakeoverError(
+            "Für dieses Objekt läuft gerade eine Übernahme oder ein Aufräumen; bitte kurz warten."
+        )
+    result = {"files": 0, "folders": 0, "documents": 0, "errors": [], "root_trashed": False}
+    try:
+        for kind, items in (
+            ("duplicate", plan.duplicates),
+            ("junk", plan.junk),
+            ("duplicate", plan.dubletten_folder),
+        ):
+            for item in items:
+                try:
+                    drive.trash(item.file_id)
+                except DriveError as exc:
+                    result["errors"].append(f"{item.path}: {exc}")
+                    _trash_failed(obj, src, item.path, item.file_id, str(exc), user=user, request=request)
+                    continue
+                result["files"] += 1
+                try:
+                    with transaction.atomic():
+                        record(
+                            "drive.trash",
+                            entity_type="document" if item.document_id else "drive_file",
+                            entity_id=item.document_id,
+                            object_id=obj.pk,
+                            request=request,
+                            actor=user,
+                            reason=reason or None,
+                            after={
+                                "drive_file_id": item.file_id,
+                                "path": item.path,
+                                "kind": kind,
+                                "source_id": src.pk,
+                            },
+                        )
+                        if item.document_id:
+                            doc = Document.objects.filter(pk=item.document_id).first()
+                            if doc is not None and doc.deleted_at is None:
+                                doc.deleted_at = timezone.now()
+                                doc.deleted_by = user if getattr(user, "pk", None) else None
+                                doc.delete_reason = f"Dublette beim Aufräumen in den Papierkorb verschoben (Drive {item.file_id})"
+                                doc.drive_file_id = None
+                                doc.save(
+                                    update_fields=[
+                                        "deleted_at",
+                                        "deleted_by",
+                                        "delete_reason",
+                                        "drive_file_id",
+                                        "updated_at",
+                                    ]
+                                )
+                                ReviewCase.objects.filter(
+                                    document=doc, status__in=[CaseStatus.OPEN, CaseStatus.IN_PROGRESS]
+                                ).update(
+                                    status=CaseStatus.RESOLVED,
+                                    resolved_at=timezone.now(),
+                                    resolution={"decision": "cleanup_trash", "reason": reason or None},
+                                )
+                                result["documents"] += 1
+                except Exception as exc:  # Datei liegt im Papierkorb, Buchung fehlgeschlagen: sichtbar machen
+                    result["errors"].append(
+                        f"{item.path}: Datei im Papierkorb, Buchung fehlgeschlagen ({exc})"
+                    )
+                    _trash_failed(
+                        obj, src, item.path, item.file_id, f"Buchung: {exc}", user=user, request=request
+                    )
+        for folder_id, path in plan.empty_folders:
             try:
-                drive.trash(item.file_id)
+                live = [c for c in drive.list_children_including_trashed(folder_id) if not c.trashed]
             except DriveError as exc:
-                result["errors"].append(f"{item.path}: {exc}")
+                result["errors"].append(f"{path}: Ordner nicht geprüft, bleibt bestehen ({exc})")
+                _trash_failed(obj, src, path, folder_id, str(exc), user=user, request=request)
                 continue
-            result["files"] += 1
+            if live:
+                result["errors"].append(f"{path}: Ordner ist nicht mehr leer, bleibt bestehen")
+                continue
+            try:
+                drive.trash(folder_id)
+            except DriveError as exc:
+                result["errors"].append(f"{path}: {exc}")
+                _trash_failed(obj, src, path, folder_id, str(exc), user=user, request=request)
+                continue
+            result["folders"] += 1
             record(
                 "drive.trash",
-                entity_type="document" if item.document_id else "drive_file",
-                entity_id=item.document_id,
+                entity_type="drive_folder",
                 object_id=obj.pk,
                 request=request,
                 actor=user,
                 reason=reason or None,
-                after={"drive_file_id": item.file_id, "path": item.path, "kind": kind, "source_id": src.pk},
+                after={"drive_file_id": folder_id, "path": path, "kind": "empty_folder", "source_id": src.pk},
             )
-            if item.document_id:
-                doc = Document.objects.filter(pk=item.document_id).first()
-                if doc is not None and doc.deleted_at is None:
-                    doc.deleted_at = timezone.now()
-                    doc.deleted_by = user if getattr(user, "pk", None) else None
-                    doc.delete_reason = "Dublette beim Aufräumen in den Papierkorb verschoben"
-                    doc.save(update_fields=["deleted_at", "deleted_by", "delete_reason", "updated_at"])
-                    ReviewCase.objects.filter(
-                        document=doc, status__in=[CaseStatus.OPEN, CaseStatus.IN_PROGRESS]
-                    ).update(
-                        status=CaseStatus.RESOLVED,
-                        resolved_at=timezone.now(),
-                        resolution={"decision": "cleanup_trash", "reason": reason or None},
-                    )
-                    result["documents"] += 1
-    for folder_id, path in plan.empty_folders:
-        live = [c for c in drive.list_children_including_trashed(folder_id) if not c.trashed]
-        if live:
-            result["errors"].append(f"{path}: Ordner ist nicht mehr leer, bleibt bestehen")
-            continue
-        try:
-            drive.trash(folder_id)
-        except DriveError as exc:
-            result["errors"].append(f"{path}: {exc}")
-            continue
-        result["folders"] += 1
-        record(
-            "drive.trash",
-            entity_type="drive_folder",
-            object_id=obj.pk,
-            request=request,
-            actor=user,
-            reason=reason or None,
-            after={"drive_file_id": folder_id, "path": path, "kind": "empty_folder", "source_id": src.pk},
-        )
-        if folder_id == src.drive_folder_id:
-            result["root_trashed"] = True
-    if result["root_trashed"]:
-        record(
-            "drive.takeover_source_prune",
-            entity_type="takeover_source",
-            entity_id=src.pk,
-            object_id=obj.pk,
-            request=request,
-            actor=user,
-            before={"drive_folder_id": src.drive_folder_id, "name": src.name, "status": src.status},
-            after={"reason": "nach dem Aufräumen leer, in den Papierkorb verschoben"},
-        )
-        src.delete()
+            if folder_id == src.drive_folder_id:
+                result["root_trashed"] = True
+        if result["root_trashed"]:
+            record(
+                "drive.takeover_source_prune",
+                entity_type="takeover_source",
+                entity_id=src.pk,
+                object_id=obj.pk,
+                request=request,
+                actor=user,
+                before=_source_snapshot(src),
+                after={"reason": "nach dem Aufräumen leer, in den Papierkorb verschoben"},
+            )
+            src.delete()
+    finally:
+        cache.delete(lock_key)
     return result
+
+
+def _source_snapshot(src) -> dict:
+    return {
+        "drive_folder_id": src.drive_folder_id,
+        "name": src.name,
+        "status": src.status,
+        "detected_object_number": src.detected_object_number,
+        "object_id": src.object_id,
+        "files_registered": src.files_registered,
+        "files_skipped": src.files_skipped,
+        "last_run_id": src.last_run_id,
+        "taken_at": src.taken_at.isoformat() if src.taken_at else None,
+    }
 
 
 def refresh_sources(drive: DriveAdapter, *, user=None, request=None) -> dict[str, int]:
@@ -659,13 +768,10 @@ def refresh_sources(drive: DriveAdapter, *, user=None, request=None) -> dict[str
                 object_id=src.object_id,
                 request=request,
                 actor=user,
-                before={
-                    "drive_folder_id": src.drive_folder_id,
-                    "name": src.name,
-                    "status": src.status,
-                    "files_registered": src.files_registered,
+                before=_source_snapshot(src),
+                after={
+                    "reason": "in Drive nicht gefunden oder kein Zugriff" if node is None else "im Papierkorb"
                 },
-                after={"reason": "in Drive gelöscht" if node is None else "im Papierkorb"},
             )
             src.delete()
             result["removed"] += 1

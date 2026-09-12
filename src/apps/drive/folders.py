@@ -75,7 +75,16 @@ def _register(
         row.drive_name = node.name
         row.status = NodeStatus.ACTIVE
         row.last_verified_at = timezone.now()
-        row.save(update_fields=["drive_name", "status", "last_verified_at", "updated_at"])
+        fields = ["drive_name", "status", "last_verified_at", "updated_at"]
+        if row.owner_file_id != owner_file.pk:
+            # Zeile einer stillgelegten Akte gleichen Namens: an diese Akte binden; expected_name bleibt sonst der
+            # zuletzt von der Anwendung vergebene Name (Grundlage der Umbenennung in sync_file_names)
+            row.owner_file = owner_file
+            row.subfolder = subfolder
+            row.parent_node = parent_row
+            row.expected_name = owner_file.folder_name if subfolder is None else subfolder.folder_name
+            fields += ["owner_file", "subfolder", "parent_node", "expected_name"]
+        row.save(update_fields=fields)
     return row
 
 
@@ -235,7 +244,13 @@ def _register_tenant(tenant_file: TenantFile, node: DriveNode, *, parent_row, cr
     row.drive_name = node.name
     row.status = NodeStatus.ACTIVE
     row.last_verified_at = timezone.now()
-    row.save(update_fields=["drive_name", "status", "last_verified_at", "updated_at"])
+    fields = ["drive_name", "status", "last_verified_at", "updated_at"]
+    if row.tenant_file_id != tenant_file.pk:  # Zeile einer stillgelegten Akte gleichen Namens uebernehmen
+        row.tenant_file = tenant_file
+        row.parent_node = parent_row
+        row.expected_name = tenant_file.folder_name
+        fields += ["tenant_file", "parent_node", "expected_name"]
+    row.save(update_fields=fields)
     return row
 
 

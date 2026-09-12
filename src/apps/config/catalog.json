@@ -44,7 +44,7 @@
       "key": "drive.takeover_ignore_patterns",
       "category": "drive",
       "value_type": "list",
-      "description": "Dateinamenmuster, die bei der Übernahme aus Drive übersprungen werden (Temporär- und Systemdateien)",
+      "description": "Dateinamenmuster, die bei der Übernahme aus Drive übersprungen werden (Temporär- und Systemdateien). Dieselben Muster gelten beim Aufräumen nach der Aufarbeitung: nicht registrierte Dateien mit passendem Namen gehen als Temporär- oder Systemdatei in den Papierkorb (Vorschau vorher prüfen)",
       "source": "Befund 11.09.2026 (Objekt 82: Word-Temporärdateien im Altbestand)",
       "schema": {
         "type": "array",

@@ -21,7 +21,9 @@
 #                             sobald ein Schema vorhanden ist (Schutz gegen Datenverlust)
 #   oauth-check <branch>      Google-Verbindung: Konfiguration ohne Geheimnisse und Probe der Client-Zugangsdaten
 #   deploy-tests <branch>     Deployment-Tests T2, T3, T11, T14 (nur lesend)
-#   doc-status <branch>       Dokumente je Objekt und Status, offene und fehlgeschlagene Jobs (nur lesend)
+#   doc-status <branch> [nr]  Dokumente je Objekt und Status, offene und fehlgeschlagene Jobs (nur lesend);
+#                             mit Objektnummer je Dokument Stufen, Entitaetenzaehler und Faelle, ohne Namen
+#   reconcile-all <branch>    Ordnerabgleich aller aktiven Objekte (legt fehlende Struktur an)
 #   config-set <branch> <schluessel=wert>  Konfigurationswert setzen (Wert als JSON: true, 5, "text"); Audit
 #   altbestand-import <branch>  Quellordner aus db/seeds/altbestand_ordner.txt in die Altbestand-Tabelle
 #                             aufnehmen (ohne Doppelte) und Namen aus Drive lesen
@@ -368,5 +370,5 @@ PY
     # Quellordner der bisherigen Ablage in die Altbestand-Tabelle aufnehmen; idempotent, nur Folder-IDs und Namen
     docker compose exec -T web python manage.py altbestand_import --aufloesen
     ;;
-  *) echo "Nur check, pull, befund, env-init, ps, logs, smoke, cert-retry, db-status, db-reset, first-run, deploy, rollback, create-admin, oauth-check, deploy-tests, doc-status, config-set oder altbestand-import erlaubt"; exit 2 ;;
+  *) echo "Nur check, pull, befund, env-init, ps, logs, smoke, cert-retry, db-status, db-reset, first-run, deploy, rollback, create-admin, oauth-check, deploy-tests, doc-status, config-set, altbestand-import oder reconcile-all erlaubt"; exit 2 ;;
 esac

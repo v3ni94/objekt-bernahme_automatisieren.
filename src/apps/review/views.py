@@ -125,6 +125,7 @@ def case_detail(request, pk: int):
         except Exception:  # Kontext ist Hilfe, kein Muss
             period_suggestion = None
     lease_facts = (case.context or {}).get("lease_facts") if isinstance(case.context, dict) else None
+    lease_tenants = list((lease_facts or {}).get("tenants") or [])
     lease_unit_id = None
     if lease_facts and obj is not None:
         lease_unit_id = lease_facts.get("unit_id")
@@ -148,10 +149,8 @@ def case_detail(request, pk: int):
             "target": target,
             "lease_facts": lease_facts,
             "lease_unit_id": lease_unit_id,
-            "lease_tenant": (lease_facts or {}).get("tenants", [None])[0] if lease_facts else None,
-            "lease_co_tenant": (lease_facts or {}).get("tenants", [None, None])[1]
-            if lease_facts and len(lease_facts.get("tenants") or []) > 1
-            else None,
+            "lease_tenant": lease_tenants[0] if lease_tenants else None,
+            "lease_co_tenant": lease_tenants[1] if len(lease_tenants) > 1 else None,
             "pages": pages,
             "previews": {p.page_no: preview_path(doc.pk, p.page_no).exists() for p in pages} if doc else {},
             "entities": ctx_entities[:200],

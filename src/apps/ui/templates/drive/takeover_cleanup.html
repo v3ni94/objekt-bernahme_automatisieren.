@@ -1,6 +1,6 @@
 {% extends "base.html" %}{% block title %}Aufräumen · {{ APP_NAME }}{% endblock %}
 {% block content %}<h1>Aufräumen: {{ source.name|default:source.drive_folder_id }} <span class="klein">Objekt {{ source.object.object_number }} {{ source.object.name|default:"" }}</span></h1>
-<p class="hinweis">Nach der Aufarbeitung werden Dubletten, Temporär- und Systemdateien sowie danach leere Ordner der alten Struktur in den Papierkorb von Google Drive verschoben (30 Tage wiederherstellbar). Endgültig gelöscht wird nichts. Dateien, die noch in Prüfung stehen, fehlgeschlagen oder unbekannt sind, bleiben liegen und schützen ihren Ordner.</p>
+<p class="hinweis">Nach der Aufarbeitung werden Dubletten (nur mit erreichbarem Original in der neuen Struktur), Temporär- und Systemdateien sowie danach leere Ordner der alten Struktur in den Papierkorb von Google Drive verschoben (30 Tage wiederherstellbar). Endgültig gelöscht wird nichts. Dateien, die noch in Prüfung stehen, fehlgeschlagen, unbekannt oder Google-Dokumente sind, bleiben liegen und schützen ihren Ordner. Die Vorschau gilt für die angezeigten Häkchen; „Vorschau aktualisieren“ rechnet sie nach einer Änderung neu.</p>
 {% if plan.blockers %}<div class="karte"><h2>Noch nicht möglich</h2><ul>{% for b in plan.blockers %}<li>{{ b }}</li>{% endfor %}</ul><p><a class="knopf" href="{% url 'takeover_sources' %}">Zurück zur Tabelle</a></p></div>
 {% else %}
 <div class="raster">
@@ -20,10 +20,10 @@
 <div class="karte"><h2>Ausführen</h2>
 <form method="post">{% csrf_token %}
 <p><label class="klein"><input type="checkbox" name="dubletten" value="1" style="width:auto" {% if include_dubletten %}checked{% endif %}> Auch den Ordner 06_Sonstiges/03_Dubletten des Objekts leeren</label></p>
-<p><label class="klein"><input type="checkbox" name="junk" value="1" style="width:auto" checked> Temporär- und Systemdateien einschließen</label></p>
-<p><label class="klein"><input type="checkbox" name="folders" value="1" style="width:auto" checked> Leere Ordner in den Papierkorb verschieben</label></p>
+<p><label class="klein"><input type="checkbox" name="junk" value="1" style="width:auto" {% if include_junk %}checked{% endif %}> Temporär- und Systemdateien einschließen</label></p>
+<p><label class="klein"><input type="checkbox" name="folders" value="1" style="width:auto" {% if include_folders %}checked{% endif %}> Leere Ordner in den Papierkorb verschieben</label></p>
 <p><label>Begründung (Protokoll)</label><input type="text" name="reason" value="Aufräumen nach Aufarbeitung" style="width:320px"></p>
-<p class="aktionen"><button type="submit" name="action" value="vorschau" class="knopf">Vorschau aktualisieren</button> <button type="submit" name="action" value="ausfuehren" onsubmit="return confirm('In den Papierkorb verschieben?')" {% if not plan.actionable %}disabled title="nichts zu tun"{% endif %}>In den Papierkorb verschieben</button> <a href="{% url 'takeover_sources' %}">Abbrechen</a></p>
+<p class="aktionen"><button type="submit" name="action" value="vorschau" class="knopf">Vorschau aktualisieren</button> <button type="submit" name="action" value="ausfuehren" onclick="return confirm('{{ plan.file_count }} Dateien und {{ plan.empty_folders|length }} Ordner in den Papierkorb verschieben? Wiederherstellung über den Papierkorb in Google Drive.')" {% if not plan.actionable %}disabled title="nichts zu tun"{% endif %}>In den Papierkorb verschieben</button> <a href="{% url 'takeover_sources' %}">Abbrechen</a></p>
 </form>
 <p class="klein">Nur Admins. Jeder Vorgang steht im Protokoll (drive.trash). Wiederherstellung über den Papierkorb in Google Drive.</p></div>
 </div>

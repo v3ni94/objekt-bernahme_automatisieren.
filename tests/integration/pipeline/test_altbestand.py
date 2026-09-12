@@ -220,7 +220,7 @@ def test_aktualisieren_entfernt_geloeschte_und_papierkorb_ordner(client_as, cler
     gruende = sorted(
         e.after_state["reason"] for e in AuditEvent.objects.filter(action="drive.takeover_source_prune")
     )
-    assert gruende == ["im Papierkorb", "in Drive gelöscht"]
+    assert gruende == ["im Papierkorb", "in Drive nicht gefunden oder kein Zugriff"]
     # Voruebergehender Fehler: nichts wird entfernt
     drive.inject("get", TransientError("Drive 503"), times=1)
     resp = client.post("/verwaltung/altbestand/aktualisieren/", follow=True)

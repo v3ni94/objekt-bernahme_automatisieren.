@@ -7,7 +7,7 @@ from __future__ import annotations
 import pytest
 
 from apps.config import store
-from apps.documents.models import Document, DocumentCategory
+from apps.documents.models import Document, DocumentCategory, DocumentSubfolder
 from apps.drive.adapter import InMemoryDriveAdapter, RecordingDriveAdapter, count_tree
 from apps.drive.models import DriveNode, DriveSyncAction, DriveSyncRun
 from apps.drive.reconcile import DriveConfig, reconcile_object, undo_rename
@@ -66,12 +66,13 @@ def test_objekt_ohne_unterordner(drive, cfg):
     dry = reconcile_object(obj, drive=rec, dry_run=True, cfg=cfg)
     assert dry.status == "done" and dry.dry_run and rec.read_only
     creates = [a for a in actions(dry) if a.action_type == "create_folder"]
-    assert len(creates) == 6 + 4 and not [a for a in actions(dry) if a.action_type == "rename_folder"]
+    # sechs Hauptordner, vier Unterordner in 06, fuenfzehn Unterordner der Stammakte (12.09.2026)
+    assert len(creates) == 6 + 4 + 15 and not [a for a in actions(dry) if a.action_type == "rename_folder"]
     assert dry.file_count_before == 0 and Document.objects.count() == 0 and ReviewCase.objects.count() == 0
     assert names(drive, obj_id) == []  # Dry-Run schreibt nichts
 
     run = reconcile_object(obj, drive=drive, dry_run=False, cfg=cfg)
-    assert run.status == "done" and run.actions_executed == 10 and run.no_changes is False
+    assert run.status == "done" and run.actions_executed == 25 and run.no_changes is False
     assert names(drive, obj_id) == [cat_name(c) for c in ("01", "02", "03", "04", "05", "06")]
     six = DriveNode.objects.get(object=obj, node_kind="main_folder", category_id="06")
     assert names(drive, six.drive_file_id) == [
@@ -80,9 +81,11 @@ def test_objekt_ohne_unterordner(drive, cfg):
         "03_Dubletten",
         "04_Nicht_objektbezogen",
     ]
+    two = DriveNode.objects.get(object=obj, node_kind="main_folder", category_id="02")
+    assert names(drive, two.drive_file_id)[:2] == ["01_Objektstammdaten_und_Einheiten", "02_Grundstück_Rechte_und_Baulasten"]
     assert (
         DriveNode.objects.filter(object=obj, node_kind="main_folder").count() == 6
-        and DriveNode.objects.filter(object=obj, node_kind="subfolder").count() == 4
+        and DriveNode.objects.filter(object=obj, node_kind="subfolder").count() == 4 + 15
     )
     obj.refresh_from_db()
     assert obj.drive_root_folder_id == obj_id and run.file_count_before == run.file_count_after == 0
@@ -91,7 +94,7 @@ def test_objekt_ohne_unterordner(drive, cfg):
     second = reconcile_object(obj, drive=rec2, dry_run=False, cfg=cfg)
     assert second.no_changes is True and second.actions_executed == 0 and rec2.read_only
     assert {c[0] for c in rec2.calls} <= {"get", "list_children", "walk"}
-    assert DriveNode.objects.filter(object=obj, status="active", is_folder=True).count() == 11
+    assert DriveNode.objects.filter(object=obj, status="active", is_folder=True).count() == 1 + 6 + 4 + 15
 
 
 def test_objekt_mit_altordner_und_dateien(drive, cfg):
@@ -177,6 +180,7 @@ def test_objekt_mit_vollstaendiger_struktur(drive, cfg):
         "625", name="Beispielstadt", city="Beispielstadt", street="Beispielweg", house_number="3"
     )
     tree = {cat_name(c): {} for c in ("01", "02", "03", "04", "05")}
+    tree[cat_name("02")] = {s.folder_name: {} for s in DocumentSubfolder.objects.filter(category_id="02")}
     tree[cat_name("06")] = {
         "01_Unklar": {},
         "02_Manuelle_Pruefung": {},

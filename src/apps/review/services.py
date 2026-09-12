@@ -295,6 +295,7 @@ class Target:
             for k in ("salutation", "first_name", "last_name")
         }
         nt["co_tenant"] = co if co["last_name"] else None
+        nt["co_tenant_raw"] = co if any(co.values()) else None
         return nt
 
 
@@ -352,24 +353,37 @@ def proposal_target(case: ReviewCase) -> Target:
     return t
 
 
-def _validate_new_tenant(nt: dict) -> list[str]:
+def _validate_new_tenant(nt: dict, obj=None) -> list[str]:
     errors: list[str] = []
+    if nt.get("last_name") and nt.get("company_name"):
+        errors.append("Entweder Nachname (Person) oder Firma angeben, nicht beides")
     if not (nt.get("last_name") or nt.get("company_name")):
         errors.append("Nachname oder Firma des neuen Mieters angeben")
+    co = nt.get("co_tenant_raw") or {}
+    if (co.get("first_name") or co.get("salutation")) and not co.get("last_name"):
+        errors.append("Mitmieter: Nachname fehlt")
     if not (nt.get("unit_id") or nt.get("unit_label")):
         errors.append("Einheit wählen oder Bezeichnung der neuen Einheit angeben")
+    elif nt.get("unit_id") and obj is not None:
+        if not Unit.active.filter(pk=nt["unit_id"], object=obj).exists():
+            errors.append("Die gewählte Einheit gehört nicht zu diesem Objekt oder ist stillgelegt")
+    dates: dict[str, date | None] = {}
     for key in ("start_date", "end_date"):
+        dates[key] = None
         if nt.get(key):
             try:
-                date.fromisoformat(nt[key])
+                dates[key] = date.fromisoformat(nt[key])
             except ValueError:
                 errors.append(f"Datum {key} im Format JJJJ-MM-TT eingeben")
+    if dates["start_date"] and dates["end_date"] and dates["end_date"] < dates["start_date"]:
+        errors.append("Mietende liegt vor dem Mietbeginn")
     for key in ("base_rent", "utilities_prepayment", "heating_prepayment", "deposit_amount"):
         if nt.get(key):
-            try:
-                Decimal(str(nt[key]).replace(",", "."))
-            except (InvalidOperation, ValueError):
+            value = _dec_or_none(nt.get(key))
+            if value is None:
                 errors.append(f"Betrag {key} ist keine Zahl")
+            elif value < 0 or value >= Decimal("1000000"):
+                errors.append(f"Betrag {key} liegt außerhalb des zulässigen Bereichs")
     return errors
 
 
@@ -407,11 +421,7 @@ def unit_from_label(obj, label: str, *, user=None):
 def _party_kwargs(nt: dict, *, co: bool = False) -> dict:
     src = nt["co_tenant"] if co else nt
     company = None if co else nt.get("company_name")
-    kind = (
-        "legal_entity"
-        if (nt.get("kind") == "legal_entity" and not co) or (company and not src.get("last_name"))
-        else "natural_person"
-    )
+    kind = "legal_entity" if company and not src.get("last_name") else "natural_person"
     if kind == "legal_entity":
         return {
             "type": "legal_entity",
@@ -437,7 +447,13 @@ def _party_kwargs(nt: dict, *, co: bool = False) -> dict:
 def _dec_or_none(value):
     if value in (None, ""):
         return None
-    return Decimal(str(value).replace(",", "."))
+    text = str(value).strip().replace(" ", "")
+    if "," in text:
+        text = text.replace(".", "").replace(",", ".")
+    try:
+        return Decimal(text)
+    except InvalidOperation:
+        return None
 
 
 def create_tenant_from_document(obj, doc: Document, target: Target, user, *, request=None) -> dict:
@@ -448,13 +464,46 @@ def create_tenant_from_document(obj, doc: Document, target: Target, user, *, req
 
     nt = target.new_tenant or {}
     unit = (
-        Unit.objects.get(pk=int(nt["unit_id"]), object=obj)
+        Unit.active.get(pk=int(nt["unit_id"]), object=obj)
         if nt.get("unit_id")
         else unit_from_label(obj, nt["unit_label"], user=user)
     )
     start = date.fromisoformat(nt["start_date"]) if nt.get("start_date") else None
     end = date.fromisoformat(nt["end_date"]) if nt.get("end_date") else None
     base_rent = _dec_or_none(nt.get("base_rent"))
+    # Dublettenpruefung (Gegenpruefung 12.09.2026): gleicher Suchname mit aktiver Zuordnung auf dieser Einheit ->
+    # vorhandenen Mieter und sein Mietverhaeltnis verwenden statt einen zweiten anzulegen
+    haupt = _party_kwargs(nt)
+    vorhanden = (
+        TenantUnitAssignment.active.filter(
+            unit=unit, tenant__deleted_at__isnull=True, tenant__search_name=haupt["search_name"]
+        )
+        .select_related("tenant", "lease")
+        .order_by("-valid_from", "-id")
+        .first()
+    )
+    if vorhanden is not None:
+        tenants = [vorhanden.tenant]
+        assignments = [vorhanden]
+        if nt.get("co_tenant"):
+            neben = _party_kwargs(nt, co=True)
+            mit = (
+                TenantUnitAssignment.active.filter(
+                    unit=unit, tenant__deleted_at__isnull=True, tenant__search_name=neben["search_name"]
+                )
+                .select_related("tenant")
+                .first()
+            )
+            if mit is not None:
+                tenants.append(mit.tenant)
+                assignments.append(mit)
+        return {
+            "tenants": tenants,
+            "unit": unit,
+            "lease": vorhanden.lease,
+            "assignments": assignments,
+            "reused": True,
+        }
     lease = Lease.objects.create(
         object=obj,
         start_date=start,
@@ -505,7 +554,7 @@ def create_tenant_from_document(obj, doc: Document, target: Target, user, *, req
             "base_rent": str(base_rent) if base_rent is not None else None,
         },
     )
-    return {"tenants": tenants, "unit": unit, "lease": lease, "assignments": assignments}
+    return {"tenants": tenants, "unit": unit, "lease": lease, "assignments": assignments, "reused": False}
 
 
 def validate(case: ReviewCase, target: Target) -> tuple[list[str], list[str]]:
@@ -538,7 +587,9 @@ def validate(case: ReviewCase, target: Target) -> tuple[list[str], list[str]]:
         if not target.new_tenant:
             errors.append("Mieter wählen oder aus dem Dokument anlegen")
         else:
-            errors.extend(_validate_new_tenant(target.new_tenant))
+            errors.extend(
+                _validate_new_tenant(target.new_tenant, case.object or (doc.object if doc else None))
+            )
     if target.category == "06":
         if not target.subfolder:
             errors.append("Unterordner in 06_Sonstiges wählen")
@@ -695,6 +746,10 @@ def apply_decision(
             target.tenant_id = created_tenant["tenants"][0].pk
             target.unit_id = created_tenant["unit"].pk
             decision_type = DecisionType.ASSIGN_TENANT
+            if created_tenant.get("reused"):
+                warnings.append(
+                    "Mieter war bereits mit dieser Einheit erfasst; vorhandener Mieter und Mietverhältnis wurden verwendet"
+                )
         subfolder = (
             DocumentSubfolder.objects.filter(category_id=target.category, code=target.subfolder).first()
             if target.subfolder
@@ -711,9 +766,20 @@ def apply_decision(
             # Mietverwaltung (12.09.2026): eine Eigentuemerakte je Objekt
             from apps.parties.unit_files import ensure_object_owner_file
 
+            assignment = None
+            if target.owner_id and target.unit_id:
+                # gewaehlte Einheit mit Eigentumsbeginn: Zuordnung anlegen, damit der Eigentuemer des Hauses bekannt wird
+                assignment, _group = _resolve_assignment(target, doc, user)
             owner_file = ensure_object_owner_file(obj)
             if target.owner_id:
-                links.append(DocumentOwnerLink(owner_id=target.owner_id, owner_file=owner_file))
+                links.append(
+                    DocumentOwnerLink(
+                        owner_id=target.owner_id,
+                        unit_id=target.unit_id if assignment is not None else None,
+                        assignment=assignment,
+                        owner_file=owner_file,
+                    )
+                )
             physical["owner_file_id"] = owner_file.pk
         elif target.category == "05":
             if target.owner_id and target.unit_id:
@@ -824,6 +890,7 @@ def apply_decision(
                     document=doc,
                     tenant_id=tenant_id,
                     link_kind="whole_document",
+                    deleted_at__isnull=True,
                     defaults={
                         "unit_id": target.unit_id,
                         "lease": created_tenant["lease"] if created_tenant else None,
@@ -903,18 +970,26 @@ def apply_decision(
         )
         # Drive-Verschiebung als Job, nie synchron (H 2.4 Regel 3); Segmente ohne Bewegung des Masters
         if not segment and doc.status == "classified":
+            from apps.pipeline.models import JobStatus, ProcessingJob
+
+            payload = {
+                "category": target.category,
+                "subfolder": target.subfolder,
+                "owner_file_id": physical.get("owner_file_id"),
+                "link_subfolder": target.subfolder,
+                "tenant_file_id": physical.get("tenant_file_id"),
+            }
+            # Ein noch offener Ablagejob der Pipeline (etwa wartend auf den Objektordner) traegt die alte Zielangabe;
+            # enqueue wuerde ihn unveraendert wiederverwenden (Gegenpruefung 12.09.2026): Zielangabe ersetzen
+            ProcessingJob.objects.filter(
+                document=doc, job_type=JobType.FILE_TO_DRIVE, status=JobStatus.PENDING
+            ).update(payload=payload, last_error=None, next_attempt_at=None)
             enqueue(
                 JobType.FILE_TO_DRIVE,
                 obj,
                 key=idempotency_key(JobType.FILE_TO_DRIVE, obj.pk, doc.sha256 or f"doc-{doc.pk}"),
                 document=doc,
-                payload={
-                    "category": target.category,
-                    "subfolder": target.subfolder,
-                    "owner_file_id": physical.get("owner_file_id"),
-                    "link_subfolder": target.subfolder,
-                    "tenant_file_id": physical.get("tenant_file_id"),
-                },
+                payload=payload,
             )
         hooks.request_regeneration(obj.pk, bulk_key=bulk_key)
         if created_tenant is not None:
