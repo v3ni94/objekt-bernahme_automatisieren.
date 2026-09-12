@@ -17,8 +17,8 @@ Ablauf der ersten Anmeldung:
 
 1. Der Admin legt das Konto an (Nutzer, „Nutzer anlegen“: E-Mail, Name, Rolle) und teilt das Startpasswort außerhalb des Systems mit.
 2. Anmeldung mit E-Mail und Passwort.
-3. Die Anwendung verlangt sofort die Einrichtung des zweiten Faktors (TOTP). Den angezeigten QR-Code mit einer Authenticator-App scannen und den sechsstelligen Code bestätigen. Ohne zweiten Faktor ist keine Seite erreichbar.
-4. Bei jeder weiteren Anmeldung: E-Mail, Passwort, dann der aktuelle Code aus der App.
+3. Admins: Die Anwendung verlangt sofort die Einrichtung des zweiten Faktors (TOTP). Den angezeigten QR-Code mit einer Authenticator-App scannen und den sechsstelligen Code bestätigen. Ohne zweiten Faktor ist für Admins keine Seite erreichbar. Sachbearbeiter melden sich mit E-Mail und Passwort an; sie können den zweiten Faktor freiwillig unter „Konto“ einrichten. Welche Rollen ihn brauchen, steht in der Konfiguration (`security.mfa_required_roles`, Vorgabe nur `admin`).
+4. Bei jeder weiteren Anmeldung: E-Mail, Passwort, dann der aktuelle Code aus der App, sofern ein zweiter Faktor eingerichtet ist. Nach dem Code fragt die Anwendung „Dieses Gerät merken?“. Mit „Für 90 Tage merken“ entfällt die Codeabfrage auf diesem Browser für 90 Tage (Vorgabe `MFA_TRUST_DAYS` in `.env`); das Vertrauen liegt als signiertes Cookie im Browser und erlischt bei Passwortwechsel, beim Zurücksetzen des zweiten Faktors und beim Löschen der Browserdaten. Auf gemeinsam genutzten oder fremden Geräten „Nicht merken“ wählen.
 5. Passwort ändern und zweiten Faktor verwalten unter „Konto“.
 
 Wenn etwas nicht klappt:
@@ -122,6 +122,7 @@ Für die Übernahme der bisherigen Ablage führt die Anwendung unter „Altbesta
 3. „Aufarbeiten“ in der Zeile: alle Dateien des Ordners samt Unterordnern werden in das Objekt übernommen, ein Verarbeitungslauf startet. Die Kette liest jede Datei, erkennt Inhalt und Zuordnung und verschiebt sie in den passenden Ordner der neuen Struktur; Eigentümer- und Mieterakten entstehen dabei nach der Akten-Vorlage. Der Quellordner bleibt bestehen (nach der Übernahme leer), es wird nichts gelöscht.
 4. Die Zeile zeigt Übernommen (Anzahl, übersprungene Dateien in Klammern), Status und den Lauf. Fortschritt und Fälle wie gewohnt unter „Dokumente und Verarbeitung“ und im Review Center.
 5. „Entfernen“ nimmt nur die Zeile aus der Tabelle; in Drive ändert sich nichts.
+6. „Aktualisieren“ liest alle Ordner neu aus Drive (Name, Objektnummer, Zuordnung). Ordner, die es nicht mehr gibt, weil sie gelöscht wurden oder im Papierkorb liegen, verschwinden aus der Liste; der Vorgang steht im Protokoll. Ist Drive vorübergehend nicht erreichbar, bleibt die Zeile mit einem Hinweis stehen. Auch hier ändert sich in Drive nichts.
 
 Hinweise: Ein zweites „Aufarbeiten“ übernimmt nur neue Dateien, bereits registrierte werden übersprungen. Fehlt der Objektordner noch, wird er angelegt und die Ablage wartet, bis er steht (Job zeigt „wartet: Ablageziel noch nicht vorhanden“). Mehr als `drive.takeover_max_files` Dateien in einem Ordner: Grenze in der Konfiguration anheben oder Unterordner einzeln über „Bestand aus Drive übernehmen“ holen. Liegt der alte Ordner direkt im Wurzelordner und trägt die Objektnummer, übernimmt ihn der Ordnerabgleich als Objektordner und inventarisiert seinen Inhalt ohnehin; „Aufarbeiten“ übernimmt dann nur, was noch fehlt.
 

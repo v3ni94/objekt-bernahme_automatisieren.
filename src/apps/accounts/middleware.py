@@ -16,15 +16,20 @@ EXEMPT_PREFIXES = ("/konto/", "/healthz/", "/readyz/", "/static/")
 
 
 class RequireMFAMiddleware:
-    """Angemeldete Nutzer ohne aktiven zweiten Faktor duerfen nur die Einrichtungsseite aufrufen."""
+    """Nutzer einer Pflichtrolle ohne aktiven zweiten Faktor duerfen nur die Einrichtungsseite aufrufen.
+
+    Welche Rollen den zweiten Faktor brauchen, steht im Katalog (security.mfa_required_roles, Vorgabe
+    nur admin). Alle anderen Rollen koennen ihn freiwillig unter Konto einrichten; ist er eingerichtet,
+    fragt allauth ihn bei der Anmeldung ab.
+    """
 
     def __init__(self, get_response: Callable[[HttpRequest], HttpResponse]) -> None:
         self.get_response = get_response
 
     def __call__(self, request: HttpRequest) -> HttpResponse:
         user = getattr(request, "user", None)
-        if settings.MFA_REQUIRED and user is not None and user.is_authenticated:
-            if not request.path.startswith(EXEMPT_PREFIXES):
+        if user is not None and user.is_authenticated and not request.path.startswith(EXEMPT_PREFIXES):
+            if mfa_required_for(user):
                 from allauth.mfa.utils import is_mfa_enabled
 
                 if not is_mfa_enabled(user):
@@ -33,6 +38,19 @@ class RequireMFAMiddleware:
                     )
                     return redirect(reverse("mfa_activate_totp"))
         return self.get_response(request)
+
+
+def mfa_required_roles() -> list[str]:
+    from apps.config import store
+
+    return list(store.get("security.mfa_required_roles") or [])
+
+
+def mfa_required_for(user) -> bool:
+    """Wahr, wenn die Rolle des Nutzers im Katalog als Pflichtrolle fuer den zweiten Faktor steht."""
+    if user is None or getattr(user, "role_id", None) is None:
+        return False
+    return user.role.code in mfa_required_roles()
 
 
 class SessionLimitsMiddleware:

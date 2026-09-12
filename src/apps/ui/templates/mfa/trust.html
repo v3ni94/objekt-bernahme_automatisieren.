@@ -1,0 +1,37 @@
+{% extends "mfa/base_entrance.html" %}
+{% load i18n allauth %}
+{% comment %}Vertrauenswuerdiges Geraet nach erfolgreichem zweiten Faktor (Entscheidung 12.09.2026): eigene Fassung der
+allauth-Vorlage mit deutschem Text und der Dauer aus MFA_TRUST_DAYS. Das Vertrauen liegt als signiertes Cookie im
+Browser und erlischt bei Passwortwechsel oder Zuruecksetzen des zweiten Faktors.{% endcomment %}
+{% block head_title %}Gerät merken?{% endblock head_title %}
+{% block content %}
+    {% element h1 %}Dieses Gerät merken?{% endelement %}
+    {% element p %}
+        Wenn Sie dieses Gerät merken lassen, fragt die Anwendung auf diesem Browser {{ MFA_TRUST_DAYS }} Tage lang keinen Code aus der Authenticator-App mehr ab. Auf gemeinsam genutzten oder fremden Geräten bitte „Nicht merken“ wählen.
+    {% endelement %}
+    {% url 'mfa_trust' as action_url %}
+    {% element form form=form method="post" action=action_url %}
+        {% slot body %}
+            {% csrf_token %}
+            {% element fields form=form unlabeled=True %}
+            {% endelement %}
+        {% endslot %}
+        {% slot actions %}
+            {% element button_group %}
+                {% element button name="action" value="trust" type="submit" tags="primary,mfa,trust" %}
+                    Für {{ MFA_TRUST_DAYS }} Tage merken
+                {% endelement %}
+                {% element button name="action" value="skip" type="submit" tags="outline,mfa,trust" %}
+                    Nicht merken
+                {% endelement %}
+                {% element button type="submit" form="logout-from-stage" tags="outline,mfa,trust,cancel" %}
+                    Abbrechen
+                {% endelement %}
+            {% endelement %}
+        {% endslot %}
+    {% endelement %}
+    <form id="logout-from-stage" method="post" action="{% url 'account_logout' %}">
+        <input type="hidden" name="next" value="{% url 'account_login' %}">
+        {% csrf_token %}
+    </form>
+{% endblock content %}

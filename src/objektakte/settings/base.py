@@ -6,6 +6,7 @@ Startparameter kommen aus .env (docs/betrieb.md 3.7), Geheimnisse aus /run/secre
 
 from __future__ import annotations
 
+from datetime import timedelta
 from pathlib import Path
 from urllib.parse import quote
 
@@ -186,7 +187,12 @@ MFA_ADAPTER = "apps.accounts.adapters.MFAAdapter"
 MFA_SUPPORTED_TYPES = ["totp", "recovery_codes"]
 MFA_TOTP_ISSUER = "Objektuebernahme HVM"
 MFA_RECOVERY_CODE_COUNT = 10  # ANNAHME A31
-MFA_REQUIRED = env_bool("MFA_REQUIRED", True)  # TOTP fuer jede Rolle Pflicht (Ue17)
+# Pflicht des zweiten Faktors je Rolle: Katalogschluessel security.mfa_required_roles (Vorgabe nur admin,
+# Entscheidung 12.09.2026). Vertrauenswuerdiges Geraet: nach erfolgreichem TOTP kann der Nutzer den Browser
+# merken lassen, dann entfaellt der Code fuer MFA_TRUST_DAYS Tage (signiertes Cookie, ungueltig bei
+# Passwortwechsel oder TOTP-Zuruecksetzung).
+MFA_TRUST_ENABLED = env_bool("MFA_TRUST_ENABLED", True)
+MFA_TRUST_COOKIE_AGE = timedelta(days=env_int("MFA_TRUST_DAYS", 90))
 
 SESSION_IDLE_MINUTES = env_int("SESSION_IDLE_MINUTES", 480)  # ANNAHME A31, Frage F28
 SESSION_ABSOLUTE_HOURS = env_int("SESSION_ABSOLUTE_HOURS", 12)

@@ -2,7 +2,7 @@
 
 Stand: 11.09.2026, erzeugt aus `src/apps/config/catalog.json` und `db/seeds/app_settings.json` (Definition of Done CR 14: Namensmuster Objektordner, Unterstruktur, Schwellwerte, Duplikat-Option, KI-Provider, Aufbewahrungsfristen). Änderungen erfolgen in der Anwendung unter Konfiguration (Recht `settings.write`), jede Änderung steht im Audit (`setting.update`). Werte wirken ohne Neustart; Ausnahmen stehen in der Spalte Wirkung. Seed-Werte sind Vorschläge (ANNAHME), sofern die Quelle nichts anderes sagt.
 
-Schlüssel: 120 in 18 Gruppen.
+Schlüssel: 121 in 18 Gruppen.
 
 ## Google Drive und Objektordner (`drive.*`)
 
@@ -212,6 +212,7 @@ Schlüssel: 120 in 18 Gruppen.
 | `security.iban_decrypt_roles` | list | `[]` | Rollen, die eine IBAN entschlüsseln dürfen; leer bedeutet keine | Beschluss B-18 | array |
 | `security.iban_key_version_current` | integer | `1` | Aktive Schlüsselversion für IBAN-Chiffrate | docs/architektur.md 9.6 | min 1 |
 | `security.log_document_views` | boolean | `true` | Ansichten und Downloads aus Eigentümerakten als document.view und document.download protokollieren | Frage F15 | boolean |
+| `security.mfa_required_roles` | list | `["admin"]` | Rollen, für die der zweite Faktor (Authenticator-App) Pflicht ist; andere Rollen können ihn freiwillig unter Konto einrichten. Leer bedeutet keine Pflicht | Entscheidung 12.09.2026 (ersetzt Ü17) | array, Werte admin, sachbearbeiter |
 | `security.store_full_iban` | boolean | `false` | Vollständige IBAN verschlüsselt speichern (sonst nur letzte vier Stellen und Hash) | Frage F16 | boolean |
 
 ## Umgebungsvariablen (.env)

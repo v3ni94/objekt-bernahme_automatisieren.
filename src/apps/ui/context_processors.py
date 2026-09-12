@@ -1,5 +1,7 @@
 import os
 
+from django.conf import settings
+
 # Zuordnung der URL-Praefixe zu den Bereichen der Hauptnavigation (aktiver Eintrag im Kopf)
 NAV_SECTIONS = (
     ("/objekte/", "objekte"),
@@ -35,4 +37,5 @@ def app_context(request):
         "APP_OWNER": "Hausverwaltung Müller GmbH",
         "IMAGE_TAG": os.environ.get("IMAGE_TAG", "dev"),
         "NAV_ACTIVE": nav_section(getattr(request, "path", "") or ""),
+        "MFA_TRUST_DAYS": settings.MFA_TRUST_COOKIE_AGE.days if settings.MFA_TRUST_ENABLED else 0,
     }

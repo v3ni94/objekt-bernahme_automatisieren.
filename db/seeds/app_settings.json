@@ -238,6 +238,7 @@
   "reports.review_age_warning_days": 10,
   "security.store_full_iban": false,
   "security.iban_decrypt_roles": [],
+  "security.mfa_required_roles": ["admin"],
   "security.iban_key_version_current": 1,
   "security.log_document_views": true,
   "retention.hint": "durch Geschäftsführung und Steuerberater festzulegen",

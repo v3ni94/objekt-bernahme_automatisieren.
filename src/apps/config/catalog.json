@@ -1284,6 +1284,24 @@
       }
     },
     {
+      "key": "security.mfa_required_roles",
+      "category": "security",
+      "value_type": "list",
+      "description": "Rollen, für die der zweite Faktor (Authenticator-App) Pflicht ist; andere Rollen können ihn freiwillig unter Konto einrichten. Leer bedeutet keine Pflicht",
+      "source": "Entscheidung 12.09.2026 (ersetzt Ü17)",
+      "schema": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "enum": [
+            "admin",
+            "sachbearbeiter"
+          ]
+        },
+        "uniqueItems": true
+      }
+    },
+    {
       "key": "security.iban_key_version_current",
       "category": "security",
       "value_type": "integer",

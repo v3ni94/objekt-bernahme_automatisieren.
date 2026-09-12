@@ -23,7 +23,13 @@ def user_list(request):
     totp_users = set(
         Authenticator.objects.filter(type=Authenticator.Type.TOTP).values_list("user_id", flat=True)
     )
-    return render(request, "accounts/list.html", {"users": users, "totp_users": totp_users})
+    from .middleware import mfa_required_roles
+
+    return render(
+        request,
+        "accounts/list.html",
+        {"users": users, "totp_users": totp_users, "mfa_required_roles": mfa_required_roles()},
+    )
 
 
 @permission_required("users.manage")
