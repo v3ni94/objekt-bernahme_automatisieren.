@@ -1,0 +1,31 @@
+{% extends "base.html" %}{% block title %}Aufräumen · {{ APP_NAME }}{% endblock %}
+{% block content %}<h1>Aufräumen: {{ source.name|default:source.drive_folder_id }} <span class="klein">Objekt {{ source.object.object_number }} {{ source.object.name|default:"" }}</span></h1>
+<p class="hinweis">Nach der Aufarbeitung werden Dubletten, Temporär- und Systemdateien sowie danach leere Ordner der alten Struktur in den Papierkorb von Google Drive verschoben (30 Tage wiederherstellbar). Endgültig gelöscht wird nichts. Dateien, die noch in Prüfung stehen, fehlgeschlagen oder unbekannt sind, bleiben liegen und schützen ihren Ordner.</p>
+{% if plan.blockers %}<div class="karte"><h2>Noch nicht möglich</h2><ul>{% for b in plan.blockers %}<li>{{ b }}</li>{% endfor %}</ul><p><a class="knopf" href="{% url 'takeover_sources' %}">Zurück zur Tabelle</a></p></div>
+{% else %}
+<div class="raster">
+<div class="karte"><h2>Vorschau</h2>
+<table class="voll"><tbody>
+<tr><td>Dateien im Quellordner (einschließlich Unterordner)</td><td class="zahl">{{ plan.total_files }}</td></tr>
+<tr><td>Dubletten (bereits in der neuen Struktur vorhanden)</td><td class="zahl">{{ plan.duplicates|length }}</td></tr>
+<tr><td>Temporär- und Systemdateien</td><td class="zahl">{{ plan.junk|length }}</td></tr>
+<tr><td>Verbleibende Dateien (Prüfung, Fehler, unbekannt)</td><td class="zahl">{{ plan.remaining|length }}</td></tr>
+<tr><td>Ordner, die danach leer sind{% if plan.root_empty %} (einschließlich Quellordner){% endif %}</td><td class="zahl">{{ plan.empty_folders|length }}</td></tr>
+{% if include_dubletten %}<tr><td>Dateien im Ordner 06_Sonstiges/03_Dubletten des Objekts</td><td class="zahl">{{ plan.dubletten_folder|length }}</td></tr>{% endif %}
+</tbody></table>
+{% if plan.remaining %}<details><summary>Verbleibende Dateien</summary><ul class="klein">{% for r in plan.remaining %}<li>{{ r.path }} <span class="klein">({{ r.reason }})</span></li>{% endfor %}</ul></details>{% endif %}
+{% if plan.duplicates %}<details><summary>Dubletten</summary><ul class="klein">{% for r in plan.duplicates %}<li>{{ r.path }}</li>{% endfor %}</ul></details>{% endif %}
+{% if plan.junk %}<details><summary>Temporär- und Systemdateien</summary><ul class="klein">{% for r in plan.junk %}<li>{{ r.path }}</li>{% endfor %}</ul></details>{% endif %}
+</div>
+<div class="karte"><h2>Ausführen</h2>
+<form method="post">{% csrf_token %}
+<p><label class="klein"><input type="checkbox" name="dubletten" value="1" style="width:auto" {% if include_dubletten %}checked{% endif %}> Auch den Ordner 06_Sonstiges/03_Dubletten des Objekts leeren</label></p>
+<p><label class="klein"><input type="checkbox" name="junk" value="1" style="width:auto" checked> Temporär- und Systemdateien einschließen</label></p>
+<p><label class="klein"><input type="checkbox" name="folders" value="1" style="width:auto" checked> Leere Ordner in den Papierkorb verschieben</label></p>
+<p><label>Begründung (Protokoll)</label><input type="text" name="reason" value="Aufräumen nach Aufarbeitung" style="width:320px"></p>
+<p class="aktionen"><button type="submit" name="action" value="vorschau" class="knopf">Vorschau aktualisieren</button> <button type="submit" name="action" value="ausfuehren" onsubmit="return confirm('In den Papierkorb verschieben?')" {% if not plan.actionable %}disabled title="nichts zu tun"{% endif %}>In den Papierkorb verschieben</button> <a href="{% url 'takeover_sources' %}">Abbrechen</a></p>
+</form>
+<p class="klein">Nur Admins. Jeder Vorgang steht im Protokoll (drive.trash). Wiederherstellung über den Papierkorb in Google Drive.</p></div>
+</div>
+{% endif %}
+{% endblock %}

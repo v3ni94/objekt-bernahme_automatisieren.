@@ -1712,3 +1712,4 @@ Celery-Queues aus den Settings: `ai`, `classify`, `io`, `lists`, `ocr`
 | ai.read | KI-Aufrufe und Kosten einsehen |
 | imports.write | Import hochladen und bestätigen |
 | drive.connect | Google-Drive-Verbindung herstellen und trennen |
+| drive.cleanup | Altbestand aufräumen (Dubletten, Temporärdateien und leere Ordner in den Papierkorb) |

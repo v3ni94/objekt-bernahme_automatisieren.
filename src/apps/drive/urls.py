@@ -18,6 +18,11 @@ urlpatterns = [
         "verwaltung/altbestand/aktualisieren/", views.takeover_source_refresh, name="takeover_source_refresh"
     ),
     path(
+        "verwaltung/altbestand/<int:pk>/aufraeumen/",
+        views.takeover_source_cleanup,
+        name="takeover_source_cleanup",
+    ),
+    path(
         "verwaltung/altbestand/<int:pk>/aufarbeiten/", views.takeover_source_run, name="takeover_source_run"
     ),
     path(

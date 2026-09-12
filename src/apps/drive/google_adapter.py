@@ -214,6 +214,15 @@ class GoogleDriveAdapter:
             )
         )
 
+    def trash(self, file_id: str) -> None:
+        """In den Papierkorb von Drive (30 Tage wiederherstellbar); files.delete wird nie aufgerufen."""
+        self._execute(
+            "files.update",
+            self.service.files().update(
+                fileId=file_id, body={"trashed": True}, fields="id,trashed", supportsAllDrives=True
+            ),
+        )
+
     def move(self, file_id: str, from_parent_id: str, to_parent_id: str) -> DriveNode:
         return _to_node(
             self._execute(

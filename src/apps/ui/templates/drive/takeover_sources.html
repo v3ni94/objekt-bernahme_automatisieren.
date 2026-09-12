@@ -1,6 +1,6 @@
-{% extends "base.html" %}{% block title %}Altbestand · {{ APP_NAME }}{% endblock %}
+{% extends "base.html" %}{% load perms %}{% block title %}Altbestand · {{ APP_NAME }}{% endblock %}
 {% block content %}<h1>Altbestand <span class="klein">{{ counts.total }} Ordner, {{ counts.open }} ohne Objekt, {{ counts.done }} übernommen{% if counts.failed %}, {{ counts.failed }} fehlgeschlagen{% endif %}</span></h1>
-<p class="hinweis">Quellordner der bisherigen Ablage. „Aufarbeiten“ übernimmt alle Dateien des Ordners samt Unterordnern in das Zielobjekt: die Verarbeitung liest jede Datei, erkennt Inhalt und Zuordnung und verschiebt sie in den passenden Ordner der neuen Struktur. Der Quellordner bleibt bestehen, es wird nichts gelöscht. Fehlt der Objektordner noch, wird er angelegt und die Ablage wartet darauf. Höchstens {{ limit }} Dateien je Vorgang.</p>
+<p class="hinweis">Quellordner der bisherigen Ablage. „Aufarbeiten“ übernimmt alle Dateien des Ordners samt Unterordnern in das Zielobjekt: die Verarbeitung liest jede Datei, erkennt Inhalt und Zuordnung und verschiebt sie in den passenden Ordner der neuen Struktur. Der Quellordner bleibt bestehen, es wird nichts gelöscht. Nach der Aufarbeitung kann ein Admin mit „Aufräumen“ Dubletten, Temporärdateien und leere Ordner der alten Struktur in den Papierkorb verschieben (Vorschau, wiederherstellbar). Fehlt der Objektordner noch, wird er angelegt und die Ablage wartet darauf. Höchstens {{ limit }} Dateien je Vorgang.</p>
 <div class="raster">
 <div class="karte"><h2>Ordner aufnehmen</h2>
 <form method="post" action="{% url 'takeover_source_add' %}">{% csrf_token %}<p><label for="links">Drive-Links oder Ordner-IDs, je Zeile einer</label><textarea id="links" name="links" rows="5" placeholder="https://drive.google.com/open?id=…"></textarea></p><button type="submit">Ordner aufnehmen</button></form>
@@ -22,6 +22,7 @@
 <td>{% if r.status == "done" %}<span class="ampel gruen">{{ r.get_status_display }}</span>{% elif r.status == "failed" %}<span class="ampel rot">{{ r.get_status_display }}</span>{% elif r.status == "linked" %}<span class="ampel gelb">{{ r.get_status_display }}</span>{% else %}<span class="ampel grau">{{ r.get_status_display }}</span>{% endif %}</td>
 <td class="klein">{% if r.taken_at %}{{ r.taken_at|date:"d.m.Y H:i" }}{% if r.last_run_id %}, Lauf {{ r.last_run_id }}{% endif %}{% endif %}</td>
 <td class="aktionen">{% if r.object and connected %}<form method="post" action="{% url 'takeover_source_run' r.pk %}" class="inline" onsubmit="return confirm('Alle Dateien aus „{{ r.name|default:r.drive_folder_id|escapejs }}“ samt Unterordnern in Objekt {{ r.object.object_number }} übernehmen? Der Quellordner bleibt bestehen.')">{% csrf_token %}<button type="submit">Aufarbeiten</button></form>{% endif %}
+{% if r.status == "done" and connected and user|has_perm:"drive.cleanup" %}<a class="link" href="{% url 'takeover_source_cleanup' r.pk %}">Aufräumen</a>{% endif %}
 <form method="post" action="{% url 'takeover_source_remove' r.pk %}" class="inline" onsubmit="return confirm('Zeile aus der Tabelle entfernen? In Drive ändert sich nichts.')">{% csrf_token %}<button type="submit" class="link">Entfernen</button></form></td>
 </tr>{% empty %}<tr><td colspan="7">Noch keine Quellordner. Oben Links einfügen.</td></tr>{% endfor %}</tbody></table></div>
 {% endblock %}

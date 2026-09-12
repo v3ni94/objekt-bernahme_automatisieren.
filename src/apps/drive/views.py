@@ -507,6 +507,56 @@ def takeover_source_run(request, pk: int):
     return _altbestand_zurueck()
 
 
+@permission_required("drive.cleanup")
+@reauthentication_required
+def takeover_source_cleanup(request, pk: int):
+    """Aufraeumen nach der Aufarbeitung (12.09.2026): Vorschau (GET oder „Vorschau aktualisieren“) und Ausfuehrung.
+    Dubletten, Temporaer- und Systemdateien und danach leere Ordner der alten Struktur gehen in den Papierkorb von
+    Drive, nie endgueltig; Admin-Recht, Step-up, Protokoll."""
+    from apps.drive import takeover
+    from apps.drive.models import TakeoverSource
+
+    src = get_object_or_404(TakeoverSource.objects.select_related("object"), pk=pk)
+    adapter = oauth.get_adapter()
+    if adapter is None:
+        messages.error(request, "Keine Google-Verbindung.")
+        return _altbestand_zurueck()
+    posted = request.method == "POST"
+    include_dubletten = request.POST.get("dubletten") == "1" if posted else False
+    include_junk = request.POST.get("junk") == "1" if posted else True
+    include_folders = request.POST.get("folders") == "1" if posted else True
+    try:
+        plan = takeover.plan_cleanup(
+            src,
+            adapter,
+            include_junk=include_junk,
+            include_folders=include_folders,
+            include_dubletten=include_dubletten,
+        )
+    except DriveError as exc:
+        messages.error(request, f"Drive-Fehler: {exc}")
+        return _altbestand_zurueck()
+    if posted and request.POST.get("action") == "ausfuehren" and not plan.blockers and plan.actionable:
+        result = takeover.run_cleanup(
+            src, adapter, plan, user=request.user, request=request, reason=request.POST.get("reason", "")
+        )
+        text = (
+            f"{result['files']} Dateien und {result['folders']} Ordner in den Papierkorb verschoben, "
+            f"{result['documents']} Dubletten stillgelegt."
+        )
+        if result["root_trashed"]:
+            text += " Der Quellordner war leer und wurde ebenfalls in den Papierkorb verschoben; die Zeile ist entfernt."
+        messages.success(request, text)
+        for err in result["errors"][:10]:
+            messages.warning(request, err)
+        return _altbestand_zurueck()
+    return render(
+        request,
+        "drive/takeover_cleanup.html",
+        {"source": src, "plan": plan, "include_dubletten": include_dubletten},
+    )
+
+
 @permission_required("objects.write")
 @require_POST
 def takeover_source_remove(request, pk: int):

@@ -228,3 +228,162 @@ def test_aktualisieren_entfernt_geloeschte_und_papierkorb_ordner(client_as, cler
     src = TakeoverSource.objects.get()
     assert src.last_error and src.last_error.startswith("Drive nicht erreichbar")
     assert any("1 nicht lesbar" in m.message for m in resp.context["messages"])
+
+
+# ---------------------------------------------------------------- Aufraeumen nach der Aufarbeitung (12.09.2026)
+
+
+def _dok(obj, name, drive_file_id, status, *, sha=None, duplicate_of=None):
+    from django.utils import timezone
+
+    return Document.objects.create(
+        object=obj,
+        sha256=sha,
+        size_bytes=8,
+        mime_type="application/pdf",
+        original_name=name,
+        current_name=name,
+        source="drive_existing",
+        drive_file_id=drive_file_id,
+        status=status,
+        duplicate_of=duplicate_of,
+        first_seen_at=timezone.now(),
+    )
+
+
+@pytest.fixture
+def aufgeraeumt(objekt, drive, altordner, admin_user):
+    """Zustand nach der Aufarbeitung: Original nach 02 verschoben, im Quellordner bleiben eine Dublette, eine Datei
+    in Pruefung, zwei Systemdateien und ein leerer Unterordner."""
+    from apps.drive.models import DriveNode, NodeKind
+    from apps.review.models import ReviewCase
+
+    quelle = altordner["o623"]
+    kinder = {n.name: n for n in drive.list_children(quelle)}
+    rechnungen = altordner["rech"]
+    original_id = kinder["Protokoll 2023.pdf"].id
+    ziel = DriveNode.objects.get(object=objekt, node_kind=NodeKind.MAIN_FOLDER, category_id="02")
+    drive.move(original_id, quelle, ziel.drive_file_id)
+    original = _dok(objekt, "Protokoll 2023.pdf", original_id, "filed", sha="a" * 64)
+    kopie_id = drive.add_file(quelle, "Protokoll 2023 Kopie.pdf", b"b" * 8)
+    kopie = _dok(objekt, "Protokoll 2023 Kopie.pdf", kopie_id, "duplicate", duplicate_of=original)
+    ReviewCase.objects.create(
+        object=objekt,
+        document=kopie,
+        case_type="unclear",
+        case_subtype="duplicate",
+        context={"reason": "Test"},
+    )
+    rechnung = {n.name: n for n in drive.list_children(rechnungen)}["Rechnung Dach.pdf"]
+    pruefung = _dok(objekt, "Rechnung Dach.pdf", rechnung.id, "review", sha="c" * 64)
+    thumbs = drive.add_file(quelle, "Thumbs.db", b"t" * 8)
+    tmp = drive.add_file(rechnungen, "~$Protokoll.docx", b"x" * 8)
+    leer = drive.add_folder(quelle, "Leer")
+    src = TakeoverSource.objects.create(
+        drive_folder_id=quelle,
+        name="623 alt",
+        object=objekt,
+        status="done",
+        files_registered=3,
+        taken_at=None,
+    )
+    return {
+        "src": src,
+        "quelle": quelle,
+        "rechnungen": rechnungen,
+        "original": original,
+        "kopie": kopie,
+        "kopie_id": kopie_id,
+        "pruefung": pruefung,
+        "thumbs": thumbs,
+        "tmp": tmp,
+        "leer": leer,
+    }
+
+
+def test_aufraeumen_plan_und_ausfuehrung(objekt, drive, aufgeraeumt, admin_user):
+    from apps.review.models import ReviewCase
+
+    z = aufgeraeumt
+    plan = takeover.plan_cleanup(z["src"], drive)
+    assert not plan.blockers and plan.total_files == 4
+    assert [d.document_id for d in plan.duplicates] == [z["kopie"].pk]
+    assert sorted(j.path.rsplit("/", 1)[-1] for j in plan.junk) == ["Thumbs.db", "~$Protokoll.docx"]
+    assert [(r.document_id, r.reason) for r in plan.remaining] == [(z["pruefung"].pk, "Status review")]
+    assert [f[0] for f in plan.empty_folders] == [z["leer"]] and plan.root_empty is False
+    assert plan.actionable
+    result = takeover.run_cleanup(z["src"], drive, plan, user=admin_user, reason="Test")
+    assert result == {"files": 3, "folders": 1, "documents": 1, "errors": [], "root_trashed": False}
+    assert drive.get(z["kopie_id"]).trashed and drive.get(z["thumbs"]).trashed and drive.get(z["tmp"]).trashed
+    assert drive.get(z["leer"]).trashed
+    assert not drive.get(z["rechnungen"]).trashed and not drive.get(z["quelle"]).trashed
+    assert (
+        not drive.get(z["pruefung"].drive_file_id).trashed
+        and not drive.get(z["original"].drive_file_id).trashed
+    )
+    z["kopie"].refresh_from_db()
+    assert z["kopie"].deleted_at is not None and "Papierkorb" in z["kopie"].delete_reason
+    assert ReviewCase.objects.get(document=z["kopie"]).status == "resolved"
+    assert AuditEvent.objects.filter(action="drive.trash", object_id=objekt.pk).count() == 4
+    assert TakeoverSource.objects.filter(pk=z["src"].pk).exists()
+    # zweiter Durchgang: nichts mehr zu tun, Pruefdatei schuetzt weiterhin ihren Ordner
+    plan2 = takeover.plan_cleanup(z["src"], drive)
+    assert not plan2.actionable and len(plan2.remaining) == 1
+
+
+def test_aufraeumen_leerer_quellordner_verschwindet_struktur_bleibt(objekt, drive, aufgeraeumt, admin_user):
+    from apps.drive.models import DriveNode, NodeStatus
+
+    z = aufgeraeumt
+    Document.objects.filter(pk=z["pruefung"].pk).update(
+        status="duplicate", duplicate_of=z["original"], sha256=None
+    )
+    plan = takeover.plan_cleanup(z["src"], drive)
+    assert len(plan.duplicates) == 2 and not plan.remaining and plan.root_empty
+    assert [f[0] for f in plan.empty_folders][-1] == z["quelle"]  # Quellordner zuletzt
+    result = takeover.run_cleanup(z["src"], drive, plan, user=admin_user)
+    assert result["files"] == 4 and result["folders"] == 3 and result["root_trashed"] is True
+    assert drive.get(z["quelle"]).trashed and drive.get(z["rechnungen"]).trashed
+    assert not TakeoverSource.objects.filter(pk=z["src"].pk).exists()
+    assert AuditEvent.objects.filter(action="drive.takeover_source_prune").exists()
+    # Struktur des Objekts und das verschobene Original bleiben unangetastet
+    for row in DriveNode.objects.filter(object=objekt, status=NodeStatus.ACTIVE):
+        assert not drive.get(row.drive_file_id).trashed
+    assert not drive.get(z["original"].drive_file_id).trashed
+    assert not [op for op in drive.ops if op[0] == "delete"]
+
+
+def test_aufraeumen_sperren_und_rechte(
+    objekt, drive, aufgeraeumt, client_as, clerk_user, admin_user, monkeypatch
+):
+    from allauth.account.internal.flows import reauthentication
+
+    z = aufgeraeumt
+    # Sperre: offener Job des Objekts
+    ProcessingJob.objects.create(
+        object=objekt, job_type=JobType.FILE_TO_DRIVE, idempotency_key="t-offen", status=JobStatus.PENDING
+    )
+    plan = takeover.plan_cleanup(z["src"], drive)
+    assert plan.blockers and "offen" in plan.blockers[0]
+    ProcessingJob.objects.filter(idempotency_key="t-offen").delete()
+    # Sperre: noch nicht aufgearbeitet
+    TakeoverSource.objects.filter(pk=z["src"].pk).update(status="linked")
+    z["src"].refresh_from_db()
+    assert takeover.plan_cleanup(z["src"], drive).blockers
+    TakeoverSource.objects.filter(pk=z["src"].pk).update(status="done")
+    # Rechte: Sachbearbeiter nicht, Admin mit Vorschau und Ausfuehrung ueber die Oberflaeche
+    monkeypatch.setattr(reauthentication, "did_recently_authenticate", lambda request: True)
+    assert client_as(clerk_user).get(f"/verwaltung/altbestand/{z['src'].pk}/aufraeumen/").status_code == 403
+    client = client_as(admin_user)
+    seite = client.get(f"/verwaltung/altbestand/{z['src'].pk}/aufraeumen/")
+    assert seite.status_code == 200 and b"Vorschau" in seite.content and seite.context["plan"].actionable
+    liste = client.get("/verwaltung/altbestand/")
+    assert "Aufräumen".encode() in liste.content
+    resp = client.post(
+        f"/verwaltung/altbestand/{z['src'].pk}/aufraeumen/",
+        {"action": "ausfuehren", "junk": "1", "folders": "1", "reason": "Test UI"},
+        follow=True,
+    )
+    assert resp.status_code == 200
+    assert any("3 Dateien und 1 Ordner in den Papierkorb" in m.message for m in resp.context["messages"])
+    assert drive.get(z["kopie_id"]).trashed
