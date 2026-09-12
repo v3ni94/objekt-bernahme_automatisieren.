@@ -452,7 +452,7 @@
    "expected": {
     "category": "02",
     "subfolder": "10",
-    "document_type": "dienstleistervertrag",
+    "document_type": "hausmeistervertrag",
     "case_type": null,
     "period_year": null,
     "physical_category": "02"

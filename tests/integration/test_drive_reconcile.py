@@ -82,7 +82,10 @@ def test_objekt_ohne_unterordner(drive, cfg):
         "04_Nicht_objektbezogen",
     ]
     two = DriveNode.objects.get(object=obj, node_kind="main_folder", category_id="02")
-    assert names(drive, two.drive_file_id)[:2] == ["01_Objektstammdaten_und_Einheiten", "02_Grundstück_Rechte_und_Baulasten"]
+    assert names(drive, two.drive_file_id)[:2] == [
+        "01_Objektstammdaten_und_Einheiten",
+        "02_Grundstück_Rechte_und_Baulasten",
+    ]
     assert (
         DriveNode.objects.filter(object=obj, node_kind="main_folder").count() == 6
         and DriveNode.objects.filter(object=obj, node_kind="subfolder").count() == 4 + 15

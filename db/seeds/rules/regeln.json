@@ -1929,5 +1929,4337 @@
     "Betriebskostenabrechnung 2025 für Wohnung 4"
    ]
   }
+ },
+ {
+  "id": "R-02-OBJSTAMM-001",
+  "name": "Objektstammblatt",
+  "version": 1,
+  "priority": 180,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)objekt-?stamm(daten)?blatt",
+    "(?i)objektstammdaten",
+    "(?i)objekt-?datenblatt",
+    "(?i)stammdatenblatt.{0,40}\\bobjekt",
+    "(?i)liegenschafts-?(stamm)?datenblatt"
+   ],
+   "not_text_regex": [
+    "(?i)\\brechnung\\b",
+    "(?i)abrechnung",
+    "(?i)mietvertrag",
+    "(?i)eigent(ue|ü)mer-?stammdaten",
+    "(?i)kaufvertrag"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.9,
+   "hard": false,
+   "subfolder": "01",
+   "document_type": "objektstammblatt",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Objektstammblatt: Objekt 0421 WEG Musterstraße 5, 40721 Hilden, Baujahr 1972, 2 Gebäude, 12 Wohnungen, 1 Gewerbeeinheit, 8 Stellplätze, Verwaltungsart WEG, Objektbetreuer Herr Weber.",
+    "Objektstammdaten der Liegenschaft Gartenstraße 12, Objektnummer 0433, Verwaltungsart Mietverwaltung, Baujahr 1985."
+   ],
+   "negative": [
+    "Eigentümerstammdaten Herr Mustermann, WE 3, Objekt 0421 Musterstraße 5.",
+    "Jahresabrechnung 2025 für das Objekt 0421 Musterstraße 5, Hilden."
+   ]
+  }
+ },
+ {
+  "id": "R-02-EINHSTAMM-001",
+  "name": "Einheitenstammblatt",
+  "version": 1,
+  "priority": 180,
+  "scope": {
+   "management_types": [
+    "rental",
+    "weg_with_se"
+   ]
+  },
+  "when": {
+   "text_regex": [
+    "(?i)einheiten?-?stamm(daten)?blatt",
+    "(?i)wohnungs-?stamm(daten)?blatt",
+    "(?i)stammdaten der einheit",
+    "(?i)einheitenstammdaten"
+   ],
+   "not_text_regex": [
+    "(?i)\\brechnung\\b",
+    "(?i)abrechnung",
+    "(?i)mietvertrag",
+    "(?i)eigent(ue|ü)mer-?stammdaten",
+    "(?i)kaufvertrag"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.9,
+   "hard": false,
+   "subfolder": "01",
+   "document_type": "einheitenstammblatt",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Einheitenstammblatt WE 07: 2. OG rechts, Wohnfläche 71,20 m², Miteigentumsanteil 82,5/1.000, Keller Nr. 7, Stellplatz TG 4, Sondernutzungsrecht Gartenfläche.",
+    "Wohnungsstammblatt für die Einheit Nr. 3, Gartenstraße 12, Hilden, Lage 1. OG links, Fläche 62,50 m²."
+   ],
+   "negative": [
+    "Eigentümerstammdaten Frau Beispiel, Einheit WE 07, Musterstraße 5.",
+    "Einzelabrechnung 2025 für die Einheit WE 07, Abrechnungsergebnis Guthaben 120,00 EUR."
+   ]
+  }
+ },
+ {
+  "id": "R-02-EINHVERZ-001",
+  "name": "Einheitenverzeichnis",
+  "version": 1,
+  "priority": 175,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)einheiten-?(verzeichnis|liste|(ue|ü)bersicht|aufstellung)",
+    "(?i)wohnungs-?(verzeichnis|liste|(ue|ü)bersicht)",
+    "(?i)verzeichnis der (einheiten|wohnungen)",
+    "(?i)(ue|ü)bersicht der (einheiten|wohnungen)",
+    "(?i)stellplatz-?(verzeichnis|liste|zuordnung)",
+    "(?i)keller-?(verzeichnis|zuordnung)"
+   ],
+   "not_text_regex": [
+    "(?i)\\brechnung\\b",
+    "(?i)abrechnung",
+    "(?i)mietvertrag",
+    "(?i)eigent(ue|ü)merliste",
+    "(?i)teilungserkl(ae|ä)rung",
+    "(?i)wirtschaftsplan"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.85,
+   "hard": false,
+   "subfolder": "01",
+   "document_type": "einheitenverzeichnis",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Einheitenverzeichnis Objekt 0421 Musterstraße 5: WE 01 EG links Wohnung, WE 02 EG rechts Wohnung, GE 01 EG Ladenlokal, Keller K1 bis K12, Stellplätze TG 1 bis TG 8.",
+    "Übersicht der Einheiten mit Etage, Lage und Nutzungsart sowie Zuordnung der Kellerräume und Stellplätze, Stand 01.07.2026."
+   ],
+   "negative": [
+    "Eigentümerliste der WEG Musterstraße 5, Stand 01.07.2026, mit Miteigentumsanteilen.",
+    "Gesamtjahresabrechnung 2025 mit Aufstellung aller Einheiten und Verteilung nach Miteigentumsanteilen."
+   ]
+  }
+ },
+ {
+  "id": "R-02-FLAECHEN-001",
+  "name": "Wohn- und Nutzflächenverzeichnis",
+  "version": 1,
+  "priority": 176,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)\\b(wohn|nutz|gesamt|grund)?fl(ae|ä)chen-?(verzeichnis|aufstellung|(ue|ü)bersicht|liste|tabelle)\\b",
+    "(?i)ma(ss|ß)gebliche[nr]? fl(ae|ä)chen"
+   ],
+   "not_text_regex": [
+    "(?i)\\brechnung\\b",
+    "(?i)abrechnung",
+    "(?i)mietvertrag",
+    "(?i)kaufvertrag",
+    "(?i)wohnfl(ae|ä)chenberechnung",
+    "(?i)teilungserkl(ae|ä)rung",
+    "(?i)wirtschaftsplan"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.85,
+   "hard": false,
+   "subfolder": "01",
+   "document_type": "flaechenverzeichnis",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Wohn- und Nutzflächenverzeichnis für das Objekt Gartenstraße 12, Stand 01.01.2026, alle Einheiten mit Wohnfläche in m².",
+    "Flächenaufstellung aller Einheiten: WE 1 EG links 62,50 m², WE 2 EG rechts 71,20 m², GE 1 Ladenlokal 95,00 m²."
+   ],
+   "negative": [
+    "Wohnflächenberechnung nach der Wohnflächenverordnung für die Wohnung im 2. OG links.",
+    "Betriebskostenabrechnung 2025, Umlage nach Wohnfläche 62,50 m² von 1.250,00 m²."
+   ]
+  }
+ },
+ {
+  "id": "R-02-ABRSTRUKT-001",
+  "name": "Abrechnungsstruktur und Verteilungsschlüssel",
+  "version": 1,
+  "priority": 165,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)(verteil(er|ungs)|umlage)-?schl(ue|ü)ssel",
+    "(?i)(ue|ü)bersicht der abrechnungseinheiten",
+    "(?i)abrechnungs-?(einheiten|kreise|struktur)",
+    "(?i)z(ae|ä)hler-?zuordnung"
+   ],
+   "not_text_regex": [
+    "(?i)\\brechnung\\b",
+    "(?i)jahresabrechnung",
+    "(?i)gesamtabrechnung",
+    "(?i)einzelabrechnung",
+    "(?i)betriebskostenabrechnung",
+    "(?i)heizkostenabrechnung",
+    "(?i)nebenkostenabrechnung",
+    "(?i)wirtschaftsplan",
+    "(?i)mietvertrag",
+    "(?i)teilungserkl(ae|ä)rung",
+    "(?i)gemeinschaftsordnung",
+    "(?i)protokoll der eigent"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.8,
+   "hard": false,
+   "subfolder": "01",
+   "document_type": "abrechnungsstruktur",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Übersicht der Verteilungsschlüssel für das Objekt Musterstraße 5: Heizkosten 70/30 nach Verbrauch und Wohnfläche, Kaltwasser nach Zähler, Allgemeinstrom nach Miteigentumsanteilen.",
+    "Übersicht der Abrechnungseinheiten und Zählerzuordnung: Abrechnungseinheit Haus A mit Wärmezähler WZ 1, Haus B mit Wärmezähler WZ 2."
+   ],
+   "negative": [
+    "Jahresabrechnung 2025, Verteilungsschlüssel Miteigentumsanteile 1.000/1.000, Gesamtkosten 84.320,15 EUR.",
+    "Wirtschaftsplan 2027: Umlageschlüssel nach Wohnfläche, Hausgeld monatlich 310,00 EUR."
+   ]
+  }
+ },
+ {
+  "id": "R-02-AUSSTATT-001",
+  "name": "Ausstattungsbeschreibung",
+  "version": 1,
+  "priority": 170,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)ausstattungs-?(beschreibung|merkmale|liste|(ue|ü)bersicht)",
+    "(?i)wohnungsbeschreibung",
+    "(?i)beschreibung der ausstattung"
+   ],
+   "not_text_regex": [
+    "(?i)\\brechnung\\b",
+    "(?i)abrechnung",
+    "(?i)mietvertrag",
+    "(?i)kaufvertrag",
+    "(?i)baubeschreibung",
+    "(?i)bau- und ausstattungsbeschreibung",
+    "(?i)mieterh(oe|ö)hung"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.85,
+   "hard": false,
+   "subfolder": "01",
+   "document_type": "ausstattungsbeschreibung",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Ausstattungsbeschreibung Wohnung WE 03, 1. OG links: Parkett in allen Wohnräumen, Einbauküche, Bad mit Wanne und Dusche, Balkon nach Süden.",
+    "Beschreibung der Ausstattung der Einheit Nr. 5 für die Vermietung: Fußbodenheizung, elektrische Rollläden, Tiefgaragenstellplatz."
+   ],
+   "negative": [
+    "Mietvertrag: Die Wohnung wird mit der in der Ausstattungsbeschreibung genannten Einbauküche vermietet.",
+    "Bau- und Ausstattungsbeschreibung des Bauträgers für die Wohnanlage Gartenstraße 12."
+   ]
+  }
+ },
+ {
+  "id": "R-02-FOTOS-001",
+  "name": "Objektfotos",
+  "version": 1,
+  "priority": 165,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)objekt-?fotos?",
+    "(?i)foto-?dokumentation",
+    "(?i)bild-?dokumentation",
+    "(?i)fotos? (des|vom|der) (objekt|geb(ae|ä)ude|wohnung|einheit)",
+    "(?i)geb(ae|ä)ude-?fotos?"
+   ],
+   "not_text_regex": [
+    "(?i)\\brechnung\\b",
+    "(?i)schaden",
+    "(?i)m(ae|ä)ngel",
+    "(?i)gutachten",
+    "(?i)(ue|ü)bergabeprotokoll",
+    "(?i)mietvertrag"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.8,
+   "hard": false,
+   "subfolder": "01",
+   "document_type": "objektfotos",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Objektfotos Musterstraße 5, Hilden: Straßenansicht, Hofseite, Hauseingang, Treppenhaus, Stand Mai 2026.",
+    "Fotodokumentation des Gebäudes Gartenstraße 12 für das Vermietungsexposé, 14 Aufnahmen vom 20.05.2026."
+   ],
+   "negative": [
+    "Fotodokumentation des Wasserschadens in der Wohnung WE 03 vom 12.02.2026.",
+    "Übergabeprotokoll mit Fotos der Wohnung bei Auszug des Mieters am 31.03.2026."
+   ]
+  }
+ },
+ {
+  "id": "R-02-INVENTAR-001",
+  "name": "Inventar- und Geräteverzeichnis",
+  "version": 1,
+  "priority": 170,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)inventar-?(verzeichnis|liste|(ue|ü)bersicht|aufstellung)",
+    "(?i)ger(ae|ä)te-?(verzeichnis|liste)",
+    "(?i)mitvermietete[nrs]? (einrichtung|gegenst(ae|ä)nde|einbauk(ue|ü)che|ger(ae|ä)te|m(oe|ö)bel)",
+    "(?i)verzeichnis (des|der) (inventars|mitvermieteten)"
+   ],
+   "not_text_regex": [
+    "(?i)\\brechnung\\b",
+    "(?i)abrechnung",
+    "(?i)mietvertrag",
+    "(?i)kaufvertrag",
+    "(?i)(ue|ü)bergabeprotokoll",
+    "(?i)anlagenverzeichnis"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.85,
+   "hard": false,
+   "subfolder": "01",
+   "document_type": "inventarverzeichnis",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Inventarverzeichnis der mitvermieteten Einrichtung, Wohnung WE 03: Einbauküche mit Geschirrspüler, Kühlschrank, Herd, Waschmaschine im Keller.",
+    "Geräteliste der Gewerbeeinheit GE 01: Klimagerät, Lüftungsanlage, Kühltheke, jeweils Eigentum des Vermieters."
+   ],
+   "negative": [
+    "Mietvertrag § 2: Mitvermietet wird die Einbauküche gemäß beigefügtem Inventarverzeichnis.",
+    "Rechnung Nr. 1234 über die Lieferung und Montage der Einbauküche für die Wohnung WE 03."
+   ]
+  }
+ },
+ {
+  "id": "R-02-ZUSTAEND-001",
+  "name": "Zuständigkeits- und Freigaberegelung",
+  "version": 1,
+  "priority": 170,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)zust(ae|ä)ndigkeits-?((ue|ü)bersicht|regelung|abgrenzung|matrix|verteilung)",
+    "(?i)(ue|ü)bersicht der (vereinbarten )?zust(ae|ä)ndigkeiten",
+    "(?i)abgrenzung der zust(ae|ä)ndigkeiten",
+    "(?i)freigabe-?(grenzen?|regelung(en)?|limit|prozess)",
+    "(?i)wertgrenze.{0,60}(reparatur|instandhaltung|auftrag)",
+    "(?i)freigabe.{0,60}vermietung"
+   ],
+   "not_text_regex": [
+    "(?i)\\brechnung\\b",
+    "(?i)abrechnung",
+    "(?i)mietvertrag",
+    "(?i)verwalt(er|ungs)vertrag",
+    "(?i)protokoll der eigent",
+    "(?i)beschluss-?sammlung",
+    "(?i)teilungserkl(ae|ä)rung"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.85,
+   "hard": false,
+   "subfolder": "01",
+   "document_type": "zustaendigkeitsregelung",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Übersicht der vereinbarten Zuständigkeiten zwischen Eigentümer und Hausverwaltung Müller GmbH: Freigabegrenze für Reparaturen 1.500,00 EUR je Einzelfall, Neuvermietungen nur nach Freigabe durch den Eigentümer.",
+    "Zuständigkeitsabgrenzung SEV und WEG-Verwaltung für die Einheit WE 07: Sondereigentum durch die Hausverwaltung Müller GmbH, Gemeinschaftseigentum durch die WEG-Verwaltung."
+   ],
+   "negative": [
+    "Verwaltervertrag § 5: Der Verwalter darf Reparaturen bis 1.000,00 EUR ohne gesonderte Freigabe beauftragen.",
+    "Protokoll der Eigentümerversammlung, TOP 4: Freigabegrenze für Instandhaltungsaufträge des Verwalters."
+   ]
+  }
+ },
+ {
+  "id": "R-02-WEGKONTAKT-001",
+  "name": "Kontaktblatt WEG-Verwaltung",
+  "version": 1,
+  "priority": 165,
+  "scope": {
+   "management_types": [
+    "rental",
+    "weg_with_se"
+   ]
+  },
+  "when": {
+   "text_regex": [
+    "(?i)kontaktdaten der weg-?verwalt",
+    "(?i)ansprechpartner.{0,60}weg-?verwalt",
+    "(?i)weg-?verwalt(ung|er).{0,80}(ansprechpartner|kontaktdaten|kontakt|erreichbar)",
+    "(?i)kontaktblatt.{0,40}weg"
+   ],
+   "not_text_regex": [
+    "(?i)\\brechnung\\b",
+    "(?i)abrechnung",
+    "(?i)mietvertrag",
+    "(?i)verwalt(er|ungs)vertrag",
+    "(?i)protokoll der eigent",
+    "(?i)einladung zur",
+    "(?i)wirtschaftsplan"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.8,
+   "hard": false,
+   "subfolder": "01",
+   "document_type": "weg_verwaltung_kontakt",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Kontaktdaten der WEG-Verwaltung für die Einheit WE 07, Musterstraße 5: Immobilienverwaltung Beispiel GmbH, Ansprechpartner Frau Krause, Objektnummer 1187, Kommunikation per E-Mail.",
+    "Ansprechpartner bei der WEG-Verwaltung: Herr Lang, Telefon 02103 123456, zuständig für Objekt 1187, Einheit 07, Zuständigkeit nur für das Gemeinschaftseigentum."
+   ],
+   "negative": [
+    "Einzelabrechnung 2025 der WEG-Verwaltung für die Einheit WE 07, Ansprechpartner Frau Krause.",
+    "Einladung zur Eigentümerversammlung am 15.10.2026, Ansprechpartner der WEG-Verwaltung Frau Krause."
+   ]
+  }
+ },
+ {
+  "id": "R-02-VERMGRUNDRISS-001",
+  "name": "Vermietungsgrundriss",
+  "version": 1,
+  "priority": 175,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)grundriss"
+   ],
+   "any_of": {
+    "text_regex": [
+     "(?i)vermiet",
+     "(?i)expos(e|é)",
+     "(?i)freigegeben",
+     "(?i)vermarktung"
+    ]
+   },
+   "not_text_regex": [
+    "(?i)\\brechnung\\b",
+    "(?i)mietvertrag",
+    "(?i)kaufvertrag",
+    "(?i)teilungserkl(ae|ä)rung",
+    "(?i)aufteilungsplan"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.85,
+   "hard": false,
+   "subfolder": "01",
+   "document_type": "vermietungsgrundriss",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Grundriss Wohnung WE 03, 1. OG links, 71,20 m², freigegebene Fassung für das Vermietungsexposé.",
+    "Vermietungsgrundriss der Einheit Nr. 5 mit Möblierungsvorschlag, Gartenstraße 12, Hilden."
+   ],
+   "negative": [
+    "Mietvertrag über die Wohnung WE 03, Grundriss der Wohnung als Anlage 1.",
+    "Grundriss Erdgeschoss, Maßstab 1:100, Bauantrag 2019, Architekturbüro Schmidt."
+   ]
+  }
+ },
+ {
+  "id": "R-02-FLURKARTE-001",
+  "name": "Flurkarte und Lageplan",
+  "version": 1,
+  "priority": 175,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)flurkarte",
+    "(?i)liegenschaftskarte",
+    "(?i)katasterkarte",
+    "(?i)\\blagepl(a|ae|ä)n(e|es)?\\b",
+    "(?i)auszug aus dem liegenschaftskataster",
+    "(?i)flurst(ue|ü)cks-?nachweis"
+   ],
+   "not_text_regex": [
+    "(?i)\\brechnung\\b",
+    "(?i)abrechnung",
+    "(?i)mietvertrag",
+    "(?i)kaufvertrag",
+    "(?i)grundbuch",
+    "(?i)baugenehmigung",
+    "(?i)teilungserkl(ae|ä)rung"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.85,
+   "hard": false,
+   "subfolder": "02",
+   "document_type": "flurkarte",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Auszug aus der Liegenschaftskarte, Gemarkung Hilden, Flur 12, Flurstück 345/6, Maßstab 1:1000, Stand 03.03.2026.",
+    "Amtlicher Lageplan zum Grundstück Musterstraße 5, Gemarkung Musterstadt, Flur 3, Flurstück 120, öffentlich bestellter Vermessungsingenieur."
+   ],
+   "negative": [
+    "Grundbuchauszug, Bestandsverzeichnis: Gemarkung Hilden, Flur 12, Flurstück 345/6, Gebäude- und Freifläche.",
+    "Notarieller Kaufvertrag über das Grundstück Gemarkung Hilden, Flur 12, Flurstück 345/6."
+   ]
+  }
+ },
+ {
+  "id": "R-02-BAULAST-001",
+  "name": "Baulastenauskunft",
+  "version": 1,
+  "priority": 185,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)baulasten?-?(auskunft|verzeichnis|blatt|bescheinigung|erkl(ae|ä)rung|(ue|ü)bernahme)",
+    "(?i)\\bbaulast(en)?\\b"
+   ],
+   "not_text_regex": [
+    "(?i)\\brechnung\\b",
+    "(?i)abrechnung",
+    "(?i)mietvertrag",
+    "(?i)kaufvertrag"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.9,
+   "hard": false,
+   "subfolder": "02",
+   "document_type": "baulastenauskunft",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Auskunft aus dem Baulastenverzeichnis der Stadt Hilden für das Grundstück Gemarkung Hilden, Flur 12, Flurstück 345/6: Es sind keine Baulasten eingetragen.",
+    "Baulastenauskunft: Auf dem Flurstück 120 lastet eine Abstandsflächenbaulast zugunsten des Nachbargrundstücks Flurstück 121."
+   ],
+   "negative": [
+    "Notarieller Kaufvertrag: Der Verkäufer versichert, dass keine Baulasten bestehen.",
+    "Rechnung Nr. 2026-117 für die Vermessung des Grundstücks Musterstraße 5."
+   ]
+  }
+ },
+ {
+  "id": "R-02-DIENSTBARKEIT-001",
+  "name": "Wege- und Leitungsrechte",
+  "version": 1,
+  "priority": 175,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)\\b(geh|fahr|wege|leitungs|(ue|ü)berfahrts?|durchgangs|(ue|ü)berbau|mitbenutzungs)-?rechte?s?\\b",
+    "(?i)grunddienstbarkeit",
+    "(?i)beschr(ae|ä)nkte pers(oe|ö)nliche dienstbarkeit",
+    "(?i)dienstbarkeit(en)?\\b",
+    "(?i)gestattungsvertrag",
+    "(?i)nutzungsrechts?-?vereinbarung"
+   ],
+   "not_text_regex": [
+    "(?i)\\brechnung\\b",
+    "(?i)abrechnung",
+    "(?i)mietvertrag",
+    "(?i)kaufvertrag",
+    "(?i)grundbuch(auszug|blatt)",
+    "(?i)bestandsverzeichnis",
+    "(?i)teilungserkl(ae|ä)rung",
+    "(?i)gemeinschaftsordnung"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.85,
+   "hard": false,
+   "subfolder": "02",
+   "document_type": "dienstbarkeit",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Bewilligung einer Grunddienstbarkeit (Geh- und Fahrrecht) zugunsten des jeweiligen Eigentümers des Flurstücks 346, Gemarkung Hilden.",
+    "Gestattungsvertrag über die Verlegung und den Betrieb einer Fernwärmeleitung (Leitungsrecht) auf dem Grundstück Musterstraße 5."
+   ],
+   "negative": [
+    "Grundbuchauszug Abteilung II: Geh- und Fahrrecht für den jeweiligen Eigentümer von Flurstück 346.",
+    "Notarieller Kaufvertrag: Der Käufer übernimmt das eingetragene Leitungsrecht zugunsten der Stadtwerke."
+   ]
+  }
+ },
+ {
+  "id": "R-02-NACHBAR-001",
+  "name": "Nachbarvereinbarung",
+  "version": 1,
+  "priority": 170,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)nachbar(schafts|rechtliche)?-?vereinbarung",
+    "(?i)nachbarschaftsvertrag",
+    "(?i)vereinbarung.{0,80}nachbar",
+    "(?i)grenz-?(bebauung|abstand|vereinbarung|niederschrift|regelung)",
+    "(?i)zustimmung des nachbarn",
+    "(?i)nachbarliche zustimmung"
+   ],
+   "not_text_regex": [
+    "(?i)\\brechnung\\b",
+    "(?i)abrechnung",
+    "(?i)mietvertrag",
+    "(?i)kaufvertrag",
+    "(?i)grundbuch",
+    "(?i)beschwerde"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.85,
+   "hard": false,
+   "subfolder": "02",
+   "document_type": "nachbarvereinbarung",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Nachbarvereinbarung zwischen den Eigentümern der Grundstücke Musterstraße 5 und 7 über die gemeinsame Nutzung der Grenzgarage.",
+    "Vereinbarung mit dem Eigentümer des Nachbargrundstücks Flurstück 346 über die Unterhaltung der gemeinsamen Grenzmauer."
+   ],
+   "negative": [
+    "Beschwerde des Eigentümers Mustermann über Lärmbelästigung durch den Nachbarn im 2. OG.",
+    "Rechnung Nr. 88 der Firma Bau GmbH für die Sanierung der Grenzmauer."
+   ]
+  }
+ },
+ {
+  "id": "R-02-ERBBAU-001",
+  "name": "Erbbaurechtsunterlagen",
+  "version": 1,
+  "priority": 185,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)erbbaurecht",
+    "(?i)erbbauzins",
+    "(?i)erbbaugrundbuch",
+    "(?i)erbbauvertrag",
+    "(?i)erbbauberechtigte"
+   ],
+   "not_text_regex": [
+    "(?i)\\brechnung\\b",
+    "(?i)abrechnung",
+    "(?i)mietvertrag",
+    "(?i)kaufvertrag",
+    "(?i)grundbuchauszug",
+    "(?i)mahnung"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.9,
+   "hard": false,
+   "subfolder": "02",
+   "document_type": "erbbaurecht",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Erbbaurechtsvertrag zwischen der Stadt Hilden als Grundstückseigentümerin und der Wohnungseigentümergemeinschaft Musterstraße 5, Laufzeit 99 Jahre.",
+    "Erbbauzinsanpassung: Der Erbbauzins wird ab dem 01.01.2027 gemäß § 9 des Erbbaurechtsvertrags an den Verbraucherpreisindex angepasst."
+   ],
+   "negative": [
+    "Rechnung über den Erbbauzins für das Jahr 2026, fällig am 31.03.2026.",
+    "Grundbuchauszug Abteilung II: Erbbaurecht für die Dauer von 99 Jahren zugunsten der Wohnungsbau GmbH."
+   ]
+  }
+ },
+ {
+  "id": "R-02-BAUGEN-001",
+  "name": "Baugenehmigung",
+  "version": 1,
+  "priority": 195,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)baugenehmigung",
+    "(?i)\\bbauschein\\b",
+    "(?i)genehmigung(sbescheid)? .{0,40}nutzungs(ae|ä)nderung",
+    "(?i)nutzungs(ae|ä)nderung.{0,80}genehmigt",
+    "(?i)bauordnungsrechtliche genehmigung"
+   ],
+   "not_text_regex": [
+    "(?i)\\brechnung\\b",
+    "(?i)abrechnung",
+    "(?i)mietvertrag",
+    "(?i)kaufvertrag",
+    "(?i)wirtschaftsplan",
+    "(?i)\\bangebot\\b"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.95,
+   "hard": true,
+   "subfolder": "03",
+   "document_type": "baugenehmigung",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Baugenehmigung Nr. 2019/0456 der Stadt Hilden für den Neubau eines Mehrfamilienhauses mit 12 Wohneinheiten auf dem Grundstück Musterstraße 5.",
+    "Genehmigung der Nutzungsänderung: Die Umnutzung der Gewerbeeinheit im Erdgeschoss in eine Wohnung wird hiermit genehmigt."
+   ],
+   "negative": [
+    "Rechnung des Architekturbüros Schmidt für die Erstellung des Bauantrags und der Baugenehmigungsplanung.",
+    "Notarieller Kaufvertrag: Die Baugenehmigung liegt dem Käufer in Kopie vor."
+   ]
+  }
+ },
+ {
+  "id": "R-02-BAUBESCHR-001",
+  "name": "Baubeschreibung",
+  "version": 1,
+  "priority": 180,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)baubeschreibung",
+    "(?i)bau- und (leistungs|ausstattungs)beschreibung",
+    "(?i)leistungsbeschreibung.{0,40}bauvorhaben"
+   ],
+   "not_text_regex": [
+    "(?i)\\brechnung\\b",
+    "(?i)abrechnung",
+    "(?i)mietvertrag",
+    "(?i)kaufvertrag",
+    "(?i)teilungserkl(ae|ä)rung",
+    "(?i)\\bangebot\\b"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.9,
+   "hard": false,
+   "subfolder": "03",
+   "document_type": "baubeschreibung",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Baubeschreibung für das Bauvorhaben Neubau eines Mehrfamilienhauses, Musterstraße 5, Hilden. Rohbau: Außenwände aus Kalksandstein 24 cm mit Wärmedämmverbundsystem.",
+    "Bau- und Ausstattungsbeschreibung, Stand März 2019, Wohnanlage Gartenstraße 12, Hilden."
+   ],
+   "negative": [
+    "Bauträgerkaufvertrag mit Baubeschreibung als Anlage 2, Verkäufer Wohnbau GmbH, Käufer Mustermann.",
+    "Ausstattungsbeschreibung der Wohnung WE 3 für das Vermietungsexposé."
+   ]
+  }
+ },
+ {
+  "id": "R-02-GRUNDRISS-001",
+  "name": "Grundriss",
+  "version": 1,
+  "priority": 170,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)grundriss(e|es|pl(a|ae|ä)n(e|es)?|zeichnung(en)?)?\\b",
+    "(?i)geschosspl(a|ae|ä)n(e|es)?\\b"
+   ],
+   "not_text_regex": [
+    "(?i)\\brechnung\\b",
+    "(?i)abrechnung",
+    "(?i)mietvertrag",
+    "(?i)kaufvertrag",
+    "(?i)teilungserkl(ae|ä)rung",
+    "(?i)aufteilungsplan",
+    "(?i)abgeschlossenheitsbescheinigung",
+    "(?i)vermiet",
+    "(?i)expos(e|é)",
+    "(?i)\\bangebot\\b"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.8,
+   "hard": false,
+   "subfolder": "03",
+   "document_type": "grundriss",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Grundriss Erdgeschoss, Maßstab 1:100, Mehrfamilienhaus Musterstraße 5, Wohnung 1 und Wohnung 2, Architekturbüro Schmidt.",
+    "Grundrisspläne aller Geschosse, Bestand 2019, Gartenstraße 12, Hilden, Blatt A-01 bis A-05."
+   ],
+   "negative": [
+    "Mietvertrag über die Wohnung im 1. OG links, Grundriss als Anlage 1.",
+    "Aufteilungsplan zur Teilungserklärung mit Grundrissen aller Geschosse und Kennzeichnung der Sondereigentumseinheiten."
+   ]
+  }
+ },
+ {
+  "id": "R-02-ANSICHT-001",
+  "name": "Ansichten und Schnitte",
+  "version": 1,
+  "priority": 170,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)\\bansicht(en)?\\b.{0,40}\\bschnitt(e|en)?\\b",
+    "(?i)\\bschnitt(e|en)?\\b.{0,40}\\bansicht(en)?\\b",
+    "(?i)\\b(nord|s(ue|ü)d|ost|west|stra(ss|ß)en|garten|hof|r(ue|ü)ck)-?ansicht(en)?\\b",
+    "(?i)\\b(l(ae|ä)ngs|quer|geb(ae|ä)ude)-?schnitt(e|en)?\\b",
+    "(?i)\\bschnitt [a-z]-[a-z]\\b"
+   ],
+   "not_text_regex": [
+    "(?i)\\brechnung\\b",
+    "(?i)abrechnung",
+    "(?i)mietvertrag",
+    "(?i)kaufvertrag",
+    "(?i)teilungserkl(ae|ä)rung",
+    "(?i)aufteilungsplan",
+    "(?i)\\bangebot\\b",
+    "(?i)protokoll der eigent",
+    "(?i)foto"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.8,
+   "hard": false,
+   "subfolder": "03",
+   "document_type": "ansichten_schnitte",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Ansichten und Schnitte, Maßstab 1:100, Bauvorhaben Mehrfamilienhaus Musterstraße 5, Blatt 4, Architekturbüro Schmidt.",
+    "Schnitt A-A und Südansicht, Maßstab 1:100, Gartenstraße 12, Hilden, Stand 2019, Architekturbüro Schmidt."
+   ],
+   "negative": [
+    "Nach Ansicht des Verwaltungsbeirats ist die Sanierung der Fassade im Schnitt günstiger als ursprünglich geplant.",
+    "Rechnung Nr. 5 des Architekturbüros Schmidt für die Erstellung der Ansichten und Schnitte."
+   ]
+  }
+ },
+ {
+  "id": "R-02-WOFL-001",
+  "name": "Wohnflächenberechnung",
+  "version": 1,
+  "priority": 180,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)(wohn|nutz|grund|brutto-?grund)?fl(ae|ä)chen-?berechnung",
+    "(?i)berechnung der (wohn|nutz)-?fl(ae|ä)che(n)?",
+    "(?i)wohnfl(ae|ä)chenverordnung",
+    "(?i)\\bwoflv\\b",
+    "(?i)\\bdin 277\\b"
+   ],
+   "not_text_regex": [
+    "(?i)\\brechnung\\b",
+    "(?i)abrechnung",
+    "(?i)mietvertrag",
+    "(?i)kaufvertrag",
+    "(?i)teilungserkl(ae|ä)rung",
+    "(?i)mieterh(oe|ö)hung"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.9,
+   "hard": false,
+   "subfolder": "03",
+   "document_type": "wohnflaechenberechnung",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Wohnflächenberechnung nach der Wohnflächenverordnung (WoFlV) für die Wohnung Nr. 3, 1. OG links: Wohnfläche 71,20 m².",
+    "Berechnung der Wohnflächen aller Einheiten, Mehrfamilienhaus Musterstraße 5, Stand 2019, Architekturbüro Schmidt."
+   ],
+   "negative": [
+    "Mietvertrag: Die Wohnfläche beträgt ca. 71 m², eine Wohnflächenberechnung ist als Anlage beigefügt.",
+    "Betriebskostenabrechnung 2025: Umlage nach Wohnfläche 71,20 m² von 1.250,00 m²."
+   ]
+  }
+ },
+ {
+  "id": "R-02-BESTANDSPLAN-001",
+  "name": "Bestands- und Ausführungspläne",
+  "version": 1,
+  "priority": 175,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)bestands-?(pl(a|ae|ä)n(e|es)?|zeichnung(en)?|unterlagen)\\b",
+    "(?i)revisions-?(pl(a|ae|ä)n(e|es)?|zeichnung(en)?|unterlagen)\\b",
+    "(?i)ausf(ue|ü)hrungs-?(pl(a|ae|ä)n(e|es)?|zeichnung(en)?|unterlagen)\\b",
+    "(?i)werkpl(a|ae|ä)n(e|es|ung)?\\b",
+    "(?i)detailpl(a|ae|ä)n(e|es)?\\b",
+    "(?i)as-?built"
+   ],
+   "not_text_regex": [
+    "(?i)\\brechnung\\b",
+    "(?i)abrechnung",
+    "(?i)mietvertrag",
+    "(?i)kaufvertrag",
+    "(?i)\\bangebot\\b",
+    "(?i)teilungserkl(ae|ä)rung"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.85,
+   "hard": false,
+   "subfolder": "03",
+   "document_type": "bestandsplan",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Bestandspläne Elektroinstallation, Stand nach Sanierung 2022, Mehrfamilienhaus Musterstraße 5, Blatt E-01 bis E-04.",
+    "Revisionsunterlagen Heizungsanlage: Strangschema und Ausführungspläne der Firma Wärme GmbH, Gartenstraße 12."
+   ],
+   "negative": [
+    "Rechnung Nr. 2022-311 der Firma Wärme GmbH für die Erstellung der Revisionsunterlagen.",
+    "Angebot für die Erstellung der Bestandspläne Elektro, Ingenieurbüro Strom GmbH."
+   ]
+  }
+ },
+ {
+  "id": "R-02-STATIK-001",
+  "name": "Statische Unterlagen",
+  "version": 1,
+  "priority": 180,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)statische[nrs]? (berechnung|unterlagen|nachweis|pr(ue|ü)fung)",
+    "(?i)standsicherheits-?nachweis",
+    "(?i)\\bstatik\\b",
+    "(?i)tragwerks-?planung",
+    "(?i)pr(ue|ü)f-?statik",
+    "(?i)pr(ue|ü)fingenieur",
+    "(?i)pr(ue|ü)fbericht.{0,40}standsicherheit"
+   ],
+   "not_text_regex": [
+    "(?i)\\brechnung\\b",
+    "(?i)abrechnung",
+    "(?i)mietvertrag",
+    "(?i)kaufvertrag",
+    "(?i)\\bangebot\\b"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.9,
+   "hard": false,
+   "subfolder": "03",
+   "document_type": "statik",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Statische Berechnung für den Neubau eines Mehrfamilienhauses, Musterstraße 5, Hilden, Ingenieurbüro Tragwerk GmbH, Positionen 1 bis 48.",
+    "Prüfbericht des Prüfingenieurs für Baustatik zum Standsicherheitsnachweis, Bauvorhaben Gartenstraße 12, Hilden."
+   ],
+   "negative": [
+    "Rechnung des Ingenieurbüros Tragwerk GmbH für die statische Berechnung der Balkonsanierung.",
+    "Angebot des Statikers für die Prüfung der Balkonplatten, Gartenstraße 12."
+   ]
+  }
+ },
+ {
+  "id": "R-02-ENERGIEBERAT-001",
+  "name": "Energieberatungsbericht",
+  "version": 1,
+  "priority": 180,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)energieberatung(sbericht)?",
+    "(?i)energetische[nr]? (bewertung|bestandsaufnahme|analyse|gutachten)",
+    "(?i)energiegutachten",
+    "(?i)energieaudit",
+    "(?i)energieberater(in)?\\b",
+    "(?i)energieeffizienz-?experte"
+   ],
+   "not_text_regex": [
+    "(?i)\\brechnung\\b",
+    "(?i)abrechnung",
+    "(?i)mietvertrag",
+    "(?i)kaufvertrag",
+    "(?i)\\bangebot\\b",
+    "(?i)sanierungsfahrplan",
+    "(?i)protokoll der eigent"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.9,
+   "hard": false,
+   "subfolder": "04",
+   "document_type": "energieberatungsbericht",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Energieberatungsbericht für das Wohngebäude Musterstraße 5, Hilden, erstellt durch Energieberater Dipl.-Ing. Klaus Sonne, gefördert durch das BAFA.",
+    "Energetische Bestandsaufnahme und Bewertung der Gebäudehülle, Wohnanlage Gartenstraße 12, Bericht vom 03.05.2026."
+   ],
+   "negative": [
+    "Rechnung für die Energieberatung gemäß Angebot vom 12.03.2026, Energieberatungsbüro Sonne.",
+    "Energieausweis für Wohngebäude gemäß §§ 79 ff. GEG, Gültigkeit bis 2036."
+   ]
+  }
+ },
+ {
+  "id": "R-02-ISFP-001",
+  "name": "Sanierungsfahrplan",
+  "version": 1,
+  "priority": 190,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)sanierungsfahrplan",
+    "(?i)\\bisfp\\b"
+   ],
+   "not_text_regex": [
+    "(?i)\\brechnung\\b",
+    "(?i)abrechnung",
+    "(?i)mietvertrag",
+    "(?i)kaufvertrag",
+    "(?i)\\bangebot\\b",
+    "(?i)wirtschaftsplan",
+    "(?i)protokoll der eigent"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.95,
+   "hard": true,
+   "subfolder": "04",
+   "document_type": "sanierungsfahrplan",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Individueller Sanierungsfahrplan (iSFP) für das Gebäude Musterstraße 5, Hilden. Mein Sanierungsfahrplan: Schritt 1 Dämmung der obersten Geschossdecke.",
+    "Sanierungsfahrplan für die Wohnanlage Gartenstraße 12, erstellt am 15.04.2026 durch das Energieberatungsbüro Sonne."
+   ],
+   "negative": [
+    "Rechnung Nr. 2026-45 für die Erstellung des individuellen Sanierungsfahrplans, Musterstraße 5.",
+    "Angebot über die Erstellung eines iSFP nach BAFA-Richtlinie für das Objekt Gartenstraße 12."
+   ]
+  }
+ },
+ {
+  "id": "R-02-ENERGMASSN-001",
+  "name": "Energetische Maßnahme",
+  "version": 1,
+  "priority": 165,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)energetische[nr]? (sanierung|ma(ss|ß)nahme|modernisierung)",
+    "(?i)(fassaden|kellerdecken|dach|geschossdecken)-?d(ae|ä)mmung",
+    "(?i)w(ae|ä)rmed(ae|ä)mmverbundsystem",
+    "(?i)\\bwdvs\\b",
+    "(?i)hydraulische[rn]? abgleich",
+    "(?i)heizungs-?(tausch|erneuerung|modernisierung)",
+    "(?i)fachunternehmererkl(ae|ä)rung",
+    "(?i)best(ae|ä)tigung nach durchf(ue|ü)hrung",
+    "(?i)\\bbnd\\b",
+    "(?i)(bafa|kfw).{0,60}(zuschuss|f(oe|ö)rder|zusage|bescheid)"
+   ],
+   "not_text_regex": [
+    "(?i)\\brechnung\\b",
+    "(?i)abrechnung",
+    "(?i)mietvertrag",
+    "(?i)kaufvertrag",
+    "(?i)\\bangebot\\b",
+    "(?i)wirtschaftsplan",
+    "(?i)sonderumlage",
+    "(?i)protokoll der eigent",
+    "(?i)modernisierungsank(ue|ü)ndigung",
+    "(?i)mieterh(oe|ö)hung",
+    "(?i)baubeschreibung"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.8,
+   "hard": false,
+   "subfolder": "04",
+   "document_type": "energetische_massnahme",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Fachunternehmererklärung zur energetischen Sanierung: Dämmung der Fassade mit einem Wärmedämmverbundsystem (WDVS), Musterstraße 5, ausgeführt im Juli 2025.",
+    "Bestätigung nach Durchführung (BnD) für die Heizungserneuerung im Gebäude Gartenstraße 12, BAFA Vorgangsnummer BEG-EM 12345."
+   ],
+   "negative": [
+    "Rechnung Nr. 2025-882 der Firma Dämm GmbH für die Fassadendämmung, Musterstraße 5.",
+    "Modernisierungsankündigung: Die energetische Sanierung der Fassade beginnt am 01.09.2026."
+   ]
+  }
+ },
+ {
+  "id": "R-02-NACHTRAG-001",
+  "name": "Nachtrag zur Teilungserklärung oder Gemeinschaftsordnung",
+  "version": 1,
+  "priority": 200,
+  "scope": {
+   "management_types": [
+    "weg",
+    "weg_with_se"
+   ]
+  },
+  "when": {
+   "text_regex": [
+    "(?i)\\b(nachtrag|nachtr(ae|ä)ge|(ae|ä)nderung|erg(ae|ä)nzung|neufassung)\\b.{0,60}\\b(teilungserkl(ae|ä)rung|gemeinschaftsordnung)"
+   ],
+   "not_text_regex": [
+    "(?i)kaufvertrag",
+    "(?i)protokoll der",
+    "(?i)\\brechnung\\b",
+    "(?i)abrechnung",
+    "(?i)mietvertrag"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 1.0,
+   "hard": true,
+   "subfolder": "05",
+   "document_type": "nachtrag_teilungserklaerung",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Nachtrag zur Teilungserklärung vom 12.03.1998, Urkundenrolle Nr. 456/2019 des Notars Dr. Weber in Düsseldorf.",
+    "Erster Nachtrag zur Gemeinschaftsordnung der Wohnungseigentümergemeinschaft Hauptstraße 12. Die Kostenverteilung in § 7 wird wie folgt neu gefasst.",
+    "Änderung der Teilungserklärung: Das Sondernutzungsrecht an der Gartenfläche G3 wird der Einheit Nr. 4 zugeordnet."
+   ],
+   "negative": [
+    "Kaufvertrag über die Eigentumswohnung Nr. 4; die Teilungserklärung nebst Nachtrag vom 03.05.2019 ist dem Käufer bekannt.",
+    "Protokoll der Eigentümerversammlung vom 20.05.2026, TOP 5: Änderung der Gemeinschaftsordnung wird vertagt."
+   ]
+  }
+ },
+ {
+  "id": "R-02-AUFTPLAN-001",
+  "name": "Aufteilungsplan",
+  "version": 1,
+  "priority": 185,
+  "scope": {
+   "management_types": [
+    "weg",
+    "weg_with_se"
+   ]
+  },
+  "when": {
+   "any_of": {
+    "text_regex": [
+     "(?i)\\baufteilungspl(a|ae|ä)n",
+     "(?i)\\baufteilungszeichnung"
+    ],
+    "filename_regex": [
+     "(?i)aufteilungsplan"
+    ]
+   },
+   "not_text_regex": [
+    "(?i)teilungserkl(ae|ä)rung",
+    "(?i)gemeinschaftsordnung",
+    "(?i)kaufvertrag",
+    "(?i)protokoll der",
+    "(?i)\\brechnung\\b",
+    "(?i)abrechnung",
+    "(?i)mietvertrag",
+    "(?i)grundbuch"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.9,
+   "hard": false,
+   "subfolder": "05",
+   "document_type": "aufteilungsplan",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Aufteilungsplan gemäß § 7 Abs. 4 WEG, Wohnhaus Hauptstraße 12, Erdgeschoss, Maßstab 1:100. Einheit Nr. 1 bis Nr. 6 farbig gekennzeichnet.",
+    "Aufteilungspläne zur Abgeschlossenheit, Blatt 2 von 5, Obergeschoss mit Einheitsnummern 7 bis 12.",
+    "Änderung des Aufteilungsplans: Zusammenlegung der Einheiten Nr. 9 und Nr. 10 im 2. Obergeschoss."
+   ],
+   "negative": [
+    "Teilungserklärung mit Gemeinschaftsordnung. Die Aufteilung ergibt sich aus dem als Anlage beigefügten Aufteilungsplan.",
+    "Rechnung Nr. 2026-118 des Architekturbüros für die Erstellung der Aufteilungspläne, Betrag 1.450,00 EUR."
+   ]
+  }
+ },
+ {
+  "id": "R-02-ABGESCHL-001",
+  "name": "Abgeschlossenheitsbescheinigung",
+  "version": 1,
+  "priority": 195,
+  "scope": {
+   "management_types": [
+    "weg",
+    "weg_with_se"
+   ]
+  },
+  "when": {
+   "text_regex": [
+    "(?i)abgeschlossenheits-?bescheinigung"
+   ],
+   "not_text_regex": [
+    "(?i)kaufvertrag",
+    "(?i)\\brechnung\\b",
+    "(?i)abrechnung",
+    "(?i)mietvertrag",
+    "(?i)protokoll der",
+    "(?i)geb(ue|ü)hrenbescheid"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.97,
+   "hard": true,
+   "subfolder": "05",
+   "document_type": "abgeschlossenheitsbescheinigung",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Abgeschlossenheitsbescheinigung gemäß § 7 Abs. 4 Nr. 2 WEG. Die Bauaufsichtsbehörde der Stadt Düsseldorf bescheinigt, dass die im Aufteilungsplan bezeichneten Wohnungen in sich abgeschlossen sind.",
+    "Bescheinigung der Abgeschlossenheit: Es wird bescheinigt, dass die Wohnungen Nr. 1 bis 12 abgeschlossen sind. Abgeschlossenheitsbescheinigung Az. 63/2-1234."
+   ],
+   "negative": [
+    "Kaufvertrag: Dem Käufer ist die Abgeschlossenheitsbescheinigung vom 04.02.1998 bekannt.",
+    "Gebührenbescheid der Stadt Düsseldorf für die Erteilung der Abgeschlossenheitsbescheinigung, Betrag 210,00 EUR."
+   ]
+  }
+ },
+ {
+  "id": "R-02-SNR-001",
+  "name": "Zuordnung der Sondernutzungsrechte",
+  "version": 1,
+  "priority": 180,
+  "scope": {
+   "management_types": [
+    "weg",
+    "weg_with_se"
+   ]
+  },
+  "when": {
+   "text_regex": [
+    "(?i)sondernutzungsrecht",
+    "(?i)sondernutzungs(plan|fl(ae|ä)che|regelung)"
+   ],
+   "not_text_regex": [
+    "(?i)teilungserkl(ae|ä)rung",
+    "(?i)gemeinschaftsordnung",
+    "(?i)kaufvertrag",
+    "(?i)grundbuch",
+    "(?i)protokoll der",
+    "(?i)\\brechnung\\b",
+    "(?i)abrechnung",
+    "(?i)mietvertrag"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.85,
+   "hard": false,
+   "subfolder": "05",
+   "document_type": "sondernutzungsrecht",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Übersicht der Sondernutzungsrechte, WEG Hauptstraße 12: Gartenfläche G1 ist der Einheit Nr. 1 zugeordnet, Stellplatz P4 der Einheit Nr. 7.",
+    "Sondernutzungsplan Außenanlagen, Maßstab 1:200, mit Kennzeichnung der Sondernutzungsflächen G1 bis G4.",
+    "Zuordnung der Sondernutzungsrechte an den Kellerräumen und Tiefgaragenstellplätzen, Stand 01.07.2026."
+   ],
+   "negative": [
+    "Teilungserklärung: Dem jeweiligen Eigentümer der Einheit Nr. 1 wird das Sondernutzungsrecht an der Gartenfläche G1 eingeräumt.",
+    "Kaufvertrag über die Wohnung Nr. 7 nebst Sondernutzungsrecht am Stellplatz P4."
+   ]
+  }
+ },
+ {
+  "id": "R-02-KOSTENSCHL-001",
+  "name": "Übersicht der Kostenverteilungsschlüssel",
+  "version": 1,
+  "priority": 170,
+  "scope": {
+   "management_types": [
+    "weg",
+    "weg_with_se"
+   ]
+  },
+  "when": {
+   "text_regex": [
+    "(?i)(ue|ü)bersicht.{0,40}kostenverteil(er|ungs)?schl(ue|ü)ssel",
+    "(?i)kostenverteilungsschl(ue|ü)ssel",
+    "(?i)kostentragungs?regel",
+    "(?i)erhaltungs(pflicht|last).{0,60}(regelung|sondereigentum|gemeinschaftseigentum)",
+    "(?i)umlageschl(ue|ü)ssel.{0,40}(ue|ü)bersicht"
+   ],
+   "not_text_regex": [
+    "(?i)abrechnung",
+    "(?i)wirtschaftsplan",
+    "(?i)\\brechnung\\b",
+    "(?i)protokoll der",
+    "(?i)teilungserkl(ae|ä)rung",
+    "(?i)gemeinschaftsordnung",
+    "(?i)kaufvertrag",
+    "(?i)mietvertrag"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.8,
+   "hard": false,
+   "subfolder": "05",
+   "document_type": "kostenverteilungsschluessel",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Übersicht der Kostenverteilungsschlüssel, WEG Hauptstraße 12: Heizkosten 70/30 nach Verbrauch, Aufzug nach Miteigentumsanteilen ohne Erdgeschoss, Müll nach Einheiten.",
+    "Besondere Kostentragungsregelungen und Erhaltungspflichten: Fenster und Balkone trägt der jeweilige Sondereigentümer, Dach und Fassade die Gemeinschaft."
+   ],
+   "negative": [
+    "Gesamtwirtschaftsplan 2026 mit Verteilerschlüssel für alle Einheiten.",
+    "Einzelabrechnung 2025 für WE03, Kostenverteilungsschlüssel: Miteigentumsanteile 112/1000."
+   ]
+  }
+ },
+ {
+  "id": "R-02-EINLADUNG-001",
+  "name": "Einladung zur Eigentümerversammlung mit Tagesordnung",
+  "version": 1,
+  "priority": 188,
+  "scope": {
+   "management_types": [
+    "weg",
+    "weg_with_se"
+   ]
+  },
+  "when": {
+   "text_regex": [
+    "(?i)eigent(ue|ü)merversammlung"
+   ],
+   "any_of": {
+    "text_regex": [
+     "(?i)\\beinladung\\b",
+     "(?i)\\btagesordnung\\b",
+     "(?i)laden wir sie.{0,60}\\bein\\b",
+     "(?i)\\beingeladen\\b"
+    ]
+   },
+   "not_text_regex": [
+    "(?i)protokoll der",
+    "(?i)niederschrift",
+    "(?i)versammlungsprotokoll",
+    "(?i)\\brechnung\\b",
+    "(?i)abrechnung\\s+20\\d{2}\\s+der",
+    "(?i)versandnachweis",
+    "(?i)einlieferungs-?(beleg|liste)",
+    "(?i)postausgangsbuch",
+    "(?i)zustellnachweis"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.9,
+   "hard": false,
+   "subfolder": "06",
+   "document_type": "einladung_eigentuemerversammlung",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Einladung zur ordentlichen Eigentümerversammlung der WEG Hauptstraße 12 am 20.05.2026 um 18:00 Uhr im Gemeindesaal.",
+    "Sehr geehrte Eigentümerinnen und Eigentümer, hiermit laden wir Sie zur Eigentümerversammlung 2026 ein. Tagesordnung: TOP 1 Begrüßung, TOP 2 Jahresabrechnung 2025.",
+    "Tagesordnung der außerordentlichen Eigentümerversammlung am 03.11.2026, TOP 1 Sanierung der Tiefgarage."
+   ],
+   "negative": [
+    "Protokoll der Eigentümerversammlung vom 20.05.2026, Tagesordnung wie in der Einladung.",
+    "Niederschrift über die Eigentümerversammlung am 20.05.2026, Anwesenheit laut Anwesenheitsliste."
+   ]
+  }
+ },
+ {
+  "id": "R-02-VERSAND-001",
+  "name": "Versandnachweis zur Einladung",
+  "version": 1,
+  "priority": 175,
+  "scope": {
+   "management_types": [
+    "weg",
+    "weg_with_se"
+   ]
+  },
+  "when": {
+   "text_regex": [
+    "(?i)(einladung|versammlung|protokoll|beschl(u|ue|ü)ss)"
+   ],
+   "any_of": {
+    "text_regex": [
+     "(?i)versandnachweis",
+     "(?i)einlieferungs-?(beleg|liste|nachweis)",
+     "(?i)postausgangs-?(buch|liste)",
+     "(?i)zustellnachweis",
+     "(?i)versand(protokoll|liste|best(ae|ä)tigung)",
+     "(?i)sendungsverfolgung"
+    ]
+   },
+   "not_text_regex": [
+    "(?i)\\brechnung\\b",
+    "(?i)abrechnung",
+    "(?i)mahnung",
+    "(?i)protokoll der eigent"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.85,
+   "hard": false,
+   "subfolder": "06",
+   "document_type": "versandnachweis",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Versandnachweis: Die Einladung zur Eigentümerversammlung am 20.05.2026 wurde am 28.04.2026 an alle Eigentümer per Post versandt.",
+    "Einlieferungsliste der Deutschen Post vom 28.04.2026, Versand der Einladungen zur Versammlung, 24 Sendungen.",
+    "Postausgangsbuch Protokollversand WEG Hauptstraße 12, Versanddatum 02.06.2026."
+   ],
+   "negative": [
+    "Rechnung der Deutschen Post für Einlieferung vom 28.04.2026, Betrag 21,60 EUR.",
+    "Protokoll der Eigentümerversammlung vom 20.05.2026, die Einladung wurde fristgerecht versandt."
+   ]
+  }
+ },
+ {
+  "id": "R-02-ANWESEND-001",
+  "name": "Anwesenheitsliste der Eigentümerversammlung",
+  "version": 1,
+  "priority": 185,
+  "scope": {
+   "management_types": [
+    "weg",
+    "weg_with_se"
+   ]
+  },
+  "when": {
+   "text_regex": [
+    "(?i)anwesenheitsliste",
+    "(?i)anwesenheits(verzeichnis|kontrolle)",
+    "(?i)teilnehmerliste.{0,60}versammlung",
+    "(?i)pr(ae|ä)senzliste"
+   ],
+   "not_text_regex": [
+    "(?i)protokoll der",
+    "(?i)niederschrift",
+    "(?i)versammlungsprotokoll",
+    "(?i)\\brechnung\\b",
+    "(?i)abrechnung"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.9,
+   "hard": false,
+   "subfolder": "06",
+   "document_type": "anwesenheitsliste",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Anwesenheitsliste zur Eigentümerversammlung der WEG Hauptstraße 12 am 20.05.2026, Einheit, Name, Miteigentumsanteile, Unterschrift.",
+    "Teilnehmerliste der außerordentlichen Versammlung vom 03.11.2026, anwesend oder vertreten 612/1000 MEA."
+   ],
+   "negative": [
+    "Protokoll der Eigentümerversammlung vom 20.05.2026, Anwesenheit laut beigefügter Anwesenheitsliste.",
+    "Niederschrift über die Eigentümerversammlung, Anwesenheitsliste als Anlage 1."
+   ]
+  }
+ },
+ {
+  "id": "R-02-UMLAUF-001",
+  "name": "Umlaufbeschluss mit Beschlusstext und Abstimmungserklärungen",
+  "version": 1,
+  "priority": 185,
+  "scope": {
+   "management_types": [
+    "weg",
+    "weg_with_se"
+   ]
+  },
+  "when": {
+   "text_regex": [
+    "(?i)umlaufbeschl(u|ue|ü)ss",
+    "(?i)beschluss(fassung)?\\s+im\\s+(schriftlichen\\s+)?umlaufverfahren",
+    "(?i)umlaufverfahren",
+    "(?i)abstimmungserkl(ae|ä)rung",
+    "(?i)schriftliche[ns]?\\s+(abstimmung|beschlussfassung)"
+   ],
+   "not_text_regex": [
+    "(?i)auswertung",
+    "(?i)abstimmungsergebnis",
+    "(?i)verk(ue|ü)nd",
+    "(?i)protokoll der",
+    "(?i)\\brechnung\\b",
+    "(?i)abrechnung"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.9,
+   "hard": false,
+   "subfolder": "06",
+   "document_type": "umlaufbeschluss",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Umlaufbeschluss Nr. 1/2026 der WEG Hauptstraße 12. Beschlusstext: Die Gemeinschaft beauftragt die Firma Dachbau Klein mit der Reparatur des Flachdachs zum Angebotspreis von 8.450,00 EUR.",
+    "Abstimmungserklärung zum Umlaufverfahren 1/2026: Ich stimme dem vorstehenden Beschlussantrag zu. Einheit Nr. 4, Datum, Unterschrift.",
+    "Beschlussfassung im schriftlichen Umlaufverfahren gemäß § 23 Abs. 3 WEG, Beschlussantrag zur Erneuerung der Schließanlage."
+   ],
+   "negative": [
+    "Auswertung der Umlaufabstimmung 1/2026: 18 Ja-Stimmen, 0 Nein-Stimmen, Abstimmungsergebnis einstimmig, Beschluss zustande gekommen.",
+    "Protokoll der Eigentümerversammlung vom 20.05.2026, TOP 6 Bericht über den Umlaufbeschluss 1/2026."
+   ]
+  }
+ },
+ {
+  "id": "R-02-UMLAUFAUSW-001",
+  "name": "Auswertung der Umlaufabstimmung und Beschlussverkündung",
+  "version": 1,
+  "priority": 188,
+  "scope": {
+   "management_types": [
+    "weg",
+    "weg_with_se"
+   ]
+  },
+  "when": {
+   "text_regex": [
+    "(?i)auswertung.{0,60}(umlauf|schriftlich|abstimmung)",
+    "(?i)ergebnis (der|des) (umlauf|schriftlichen abstimmung)",
+    "(?i)beschlussverk(ue|ü)ndung",
+    "(?i)verk(ue|ü)ndung des (umlauf)?beschl(u|ue|ü)ss",
+    "(?i)bekanntgabe des (beschluss|abstimmungs)ergebnis",
+    "(?i)umlaufbeschl(u|ue|ü)ss.{0,80}(zustande gekommen|ist gefasst|wurde gefasst)"
+   ],
+   "not_text_regex": [
+    "(?i)protokoll der",
+    "(?i)niederschrift",
+    "(?i)\\brechnung\\b",
+    "(?i)abrechnung"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.9,
+   "hard": false,
+   "subfolder": "06",
+   "document_type": "umlaufbeschluss_auswertung",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Auswertung der Umlaufabstimmung 1/2026, WEG Hauptstraße 12: 18 Ja-Stimmen, 0 Nein-Stimmen, 2 Enthaltungen. Der Beschluss ist zustande gekommen.",
+    "Beschlussverkündung: Der im Umlaufverfahren gefasste Beschluss über die Dachreparatur wurde den Eigentümern am 15.03.2026 schriftlich bekannt gegeben.",
+    "Bekanntgabe des Abstimmungsergebnisses zum Umlaufverfahren 2/2026 an alle Wohnungseigentümer."
+   ],
+   "negative": [
+    "Umlaufbeschluss Nr. 1/2026, Beschlusstext: Die Gemeinschaft beauftragt die Firma Dachbau Klein mit der Reparatur des Flachdachs.",
+    "Protokoll der Eigentümerversammlung vom 20.05.2026, der Versammlungsleiter verkündete das Abstimmungsergebnis zu TOP 4."
+   ]
+  }
+ },
+ {
+  "id": "R-02-BAULVER-001",
+  "name": "Beschluss oder Gestattung baulicher Veränderungen",
+  "version": 1,
+  "priority": 178,
+  "scope": {
+   "management_types": [
+    "weg",
+    "weg_with_se"
+   ]
+  },
+  "when": {
+   "text_regex": [
+    "(?i)(beschl(u|ue|ü)ss|vereinbarung|gestatt|genehmig|zustimm)"
+   ],
+   "any_of": {
+    "text_regex": [
+     "(?i)bauliche[nr]?\\s+ver(ae|ä)nderung",
+     "(?i)\\bgestattung\\b",
+     "(?i)wallbox",
+     "(?i)lades(ae|ä)ule",
+     "(?i)ladestation",
+     "(?i)klimager(ae|ä)t",
+     "(?i)klimaanlage",
+     "(?i)\\bmarkise",
+     "(?i)eingriff.{0,40}gemeinschafts(eigentum|fl(ae|ä)che)"
+    ]
+   },
+   "not_text_regex": [
+    "(?i)protokoll der",
+    "(?i)niederschrift",
+    "(?i)\\brechnung\\b",
+    "(?i)abrechnung",
+    "(?i)\\bangebot\\b",
+    "(?i)mietvertrag",
+    "(?i)kaufvertrag",
+    "(?i)baugenehmigung",
+    "(?i)gestattungsvertrag",
+    "(?i)leitungsrecht",
+    "(?i)grunddienstbarkeit"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.85,
+   "hard": false,
+   "subfolder": "06",
+   "document_type": "gestattung_bauliche_veraenderung",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Gestattung einer baulichen Veränderung: Der Eigentümer der Einheit Nr. 4 erhält die Zustimmung zur Installation einer Wallbox am Tiefgaragenstellplatz TG 3 auf eigene Kosten.",
+    "Vereinbarung über die bauliche Veränderung am Gemeinschaftseigentum: Anbringung eines Klimagerätes an der Rückfassade, Einheit Nr. 9, mit technischen Unterlagen des Herstellers.",
+    "Beschluss zur baulichen Veränderung: Die Gemeinschaft genehmigt den Antrag auf Errichtung einer Markise am Balkon der Einheit Nr. 2."
+   ],
+   "negative": [
+    "Rechnung Nr. 4711 der Elektro Schulz GmbH für Lieferung und Montage einer Wallbox, Betrag 2.380,00 EUR.",
+    "Protokoll der Eigentümerversammlung vom 20.05.2026, TOP 7 bauliche Veränderung WE03, Beschluss mehrheitlich angenommen."
+   ]
+  }
+ },
+ {
+  "id": "R-02-HAUSORD-001",
+  "name": "Hausordnung",
+  "version": 1,
+  "priority": 185,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)hausordnung\\s+(der|f(ue|ü)r)\\s+(die\\s+|das\\s+)?(weg|wohnungseigent(ue|ü)mergemeinschaft|wohnanlage|liegenschaft|haus|objekt|geb(ae|ä)ude)",
+    "(?i)diese hausordnung",
+    "(?i)hausordnung.{0,40}(stand|fassung|beschlossen|g(ue|ü)ltig ab|in kraft)",
+    "(?im)^\\s*hausordnung\\s*$"
+   ],
+   "not_text_regex": [
+    "(?i)mietvertrag",
+    "(?i)teilungserkl(ae|ä)rung",
+    "(?i)gemeinschaftsordnung",
+    "(?i)kaufvertrag",
+    "(?i)protokoll der",
+    "(?i)\\brechnung\\b",
+    "(?i)abrechnung",
+    "(?i)(ue|ü)berholt",
+    "(?i)ersetzt durch",
+    "(?i)au(ss|ß)er kraft"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.9,
+   "hard": false,
+   "subfolder": "07",
+   "document_type": "hausordnung",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Hausordnung der Wohnungseigentümergemeinschaft Hauptstraße 12, Stand 01.06.2024. 1. Ruhezeiten: Von 22:00 bis 7:00 Uhr sowie von 13:00 bis 15:00 Uhr ist Zimmerlautstärke einzuhalten.",
+    "Hausordnung für das Objekt Gartenweg 5, beschlossen in der Eigentümerversammlung am 20.05.2026. Diese Hausordnung gilt für alle Bewohner.",
+    "Diese Hausordnung regelt das Zusammenleben im Haus. Treppenhaus und Kellergänge sind freizuhalten."
+   ],
+   "negative": [
+    "Mietvertrag über die Wohnung im 2. OG links. § 12: Die beigefügte Hausordnung ist Bestandteil des Mietvertrags.",
+    "Protokoll der Eigentümerversammlung vom 20.05.2026, TOP 8 Änderung der Hausordnung, Stand der Beratung."
+   ]
+  }
+ },
+ {
+  "id": "R-02-NUTZORD-001",
+  "name": "Nutzungsregelung für Gemeinschaftsflächen",
+  "version": 1,
+  "priority": 180,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)\\b(nutzungs|benutzungs|wasch(k(ue|ü)chen)?|garagen|tiefgaragen|stellplatz|m(ue|ü)ll(platz)?|fahrrad(keller|raum)?|gemeinschaftsr(au|ae|ä)um(e|s)?|spielplatz|gr(ue|ü)nfl(ae|ä)chen)-?(ordnung|regel(ung|n)|plan\\b)",
+    "(?i)regel(ung|n)\\s+(f(ue|ü)r|zur\\s+nutzung)\\s+(der|des|von)\\s+(gemeinschaftsr(ae|ä)um|waschk(ue|ü)che|m(ue|ü)llpl(ae|ä)tz|fahrrad|garage|stellpl(ae|ä)tz|tiefgarage)",
+    "(?i)waschplan",
+    "(?i)belegungsplan.{0,40}wasch"
+   ],
+   "not_text_regex": [
+    "(?i)mietvertrag",
+    "(?i)protokoll der",
+    "(?i)\\brechnung\\b",
+    "(?i)abrechnung",
+    "(?i)kaufvertrag",
+    "(?i)teilungserkl(ae|ä)rung"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.85,
+   "hard": false,
+   "subfolder": "07",
+   "document_type": "nutzungsregelung",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Waschküchenordnung für das Haus Hauptstraße 12: Die Waschküche steht montags bis samstags von 8:00 bis 20:00 Uhr zur Verfügung, Belegung nach Waschplan.",
+    "Garagenordnung und Regelung für die Stellplätze in der Tiefgarage: Das Abstellen von Gegenständen außerhalb des eigenen Stellplatzes ist untersagt.",
+    "Nutzungsregelung für den Gemeinschaftsraum im Erdgeschoss, Reservierung über die Verwaltung, Reinigung durch den Nutzer."
+   ],
+   "negative": [
+    "Mietvertrag über den Tiefgaragenstellplatz Nr. 14, monatliche Miete 60,00 EUR, die Garagenordnung ist Bestandteil des Vertrags.",
+    "Rechnung Nr. 2026-77 für die Reinigung der Waschküche und des Fahrradkellers, Betrag 180,00 EUR."
+   ]
+  }
+ },
+ {
+  "id": "R-02-HAFTPFL-001",
+  "name": "Haus- und Grundbesitzerhaftpflichtversicherung",
+  "version": 1,
+  "priority": 185,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)haus-?\\s?und\\s?grund(st(ue|ü)cks)?(besitzer)?-?haftpflicht",
+    "(?i)grund(st(ue|ü)cks)?besitzerhaftpflicht",
+    "(?i)haftpflichtversicherung",
+    "(?i)gew(ae|ä)sserschaden-?haftpflicht",
+    "(?i)(oe|ö)ltank-?haftpflicht"
+   ],
+   "not_text_regex": [
+    "(?i)\\brechnung\\b",
+    "(?i)beitragsrechnung",
+    "(?i)pr(ae|ä)mienrechnung",
+    "(?i)abrechnung",
+    "(?i)schaden(s)?(meldung|anzeige)",
+    "(?i)mietvertrag",
+    "(?i)kaufvertrag",
+    "(?i)zahlungsaufforderung"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.9,
+   "hard": false,
+   "subfolder": "08",
+   "document_type": "haftpflichtversicherung",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Versicherungsschein Haus- und Grundbesitzerhaftpflichtversicherung, Versicherungsnehmer WEG Hauptstraße 12, Vertragsnummer HV 4711 0815, Deckungssumme 5.000.000 EUR pauschal.",
+    "Haftpflichtversicherung für Haus- und Grundbesitz, Nachtrag zum Versicherungsschein: Einschluss der Gewässerschadenhaftpflicht für den Öltank ab 01.01.2026.",
+    "Gewässerschadenhaftpflicht Öltank 10.000 Liter, Versicherungsschein Nr. 88-123456, Selbstbeteiligung 250,00 EUR je Schadenfall."
+   ],
+   "negative": [
+    "Beitragsrechnung Haus- und Grundbesitzerhaftpflicht 2026, Vertragsnummer HV 4711 0815, fällig am 01.01.2026, Betrag 412,30 EUR.",
+    "Schadenmeldung zur Haftpflichtversicherung: Sturz eines Besuchers auf dem vereisten Gehweg am 12.01.2026."
+   ]
+  }
+ },
+ {
+  "id": "R-02-WEITVERS-001",
+  "name": "Weitere Objektversicherung",
+  "version": 1,
+  "priority": 183,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)versicherung"
+   ],
+   "any_of": {
+    "text_regex": [
+     "(?i)glas(bruch)?versicherung",
+     "(?i)leitungswasserversicherung",
+     "(?i)elementar(schaden)?versicherung",
+     "(?i)(oe|ö)ltank-?(versicherung|police)",
+     "(?i)sturm(schaden)?versicherung",
+     "(?i)aufzugs?versicherung",
+     "(?i)rechtsschutzversicherung",
+     "(?i)photovoltaik-?versicherung",
+     "(?i)bauleistungsversicherung"
+    ]
+   },
+   "not_text_regex": [
+    "(?i)geb(ae|ä)udeversicherung",
+    "(?i)haftpflicht",
+    "(?i)\\brechnung\\b",
+    "(?i)beitragsrechnung",
+    "(?i)abrechnung",
+    "(?i)schaden(s)?(meldung|anzeige)",
+    "(?i)mietvertrag",
+    "(?i)kaufvertrag"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.85,
+   "hard": false,
+   "subfolder": "08",
+   "document_type": "weitere_objektversicherung",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Versicherungsschein Glasversicherung, Versicherungsnehmer WEG Hauptstraße 12, versichert ist die Gebäudeverglasung einschließlich Eingangstüren, Vertragsnummer GL 55 4433.",
+    "Elementarschadenversicherung, Nachtrag Nr. 2: Einschluss von Überschwemmung und Rückstau, Selbstbehalt 5.000,00 EUR je Schadenfall.",
+    "Öltankversicherung, Versicherungsschein Nr. OT 2020-771, versichert sind Sanierungskosten nach Auslaufen von Heizöl aus dem Tank im Keller."
+   ],
+   "negative": [
+    "Beitragsrechnung Glasversicherung 2026, Vertragsnummer GL 55 4433, Betrag 96,20 EUR, fällig am 01.01.2026.",
+    "Versicherungsschein Wohngebäudeversicherung mit Elementarschadenversicherung, Feuer, Leitungswasser, Sturm und Hagel."
+   ]
+  }
+ },
+ {
+  "id": "R-02-VERSBED-001",
+  "name": "Versicherungsbedingungen und Nachträge",
+  "version": 1,
+  "priority": 182,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)versicherungsbedingungen",
+    "(?i)(allgemeine|besondere|zus(ae|ä)tzliche)\\s+(wohngeb(ae|ä)ude|haftpflicht|glas|elementar)?-?(versicherungs)?bedingungen",
+    "(?i)nachtrag\\s+(zum|zur)\\s+(versicherungsschein|police|versicherungsvertrag)",
+    "(?i)nachtrags?-?(police|nummer|nr)",
+    "(?i)klauselbogen",
+    "(?i)besondere vereinbarungen zum versicherungsvertrag"
+   ],
+   "not_text_regex": [
+    "(?i)\\brechnung\\b",
+    "(?i)beitragsrechnung",
+    "(?i)abrechnung",
+    "(?i)schaden(s)?(meldung|anzeige)",
+    "(?i)mietvertrag",
+    "(?i)kaufvertrag"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.8,
+   "hard": false,
+   "subfolder": "08",
+   "document_type": "versicherungsbedingungen",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Allgemeine Wohngebäude-Versicherungsbedingungen (VGB 2022), Stand 01.01.2022. § 1 Versicherte Gefahren und Schäden.",
+    "Nachtrag zum Versicherungsschein Nr. 88-123456: Mit Wirkung ab 01.01.2026 wird die Versicherungssumme auf 3.200.000 EUR angepasst.",
+    "Klauselbogen zur Gebäudeversicherung mit den vereinbarten besonderen Bedingungen für Rohbau und Sanierungsphase."
+   ],
+   "negative": [
+    "Beitragsrechnung zum Nachtrag Nr. 3, Versicherungsschein Nr. 88-123456, Betrag 128,40 EUR.",
+    "Schadenmeldung Leitungswasserschaden im Keller vom 03.02.2026, Versicherungsschein Nr. 88-123456."
+   ]
+  }
+ },
+ {
+  "id": "R-02-VERSUEB-001",
+  "name": "Versicherungsübersicht",
+  "version": 1,
+  "priority": 185,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)versicherungs(ue|ü)bersicht",
+    "(?i)(ue|ü)bersicht\\s+(der|(ue|ü)ber die|zu den)\\s+(bestehenden\\s+|abgeschlossenen\\s+|laufenden\\s+)?versicherung",
+    "(?i)versicherungsspiegel",
+    "(?i)versicherungsportfolio",
+    "(?i)deckungs(ue|ü)bersicht",
+    "(?i)ansprechpartner.{0,60}versicher(er|ung)"
+   ],
+   "not_text_regex": [
+    "(?i)\\brechnung\\b",
+    "(?i)beitragsrechnung",
+    "(?i)abrechnung",
+    "(?i)schaden(s)?(meldung|anzeige)",
+    "(?i)mietvertrag",
+    "(?i)kaufvertrag",
+    "(?i)protokoll der"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.85,
+   "hard": false,
+   "subfolder": "08",
+   "document_type": "versicherungsuebersicht",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Versicherungsübersicht WEG Hauptstraße 12, Stand 01.07.2026: Versicherer, Vertragsnummer, Deckungsumfang, Selbstbehalt und Ansprechpartner je Vertrag.",
+    "Übersicht der bestehenden Versicherungen des Objekts Gartenweg 5: Wohngebäude, Haftpflicht, Glas, mit Vertragsnummern und Jahresbeiträgen.",
+    "Ansprechpartner beim Versicherer für alle Objektversicherungen: Schadenabteilung, Telefon und E-Mail, Vertragsbetreuung."
+   ],
+   "negative": [
+    "Beitragsrechnung Wohngebäudeversicherung 2026 mit Übersicht der versicherten Gefahren, Betrag 2.310,00 EUR.",
+    "Protokoll der Eigentümerversammlung vom 20.05.2026, TOP 9 Übersicht der Versicherungen und Beschluss über den Wechsel des Versicherers."
+   ]
+  }
+ },
+ {
+  "id": "R-02-VERSORG-001",
+  "name": "Versorgungsvertrag Strom, Gas, Wärme, Wasser",
+  "version": 1,
+  "priority": 180,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)\\b(allgemein)?strom(liefer(ungs)?|versorgungs|bezugs)-?vertrag",
+    "(?i)\\b(erd|fl(ue|ü)ssig)?gas(liefer(ungs)?|versorgungs|bezugs)-?vertrag",
+    "(?i)\\b(fern|nah)?w(ae|ä)rme(liefer(ungs)?|versorgungs|bezugs)-?vertrag",
+    "(?i)\\b(trink|frisch)?wasser(liefer(ungs)?|versorgungs|bezugs)-?vertrag",
+    "(?i)\\bversorgungsvertrag",
+    "(?i)\\benergieliefer(ungs)?-?vertrag",
+    "(?i)\\b(w(ae|ä)rme)?contracting-?vertrag",
+    "(?i)\\bsondervertrag.{0,60}(strom|gas|w(ae|ä)rme|wasser)",
+    "(?i)vertrag (ue|ü)ber die (lieferung|versorgung) (von|mit) (strom|elektrischer energie|(erd)?gas|(fern)?w(ae|ä)rme|(trink)?wasser)",
+    "(?i)(allgemeinstrom|hausstrom|betriebsstrom).{0,60}(vertrag|tarif|lieferant)"
+   ],
+   "not_text_regex": [
+    "(?im)^\\s*(schluss|teil|ab)?rechnung\\b",
+    "(?i)\\brechnungs?-?\\s?(nr|nummer|datum)\\b",
+    "(?i)\\b(jahres|verbrauchs|betriebskosten|nebenkosten|heizkosten)abrechnung",
+    "(?i)mietvertrag",
+    "(?i)kaufvertrag",
+    "(?i)grundbuch",
+    "(?i)verwaltervertrag"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.9,
+   "hard": false,
+   "subfolder": "09",
+   "document_type": "versorgungsvertrag",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Stromliefervertrag für den Allgemeinstrom der Liegenschaft Musterstraße 12, Vertragsbeginn 01.01.2026, Laufzeit 24 Monate.",
+    "Vertrag über die Lieferung von Fernwärme für das Objekt Gartenweg 5 zwischen den Stadtwerken und der Wohnungseigentümergemeinschaft.",
+    "Erdgasversorgungsvertrag Sondervertrag Gewerbe, Kunde: WEG Bahnhofstraße 3, Abnahmestelle Heizzentrale."
+   ],
+   "negative": [
+    "Jahresverbrauchsabrechnung Strom 2025 für den Allgemeinstrom, Rechnungsnummer 4471880, zu zahlender Betrag 1.234,56 EUR.",
+    "Rechnung Nr. 2026-0412 der Stadtwerke über die Fernwärmelieferung im Zeitraum Januar bis März 2026."
+   ]
+  }
+ },
+ {
+  "id": "R-02-VERSORG-002",
+  "name": "Preisvereinbarung oder Nachtrag zum Versorgungsvertrag",
+  "version": 1,
+  "priority": 178,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)preis(anpassung|vereinbarung|(ae|ä)nderung|mitteilung|blatt|garantie).{0,80}(strom|gas|w(ae|ä)rme|wasser|energie)",
+    "(?i)(strom|gas|w(ae|ä)rme|wasser|energie).{0,80}preis(anpassung|vereinbarung|(ae|ä)nderung|mitteilung|blatt|garantie)",
+    "(?i)(nachtrag|zusatzvereinbarung|erg(ae|ä)nzungsvereinbarung|vertragsverl(ae|ä)ngerung).{0,80}(strom|gas|w(ae|ä)rme|wasser|energie|versorgungs)",
+    "(?i)(arbeitspreis|grundpreis|leistungspreis).{0,80}(ab dem|g(ue|ü)ltig ab|ab \\d{2}\\.\\d{2}\\.\\d{4})",
+    "(?i)(neue|ge(ae|ä)nderte|angepasste|aktuelle)n? (strom|gas|w(ae|ä)rme|wasser|energie)-?preise?\\b"
+   ],
+   "not_text_regex": [
+    "(?im)^\\s*(schluss|teil|ab)?rechnung\\b",
+    "(?i)\\brechnungs?-?\\s?(nr|nummer|datum)\\b",
+    "(?i)\\b(jahres|verbrauchs|betriebskosten|nebenkosten|heizkosten)abrechnung",
+    "(?i)mietvertrag",
+    "(?i)kaufvertrag",
+    "(?i)grundbuch",
+    "(?i)verwaltervertrag"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.85,
+   "hard": false,
+   "subfolder": "09",
+   "document_type": "versorgungsvertrag",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Preisanpassung zu Ihrem Gasliefervertrag: Ab dem 01.01.2027 beträgt der Arbeitspreis 9,85 ct/kWh und der Grundpreis 14,90 EUR je Monat.",
+    "Nachtrag Nr. 2 zum Wärmelieferungsvertrag für das Objekt Lindenallee 8, Anpassung der Preisgleitklausel.",
+    "Mitteilung über die neuen Strompreise für Ihre Abnahmestelle Allgemeinstrom, gültig ab 01.04.2026."
+   ],
+   "negative": [
+    "Jahresverbrauchsabrechnung Gas 2025: Arbeitspreis 9,85 ct/kWh, Grundpreis 14,90 EUR, Rechnungsnummer 5512.",
+    "Rechnung Nr. 88123 über die Wasserlieferung im Abrechnungszeitraum 2025."
+   ]
+  }
+ },
+ {
+  "id": "R-02-MESSD-001",
+  "name": "Messdienstvertrag",
+  "version": 1,
+  "priority": 185,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)\\b(messdienst|w(ae|ä)rmedienst|ablese|abrechnungs(dienst|service)|erfassungs)-?(leistungs)?-?vertrag",
+    "(?i)vertrag (ue|ü)ber (die )?(verbrauchsabh(ae|ä)ngige )?(erfassung|ablesung|abrechnung) (der|von) (heiz|w(ae|ä)rme|wasser|energie)",
+    "(?i)vertrag (ue|ü)ber (die )?(verbrauchsabh(ae|ä)ngige )?(heiz|w(ae|ä)rme|wasser|betriebs)kosten(ab|ver)rechnung",
+    "(?i)(w(ae|ä)rmemess|heizkosten|messdienst|abrechnungs)(dienst)?-?(rahmen)?vertrag",
+    "(?i)(rahmen)?vertrag.{0,80}\\b(techem|ista|brunata|minol|kalo|metrona)\\b",
+    "(?i)liegenschafts-?(nr|nummer).{0,80}(vertrag|vertragsbeginn|vertragslaufzeit)"
+   ],
+   "not_text_regex": [
+    "(?im)^\\s*(schluss|teil)?rechnung\\b",
+    "(?i)\\brechnungs?-?\\s?(nr|nummer|datum)\\b",
+    "(?i)abrechnungszeitraum",
+    "(?i)nutzungszeitraum",
+    "(?i)ihr anteil",
+    "(?i)betriebskostenabrechnung",
+    "(?i)nebenkostenabrechnung",
+    "(?i)mietvertrag",
+    "(?i)kaufvertrag",
+    "(?i)grundbuch",
+    "(?i)verwaltervertrag"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.9,
+   "hard": false,
+   "subfolder": "09",
+   "document_type": "messdienstvertrag",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Messdienstvertrag zwischen der WEG Musterstraße 12 und der Techem GmbH über die Erfassung und Abrechnung der Heiz- und Warmwasserkosten.",
+    "Vertrag über die verbrauchsabhängige Heizkostenabrechnung, Liegenschaftsnummer 4711-0815, Vertragsbeginn 01.01.2026.",
+    "Ablesevertrag für die Liegenschaft Gartenweg 5: Der Auftragnehmer übernimmt die jährliche Ablesung der Heizkostenverteiler und Wasserzähler."
+   ],
+   "negative": [
+    "Heizkostenabrechnung 2025 für die Liegenschaft Musterstraße 12, Abrechnungszeitraum 01.01.2025 bis 31.12.2025, Ihr Anteil beträgt 812,40 EUR.",
+    "Rechnung Nr. 2026-7781 der Techem GmbH für die Ablesung und Abrechnung der Liegenschaft 4711-0815."
+   ]
+  }
+ },
+ {
+  "id": "R-02-MESSD-002",
+  "name": "Gerätemietvertrag Messtechnik",
+  "version": 1,
+  "priority": 185,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)ger(ae|ä)te-?miet(ungs)?-?vertrag",
+    "(?i)(miet|leasing|nutzungs(ue|ü)berlassungs)-?vertrag (ue|ü)ber (die )?(heizkostenverteiler|messger(ae|ä)te|(w(ae|ä)rme|wasser|k(ae|ä)lte)?z(ae|ä)hler|rauch(warn)?melder|funkmesstechnik)",
+    "(?i)(heizkostenverteiler|messger(ae|ä)te|(w(ae|ä)rme|wasser)z(ae|ä)hler|rauch(warn)?melder|funkmesstechnik).{0,60}(anmietung|vermietung|gemietet|mietzeit|miet(ungs)?vertrag|leasing)",
+    "(?i)(anmietung|vermietung|leasing) (von|der) (heizkostenverteiler|messger(ae|ä)te|z(ae|ä)hler|rauch(warn)?melder)"
+   ],
+   "not_text_regex": [
+    "(?im)^\\s*(schluss|teil)?rechnung\\b",
+    "(?i)\\brechnungs?-?\\s?(nr|nummer|datum)\\b",
+    "(?i)abrechnungszeitraum",
+    "(?i)ihr anteil",
+    "(?i)wohnraummietvertrag",
+    "(?i)mietvertrag (ue|ü)ber (die |das )?(wohnung|wohnr(ae|ä)ume|gewerber(ae|ä)ume|einheit)",
+    "(?i)mietkaution",
+    "(?i)kaufvertrag",
+    "(?i)grundbuch",
+    "(?i)verwaltervertrag"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.9,
+   "hard": false,
+   "subfolder": "09",
+   "document_type": "messdienstvertrag",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Gerätemietvertrag über 48 Heizkostenverteiler und 24 Warmwasserzähler für die Liegenschaft Musterstraße 12, Mietzeit 10 Jahre.",
+    "Mietvertrag über Rauchwarnmelder mit Funktechnik für das Objekt Gartenweg 5 einschließlich jährlicher Funktionsprüfung.",
+    "Vereinbarung zur Anmietung von Messgeräten: Die Wasserzähler bleiben Eigentum des Messdienstes und werden für die Mietzeit von 6 Jahren überlassen."
+   ],
+   "negative": [
+    "Mietvertrag über die Wohnung WE02 im Objekt Musterstraße 12, Mieter Mieterling, Mietkaution 1.500,00 EUR.",
+    "Rechnung Nr. 55120 für die Gerätemiete der Heizkostenverteiler, Abrechnungszeitraum 2025."
+   ]
+  }
+ },
+ {
+  "id": "R-02-ZAEHLER-001",
+  "name": "Zähler- und Geräteverzeichnis",
+  "version": 1,
+  "priority": 175,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)(z(ae|ä)hler|messger(ae|ä)te|heizkostenverteiler|rauch(warn)?melder)-?\\s?(und ger(ae|ä)te-?\\s?)?(verzeichnis|liste|(ue|ü)bersicht|aufstellung|bestand)",
+    "(?i)z(ae|ä)hler(stands)?-?(liste|protokoll|(ue|ü)bersicht)",
+    "(?i)ger(ae|ä)te-?(nr|nummer)\\b.{0,120}(einbauort|montageort|einheit|wohnung|raum)",
+    "(?i)(einbauort|montageort).{0,120}ger(ae|ä)te-?(nr|nummer)",
+    "(?i)ausstattungs(liste|(ue|ü)bersicht|protokoll).{0,80}(heizkostenverteiler|z(ae|ä)hler|rauch(warn)?melder|messger)",
+    "(?i)(z(ae|ä)hler|ger(ae|ä)te)-?(zuordnung|kataster)"
+   ],
+   "not_text_regex": [
+    "(?i)\\brechnung\\b",
+    "(?i)rechnungs-?(nr|nummer)",
+    "(?i)abrechnung",
+    "(?i)mietvertrag",
+    "(?i)kaufvertrag",
+    "(?i)grundbuch",
+    "(?i)verwaltervertrag"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.85,
+   "hard": false,
+   "subfolder": "09",
+   "document_type": "zaehlerverzeichnis",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Zähler- und Geräteverzeichnis der Liegenschaft Musterstraße 12: Gerätenummer, Einbauort und Zuordnung zur Einheit.",
+    "Ausstattungsliste Heizkostenverteiler und Wasserzähler je Wohnung, Stand 01.07.2026.",
+    "Zählerliste Allgemeinstrom und Wasser: Zählernummer 1ESY0012345, Einbauort Hausanschlussraum."
+   ],
+   "negative": [
+    "Heizkostenabrechnung 2025: Die Gerätenummern der Heizkostenverteiler entnehmen Sie der Einzelabrechnung je Wohnung.",
+    "Rechnung Nr. 33019 über den Austausch von 12 Wasserzählern in der Musterstraße 12."
+   ]
+  }
+ },
+ {
+  "id": "R-02-EICH-001",
+  "name": "Austausch- und Eichnachweis",
+  "version": 1,
+  "priority": 175,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)\\beich(nachweis|bescheinigung|protokoll|schein|frist|g(ue|ü)ltigkeit|datum|jahr|pflicht)",
+    "(?i)(z(ae|ä)hler|ger(ae|ä)te|messger(ae|ä)te|heizkostenverteiler|rauch(warn)?melder)-?\\s?(austausch|wechsel|tausch)-?\\s?(protokoll|nachweis|bescheinigung|bericht|liste|dokumentation)",
+    "(?i)(austausch|wechsel|tausch)(protokoll|nachweis|bescheinigung|bericht).{0,80}(z(ae|ä)hler|ger(ae|ä)te|heizkostenverteiler|rauch(warn)?melder)",
+    "(?i)montage(protokoll|bericht|bescheinigung|nachweis).{0,80}(heizkostenverteiler|z(ae|ä)hler|rauch(warn)?melder|messger)",
+    "(?i)(alt|neu)ger(ae|ä)t.{0,60}(ger(ae|ä)te-?(nr|nummer)|z(ae|ä)hlerstand|ausbau|einbau)",
+    "(?i)konformit(ae|ä)tsbewertung.{0,60}(z(ae|ä)hler|messger)"
+   ],
+   "not_text_regex": [
+    "(?i)\\brechnung\\b",
+    "(?i)rechnungs-?(nr|nummer)",
+    "(?i)abrechnung",
+    "(?i)mietvertrag",
+    "(?i)kaufvertrag",
+    "(?i)grundbuch",
+    "(?i)verwaltervertrag"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.85,
+   "hard": false,
+   "subfolder": "09",
+   "document_type": "eichnachweis",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Zählerwechselprotokoll: Ausbau Kaltwasserzähler Nr. 8812345 mit Zählerstand 1.245 m³, Einbau Neugerät Nr. 9901122, Eichjahr 2026.",
+    "Eichnachweis für die Wärmezähler der Liegenschaft Gartenweg 5, Eichgültigkeit bis 31.12.2031.",
+    "Montagebescheinigung über den Austausch der Heizkostenverteiler in 24 Wohnungen der Musterstraße 12."
+   ],
+   "negative": [
+    "Rechnung Nr. 33019 über den turnusmäßigen Austausch der Wasserzähler einschließlich Eichgebühr.",
+    "Heizkostenabrechnung 2025 mit Hinweis auf den Gerätetausch zum 15.06.2025."
+   ]
+  }
+ },
+ {
+  "id": "R-02-VERSORGUEB-001",
+  "name": "Übersicht Laufzeiten und Kündigungsfristen Versorger",
+  "version": 1,
+  "priority": 165,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?is)(?=.*laufzeit)(?=.*k(ue|ü)ndigungsfrist)(?=.*((ue|ü)bersicht|\\bliste\\b|aufstellung))"
+   ],
+   "any_of": {
+    "text_regex": [
+     "(?i)\\b(allgemein)?strom",
+     "(?i)\\b(erd)?gas\\b",
+     "(?i)w(ae|ä)rme(liefer|versorg)",
+     "(?i)wasserversorg",
+     "(?i)versorg(er|ungsvertr)",
+     "(?i)messdienst"
+    ]
+   },
+   "not_text_regex": [
+    "(?i)\\brechnung\\b",
+    "(?i)rechnungs-?(nr|nummer)",
+    "(?i)abrechnung",
+    "(?i)mietvertrag",
+    "(?i)kaufvertrag",
+    "(?i)grundbuch",
+    "(?i)verwaltervertrag"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.8,
+   "hard": false,
+   "subfolder": "09",
+   "document_type": "versorger_vertragsuebersicht",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Übersicht der Versorgungsverträge Musterstraße 12: Allgemeinstrom Stadtwerke, Laufzeit bis 31.12.2026, Kündigungsfrist 3 Monate; Gas, Laufzeit bis 30.06.2027.",
+    "Aufstellung Laufzeiten und Kündigungsfristen: Wärmelieferung, Wasserversorgung, Messdienst, jeweils mit Vertragsende und Kündigungsfrist."
+   ],
+   "negative": [
+    "Stromliefervertrag Allgemeinstrom mit einer Laufzeit von 24 Monaten und einer Kündigungsfrist von 6 Wochen zum Vertragsende.",
+    "Übersicht der Hausmeister- und Reinigungsverträge mit Laufzeit und Kündigungsfrist."
+   ]
+  }
+ },
+ {
+  "id": "R-02-HAUSM-001",
+  "name": "Hausmeistervertrag",
+  "version": 1,
+  "priority": 180,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)\\bhaus(meister|wart|betreuungs|technik)-?(dienst(leistungs)?|service)?-?vertrag",
+    "(?i)vertrag (ue|ü)ber (die |den )?(hausmeister|hauswart|objektbetreuungs)-?(dienste|leistungen|t(ae|ä)tigkeit|service)",
+    "(?i)(objektbetreuungs|hausbetreuungs|facility-?management)-?vertrag"
+   ],
+   "not_text_regex": [
+    "(?im)^\\s*(schluss|teil|ab)?rechnung\\b",
+    "(?i)\\brechnungs?-?\\s?(nr|nummer|datum)\\b",
+    "(?i)\\b(jahres|verbrauchs|betriebskosten|nebenkosten|heizkosten)abrechnung",
+    "(?i)mietvertrag",
+    "(?i)kaufvertrag",
+    "(?i)grundbuch",
+    "(?i)verwaltervertrag"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.9,
+   "hard": false,
+   "subfolder": "10",
+   "document_type": "hausmeistervertrag",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Hausmeistervertrag zwischen der WEG Musterstraße 12 und der Hausmeisterdienst Sauber GmbH, Leistungsbeginn 01.01.2026.",
+    "Vertrag über die Hausmeisterleistungen für das Objekt Gartenweg 5: Kontrollgänge, Kleinreparaturen und Mülltonnenservice.",
+    "Objektbetreuungsvertrag für die Wohnanlage Lindenallee 8 mit einer monatlichen Pauschale von 450,00 EUR."
+   ],
+   "negative": [
+    "Rechnung Nr. 2026-118 der Hausmeisterdienst Sauber GmbH für Hausmeisterleistungen im Monat Mai 2026.",
+    "Mietvertrag über die Hausmeisterwohnung im Erdgeschoss des Objekts Musterstraße 12."
+   ]
+  }
+ },
+ {
+  "id": "R-02-REINIG-001",
+  "name": "Reinigungsvertrag",
+  "version": 1,
+  "priority": 180,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)\\b(treppenhaus|geb(ae|ä)ude|unterhalts|glas|fenster|haus|tiefgaragen)?reinigungs-?(dienst(leistungs)?|service)?-?vertrag",
+    "(?i)vertrag (ue|ü)ber (die )?(treppenhaus|geb(ae|ä)ude|unterhalts|glas|fenster|tiefgaragen)-?reinigung",
+    "(?i)(treppenhaus|geb(ae|ä)ude|unterhalts)reinigung.{0,80}(vertragsbeginn|vertragslaufzeit|leistungsverzeichnis|auftragnehmer)"
+   ],
+   "not_text_regex": [
+    "(?im)^\\s*(schluss|teil|ab)?rechnung\\b",
+    "(?i)\\brechnungs?-?\\s?(nr|nummer|datum)\\b",
+    "(?i)\\b(jahres|verbrauchs|betriebskosten|nebenkosten|heizkosten)abrechnung",
+    "(?i)mietvertrag",
+    "(?i)kaufvertrag",
+    "(?i)grundbuch",
+    "(?i)verwaltervertrag"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.9,
+   "hard": false,
+   "subfolder": "10",
+   "document_type": "reinigungsvertrag",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Reinigungsvertrag für die Treppenhausreinigung im Objekt Musterstraße 12, wöchentlich, Vertragsbeginn 01.03.2026.",
+    "Vertrag über die Gebäudereinigung zwischen der WEG Gartenweg 5 und der Blitzblank Gebäudereinigung GmbH.",
+    "Unterhaltsreinigung Treppenhaus und Kellergänge: Auftragnehmer Blitzblank GmbH, Vertragslaufzeit 12 Monate."
+   ],
+   "negative": [
+    "Rechnung Nr. 4471 der Blitzblank GmbH für die Treppenhausreinigung im Monat April 2026.",
+    "Jahresabrechnung 2025: Kostenposition Treppenhausreinigung 3.240,00 EUR."
+   ]
+  }
+ },
+ {
+  "id": "R-02-WINTER-001",
+  "name": "Winterdienstvertrag",
+  "version": 1,
+  "priority": 180,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)\\bwinterdienst-?(leistungs)?-?vertrag",
+    "(?i)vertrag (ue|ü)ber (den |die )?(winterdienst|schneer(ae|ä)umung|r(ae|ä)um-? ?und ?streu(dienst|pflicht|arbeiten))",
+    "(?i)(winterdienst|schneer(ae|ä)umung|r(ae|ä)um-? ?und ?streu(dienst|pflicht)).{0,80}(vertragsbeginn|vertragslaufzeit|auftragnehmer|saisonpauschale|winterperiode|winterhalbjahr)"
+   ],
+   "not_text_regex": [
+    "(?im)^\\s*(schluss|teil|ab)?rechnung\\b",
+    "(?i)\\brechnungs?-?\\s?(nr|nummer|datum)\\b",
+    "(?i)\\b(jahres|verbrauchs|betriebskosten|nebenkosten|heizkosten)abrechnung",
+    "(?i)mietvertrag",
+    "(?i)kaufvertrag",
+    "(?i)grundbuch",
+    "(?i)verwaltervertrag"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.9,
+   "hard": false,
+   "subfolder": "10",
+   "document_type": "winterdienstvertrag",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Winterdienstvertrag für das Objekt Musterstraße 12: Räum- und Streupflicht auf Gehwegen und Zufahrten, Saisonpauschale 1.800,00 EUR.",
+    "Vertrag über den Winterdienst für die Wohnanlage Gartenweg 5, Winterperiode 01.11. bis 31.03., Auftragnehmer Grünwerk GmbH.",
+    "Räum- und Streudienst Lindenallee 8: Vertragslaufzeit drei Winterhalbjahre, Bereitschaft ab Temperaturen unter 3 Grad."
+   ],
+   "negative": [
+    "Rechnung Nr. 7712 der Grünwerk GmbH für den Winterdienst im Januar 2026, 6 Einsätze.",
+    "Jahresabrechnung 2025: Kostenposition Winterdienst 1.800,00 EUR, verteilt nach Miteigentumsanteilen."
+   ]
+  }
+ },
+ {
+  "id": "R-02-GARTEN-001",
+  "name": "Gartenpflegevertrag",
+  "version": 1,
+  "priority": 180,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)\\b(garten|gr(ue|ü)n(anlagen|fl(ae|ä)chen)|au(ss|ß)enanlagen)-?(pflege|unterhaltungs)?-?(dienst)?-?vertrag",
+    "(?i)vertrag (ue|ü)ber (die )?(garten|gr(ue|ü)n(anlagen|fl(ae|ä)chen)|au(ss|ß)enanlagen)-?(pflege|unterhaltung)",
+    "(?i)(garten|gr(ue|ü)n(anlagen|fl(ae|ä)chen))pflege.{0,80}(vertragsbeginn|vertragslaufzeit|auftragnehmer|leistungsverzeichnis|jahrespauschale)"
+   ],
+   "not_text_regex": [
+    "(?im)^\\s*(schluss|teil|ab)?rechnung\\b",
+    "(?i)\\brechnungs?-?\\s?(nr|nummer|datum)\\b",
+    "(?i)\\b(jahres|verbrauchs|betriebskosten|nebenkosten|heizkosten)abrechnung",
+    "(?i)mietvertrag",
+    "(?i)kaufvertrag",
+    "(?i)grundbuch",
+    "(?i)verwaltervertrag"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.9,
+   "hard": false,
+   "subfolder": "10",
+   "document_type": "gartenpflegevertrag",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Gartenpflegevertrag für die Außenanlagen der WEG Musterstraße 12: Rasenmähen, Heckenschnitt und Laubbeseitigung, Jahrespauschale 2.400,00 EUR.",
+    "Vertrag über die Grünanlagenpflege im Objekt Gartenweg 5 zwischen der Eigentümergemeinschaft und der Grünwerk GmbH.",
+    "Grünflächenpflege Lindenallee 8: Auftragnehmer Grünwerk GmbH, Vertragslaufzeit 01.04.2026 bis 31.03.2028."
+   ],
+   "negative": [
+    "Rechnung Nr. 8810 der Grünwerk GmbH für die Gartenpflege im Mai 2026 einschließlich Heckenschnitt.",
+    "Jahresabrechnung 2025: Kostenposition Gartenpflege 2.400,00 EUR."
+   ]
+  }
+ },
+ {
+  "id": "R-02-SCHAEDL-001",
+  "name": "Schädlingsbekämpfungsvertrag",
+  "version": 1,
+  "priority": 180,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)sch(ae|ä)dlings(bek(ae|ä)mpfungs|monitoring|pr(ae|ä)ventions|kontroll)?-?(dienst)?-?vertrag",
+    "(?i)(vertrag|vereinbarung|wartungsvertrag).{0,80}(sch(ae|ä)dlingsbek(ae|ä)mpfung|schadnager|rattenbek(ae|ä)mpfung|taubenabwehr|k(oe|ö)derstationen)",
+    "(?i)(sch(ae|ä)dlingsbek(ae|ä)mpfung|schadnager(bek(ae|ä)mpfung|monitoring)|k(oe|ö)derstationen|taubenabwehr).{0,80}(vertrag|vereinbarung|vertragsbeginn|vertragslaufzeit|jahrespauschale)"
+   ],
+   "not_text_regex": [
+    "(?im)^\\s*(schluss|teil|ab)?rechnung\\b",
+    "(?i)\\brechnungs?-?\\s?(nr|nummer|datum)\\b",
+    "(?i)\\b(jahres|verbrauchs|betriebskosten|nebenkosten|heizkosten)abrechnung",
+    "(?i)mietvertrag",
+    "(?i)kaufvertrag",
+    "(?i)grundbuch",
+    "(?i)verwaltervertrag"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.9,
+   "hard": false,
+   "subfolder": "10",
+   "document_type": "schaedlingsbekaempfungsvertrag",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Schädlingsbekämpfungsvertrag für das Objekt Musterstraße 12: Quartalsweise Kontrolle der Köderstationen im Keller und Müllraum.",
+    "Vertrag über das Schadnagermonitoring in der Wohnanlage Gartenweg 5, Jahrespauschale 680,00 EUR.",
+    "Vereinbarung zur Rattenbekämpfung und Taubenabwehr, Vertragsbeginn 01.05.2026, Auftragnehmer Pestex GmbH."
+   ],
+   "negative": [
+    "Rechnung Nr. 1204 der Pestex GmbH für die Kontrolle der Köderstationen im 2. Quartal 2026.",
+    "Jahresabrechnung 2025: Kostenposition Schädlingsbekämpfung 680,00 EUR."
+   ]
+  }
+ },
+ {
+  "id": "R-02-WARTV-001",
+  "name": "Wartungsvertrag technische Anlagen",
+  "version": 1,
+  "priority": 180,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)\\b(heizungs|aufzugs?|l(ue|ü)ftungs|brandschutz|brandmelde|rwa|tor|blitzschutz|pumpen|hebeanlagen|feuerl(oe|ö)scher|photovoltaik|pv|elektro|kessel|brenner)?-?(voll)?(wartungs|instandhaltungs|inspektions|kundendienst)-?vertrag",
+    "(?i)vertrag (ue|ü)ber die (wartung|instandhaltung|inspektion).{0,80}(anlage|aufzug|heizung|tor|l(ue|ü)ftung|pumpe|feuerl(oe|ö)scher|photovoltaik)",
+    "(?i)wartungs-?(vereinbarung|rahmenvertrag|abonnement)",
+    "(?i)(service|vollservice|full-?service)-?vertrag.{0,80}(anlage|aufzug|heizung|tor|l(ue|ü)ftung|brandmelde)"
+   ],
+   "not_text_regex": [
+    "(?im)^\\s*(schluss|teil|ab)?rechnung\\b",
+    "(?i)\\brechnungs?-?\\s?(nr|nummer|datum)\\b",
+    "(?i)\\b(jahres|verbrauchs|betriebskosten|nebenkosten|heizkosten)abrechnung",
+    "(?i)mietvertrag",
+    "(?i)kaufvertrag",
+    "(?i)grundbuch",
+    "(?i)verwaltervertrag",
+    "(?i)(durchgef(ue|ü)hrte|ausgef(ue|ü)hrte) (arbeiten|wartung|leistungen)",
+    "(?i)wartung (durchgef(ue|ü)hrt|erfolgt|ausgef(ue|ü)hrt) am",
+    "(?i)festgestellte m(ae|ä)ngel"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.9,
+   "hard": false,
+   "subfolder": "10",
+   "document_type": "wartungsvertrag",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Wartungsvertrag für die Heizungsanlage im Objekt Musterstraße 12: Jährliche Wartung des Gasbrennwertkessels, Vertragsbeginn 01.01.2026.",
+    "Aufzugswartungsvertrag zwischen der WEG Gartenweg 5 und der Lift AG, Vollwartung mit monatlicher Pauschale.",
+    "Vertrag über die Wartung der Brandmeldeanlage und der Rauch- und Wärmeabzugsanlage in der Tiefgarage Lindenallee 8."
+   ],
+   "negative": [
+    "Rechnung Nr. 2026-3355 der Lift AG für die Wartung der Aufzugsanlage im 1. Halbjahr 2026 gemäß Wartungsvertrag.",
+    "Wartungsprotokoll Heizungsanlage: Wartung durchgeführt am 12.10.2026, durchgeführte Arbeiten laut Wartungsvertrag, festgestellte Mängel keine."
+   ]
+  }
+ },
+ {
+  "id": "R-02-LEISTB-001",
+  "name": "Leistungsbeschreibung oder Vertragsnachtrag Dienstleister",
+  "version": 1,
+  "priority": 175,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)(leistungs(beschreibung|verzeichnis|katalog|umfang)|\\bnachtrag\\b|zusatzvereinbarung|erg(ae|ä)nzungsvereinbarung|vertrags(ae|ä)nderung|vertragsverl(ae|ä)ngerung|preisanpassung)"
+   ],
+   "any_of": {
+    "text_regex": [
+     "(?i)\\bhaus(meister|wart)",
+     "(?i)reinigung",
+     "(?i)winterdienst",
+     "(?i)(garten|gr(ue|ü)n(anlagen|fl(ae|ä)chen))pflege",
+     "(?i)\\bwartung",
+     "(?i)sch(ae|ä)dlingsbek(ae|ä)mpfung",
+     "(?i)dienstleistungsvertrag"
+    ]
+   },
+   "not_text_regex": [
+    "(?im)^\\s*(schluss|teil|ab)?rechnung\\b",
+    "(?i)\\brechnungs?-?\\s?(nr|nummer|datum)\\b",
+    "(?i)\\b(jahres|verbrauchs|betriebskosten|nebenkosten|heizkosten)abrechnung",
+    "(?i)mietvertrag",
+    "(?i)kaufvertrag",
+    "(?i)grundbuch",
+    "(?i)verwaltervertrag"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.85,
+   "hard": false,
+   "subfolder": "10",
+   "document_type": "leistungsbeschreibung",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Leistungsbeschreibung Hausmeisterdienste Musterstraße 12: Wöchentliche Kontrollgänge, Pflege der Außenanlagen, Bereitstellung der Mülltonnen.",
+    "Nachtrag Nr. 1 zur Treppenhausreinigung Gartenweg 5: Erweiterung der Treppenhausreinigung um die Tiefgarage ab 01.06.2026.",
+    "Preisanpassung zum Winterdienst Lindenallee 8 ab der Saison 2026/2027 wegen gestiegener Lohnkosten."
+   ],
+   "negative": [
+    "Rechnung Nr. 2026-118 für Hausmeisterleistungen laut Leistungsverzeichnis, Monat Mai 2026.",
+    "Jahresabrechnung 2025 mit Leistungsbeschreibung der Kostenpositionen Hausmeister und Reinigung."
+   ]
+  }
+ },
+ {
+  "id": "R-02-DLUEB-001",
+  "name": "Übersicht Laufzeiten und Kündigungsfristen Dienstleister",
+  "version": 1,
+  "priority": 165,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?is)(?=.*laufzeit)(?=.*k(ue|ü)ndigungsfrist)(?=.*((ue|ü)bersicht|\\bliste\\b|aufstellung))"
+   ],
+   "any_of": {
+    "text_regex": [
+     "(?i)\\bhaus(meister|wart)",
+     "(?i)reinigung",
+     "(?i)winterdienst",
+     "(?i)(garten|gr(ue|ü)n(anlagen|fl(ae|ä)chen))pflege",
+     "(?i)\\bwartung",
+     "(?i)dienstleist"
+    ]
+   },
+   "not_text_regex": [
+    "(?i)\\brechnung\\b",
+    "(?i)rechnungs-?(nr|nummer)",
+    "(?i)abrechnung",
+    "(?i)mietvertrag",
+    "(?i)kaufvertrag",
+    "(?i)grundbuch",
+    "(?i)verwaltervertrag"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.8,
+   "hard": false,
+   "subfolder": "10",
+   "document_type": "dienstleister_vertragsuebersicht",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Übersicht der Dienstleistungsverträge Musterstraße 12: Hausmeister, Laufzeit bis 31.12.2026, Kündigungsfrist 3 Monate; Reinigung, Laufzeit unbefristet, Kündigungsfrist 6 Wochen.",
+    "Aufstellung Laufzeiten und Kündigungsfristen der Wartungsverträge Heizung, Aufzug und Tore."
+   ],
+   "negative": [
+    "Hausmeistervertrag mit einer Laufzeit von zwei Jahren und einer Kündigungsfrist von drei Monaten zum Vertragsende.",
+    "Übersicht der Versorgungsverträge Strom und Gas mit Laufzeit und Kündigungsfrist."
+   ]
+  }
+ },
+ {
+  "id": "R-02-ANLVERZ-001",
+  "name": "Anlagenverzeichnis und Gerätedaten",
+  "version": 1,
+  "priority": 175,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)(technische[sn]? )?anlagen-?(verzeichnis|liste|(ue|ü)bersicht|kataster|register|bestand)",
+    "(?i)(verzeichnis|liste|(ue|ü)bersicht|aufstellung) der (technischen |haustechnischen |geb(ae|ä)udetechnischen )?anlagen",
+    "(?i)ger(ae|ä)te-?(stamm)?daten(blatt)?",
+    "(?i)typen-?(schild|bezeichnung|daten)",
+    "(?i)(technisches )?datenblatt.{0,80}(kessel|brenner|pumpe|aufzug|l(ue|ü)ftung|wechselrichter|w(ae|ä)rmepumpe|hebeanlage|toranlage|antrieb)",
+    "(?i)(hersteller|fabrikat|baujahr|seriennummer|fabrik-?nr).{0,120}(hersteller|fabrikat|baujahr|seriennummer|fabrik-?nr).{0,120}(anlage|kessel|aufzug|pumpe)"
+   ],
+   "not_text_regex": [
+    "(?i)\\brechnung\\b",
+    "(?i)rechnungs-?(nr|nummer)",
+    "(?i)abrechnung",
+    "(?i)mietvertrag",
+    "(?i)kaufvertrag",
+    "(?i)grundbuch",
+    "(?i)verwaltervertrag",
+    "(?i)abschreibung",
+    "(?i)buchwert",
+    "(?i)\\bafa\\b",
+    "(?i)anlageverm(oe|ö)gen"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.85,
+   "hard": false,
+   "subfolder": "11",
+   "document_type": "anlagenverzeichnis",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Anlagenverzeichnis Musterstraße 12: Gasbrennwertkessel Viessmann, Baujahr 2018; Personenaufzug Schindler, Baujahr 2005; Hebeanlage Kessel, Baujahr 2019.",
+    "Gerätedatenblatt Heizungsanlage Gartenweg 5: Hersteller, Typenbezeichnung, Seriennummer, Nennwärmeleistung 120 kW.",
+    "Übersicht der technischen Anlagen der Wohnanlage Lindenallee 8 mit Standort, Fabrikat und Baujahr."
+   ],
+   "negative": [
+    "Anlagenverzeichnis zur Bilanz 2025 mit Anschaffungskosten, Abschreibung und Buchwert.",
+    "Rechnung Nr. 7781 über die Lieferung eines neuen Brenners, Typenbezeichnung Weishaupt WG20."
+   ]
+  }
+ },
+ {
+  "id": "R-02-BEDIEN-001",
+  "name": "Bedienungsanleitung",
+  "version": 1,
+  "priority": 170,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)\\bbedien(ungs)?-?anleitung",
+    "(?i)\\b(betriebs|montage|installations|wartungs|service|inbetriebnahme)-?(und ?bedienungs-?)?anleitung",
+    "(?i)\\bgebrauchs(anweisung|anleitung)",
+    "(?i)\\b(bedien|betriebs|benutzer|service)-?handbuch",
+    "(?i)\\bkurzanleitung"
+   ],
+   "not_text_regex": [
+    "(?i)\\brechnung\\b",
+    "(?i)rechnungs-?(nr|nummer)",
+    "(?i)abrechnung",
+    "(?i)mietvertrag",
+    "(?i)kaufvertrag",
+    "(?i)grundbuch",
+    "(?i)verwaltervertrag"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.85,
+   "hard": false,
+   "subfolder": "11",
+   "document_type": "bedienungsanleitung",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Bedienungsanleitung Gasbrennwertkessel Vitocrossal 300: Bitte lesen Sie diese Anleitung vor der Inbetriebnahme sorgfältig durch.",
+    "Montage- und Betriebsanleitung für die Abwasserhebeanlage Aqualift F, Ausgabe 03/2019.",
+    "Benutzerhandbuch Aufzugssteuerung: Bedienung im Normalbetrieb und Verhalten bei Störungen."
+   ],
+   "negative": [
+    "Rechnung Nr. 5561 über die Lieferung des Gasbrennwertkessels einschließlich Bedienungsanleitung.",
+    "Jahresabrechnung 2025 der WEG Musterstraße 12."
+   ]
+  }
+ },
+ {
+  "id": "R-02-INSTPLAN-001",
+  "name": "Installationsplan und Schema",
+  "version": 1,
+  "priority": 170,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)installations-?(plan|schema|zeichnung|(ue|ü)bersicht)",
+    "(?i)(strang|schalt|verrohrungs|hydraulik|anlagen|rohrleitungs|elektro|verteiler|regelungs|l(ue|ü)ftungs|heizungs|sanit(ae|ä)r|klemmen|steuerungs|leitungs|stromlauf)-?(schema|plan|zeichnung)",
+    "(?i)hydraulischer abgleich.{0,60}(plan|schema|protokoll)",
+    "(?i)\\b(r\\s?&\\s?i|rohrleitungs-? ?und ?instrumenten)-?(schema|flie(ss|ß)bild)",
+    "(?i)(z(ae|ä)hlerschrank|verteilung|unterverteilung).{0,60}(belegungsplan|stromkreis)"
+   ],
+   "not_text_regex": [
+    "(?i)\\brechnung\\b",
+    "(?i)rechnungs-?(nr|nummer)",
+    "(?i)abrechnung",
+    "(?i)mietvertrag",
+    "(?i)kaufvertrag",
+    "(?i)grundbuch",
+    "(?i)verwaltervertrag",
+    "(?i)bauantrag",
+    "(?i)baugenehmigung"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.85,
+   "hard": false,
+   "subfolder": "11",
+   "document_type": "installationsplan",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Installationsplan Heizung Musterstraße 12: Strangschema mit Heizkreisen, Pumpen und Absperrarmaturen, Stand 05/2018.",
+    "Schaltplan Aufzugssteuerung Gartenweg 5, Blatt 1 von 12, Steuerungsschrank Maschinenraum.",
+    "Hydraulikschema der Heizzentrale Lindenallee 8 mit Pufferspeicher, Wärmepumpe und Trinkwassererwärmung."
+   ],
+   "negative": [
+    "Rechnung Nr. 4411 des Elektrikers für die Erstellung des Schaltplans der Unterverteilung.",
+    "Bauantrag mit Grundrissen, Ansichten und Schnitten für das Mehrfamilienhaus Musterstraße 12."
+   ]
+  }
+ },
+ {
+  "id": "R-02-INBETR-001",
+  "name": "Inbetriebnahmeunterlagen",
+  "version": 1,
+  "priority": 175,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)fachunternehmererkl(ae|ä)rung.{0,80}inbetriebnahme",
+    "(?i)inbetriebnahme-?(protokoll|bericht|bescheinigung|nachweis|unterlagen|checkliste|datum)",
+    "(?i)protokoll (der |zur |(ue|ü)ber die )?(erst)?inbetriebnahme",
+    "(?i)inbetriebsetzungs?-?(protokoll|anzeige|antrag|auftrag)",
+    "(?i)(in betrieb genommen|inbetriebnahme erfolgt|einregulierung|erstinbetriebnahme).{0,80}(anlage|kessel|aufzug|l(ue|ü)ftung|pumpe|wechselrichter)",
+    "(?i)einweisung des betreibers"
+   ],
+   "not_text_regex": [
+    "(?i)\\brechnung\\b",
+    "(?i)rechnungs-?(nr|nummer)",
+    "(?i)abrechnung",
+    "(?i)mietvertrag",
+    "(?i)kaufvertrag",
+    "(?i)grundbuch",
+    "(?i)verwaltervertrag"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.85,
+   "hard": false,
+   "subfolder": "11",
+   "document_type": "inbetriebnahmeprotokoll",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Inbetriebnahmeprotokoll Gasbrennwertkessel Musterstraße 12: Inbetriebnahme erfolgt am 14.09.2018, Abgaswerte gemessen, Einweisung des Betreibers durchgeführt.",
+    "Fachunternehmererklärung zur Errichtung und Inbetriebnahme der Photovoltaikanlage Gartenweg 5 mit 29,9 kWp."
+   ],
+   "negative": [
+    "Rechnung Nr. 9001 des Heizungsbauers für die Inbetriebnahme des Kessels einschließlich Einweisung.",
+    "Wohnungsübergabeprotokoll: Übergabe der Wohnung WE04 an den neuen Mieter mit Zählerständen."
+   ]
+  }
+ },
+ {
+  "id": "R-02-ANLDOK-001",
+  "name": "Anlagendokumentation je Anlage",
+  "version": 1,
+  "priority": 165,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)anlagen-?(dokumentation|akte|buch|beschreibung|pass|handbuch)",
+    "(?i)\\b(betriebs|kessel|aufzugs|maschinen|pr(ue|ü)f)-?buch\\b",
+    "(?i)(ce|eg|eu)-?konformit(ae|ä)ts-?erkl(ae|ä)rung|konformit(ae|ä)tserkl(ae|ä)rung",
+    "(?i)hersteller-?(erkl(ae|ä)rung|bescheinigung|zertifikat|garantie(urkunde|bescheinigung))",
+    "(?i)(technische )?(dokumentation|unterlagen) (der|zur|f(ue|ü)r die) (heizungs|aufzugs|l(ue|ü)ftungs|hebe|tor|pv-|photovoltaik|brandmelde|wasseraufbereitungs)?-?anlage",
+    "(?i)(aufzugs|hebe|tor|l(ue|ü)ftungs|heizungs|photovoltaik|pv|brandmelde|rwa|enth(ae|ä)rtungs)-?anlage.{0,80}(technische )?(dokumentation|unterlagen|datenblatt|garantieurkunde)",
+    "(?i)(wechselrichter|modul|speicher).{0,60}(datenblatt|garantie(urkunde|bedingungen))"
+   ],
+   "not_text_regex": [
+    "(?i)\\brechnung\\b",
+    "(?i)rechnungs-?(nr|nummer)",
+    "(?i)abrechnung",
+    "(?i)mietvertrag",
+    "(?i)kaufvertrag",
+    "(?i)grundbuch",
+    "(?i)verwaltervertrag"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.8,
+   "hard": false,
+   "subfolder": "11",
+   "document_type": "anlagendokumentation",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Anlagendokumentation Personenaufzug Gartenweg 5: Technische Daten, Konformitätserklärung, Notrufkonzept und Wartungshistorie.",
+    "EG-Konformitätserklärung für die Toranlage der Tiefgarage Musterstraße 12 gemäß Maschinenrichtlinie.",
+    "Technische Unterlagen zur Photovoltaikanlage Lindenallee 8: Wechselrichter Datenblatt, Modulgarantie und Stringplan."
+   ],
+   "negative": [
+    "Rechnung Nr. 6602 der Lift AG für die Modernisierung der Aufzugsanlage einschließlich Dokumentation.",
+    "Jahresabrechnung 2025: Kostenposition Aufzugsanlage 4.100,00 EUR."
+   ]
+  }
+ },
+ {
+  "id": "R-02-WARTPLAN-001",
+  "name": "Wartungs- und Prüfplan",
+  "version": 1,
+  "priority": 165,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)wartungs-?\\s?(und ?pr(ue|ü)f)?-?(plan|kalender|(ue|ü)bersicht|terminplan|termin(ue|ü)bersicht|intervalle)",
+    "(?i)pr(ue|ü)f-?(plan|kalender|terminplan|termin(ue|ü)bersicht|fristen(ue|ü)bersicht|intervalle|zyklen)",
+    "(?i)(ue|ü)bersicht (der |(ue|ü)ber die )?(erforderlichen |wiederkehrenden |anstehenden |n(ae|ä)chsten |gesetzlich vorgeschriebenen )?(wartungen|pr(ue|ü)fungen|pr(ue|ü)ftermine|wartungstermine|pr(ue|ü)fpflichten)",
+    "(?i)(wiederkehrende|gesetzliche|vorgeschriebene) pr(ue|ü)fungen.{0,80}(intervall|turnus|f(ae|ä)llig|termin)",
+    "(?i)(betreiber|pr(ue|ü)f)-?pflichten.{0,80}((ue|ü)bersicht|liste|matrix|kataster)"
+   ],
+   "not_text_regex": [
+    "(?i)\\brechnung\\b",
+    "(?i)rechnungs-?(nr|nummer)",
+    "(?i)abrechnung",
+    "(?i)mietvertrag",
+    "(?i)kaufvertrag",
+    "(?i)grundbuch",
+    "(?i)verwaltervertrag",
+    "(?i)pr(ue|ü)f(protokoll|bericht|bescheinigung)",
+    "(?i)wartungs(protokoll|bericht)"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.8,
+   "hard": false,
+   "subfolder": "11",
+   "document_type": "wartungsplan",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Wartungs- und Prüfplan Musterstraße 12: Heizung jährlich, Aufzug alle 2 Jahre, Feuerlöscher alle 2 Jahre, Blitzschutz alle 3 Jahre.",
+    "Übersicht der erforderlichen Wartungen und Prüfungen der Wohnanlage Gartenweg 5 mit nächsten Fälligkeiten.",
+    "Prüfterminplan technische Anlagen Lindenallee 8 für die Jahre 2026 bis 2028."
+   ],
+   "negative": [
+    "Prüfbericht Aufzugsanlage: Hauptprüfung nach BetrSichV, nächster Prüftermin 09/2028.",
+    "Rechnung Nr. 3320 für die Erstellung eines Wartungsplans durch das Ingenieurbüro."
+   ]
+  }
+ },
+ {
+  "id": "R-02-WARTBER-001",
+  "name": "Wartungsbericht",
+  "version": 1,
+  "priority": 178,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)wartungs-?(bericht|protokoll|nachweis|checkliste|bescheinigung|dokumentation|arbeiten)",
+    "(?i)(service|kundendienst|inspektions|instandhaltungs|einsatz|monteur|techniker)-?(bericht|protokoll|nachweis)",
+    "(?i)protokoll (der |(ue|ü)ber die )?(j(ae|ä)hrlichen |durchgef(ue|ü)hrten |regelm(ae|ä)(ss|ß)igen )?wartung",
+    "(?i)wartung (durchgef(ue|ü)hrt|erfolgt|ausgef(ue|ü)hrt|erledigt) am",
+    "(?i)arbeits-?(bericht|nachweis|zettel|schein).{0,80}(wartung|inspektion|st(oe|ö)rung|instandsetzung)",
+    "(?i)(durchgef(ue|ü)hrte|ausgef(ue|ü)hrte) (wartungs)?arbeiten"
+   ],
+   "not_text_regex": [
+    "(?i)\\brechnung\\b",
+    "(?i)rechnungs-?(nr|nummer)",
+    "(?i)abrechnung",
+    "(?i)mietvertrag",
+    "(?i)kaufvertrag",
+    "(?i)grundbuch",
+    "(?i)verwaltervertrag",
+    "(?i)vertragslaufzeit",
+    "(?i)vertragsbeginn",
+    "(?i)vertragsdauer",
+    "(?i)k(ue|ü)ndigungsfrist"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.9,
+   "hard": false,
+   "subfolder": "11",
+   "document_type": "wartungsbericht",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Wartungsprotokoll Heizungsanlage Musterstraße 12: Wartung durchgeführt am 12.10.2026, Brenner gereinigt, Abgaswerte in Ordnung.",
+    "Servicebericht Aufzugsanlage Gartenweg 5: Durchgeführte Arbeiten, Schmierung der Führungsschienen, Prüfung der Türkontakte, keine Beanstandungen.",
+    "Wartungsnachweis Lüftungsanlage Tiefgarage Lindenallee 8, Filterwechsel und Funktionsprüfung der CO-Warnanlage."
+   ],
+   "negative": [
+    "Rechnung Nr. 2026-3355 der Lift AG für die Wartung der Aufzugsanlage im 1. Halbjahr 2026, Wartungsprotokoll anbei.",
+    "Wartungsvertrag Heizungsanlage: Vertragsbeginn 01.01.2026, Vertragslaufzeit 3 Jahre, Wartungsprotokoll wird nach jeder Wartung übergeben."
+   ]
+  }
+ },
+ {
+  "id": "R-02-PRUEF-001",
+  "name": "Prüfprotokoll technische Anlage",
+  "version": 1,
+  "priority": 185,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)pr(ue|ü)f-?(protokoll|bericht|bescheinigung|nachweis|plakette|zeugnis|ergebnis)",
+    "(?i)(haupt|zwischen|wiederholungs|erst|sachverst(ae|ä)ndigen|sicherheits)-?pr(ue|ü)fung",
+    "(?i)(zugelassene )?(ue|ü)berwachungsstelle",
+    "(?i)\\b(t(ue|ü)v|dekra|dguv|z(ue|ü)s|vde)\\b.{0,80}(pr(ue|ü)f|gepr(ue|ü)ft|bericht)",
+    "(?i)pr(ue|ü)fung (nach|gem(ae|ä)(ss|ß)) (dguv|betrsichv|vde|din|trbs|pr(ue|ü)fvo|pr(ue|ü)fverordnung)",
+    "(?i)(blitzschutz|brandschutz|elektro|e-?check|rwa|feuerl(oe|ö)scher|brandmelde|sicherheitsbeleuchtung|rauchabzug|ortsfeste anlagen|ortsver(ae|ä)nderliche)-?(pr(ue|ü)fung|pr(ue|ü)fbericht|(ue|ü)berpr(ue|ü)fung)",
+    "(?i)((ue|ü)ber)?pr(ue|ü)fung der (aufzugs|hebe|tor|l(ue|ü)ftungs|brandmelde|blitzschutz|elektrischen )-?anlage",
+    "(?i)(keine |ohne |erhebliche |geringf(ue|ü)gige )m(ae|ä)ngel festgestellt",
+    "(?i)(feuerst(ae|ä)ttenschau|abgasmessung|schornsteinfeger.{0,60}(messung|bescheinigung|protokoll))",
+    "(?i)n(ae|ä)chste (pr(ue|ü)fung|hauptpr(ue|ü)fung|wiederholungspr(ue|ü)fung)"
+   ],
+   "not_text_regex": [
+    "(?i)\\brechnung\\b",
+    "(?i)rechnungs-?(nr|nummer)",
+    "(?i)abrechnung",
+    "(?i)mietvertrag",
+    "(?i)kaufvertrag",
+    "(?i)grundbuch",
+    "(?i)verwaltervertrag",
+    "(?i)legionell",
+    "(?i)trinkwasser",
+    "(?i)(rechnungs|beleg|kassen)pr(ue|ü)fung",
+    "(?i)beirat",
+    "(?i)wirtschaftsplan",
+    "(?i)protokoll der eigent",
+    "(?i)standsicherheit",
+    "(?i)baustatik",
+    "(?i)statische[nrs]? berechnung"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.9,
+   "hard": false,
+   "subfolder": "11",
+   "document_type": "pruefprotokoll",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Prüfbericht Aufzugsanlage Gartenweg 5: Hauptprüfung nach BetrSichV durch die zugelassene Überwachungsstelle, keine Mängel festgestellt, nächste Prüfung 09/2028.",
+    "Prüfprotokoll Blitzschutzanlage Musterstraße 12 nach DIN EN 62305, Prüfung durchgeführt am 03.05.2026.",
+    "DGUV Vorschrift 3 Prüfung der ortsfesten elektrischen Anlagen im Objekt Lindenallee 8, Prüfplakette erteilt."
+   ],
+   "negative": [
+    "Rechnung Nr. 1188 des TÜV für die Hauptprüfung der Aufzugsanlage Gartenweg 5.",
+    "Bericht des Verwaltungsbeirats über die Rechnungsprüfung der Jahresabrechnung 2025, keine Beanstandungen."
+   ]
+  }
+ },
+ {
+  "id": "R-02-TRINKW-001",
+  "name": "Trinkwasseruntersuchung Legionellen",
+  "version": 1,
+  "priority": 185,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)legionell",
+    "(?i)trinkwasser-?(untersuchung|analyse|probe|beprobung|pr(ue|ü)fung|befund|hygiene)",
+    "(?i)pr(ue|ü)f-?(bericht|ergebnis).{0,80}trinkwasser",
+    "(?i)trinkwasserverordnung|\\btrinkwv\\b",
+    "(?i)gef(ae|ä)hrdungsanalyse",
+    "(?i)risikoabsch(ae|ä)tzung.{0,80}(trinkwasser|wasser|hygiene)",
+    "(?i)\\bkbe\\b|koloniebildende einheiten",
+    "(?i)(nachkontrolle|nachbeprobung|nachuntersuchung).{0,80}(wasser|probe)"
+   ],
+   "not_text_regex": [
+    "(?i)\\brechnung\\b",
+    "(?i)rechnungs-?(nr|nummer)",
+    "(?i)abrechnung",
+    "(?i)mietvertrag",
+    "(?i)kaufvertrag",
+    "(?i)grundbuch",
+    "(?i)verwaltervertrag",
+    "(?i)protokoll der eigent",
+    "(?i)tagesordnung"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.9,
+   "hard": false,
+   "subfolder": "11",
+   "document_type": "trinkwasseruntersuchung",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Prüfbericht Trinkwasseruntersuchung Musterstraße 12: Legionellen an 5 Probenahmestellen, alle Werte unter dem technischen Maßnahmenwert von 100 KBE/100 ml.",
+    "Gefährdungsanalyse nach Trinkwasserverordnung für die Trinkwasserinstallation Gartenweg 5 nach Überschreitung des Maßnahmenwerts.",
+    "Nachkontrolle Legionellenbeprobung Lindenallee 8 am 15.08.2026: Warmwasserspeicher und drei Entnahmestellen, Befund unauffällig."
+   ],
+   "negative": [
+    "Rechnung Nr. 2211 des Labors für die Legionellenuntersuchung in der Musterstraße 12.",
+    "Protokoll der Eigentümerversammlung: Tagesordnung Punkt 5, Beauftragung der Legionellenprüfung 2026."
+   ]
+  }
+ },
+ {
+  "id": "R-02-SCHLPLAN-001",
+  "name": "Schließplan",
+  "version": 1,
+  "priority": 190,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)schlie(ss|ß)-?(plan|anlagenplan|matrix)",
+    "(?i)schlie(ss|ß)anlage.{0,60}(plan|(ue|ü)bersicht|matrix|aufbau).{0,80}(zylinder|schl(ue|ü)ssel)"
+   ],
+   "not_text_regex": [
+    "(?i)\\brechnung\\b",
+    "(?i)rechnungs-?(nr|nummer)",
+    "(?i)abrechnung",
+    "(?i)mietvertrag",
+    "(?i)kaufvertrag",
+    "(?i)grundbuch",
+    "(?i)verwaltervertrag",
+    "(?i)\\bangebot\\b",
+    "(?i)auftragsbest(ae|ä)tigung",
+    "(?i)lieferschein"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.95,
+   "hard": true,
+   "subfolder": "12",
+   "document_type": "schliessplan",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Schließplan Schließanlage Musterstraße 12: Zylinder Haustür, Keller, Müllraum, Technikraum mit Zuordnung der Schlüsselgruppen.",
+    "Schließanlagenplan Gartenweg 5, Anlagennummer 44-1287, Generalhauptschlüssel und Einzelschlüssel je Wohnung.",
+    "Schließmatrix der Wohnanlage Lindenallee 8: Welche Schlüssel schließen welche Zylinder."
+   ],
+   "negative": [
+    "Angebot Nr. 1502 über die Erneuerung der Schließanlage Musterstraße 12 gemäß beiliegendem Schließplan.",
+    "Rechnung Nr. 8823 der Schlüssel Meier GmbH über 12 Zylinder laut Schließplan."
+   ]
+  }
+ },
+ {
+  "id": "R-02-SICHKARTE-001",
+  "name": "Sicherungskarte und Schlüsselberechtigung",
+  "version": 1,
+  "priority": 180,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)\\bsicherungs-?(karte|schein)",
+    "(?i)schl(ue|ü)ssel-?(berechtigung|berechtigungs(nachweis|karte|schein)|karte|zertifikat|eigentumsnachweis)",
+    "(?i)(eigentums|legitimations|berechtigungs)-?(karte|nachweis|ausweis).{0,80}(schlie(ss|ß)|schl(ue|ü)ssel|zylinder)",
+    "(?i)nachbestell(berechtigung|schein|karte)|berechtigung(snachweis)? zur nachbestellung",
+    "(?i)(code|system|schlie(ss|ß))-?karte.{0,80}(schl(ue|ü)ssel|schlie(ss|ß)anlage|nachbestellung)"
+   ],
+   "not_text_regex": [
+    "(?i)\\brechnung\\b",
+    "(?i)rechnungs-?(nr|nummer)",
+    "(?i)abrechnung",
+    "(?i)mietvertrag",
+    "(?i)kaufvertrag",
+    "(?i)grundbuch",
+    "(?i)verwaltervertrag",
+    "(?i)\\bangebot\\b",
+    "(?i)lieferschein"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.9,
+   "hard": false,
+   "subfolder": "12",
+   "document_type": "sicherungskarte",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Sicherungskarte zur Schließanlage Musterstraße 12, Anlagennummer 44-1287: Nur gegen Vorlage dieser Karte werden Schlüssel nachbestellt.",
+    "Schlüsselberechtigungsnachweis für die Schließanlage Gartenweg 5, ausgestellt auf die Hausverwaltung.",
+    "Berechtigung zur Nachbestellung von Schlüsseln und Zylindern für das Schließsystem Lindenallee 8."
+   ],
+   "negative": [
+    "Rechnung Nr. 8823 über die Nachbestellung von 3 Schlüsseln gegen Vorlage der Sicherungskarte.",
+    "Angebot Nr. 1502 für eine neue Schließanlage einschließlich Sicherungskarte."
+   ]
+  }
+ },
+ {
+  "id": "R-02-SCHLVERZ-001",
+  "name": "Schlüsselverzeichnis",
+  "version": 1,
+  "priority": 180,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)schl(ue|ü)ssel-?(verzeichnis|liste|(ue|ü)bersicht|buch|bestand|kataster|aufstellung|bestandsliste|inventar)",
+    "(?i)(verzeichnis|liste|(ue|ü)bersicht|aufstellung) der (ausgegebenen |vorhandenen |vorhandenen und ausgegebenen )?(schl(ue|ü)ssel|transponder|schlie(ss|ß)medien)",
+    "(?i)(transponder|schlie(ss|ß)medien|zylinder|chip)-?(liste|verzeichnis|(ue|ü)bersicht|bestand)",
+    "(?i)schl(ue|ü)ssel-?(nr|nummer).{0,120}(inhaber|ausgegeben an|verbleib|anzahl)"
+   ],
+   "not_text_regex": [
+    "(?i)\\brechnung\\b",
+    "(?i)rechnungs-?(nr|nummer)",
+    "(?i)abrechnung",
+    "(?i)mietvertrag",
+    "(?i)kaufvertrag",
+    "(?i)grundbuch",
+    "(?i)verwaltervertrag",
+    "(?i)\\bangebot\\b",
+    "(?i)lieferschein"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.9,
+   "hard": false,
+   "subfolder": "12",
+   "document_type": "schluesselverzeichnis",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Schlüsselverzeichnis Musterstraße 12: Schlüsselnummer, Anzahl, Inhaber und Verbleib, Stand 01.07.2026.",
+    "Übersicht der ausgegebenen Schlüssel und Transponder für die Tiefgarage Gartenweg 5.",
+    "Schlüsselliste Verwaltung und Hausmeister Lindenallee 8: Hauptschlüssel, Technikraum, Dachausstieg."
+   ],
+   "negative": [
+    "Rechnung Nr. 8823 der Schlüssel Meier GmbH über die Anfertigung von 6 Schlüsseln.",
+    "Angebot Nr. 1502 über die Lieferung einer Schließanlage mit 40 Schlüsseln."
+   ]
+  }
+ },
+ {
+  "id": "R-02-SCHLUEB-001",
+  "name": "Schlüsselübergabe Verwaltung und Technik",
+  "version": 1,
+  "priority": 175,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)schl(ue|ü)ssel-?(ue|ü)bergabe",
+    "(?i)(ue|ü)bergabe-?(protokoll|quittung|bescheinigung)?.{0,60}schl(ue|ü)ssel",
+    "(?i)schl(ue|ü)ssel-?(ausgabe|r(ue|ü)ckgabe|quittung|empfang|(ue|ü)bernahme|(ue|ü)berlassung)",
+    "(?i)(empfang|erhalt|(ue|ü)bernahme|r(ue|ü)ckgabe) (der |von |folgender |nachfolgender )?(aufgef(ue|ü)hrten |nachfolgend aufgef(ue|ü)hrten )?schl(ue|ü)ssel",
+    "(?i)(verwaltungs|technik|haupt|general|zentral|haus|hausmeister)-?schl(ue|ü)ssel.{0,80}((ue|ü)bergeben|(ue|ü)bergabe|ausgeh(ae|ä)ndigt|erhalten|quittiert)"
+   ],
+   "not_text_regex": [
+    "(?i)\\brechnung\\b",
+    "(?i)rechnungs-?(nr|nummer)",
+    "(?i)abrechnung",
+    "(?i)mietvertrag",
+    "(?i)kaufvertrag",
+    "(?i)grundbuch",
+    "(?i)verwaltervertrag",
+    "(?i)\\bmieter(in|s)?\\b",
+    "(?i)wohnungs(ue|ü)bergabe",
+    "(?i)(ue|ü)bergabe der wohnung",
+    "(?i)kaution",
+    "(?i)k(ae|ä)ufer",
+    "(?i)z(ae|ä)hlerst(ae|ä)nde"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.85,
+   "hard": false,
+   "subfolder": "12",
+   "document_type": "schluesseluebergabe",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Schlüsselübergabeprotokoll Musterstraße 12: Die Vorverwaltung übergibt der Hausverwaltung Müller GmbH 2 Generalhauptschlüssel, 1 Technikraumschlüssel und 1 Briefkastenschlüssel.",
+    "Übergabequittung: Der Hausmeister bestätigt den Empfang der nachfolgend aufgeführten Schlüssel für das Objekt Gartenweg 5.",
+    "Schlüsselrückgabe Lindenallee 8: Der Wartungsdienst gibt den Heizungsraumschlüssel Nr. 7 an die Verwaltung zurück."
+   ],
+   "negative": [
+    "Wohnungsübergabeprotokoll: Der Mieter erhält 3 Wohnungsschlüssel und 1 Briefkastenschlüssel, Zählerstände aufgenommen.",
+    "Rechnung Nr. 8823 über die Anfertigung von 2 Technikraumschlüsseln."
+   ]
+  }
+ },
+ {
+  "id": "R-02-ZUGANG-001",
+  "name": "Zugangsorganisation und Verweis auf Zugangsdaten",
+  "version": 1,
+  "priority": 170,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)zugangs-?(organisation|konzept|regelung|berechtigung(en)?|(ue|ü)bersicht|dokumentation|matrix)",
+    "(?i)zutritts-?(konzept|regelung|berechtigung(en)?|organisation|kontrolle|system)",
+    "(?i)schlie(ss|ß)-?(zeiten|regelung|system)",
+    "(?i)passwort-?(manager|tresor|safe|verwaltung)",
+    "(?i)(zugangsdaten|zugangscode|zahlencode|codeschloss|schl(ue|ü)ssel-?(tresor|safe|box|depot))",
+    "(?i)(hinterlegt|verweis|abgelegt|gespeichert).{0,60}(passwort|kennwort|zugangsdaten)"
+   ],
+   "not_text_regex": [
+    "(?i)\\brechnung\\b",
+    "(?i)rechnungs-?(nr|nummer)",
+    "(?i)abrechnung",
+    "(?i)mietvertrag",
+    "(?i)kaufvertrag",
+    "(?i)grundbuch",
+    "(?i)verwaltervertrag",
+    "(?i)hausordnung",
+    "(?i)\\bmieter(in|s)?\\b"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.8,
+   "hard": false,
+   "subfolder": "12",
+   "document_type": "zugangsorganisation",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Zugangsorganisation Musterstraße 12: Haustür Schließzeiten 22 bis 6 Uhr, Technikraum nur Verwaltung und Wartungsdienst, Schlüsseltresor am Nebeneingang.",
+    "Zutrittskonzept Tiefgarage Gartenweg 5 mit Transpondern für Stellplatznutzer und Handsender für den Winterdienst.",
+    "Verweis: Die Zugangsdaten für das Aufzugsnotrufportal und die Heizungsfernwartung sind im Passwortmanager hinterlegt, nicht in dieser Akte."
+   ],
+   "negative": [
+    "Hausordnung der WEG Musterstraße 12: Die Haustür ist von 22 bis 6 Uhr geschlossen zu halten.",
+    "Rechnung Nr. 4490 über die Montage eines Schlüsseltresors am Nebeneingang."
+   ]
+  }
+ },
+ {
+  "id": "R-02-ZUSTAND-001",
+  "name": "Gebäudezustandsbericht",
+  "version": 1,
+  "priority": 175,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)\\bgeb(ae|ä)udezustands?(bericht|analyse|bewertung|erfassung)\\b",
+    "(?i)\\bzustandsbericht\\b",
+    "(?i)\\bzustandserfassung\\b",
+    "(?i)\\bbauzustandsbericht\\b"
+   ],
+   "not_text_regex": [
+    "(?i)\\b(schluss|teil|abschlags)?rechnung\\b",
+    "(?i)rechnungs(betrag|nummer|nr|datum)\\b",
+    "(?i)abrechnung",
+    "(?i)mietvertrag",
+    "(?i)kaufvertrag",
+    "(?i)grundbuch",
+    "(?i)energieausweis"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.85,
+   "hard": false,
+   "subfolder": "13",
+   "document_type": "zustandsbericht",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Gebäudezustandsbericht für das Objekt Hauptstraße 12, 40721 Hilden. Erfasst wurden Dach, Fassade, Treppenhaus und Haustechnik mit Bewertung des Instandhaltungsbedarfs.",
+    "Zustandsbericht der Wohnanlage Gartenweg 5 nach Ortstermin am 14.03.2026. Die Fassade weist an der Wetterseite Risse auf, das Flachdach ist sanierungsbedürftig."
+   ],
+   "negative": [
+    "Rechnung Nr. 2026-118 für die Erstellung des Gebäudezustandsberichts, Betrag 1.450,00 EUR zahlbar bis 30.04.2026.",
+    "Energieausweis für das Wohngebäude Hauptstraße 12, Endenergiebedarf 142 kWh pro Quadratmeter und Jahr."
+   ]
+  }
+ },
+ {
+  "id": "R-02-BEGEHUNG-001",
+  "name": "Begehungsprotokoll",
+  "version": 1,
+  "priority": 178,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)\\bbegehungsprotokoll\\b",
+    "(?i)\\bprotokoll (der|zur|(ue|ü)ber die) (objekt|geb(ae|ä)ude|haus|jahres)?begehung\\b",
+    "(?i)\\b(objekt|geb(ae|ä)ude|haus|jahres)begehung\\b.{0,80}\\b(festgestellt|feststellungen|m(ae|ä)ngel)"
+   ],
+   "not_text_regex": [
+    "(?i)\\b(schluss|teil|abschlags)?rechnung\\b",
+    "(?i)rechnungs(betrag|nummer|nr|datum)\\b",
+    "(?i)abrechnung",
+    "(?i)mietvertrag",
+    "(?i)eigent(ue|ü)merversammlung",
+    "(?i)wohnungs(ue|ü)bergabe"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.85,
+   "hard": false,
+   "subfolder": "13",
+   "document_type": "begehungsprotokoll",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Begehungsprotokoll vom 22.04.2026, Objekt Gartenweg 5. Teilnehmer: Hausverwaltung, Verwaltungsbeirat, Hausmeister. Festgestellte Mängel siehe Anlage.",
+    "Protokoll zur Objektbegehung am 03.06.2026. Es wurden folgende Punkte festgestellt: Kellerlicht defekt, Rinne am Nebeneingang verstopft."
+   ],
+   "negative": [
+    "Rechnung für die Objektbegehung am 22.04.2026 durch den Sachverständigen, Honorar 380,00 EUR.",
+    "Protokoll der ordentlichen Eigentümerversammlung vom 15.05.2026, TOP 4 Bericht über die Begehung."
+   ]
+  }
+ },
+ {
+  "id": "R-02-GUTACHTEN-001",
+  "name": "Gutachten",
+  "version": 1,
+  "priority": 172,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)\\b(sachverst(ae|ä)ndigen|schadens?|bau|schimmel|feuchte|w(ae|ä)rmeschutz|schall|brandschutz|statik|standsicherheits)?gutachten\\b",
+    "(?i)\\bgutachterliche stellungnahme\\b",
+    "(?i)\\b(oe|ö)ffentlich bestellte[rn]? und vereidigte[rn]? sachverst(ae|ä)ndige"
+   ],
+   "not_text_regex": [
+    "(?i)\\b(schluss|teil|abschlags)?rechnung\\b",
+    "(?i)rechnungs(betrag|nummer|nr|datum)\\b",
+    "(?i)abrechnung",
+    "(?i)mietvertrag",
+    "(?i)kaufvertrag",
+    "(?i)klageschrift",
+    "(?i)eigent(ue|ü)merversammlung",
+    "(?i)verkehrswert",
+    "(?i)energieausweis"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.85,
+   "hard": false,
+   "subfolder": "13",
+   "document_type": "gutachten",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Gutachten zur Ursache der Feuchtigkeitsschäden im Kellergeschoss des Gebäudes Hauptstraße 12. Auftraggeber: Hausverwaltung Müller GmbH. Ortstermin am 10.02.2026.",
+    "Schadensgutachten zum Wasserschaden in der Wohnung im 2. OG links, erstellt vom öffentlich bestellten und vereidigten Sachverständigen für Schäden an Gebäuden."
+   ],
+   "negative": [
+    "Rechnung über die Erstellung des Gutachtens zur Feuchtigkeit im Keller, Honorar 2.380,00 EUR netto.",
+    "Klageschrift der Wohnungseigentümergemeinschaft gegen die Baufirma, als Beweis wird ein Gutachten angeboten."
+   ]
+  }
+ },
+ {
+  "id": "R-02-HISTORIE-001",
+  "name": "Instandhaltungs- und Maßnahmenhistorie",
+  "version": 1,
+  "priority": 172,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)\\binstandhaltungs(historie|(ue|ü)bersicht|chronik|verlauf)\\b",
+    "(?i)\\bma(ss|ß)nahmen(historie|(ue|ü)bersicht|chronik)\\b",
+    "(?i)\\bsanierungshistorie\\b",
+    "(?i)\\b(durchgef(ue|ü)hrten?|bisherigen?|abgeschlossenen?) (instandhaltungs|instandsetzungs|sanierungs|bau)ma(ss|ß)nahmen\\b"
+   ],
+   "not_text_regex": [
+    "(?i)\\b(schluss|teil|abschlags)?rechnung\\b",
+    "(?i)rechnungs(betrag|nummer|nr|datum)\\b",
+    "(?i)abrechnung",
+    "(?i)wirtschaftsplan",
+    "(?i)eigent(ue|ü)merversammlung",
+    "(?i)mietvertrag",
+    "(?i)kaufvertrag"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.82,
+   "hard": false,
+   "subfolder": "13",
+   "document_type": "instandhaltungshistorie",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Instandhaltungshistorie Objekt Gartenweg 5. 2019 Dachsanierung, 2021 Erneuerung der Heizungsanlage, 2024 Fassadenanstrich.",
+    "Übersicht der durchgeführten Instandhaltungsmaßnahmen der Wohnanlage Hauptstraße 12 seit Übernahme der Verwaltung."
+   ],
+   "negative": [
+    "Gesamtwirtschaftsplan 2026 mit Zuführung zur Erhaltungsrücklage für geplante Instandhaltungsmaßnahmen.",
+    "Rechnung der Dachdeckerei Schmidt für die Dachsanierung, Rechnungsnummer 2019-0455."
+   ]
+  }
+ },
+ {
+  "id": "R-02-SANIERUNG-001",
+  "name": "Vorgangsakte Sanierung",
+  "version": 1,
+  "priority": 168,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)\\bauftragsbest(ae|ä)tigung\\b",
+    "(?i)\\bauftragserteilung\\b",
+    "(?i)\\bleistungsverzeichnis\\b",
+    "(?i)\\bbautagebuch\\b",
+    "(?i)\\bbauzeitenplan\\b",
+    "(?i)\\bsanierungskonzept\\b",
+    "(?i)\\bausschreibung\\b",
+    "(?i)\\bvergabevorschlag\\b",
+    "(?i)\\bpreisspiegel\\b"
+   ],
+   "not_text_regex": [
+    "(?i)\\b(schluss|teil|abschlags)?rechnung\\b",
+    "(?i)rechnungs(betrag|nummer|nr|datum)\\b",
+    "(?i)abrechnung",
+    "(?i)mietvertrag",
+    "(?i)kaufvertrag",
+    "(?i)verwalt(er|ungs)vertrag",
+    "(?i)wartungsvertrag",
+    "(?i)eigent(ue|ü)merversammlung"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.8,
+   "hard": false,
+   "subfolder": "13",
+   "document_type": "sanierungsvorgang",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Auftragsbestätigung: Wir bestätigen den Auftrag zur Sanierung des Flachdachs am Objekt Gartenweg 5 gemäß unserem Angebot vom 02.03.2026.",
+    "Leistungsverzeichnis Fassadensanierung Hauptstraße 12, Positionen 1 bis 48, Gerüststellung, Putzausbesserung, Anstrich."
+   ],
+   "negative": [
+    "Schlussrechnung zur Sanierung des Flachdachs gemäß Auftragsbestätigung vom 05.03.2026, Rechnungsbetrag 38.420,00 EUR.",
+    "Protokoll der Eigentümerversammlung vom 15.05.2026, TOP 6 Vergabevorschlag zur Fassadensanierung."
+   ]
+  }
+ },
+ {
+  "id": "R-02-ANGEBOT-001",
+  "name": "Angebot und Kostenvoranschlag",
+  "version": 1,
+  "priority": 170,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)\\bkostenvoranschlag\\b",
+    "(?i)\\bangebots?[- ]?(nr|nummer)\\b",
+    "(?i)\\bangebotssumme\\b",
+    "(?i)\\bkostensch(ae|ä)tzung\\b",
+    "(?i)\\bangebot\\b.{0,80}\\b(sanierung|instandsetzung|erneuerung|reparatur|dach|fassade|heizung|maler|fenster|austausch)"
+   ],
+   "not_text_regex": [
+    "(?i)\\b(schluss|teil|abschlags)?rechnung\\b",
+    "(?i)rechnungs(betrag|nummer|nr|datum)\\b",
+    "(?i)abrechnung",
+    "(?i)mietvertrag",
+    "(?i)kaufvertrag",
+    "(?i)verwalt(er|ungs)vertrag",
+    "(?i)wartungsvertrag",
+    "(?i)eigent(ue|ü)merversammlung"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.85,
+   "hard": false,
+   "subfolder": "13",
+   "document_type": "angebot_kostenvoranschlag",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Angebot Nr. 2026-0417 über die Erneuerung der Dachrinnen am Objekt Hauptstraße 12. Angebotssumme netto 4.850,00 EUR, gültig bis 30.10.2026.",
+    "Kostenvoranschlag für die Instandsetzung der Kellertreppe, Gartenweg 5. Material und Lohn gesamt 2.130,00 EUR zuzüglich Umsatzsteuer."
+   ],
+   "negative": [
+    "Rechnung Nr. 2026-0912 zur Erneuerung der Dachrinnen gemäß Angebot vom 04.05.2026, Rechnungsbetrag 4.850,00 EUR.",
+    "Protokoll der Eigentümerversammlung, TOP 5: Die Gemeinschaft beschließt die Annahme des Angebots der Firma Dachbau."
+   ]
+  }
+ },
+ {
+  "id": "R-02-SCHADEN-001",
+  "name": "Versicherungsfall",
+  "version": 1,
+  "priority": 182,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)\\bschadens?-?(meldung|anzeige|regulierung|nummer|nr)\\b",
+    "(?i)\\bschadenfall\\b",
+    "(?i)\\bversicherungsfall\\b",
+    "(?i)\\bregulierungs(zusage|schreiben|entscheidung)\\b",
+    "(?i)\\bleitungswasserschaden\\b",
+    "(?i)\\bsturmschaden\\b"
+   ],
+   "not_text_regex": [
+    "(?i)\\b(schluss|teil|abschlags)?rechnung\\b",
+    "(?i)rechnungs(betrag|nummer|nr|datum)\\b",
+    "(?i)abrechnung",
+    "(?i)mietvertrag",
+    "(?i)versicherungsschein",
+    "(?i)versicherungspolice",
+    "(?i)eigent(ue|ü)merversammlung"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.88,
+   "hard": false,
+   "subfolder": "13",
+   "document_type": "versicherungsschaden",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Schadenmeldung an die Gebäudeversicherung: Am 12.01.2026 trat im Keller des Objekts Hauptstraße 12 ein Leitungswasserschaden auf. Schaden-Nr. wird erbeten.",
+    "Regulierungszusage zum Schadenfall Nr. 4711-2026-88, Objekt Gartenweg 5. Wir übernehmen die Kosten der Trocknung abzüglich Selbstbeteiligung."
+   ],
+   "negative": [
+    "Rechnung der Trocknungsfirma zum Leitungswasserschaden im Keller, Rechnungsbetrag 1.890,00 EUR, Schaden-Nr. 4711-2026-88.",
+    "Versicherungsschein Wohngebäudeversicherung für das Objekt Hauptstraße 12, Versicherungsbeginn 01.01.2026."
+   ]
+  }
+ },
+ {
+  "id": "R-02-ABNAHME-001",
+  "name": "Abnahmeprotokoll",
+  "version": 1,
+  "priority": 185,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)\\babnahmeprotokoll\\b",
+    "(?i)\\bprotokoll (der|zur|(ue|ü)ber die) (bau|werk|teil|schluss|end)?abnahme\\b",
+    "(?i)\\b(bau|werk|schluss|end)abnahme\\b.{0,80}\\b(m(ae|ä)ngel|vorbehalt|abgenommen)"
+   ],
+   "not_text_regex": [
+    "(?i)\\b(schluss|teil|abschlags)?rechnung\\b",
+    "(?i)rechnungs(betrag|nummer|nr|datum)\\b",
+    "(?i)abrechnung",
+    "(?i)mietvertrag",
+    "(?i)wohnungs(ue|ü)bergabe",
+    "(?i)wohnungsabnahme",
+    "(?i)\\bmieter(in)?\\b"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.9,
+   "hard": false,
+   "subfolder": "13",
+   "document_type": "abnahmeprotokoll",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Abnahmeprotokoll Dachsanierung Gartenweg 5. Die Leistung wurde am 18.06.2026 unter Vorbehalt der aufgeführten Restmängel abgenommen.",
+    "Protokoll zur Schlussabnahme der Fassadenarbeiten Hauptstraße 12, Teilnehmer: Auftraggeber, Auftragnehmer, Bauleitung. Mängel: keine."
+   ],
+   "negative": [
+    "Schlussrechnung Dachsanierung Gartenweg 5 nach Abnahme vom 18.06.2026, Rechnungsbetrag 38.420,00 EUR.",
+    "Wohnungsübergabeprotokoll bei Auszug des Mieters Herrn Weber, Wohnung 2. OG links, Zählerstände und Schlüsselrückgabe."
+   ]
+  }
+ },
+ {
+  "id": "R-02-MAENGEL-001",
+  "name": "Mängelliste und Mängelbeseitigung",
+  "version": 1,
+  "priority": 176,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)\\bm(ae|ä)ngelliste\\b",
+    "(?i)\\bm(ae|ä)ngelanzeige\\b",
+    "(?i)\\bm(ae|ä)ngelr(ue|ü)ge\\b",
+    "(?i)\\bm(ae|ä)ngelbeseitigung\\b",
+    "(?i)\\bm(ae|ä)ngelprotokoll\\b",
+    "(?i)\\bnachbesserung\\b",
+    "(?i)\\brestm(ae|ä)ngel\\b"
+   ],
+   "not_text_regex": [
+    "(?i)\\b(schluss|teil|abschlags)?rechnung\\b",
+    "(?i)rechnungs(betrag|nummer|nr|datum)\\b",
+    "(?i)abrechnung",
+    "(?i)mietvertrag",
+    "(?i)mietminderung",
+    "(?i)abnahmeprotokoll",
+    "(?i)kaufvertrag",
+    "(?i)eigent(ue|ü)merversammlung"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.85,
+   "hard": false,
+   "subfolder": "13",
+   "document_type": "maengelliste",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Mängelliste zur Fassadensanierung Hauptstraße 12, Stand 20.06.2026: Pos. 1 Risse im Sockelputz, Pos. 2 Fehlstellen im Anstrich Nordseite.",
+    "Mängelrüge: Wir fordern Sie auf, die in der Anlage aufgeführten Mängel an der Heizungsanlage bis zum 15.07.2026 zu beseitigen. Nachweis der Mängelbeseitigung erbeten."
+   ],
+   "negative": [
+    "Rechnung über die Nachbesserung am Sockelputz, Rechnungsbetrag 640,00 EUR.",
+    "Mängelanzeige des Mieters Herrn Weber mit Ankündigung einer Mietminderung wegen Schimmel im Bad."
+   ]
+  }
+ },
+ {
+  "id": "R-02-GEWAEHR-001",
+  "name": "Gewährleistungsübersicht",
+  "version": 1,
+  "priority": 174,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)\\bgew(ae|ä)hrleistungs(ue|ü)bersicht\\b",
+    "(?i)\\bgew(ae|ä)hrleistungsfrist(en)?\\b",
+    "(?i)\\bgew(ae|ä)hrleistungsverfolgung\\b",
+    "(?i)\\bablauf der gew(ae|ä)hrleistung\\b",
+    "(?i)\\bgew(ae|ä)hrleistungsliste\\b"
+   ],
+   "not_text_regex": [
+    "(?i)\\b(schluss|teil|abschlags)?rechnung\\b",
+    "(?i)rechnungs(betrag|nummer|nr|datum)\\b",
+    "(?i)abrechnung",
+    "(?i)kaufvertrag",
+    "(?i)mietvertrag",
+    "(?i)b(ue|ü)rgschaft",
+    "(?i)abnahmeprotokoll",
+    "(?i)eigent(ue|ü)merversammlung"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.85,
+   "hard": false,
+   "subfolder": "13",
+   "document_type": "gewaehrleistungsuebersicht",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Gewährleistungsübersicht Objekt Gartenweg 5: Dachsanierung, Abnahme 18.06.2026, Ablauf der Gewährleistung 18.06.2031, Firma Dachbau GmbH.",
+    "Übersicht der laufenden Gewährleistungsfristen der Wohnanlage Hauptstraße 12 mit Auftragnehmer, Abnahmedatum und Fristende."
+   ],
+   "negative": [
+    "Kaufvertrag über die Eigentumswohnung Nr. 7, die Gewährleistungsfristen des Bauträgers gehen auf den Käufer über.",
+    "Gewährleistungsbürgschaft der Sparkasse über 5 Prozent der Auftragssumme für die Dachsanierung."
+   ]
+  }
+ },
+ {
+  "id": "R-02-BUERGSCHAFT-001",
+  "name": "Sicherheiten und Bürgschaften",
+  "version": 1,
+  "priority": 180,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)\\b(gew(ae|ä)hrleistungs|vertragserf(ue|ü)llungs|m(ae|ä)ngelanspr(ue|ü)che|bank)?b(ue|ü)rgschaft(surkunde|serkl(ae|ä)rung)?\\b",
+    "(?i)\\bsicherheitseinbehalt\\b",
+    "(?i)\\bsicherheitsleistung\\b"
+   ],
+   "not_text_regex": [
+    "(?i)\\b(schluss|teil|abschlags)?rechnung\\b",
+    "(?i)rechnungs(betrag|nummer|nr|datum)\\b",
+    "(?i)abrechnung",
+    "(?i)mietvertrag",
+    "(?i)kaufvertrag",
+    "(?i)\\bkaution\\b",
+    "(?i)mietb(ue|ü)rgschaft",
+    "(?i)\\bmieter(in)?\\b"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.88,
+   "hard": false,
+   "subfolder": "13",
+   "document_type": "buergschaft",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Gewährleistungsbürgschaft der Sparkasse Hilden über 1.921,00 EUR zugunsten der Wohnungseigentümergemeinschaft Gartenweg 5 für die Dachsanierung.",
+    "Bürgschaftsurkunde Nr. 88-2026: Wir übernehmen die selbstschuldnerische Bürgschaft für die Erfüllung der Mängelansprüche aus dem Bauvertrag Hauptstraße 12."
+   ],
+   "negative": [
+    "Mietbürgschaft der Eltern für die Mieterin Frau Krause anstelle einer Barkaution, Wohnung 1. OG rechts.",
+    "Schlussrechnung Dachsanierung, vom Rechnungsbetrag wird ein Sicherheitseinbehalt von 5 Prozent abgezogen."
+   ]
+  }
+ },
+ {
+  "id": "R-02-BEHOERDE-001",
+  "name": "Behördliche Anordnung und Bescheid",
+  "version": 1,
+  "priority": 172,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)\\b(bauaufsicht|bauordnungsamt|ordnungsamt|bauamt|umweltamt|gesundheitsamt|brandschutzdienststelle|feuerwehr|kreisverwaltung|bezirksamt|landeshauptstadt|stadt \\w+|gemeinde \\w+|\\bkreis \\w+)"
+   ],
+   "any_of": {
+    "text_regex": [
+     "(?i)\\bordnungsverf(ue|ü)gung\\b",
+     "(?i)\\banordnung\\b",
+     "(?i)\\bnutzungsuntersagung\\b",
+     "(?i)\\b(beseitigungs|instandsetzungs|sicherungs)anordnung\\b",
+     "(?i)\\bauflagen?\\b",
+     "(?i)\\banh(oe|ö)rung\\b",
+     "(?i)\\brechtsbehelfsbelehrung\\b",
+     "(?i)\\bbescheid\\b",
+     "(?i)\\bbrandschau\\b",
+     "(?i)\\bbrandverh(ue|ü)tungsschau\\b"
+    ]
+   },
+   "not_text_regex": [
+    "(?i)grundsteuer",
+    "(?i)geb(ue|ü)hren",
+    "(?i)abgaben",
+    "(?i)beitragsbescheid",
+    "(?i)f(oe|ö)rder",
+    "(?i)\\b(schluss|teil|abschlags)?rechnung\\b",
+    "(?i)rechnungs(betrag|nummer|nr|datum)\\b",
+    "(?i)abrechnung",
+    "(?i)mietvertrag",
+    "(?i)kaufvertrag",
+    "(?i)denkmal",
+    "(?i)hausgeld"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.82,
+   "hard": false,
+   "subfolder": "14",
+   "document_type": "behoerdliche_anordnung",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Stadt Hilden, Bauaufsicht. Ordnungsverfügung: Ihnen wird aufgegeben, die Brandschutztüren im Treppenhaus des Gebäudes Hauptstraße 12 bis zum 30.11.2026 instand zu setzen.",
+    "Kreis Mettmann, Brandschutzdienststelle. Bericht über die Brandverhütungsschau vom 08.04.2026 im Objekt Gartenweg 5 mit Auflagen zur Freihaltung der Rettungswege.",
+    "Ordnungsamt der Stadt Hilden, Anhörung vor Erlass einer Anordnung: Der Gehweg vor dem Grundstück Gartenweg 5 ist von Bewuchs freizuhalten."
+   ],
+   "negative": [
+    "Grundsteuerbescheid 2026 der Stadt Hilden. Festgesetzt wird eine Grundsteuer B in Höhe von 1.240,00 EUR, fällig in vier Raten.",
+    "Gebührenbescheid der Stadt Hilden über Abfallentsorgung und Straßenreinigung für das Grundstück Hauptstraße 12."
+   ]
+  }
+ },
+ {
+  "id": "R-02-FOERDER-001",
+  "name": "Förderbescheid",
+  "version": 1,
+  "priority": 185,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)\\b(f(oe|ö)rder|zuwendungs|bewilligungs)bescheid\\b",
+    "(?i)\\bf(oe|ö)rderzusage\\b",
+    "(?i)\\bf(oe|ö)rdermittel(bescheid|zusage)?\\b",
+    "(?i)\\bzuwendung\\b.{0,80}\\b(bewilligt|gew(ae|ä)hrt)",
+    "(?i)\\bkfw\\b.{0,80}\\b(zusage|bewilligung|f(oe|ö)rderung|zuschuss)",
+    "(?i)\\bbafa\\b.{0,80}\\b(zuschuss|bewilligung|f(oe|ö)rderung)"
+   ],
+   "not_text_regex": [
+    "(?i)\\b(schluss|teil|abschlags)?rechnung\\b",
+    "(?i)rechnungs(betrag|nummer|nr|datum)\\b",
+    "(?i)abrechnung",
+    "(?i)mietvertrag",
+    "(?i)kaufvertrag",
+    "(?i)energieausweis",
+    "(?i)eigent(ue|ü)merversammlung"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.9,
+   "hard": false,
+   "subfolder": "14",
+   "document_type": "foerderbescheid",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Zuwendungsbescheid: Auf Ihren Antrag vom 12.01.2026 bewilligen wir für die energetische Sanierung des Gebäudes Hauptstraße 12 eine Zuwendung in Höhe von 48.000,00 EUR.",
+    "Förderbescheid der KfW zum Programm Energieeffizient Sanieren, Objekt Gartenweg 5. Der Tilgungszuschuss beträgt 15 Prozent der förderfähigen Kosten.",
+    "BAFA Bewilligung: Für den Austausch der Heizungsanlage im Objekt Gartenweg 5 wird ein Zuschuss in Höhe von 12.300,00 EUR gewährt."
+   ],
+   "negative": [
+    "Rechnung des Energieberaters für die Erstellung des Förderantrags bei der KfW, Honorar 1.200,00 EUR.",
+    "Protokoll der Eigentümerversammlung, TOP 3: Beschluss über die Beantragung von Fördermitteln für die Dachdämmung."
+   ]
+  }
+ },
+ {
+  "id": "R-02-BINDUNG-001",
+  "name": "Belegungs- und Mietpreisbindung",
+  "version": 1,
+  "priority": 178,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)\\bbelegungsbindung\\b",
+    "(?i)\\bmietpreisbindung\\b",
+    "(?i)\\bwohnungsbindung(sgesetz)?\\b",
+    "(?i)\\b(oe|ö)ffentlich gef(oe|ö)rderte[rn]? (wohnraum|wohnung|mietwohnung)",
+    "(?i)\\bbindungsfrist\\b",
+    "(?i)\\bbewilligungsmiete\\b",
+    "(?i)\\bkostenmiete\\b",
+    "(?i)\\bbelegungsrecht\\b"
+   ],
+   "not_text_regex": [
+    "(?i)\\b(schluss|teil|abschlags)?rechnung\\b",
+    "(?i)rechnungs(betrag|nummer|nr|datum)\\b",
+    "(?i)abrechnung",
+    "(?i)mietvertrag",
+    "(?i)kaufvertrag",
+    "(?i)betriebskosten",
+    "(?i)\\bkaution\\b"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.85,
+   "hard": false,
+   "subfolder": "14",
+   "document_type": "belegungsbindung",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Bescheinigung über die Belegungsbindung: Die Wohnungen im Gebäude Gartenweg 5 unterliegen bis zum 31.12.2032 der Belegungs- und Mietpreisbindung nach dem Wohnraumförderungsgesetz.",
+    "Mitteilung der Bewilligungsbehörde zur Bindungsfrist für den öffentlich geförderten Wohnraum Hauptstraße 12, Bewilligungsmiete 6,20 EUR je Quadratmeter."
+   ],
+   "negative": [
+    "Mietvertrag über die öffentlich geförderte Wohnung im 1. OG links, die Miete beträgt 6,20 EUR je Quadratmeter.",
+    "Betriebskostenabrechnung 2025 für die Wohnung Nr. 4, Gartenweg 5, Nachzahlung 212,40 EUR."
+   ]
+  }
+ },
+ {
+  "id": "R-02-DENKMAL-001",
+  "name": "Denkmalschutzunterlagen",
+  "version": 1,
+  "priority": 180,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)\\bdenkmalschutz(beh(oe|ö)rde|gesetz|rechtlich|auflage)?\\b",
+    "(?i)\\bdenkmal(liste|pflege|eigenschaft|wert|buch)\\b",
+    "(?i)\\bbaudenkmal\\b",
+    "(?i)\\bdenkmalrechtliche[rn]? (erlaubnis|genehmigung|bescheid)",
+    "(?i)\\buntere denkmalbeh(oe|ö)rde\\b"
+   ],
+   "not_text_regex": [
+    "(?i)\\b(schluss|teil|abschlags)?rechnung\\b",
+    "(?i)rechnungs(betrag|nummer|nr|datum)\\b",
+    "(?i)abrechnung",
+    "(?i)kaufvertrag",
+    "(?i)mietvertrag",
+    "(?i)grundbuch",
+    "(?i)energieausweis",
+    "(?i)eigent(ue|ü)merversammlung"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.88,
+   "hard": false,
+   "subfolder": "14",
+   "document_type": "denkmalschutz",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Untere Denkmalbehörde der Stadt Hilden: Das Gebäude Hauptstraße 12 ist als Baudenkmal in die Denkmalliste eingetragen. Änderungen bedürfen der denkmalrechtlichen Erlaubnis.",
+    "Denkmalrechtliche Erlaubnis für den Austausch der Fenster an der Straßenfassade des Baudenkmals Gartenweg 5 unter Auflagen zur Sprossenteilung."
+   ],
+   "negative": [
+    "Kaufvertrag über das Grundstück Hauptstraße 12, der Käufer wird darauf hingewiesen, dass das Gebäude dem Denkmalschutz unterliegt.",
+    "Rechnung der Tischlerei Holz für die denkmalgerechten Fenster, Rechnungsbetrag 24.600,00 EUR."
+   ]
+  }
+ },
+ {
+  "id": "R-02-NUTZUNG-001",
+  "name": "Nutzungsbeschränkung und Nutzungsgenehmigung",
+  "version": 1,
+  "priority": 170,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)\\bnutzungs(ae|ä)nderung(sgenehmigung|santrag)?\\b",
+    "(?i)\\bnutzungsbeschr(ae|ä)nkung(en)?\\b",
+    "(?i)\\bnutzungsgenehmigung\\b",
+    "(?i)\\bgenehmigung (zur|der|f(ue|ü)r die) (nutzung|gewerbliche[n]? nutzung|zweckentfremdung)",
+    "(?i)\\bzweckentfremdung(sgenehmigung|sverbot)?\\b",
+    "(?i)\\bsondernutzungserlaubnis\\b",
+    "(?i)\\bgastst(ae|ä)ttenerlaubnis\\b",
+    "(?i)\\bausnahmegenehmigung\\b",
+    "(?i)\\bbefreiung\\b.{0,60}\\b(bebauungsplan|festsetzungen|baurecht)"
+   ],
+   "not_text_regex": [
+    "(?i)\\b(schluss|teil|abschlags)?rechnung\\b",
+    "(?i)rechnungs(betrag|nummer|nr|datum)\\b",
+    "(?i)abrechnung",
+    "(?i)mietvertrag",
+    "(?i)kaufvertrag",
+    "(?i)teilungserkl(ae|ä)rung",
+    "(?i)gemeinschaftsordnung",
+    "(?i)baugenehmigung",
+    "(?i)eigent(ue|ü)merversammlung"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.82,
+   "hard": false,
+   "subfolder": "14",
+   "document_type": "nutzungsgenehmigung",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Sondernutzungserlaubnis der Stadt Hilden für die Aufstellung eines Gerüsts auf dem Gehweg vor dem Gebäude Gartenweg 5 vom 01.05.2026 bis 30.06.2026.",
+    "Zweckentfremdungsgenehmigung: Die vorübergehende Nutzung der Wohnung im 3. OG als Ferienwohnung wird bis zum 31.12.2027 genehmigt."
+   ],
+   "negative": [
+    "Mietvertrag über Gewerberäume im Erdgeschoss, der Mieter ist für die Genehmigung zur Nutzungsänderung selbst verantwortlich.",
+    "Teilungserklärung mit Gemeinschaftsordnung, § 5 Nutzungsbeschränkungen für das Teileigentum im Erdgeschoss."
+   ]
+  }
+ },
+ {
+  "id": "R-02-VERFAHREN-001",
+  "name": "Gerichtsverfahren der Gemeinschaft",
+  "version": 1,
+  "priority": 180,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)\\b(beschluss)?anfechtungsklage\\b",
+    "(?i)\\bbeschlussklage\\b",
+    "(?i)\\bbeschlussanfechtung\\b",
+    "(?i)\\bbeschlussersetzungsklage\\b",
+    "(?i)\\bklage\\b.{0,80}\\b(beschl(ue|ü)sse?|eigent(ue|ü)merversammlung|ung(ue|ü)ltig)",
+    "(?i)\\bklageschrift\\b",
+    "(?i)\\bklageerwiderung\\b",
+    "(?i)\\bin dem rechtsstreit\\b",
+    "(?i)\\brechtsstreit\\b",
+    "(?i)\\bamtsgericht\\b.{0,80}\\b(klage|verfahren|aktenzeichen|az\\.)"
+   ],
+   "not_text_regex": [
+    "(?i)hausgeld",
+    "(?i)r(ue|ü)ckst(ae|ä)nd",
+    "(?i)mahnbescheid",
+    "(?i)vollstreckungsbescheid",
+    "(?i)r(ae|ä)umung",
+    "(?i)mietvertrag",
+    "(?i)kaufvertrag",
+    "(?i)\\b(schluss|teil|abschlags)?rechnung\\b",
+    "(?i)rechnungs(betrag|nummer|nr|datum)\\b",
+    "(?i)\\burteil\\b",
+    "(?i)im namen des volkes"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.85,
+   "hard": false,
+   "subfolder": "14",
+   "document_type": "gerichtsverfahren",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Klageschrift: In dem Rechtsstreit Müller gegen die Gemeinschaft der Wohnungseigentümer Gartenweg 5 wird beantragt, den Beschluss zu TOP 4 der Eigentümerversammlung vom 15.05.2026 für ungültig zu erklären.",
+    "Anfechtungsklage gegen die Beschlüsse der Eigentümerversammlung vom 15.05.2026, Amtsgericht Langenfeld, Aktenzeichen 64 C 118/26.",
+    "Klageerwiderung der Gemeinschaft der Wohnungseigentümer Hauptstraße 12 im Rechtsstreit wegen der Beschlussanfechtung zur Fassadensanierung."
+   ],
+   "negative": [
+    "Klageschrift der Gemeinschaft der Wohnungseigentümer gegen Herrn Weber wegen Hausgeldrückständen in Höhe von 3.420,00 EUR.",
+    "Urteil des Amtsgerichts Langenfeld im Namen des Volkes: Der Beschluss zu TOP 4 der Eigentümerversammlung vom 15.05.2026 wird für ungültig erklärt."
+   ]
+  }
+ },
+ {
+  "id": "R-02-URTEIL-001",
+  "name": "Gerichtliche Entscheidung und Vergleich",
+  "version": 1,
+  "priority": 184,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)\\b(end|teil|vers(ae|ä)umnis|anerkenntnis)?urteil\\b",
+    "(?i)\\bim namen des volkes\\b",
+    "(?i)\\bbeschluss des (amts|land|oberlandes)gerichts\\b",
+    "(?i)\\b(prozess)?vergleich\\b.{0,80}\\b(gericht|verfahren|aktenzeichen|az\\.|rechtsstreit)",
+    "(?i)\\bvergleichsvorschlag\\b",
+    "(?i)\\bkostenfestsetzungsbeschluss\\b",
+    "(?i)\\bhinweisbeschluss\\b",
+    "(?i)\\bhat das amtsgericht\\b.{0,80}\\b(beschlossen|f(ue|ü)r recht erkannt)"
+   ],
+   "not_text_regex": [
+    "(?i)hausgeld",
+    "(?i)r(ue|ü)ckst(ae|ä)nd",
+    "(?i)mahnbescheid",
+    "(?i)vollstreckungsbescheid",
+    "(?i)r(ae|ä)umung",
+    "(?i)mietvertrag",
+    "(?i)kaufvertrag",
+    "(?i)\\b(schluss|teil|abschlags)?rechnung\\b",
+    "(?i)rechnungs(betrag|nummer|nr|datum)\\b"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.88,
+   "hard": false,
+   "subfolder": "14",
+   "document_type": "gerichtsentscheidung",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Amtsgericht Langenfeld, Aktenzeichen 64 C 118/26. Im Namen des Volkes. Urteil: Der Beschluss zu TOP 4 der Eigentümerversammlung vom 15.05.2026 wird für ungültig erklärt.",
+    "Vergleichsvorschlag des Gerichts: Die Gemeinschaft der Wohnungseigentümer Gartenweg 5 und die Firma Dachbau GmbH einigen sich zur Erledigung des Rechtsstreits auf eine Nachbesserung bis 30.09.2026.",
+    "Kostenfestsetzungsbeschluss des Amtsgerichts Langenfeld: Die von der Beklagten an die Klägerin zu erstattenden Kosten werden auf 1.284,50 EUR festgesetzt."
+   ],
+   "negative": [
+    "Versäumnisurteil gegen Herrn Weber wegen Hausgeldrückständen für die Monate Januar bis Juni 2026 in Höhe von 2.100,00 EUR.",
+    "Mahnbescheid des Amtsgerichts Hagen gegen die Eigentümerin Frau Krause wegen rückständigem Hausgeld."
+   ]
+  }
+ },
+ {
+  "id": "R-02-FRISTEN-001",
+  "name": "Fristenübersicht",
+  "version": 1,
+  "priority": 183,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)\\bfristen(ue|ü)bersicht\\b",
+    "(?i)\\bfristenliste\\b",
+    "(?i)\\bfristenkalender\\b",
+    "(?i)\\bfristenkontrolle\\b",
+    "(?i)\\bfristenspiegel\\b"
+   ],
+   "not_text_regex": [
+    "(?i)\\b(schluss|teil|abschlags)?rechnung\\b",
+    "(?i)rechnungs(betrag|nummer|nr|datum)\\b",
+    "(?i)abrechnung",
+    "(?i)hausgeld",
+    "(?i)mahnung",
+    "(?i)mietvertrag",
+    "(?i)kaufvertrag"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.85,
+   "hard": false,
+   "subfolder": "14",
+   "document_type": "fristenuebersicht",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Fristenübersicht Objekt Gartenweg 5, Stand 01.09.2026: Stellungnahme an das Amtsgericht Langenfeld bis 24.09.2026, Ablauf der Gewährleistung Dach 18.06.2031.",
+    "Fristenliste für die laufenden Verfahren und behördlichen Auflagen der Wohnanlage Hauptstraße 12 mit Vorfristen und Zuständigkeit."
+   ],
+   "negative": [
+    "Mahnung: Trotz Zahlungserinnerung ist das Hausgeld für Juli 2026 nicht eingegangen, wir setzen eine letzte Frist bis 15.08.2026.",
+    "Rechnung Nr. 2026-311, Zahlungsfrist 14 Tage, Betrag 480,00 EUR."
+   ]
+  }
+ },
+ {
+  "id": "R-02-UEBERGABE-001",
+  "name": "Übergabeprotokoll der Vorverwaltung",
+  "version": 1,
+  "priority": 185,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)\\b(vorverwalt|verwalterwechsel|verwaltungswechsel|alte[nr]? verwalt|bisherige[nr]? verwalt|neue[nr]? verwalt|verwaltungs(ue|ü)bernahme|(ue|ü)bernahme der verwaltung|verwaltungs(ue|ü)bergabe|verwalter(ue|ü)bergabe)"
+   ],
+   "any_of": {
+    "text_regex": [
+     "(?i)\\b(ue|ü)bergabeprotokoll\\b",
+     "(?i)\\bprotokoll (der|zur|(ue|ü)ber die) (verwalter|verwaltungs|objekt|akten|unterlagen)?(ue|ü)bergabe\\b",
+     "(?i)\\b(ue|ü)bergabe der (verwaltungs)?unterlagen\\b",
+     "(?i)\\bunterlagen(ue|ü)bergabe\\b"
+    ]
+   },
+   "not_text_regex": [
+    "(?i)wohnungs(ue|ü)bergabe",
+    "(?i)\\bmieter(in)?\\b",
+    "(?i)mietvertrag",
+    "(?i)\\bkaution\\b",
+    "(?i)\\b(schluss|teil|abschlags)?rechnung\\b",
+    "(?i)rechnungs(betrag|nummer|nr|datum)\\b",
+    "(?i)kaufvertrag"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.9,
+   "hard": false,
+   "subfolder": "15",
+   "document_type": "uebergabeprotokoll_verwaltung",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Übergabeprotokoll zur Verwaltungsübernahme des Objekts Gartenweg 5 zum 01.07.2026. Die Vorverwaltung übergibt Verträge, Versicherungsunterlagen und Kontounterlagen.",
+    "Protokoll der Verwalterübergabe Hauptstraße 12: Der bisherige Verwalter übergibt an die Hausverwaltung Müller GmbH die Objektakte, Schlüssel und Zugangsdaten.",
+    "Übergabe der Verwaltungsunterlagen anlässlich des Verwalterwechsels zum 01.07.2026, Objekt Gartenweg 5, Liste der übergebenen Ordner siehe Anlage."
+   ],
+   "negative": [
+    "Wohnungsübergabeprotokoll bei Einzug der Mieterin Frau Krause, Wohnung 1. OG rechts, Zählerstände und Schlüssel.",
+    "Abnahmeprotokoll Dachsanierung Gartenweg 5, die Leistung wurde am 18.06.2026 abgenommen."
+   ]
+  }
+ },
+ {
+  "id": "R-02-VERZEICHNIS-001",
+  "name": "Dokumenten- und Unterlagenverzeichnis",
+  "version": 1,
+  "priority": 176,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)\\b(unterlagen|dokumenten|akten|ordner)verzeichnis\\b",
+    "(?i)\\b(unterlagen|dokumenten|akten|ordner)(ue|ü)bersicht\\b",
+    "(?i)\\b(ue|ü)bersicht der (ue|ü)bergebenen (unterlagen|dokumente|ordner)\\b",
+    "(?i)\\b(ue|ü)bergabeliste\\b",
+    "(?i)\\bunterlagenliste\\b",
+    "(?i)\\bliste der (ue|ü)bergebenen (unterlagen|dokumente|ordner)\\b"
+   ],
+   "not_text_regex": [
+    "(?i)fehlunterlagen",
+    "(?i)fehlende unterlagen",
+    "(?i)\\b(schluss|teil|abschlags)?rechnung\\b",
+    "(?i)rechnungs(betrag|nummer|nr|datum)\\b",
+    "(?i)abrechnung",
+    "(?i)mietvertrag",
+    "(?i)kaufvertrag",
+    "(?i)(ue|ü)bergabeprotokoll"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.85,
+   "hard": false,
+   "subfolder": "15",
+   "document_type": "unterlagenverzeichnis",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Unterlagenverzeichnis Objekt Gartenweg 5, Stand 01.07.2026: Ordner 1 Verträge, Ordner 2 Versicherungen, Ordner 3 Technik und Wartung.",
+    "Übergabeliste der von der Vorverwaltung übergebenen Ordner und Dateien für das Objekt Hauptstraße 12 mit Angabe von Jahrgang und Umfang."
+   ],
+   "negative": [
+    "Fehlunterlagenliste Objekt Gartenweg 5: Energieausweis, Prüfbericht Aufzug 2025 und Schließplan liegen nicht vor.",
+    "Übergabeprotokoll zur Verwaltungsübernahme des Objekts Gartenweg 5 zum 01.07.2026."
+   ]
+  }
+ },
+ {
+  "id": "R-02-FEHLUNTERL-001",
+  "name": "Fehlunterlagenliste",
+  "version": 1,
+  "priority": 189,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)\\bfehlunterlagen(liste)?\\b",
+    "(?i)\\bfehlende unterlagen\\b",
+    "(?i)\\bfehlliste\\b",
+    "(?i)\\bnachforderung (von|der) unterlagen\\b",
+    "(?i)\\bunterlagen\\b.{0,60}\\b(nicht (ue|ü)bergeben|noch offen|ausstehend|nachzureichen|liegen nicht vor)",
+    "(?i)\\bausstehende unterlagen\\b"
+   ],
+   "not_text_regex": [
+    "(?i)\\b(schluss|teil|abschlags)?rechnung\\b",
+    "(?i)rechnungs(betrag|nummer|nr|datum)\\b",
+    "(?i)abrechnung",
+    "(?i)mietvertrag",
+    "(?i)kaufvertrag",
+    "(?i)hausgeld"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.88,
+   "hard": false,
+   "subfolder": "15",
+   "document_type": "fehlunterlagenliste",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Fehlunterlagenliste Objekt Gartenweg 5 nach Verwaltungsübernahme: Prüfbericht Aufzug 2025 und Wartungsvertrag Heizung liegen nicht vor.",
+    "Nachforderung von Unterlagen bei der Vorverwaltung: Folgende Unterlagen zum Objekt Hauptstraße 12 wurden bislang nicht übergeben und sind nachzureichen."
+   ],
+   "negative": [
+    "Unterlagenverzeichnis Objekt Gartenweg 5, Stand 01.07.2026, Ordner 1 bis 12 vollständig übergeben.",
+    "Einzelabrechnung 2025 für die Wohnung Nr. 4, die Belege können in der Verwaltung eingesehen werden."
+   ]
+  }
+ },
+ {
+  "id": "R-02-OFFEN-001",
+  "name": "Übersicht offener Vorgänge",
+  "version": 1,
+  "priority": 170,
+  "scope": {},
+  "when": {
+   "text_regex": [
+    "(?i)\\b(ue|ü)bersicht (der |(ue|ü)ber die |aller )?offene[nr]? (auftr(ae|ä)ge|sch(ae|ä)den|vorg(ae|ä)nge|aufgaben|ma(ss|ß)nahmen|punkte)\\b",
+    "(?i)\\boffene (auftr(ae|ä)ge|sch(ae|ä)den|vorg(ae|ä)nge|aufgaben|punkte|ma(ss|ß)nahmen)\\b",
+    "(?i)\\b(aufgaben|vorgangs|pendenzen|to-?do)-?liste\\b",
+    "(?i)\\b(ue|ü)bersicht (der |(ue|ü)ber die )?beh(oe|ö)rdlichen? (anforderungen|auflagen)\\b",
+    "(?i)\\bbeh(oe|ö)rdliche anforderungen\\b"
+   ],
+   "not_text_regex": [
+    "(?i)offene posten",
+    "(?i)\\b(schluss|teil|abschlags)?rechnung\\b",
+    "(?i)rechnungs(betrag|nummer|nr|datum)\\b",
+    "(?i)abrechnung",
+    "(?i)hausgeld",
+    "(?i)r(ue|ü)ckst(ae|ä)nd",
+    "(?i)mahnung",
+    "(?i)mietvertrag",
+    "(?i)eigent(ue|ü)merversammlung"
+   ]
+  },
+  "then": {
+   "category": "02",
+   "confidence": 0.8,
+   "hard": false,
+   "subfolder": "15",
+   "document_type": "offene_vorgaenge",
+   "scope": "object"
+  },
+  "examples": {
+   "positive": [
+    "Übersicht offener Aufträge Objekt Gartenweg 5 zum 01.07.2026: Dachrinnenreinigung beauftragt, Austausch Kellertür in Vergabe, Heizungswartung terminiert.",
+    "Offene Schäden und Vorgänge bei Verwaltungsübernahme Hauptstraße 12: Wasserschaden Keller (Regulierung läuft), Fassadenriss Nordseite (Angebot ausstehend).",
+    "Übersicht der behördlichen Anforderungen: Brandschutztüren bis 30.11.2026 instand setzen, Nachweis an die Bauaufsicht der Stadt Hilden."
+   ],
+   "negative": [
+    "Offene-Posten-Liste zum 30.06.2026: Hausgeldrückstände Einheit 4 in Höhe von 1.260,00 EUR.",
+    "Protokoll der Eigentümerversammlung vom 15.05.2026, TOP 7 Bericht des Verwalters über offene Aufträge."
+   ]
+  }
  }
 ]

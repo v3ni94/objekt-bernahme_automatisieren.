@@ -70,7 +70,9 @@ def test_dokumentunterarten_pflichtmetadaten(seeded):
     assert DocumentType.objects.filter(category_id="05", requires_owner=False).count() == 0
     assert DocumentType.objects.get(code="verwaltervollmacht").category_id == "01"
     assert DocumentType.objects.get(code="einzelabrechnung").subfolder.folder_name == "05_Abrechnungen"
-    assert DocumentType.objects.filter(category_id="02").count() == 8
+    # 8 Arten aus CR und 93 Arten der Checkliste vom 12.09.2026, alle an einem der 15 Unterordner
+    assert DocumentType.objects.filter(category_id="02").count() == 101
+    assert not DocumentType.objects.filter(category_id="02", subfolder__isnull=True).exists()
     assert DocumentType.objects.count() >= 45
 
 

@@ -808,5 +808,1518 @@
       "Mieter",
       "Schreiben"
     ]
+  },
+  {
+    "code": "objektstammblatt",
+    "category_code": "02",
+    "subfolder_code": "01",
+    "name": "Objektstammblatt",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Objektstammblatt",
+      "Objektstammdaten",
+      "Objektnummer",
+      "Objektanschrift",
+      "Baujahr",
+      "Verwaltungsart"
+    ]
+  },
+  {
+    "code": "einheitenstammblatt",
+    "category_code": "02",
+    "subfolder_code": "01",
+    "name": "Einheitenstammblatt",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Einheitenstammblatt",
+      "Wohnungsstammblatt",
+      "Einheitsnummer",
+      "Miteigentumsanteil",
+      "Sondernutzungsrecht"
+    ]
+  },
+  {
+    "code": "einheitenverzeichnis",
+    "category_code": "02",
+    "subfolder_code": "01",
+    "name": "Einheitenverzeichnis",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Einheitenverzeichnis",
+      "Einheitenliste",
+      "Wohnungsverzeichnis",
+      "Stellplatzverzeichnis",
+      "Kellerzuordnung",
+      "Nutzungsart",
+      "Miteigentumsanteile"
+    ]
+  },
+  {
+    "code": "flaechenverzeichnis",
+    "category_code": "02",
+    "subfolder_code": "01",
+    "name": "Wohn- und Nutzflächenverzeichnis",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Flächenverzeichnis",
+      "Wohnflächenverzeichnis",
+      "Nutzflächenverzeichnis",
+      "Flächenaufstellung",
+      "Flächenübersicht"
+    ]
+  },
+  {
+    "code": "abrechnungsstruktur",
+    "category_code": "02",
+    "subfolder_code": "01",
+    "name": "Abrechnungsstruktur und Verteilungsschlüssel",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Verteilungsschlüssel",
+      "Umlageschlüssel",
+      "Abrechnungseinheiten",
+      "Zählerzuordnung",
+      "Verteilerschlüssel"
+    ]
+  },
+  {
+    "code": "ausstattungsbeschreibung",
+    "category_code": "02",
+    "subfolder_code": "01",
+    "name": "Ausstattungsbeschreibung",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Ausstattungsbeschreibung",
+      "Ausstattungsmerkmale",
+      "Wohnungsbeschreibung",
+      "Ausstattung",
+      "Einbauküche"
+    ]
+  },
+  {
+    "code": "objektfotos",
+    "category_code": "02",
+    "subfolder_code": "01",
+    "name": "Objektfotos",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Objektfotos",
+      "Fotodokumentation",
+      "Gebäudefotos",
+      "Straßenansicht",
+      "Bilddokumentation"
+    ]
+  },
+  {
+    "code": "inventarverzeichnis",
+    "category_code": "02",
+    "subfolder_code": "01",
+    "name": "Inventar- und Geräteverzeichnis",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Inventarverzeichnis",
+      "Inventarliste",
+      "Geräteliste",
+      "mitvermietete Einrichtung",
+      "Einbauküche"
+    ]
+  },
+  {
+    "code": "zustaendigkeitsregelung",
+    "category_code": "02",
+    "subfolder_code": "01",
+    "name": "Zuständigkeits- und Freigaberegelung",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Zuständigkeiten",
+      "Zuständigkeitsabgrenzung",
+      "Freigabegrenze",
+      "Freigaberegelung",
+      "Wertgrenze"
+    ]
+  },
+  {
+    "code": "weg_verwaltung_kontakt",
+    "category_code": "02",
+    "subfolder_code": "01",
+    "name": "Kontaktblatt WEG-Verwaltung",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "WEG-Verwaltung",
+      "Ansprechpartner",
+      "Kontaktdaten",
+      "Kommunikationsweg",
+      "Objektnummer"
+    ]
+  },
+  {
+    "code": "vermietungsgrundriss",
+    "category_code": "02",
+    "subfolder_code": "01",
+    "name": "Vermietungsgrundriss",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Vermietungsgrundriss",
+      "Grundriss",
+      "Exposé",
+      "freigegeben",
+      "Vermietung"
+    ]
+  },
+  {
+    "code": "flurkarte",
+    "category_code": "02",
+    "subfolder_code": "02",
+    "name": "Flurkarte und Lageplan",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Flurkarte",
+      "Liegenschaftskarte",
+      "Lageplan",
+      "Gemarkung",
+      "Flurstück",
+      "Kataster"
+    ]
+  },
+  {
+    "code": "baulastenauskunft",
+    "category_code": "02",
+    "subfolder_code": "02",
+    "name": "Baulastenauskunft",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Baulastenauskunft",
+      "Baulastenverzeichnis",
+      "Baulast",
+      "Baulastenblatt",
+      "Abstandsflächenbaulast"
+    ]
+  },
+  {
+    "code": "dienstbarkeit",
+    "category_code": "02",
+    "subfolder_code": "02",
+    "name": "Wege- und Leitungsrechte",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Wegerecht",
+      "Leitungsrecht",
+      "Grunddienstbarkeit",
+      "Geh- und Fahrrecht",
+      "Gestattungsvertrag",
+      "Dienstbarkeit"
+    ]
+  },
+  {
+    "code": "nachbarvereinbarung",
+    "category_code": "02",
+    "subfolder_code": "02",
+    "name": "Nachbarvereinbarung",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Nachbarvereinbarung",
+      "Nachbarschaftsvertrag",
+      "Grenzbebauung",
+      "Nachbargrundstück",
+      "Grenzvereinbarung"
+    ]
+  },
+  {
+    "code": "erbbaurecht",
+    "category_code": "02",
+    "subfolder_code": "02",
+    "name": "Erbbaurechtsunterlagen",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Erbbaurecht",
+      "Erbbaurechtsvertrag",
+      "Erbbauzins",
+      "Erbbaugrundbuch",
+      "Erbbauberechtigter"
+    ]
+  },
+  {
+    "code": "baugenehmigung",
+    "category_code": "02",
+    "subfolder_code": "03",
+    "name": "Baugenehmigung",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Baugenehmigung",
+      "Bauschein",
+      "Nutzungsänderung",
+      "Genehmigungsbescheid",
+      "Bauaufsicht"
+    ]
+  },
+  {
+    "code": "baubeschreibung",
+    "category_code": "02",
+    "subfolder_code": "03",
+    "name": "Baubeschreibung",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Baubeschreibung",
+      "Bau- und Ausstattungsbeschreibung",
+      "Bau- und Leistungsbeschreibung",
+      "Bauvorhaben",
+      "Rohbau"
+    ]
+  },
+  {
+    "code": "grundriss",
+    "category_code": "02",
+    "subfolder_code": "03",
+    "name": "Grundriss",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Grundriss",
+      "Grundrissplan",
+      "Geschossplan",
+      "Maßstab",
+      "Erdgeschoss"
+    ]
+  },
+  {
+    "code": "ansichten_schnitte",
+    "category_code": "02",
+    "subfolder_code": "03",
+    "name": "Ansichten und Schnitte",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Ansichten",
+      "Schnitte",
+      "Südansicht",
+      "Straßenansicht",
+      "Längsschnitt",
+      "Schnitt A-A"
+    ]
+  },
+  {
+    "code": "wohnflaechenberechnung",
+    "category_code": "02",
+    "subfolder_code": "03",
+    "name": "Wohnflächenberechnung",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Wohnflächenberechnung",
+      "Flächenberechnung",
+      "Wohnflächenverordnung",
+      "WoFlV",
+      "DIN 277"
+    ]
+  },
+  {
+    "code": "bestandsplan",
+    "category_code": "02",
+    "subfolder_code": "03",
+    "name": "Bestands- und Ausführungspläne",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Bestandsplan",
+      "Bestandspläne",
+      "Revisionsunterlagen",
+      "Ausführungspläne",
+      "Werkplanung",
+      "Strangschema"
+    ]
+  },
+  {
+    "code": "statik",
+    "category_code": "02",
+    "subfolder_code": "03",
+    "name": "Statische Unterlagen",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Statik",
+      "statische Berechnung",
+      "Standsicherheitsnachweis",
+      "Tragwerksplanung",
+      "Prüfingenieur",
+      "Prüfstatik"
+    ]
+  },
+  {
+    "code": "energieberatungsbericht",
+    "category_code": "02",
+    "subfolder_code": "04",
+    "name": "Energieberatungsbericht",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Energieberatungsbericht",
+      "Energieberatung",
+      "Energieberater",
+      "energetische Bewertung",
+      "Energieaudit",
+      "BAFA"
+    ]
+  },
+  {
+    "code": "sanierungsfahrplan",
+    "category_code": "02",
+    "subfolder_code": "04",
+    "name": "Sanierungsfahrplan",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Sanierungsfahrplan",
+      "iSFP",
+      "individueller Sanierungsfahrplan",
+      "Sanierungsschritte",
+      "Energieberatung"
+    ]
+  },
+  {
+    "code": "energetische_massnahme",
+    "category_code": "02",
+    "subfolder_code": "04",
+    "name": "Energetische Maßnahme",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "energetische Sanierung",
+      "Fassadendämmung",
+      "Wärmedämmverbundsystem",
+      "hydraulischer Abgleich",
+      "Fachunternehmererklärung",
+      "Bestätigung nach Durchführung"
+    ]
+  },
+  {
+    "code": "nachtrag_teilungserklaerung",
+    "category_code": "02",
+    "subfolder_code": "05",
+    "name": "Nachtrag zur Teilungserklärung oder Gemeinschaftsordnung",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Nachtrag Teilungserklärung",
+      "Änderung Teilungserklärung",
+      "Nachtrag Gemeinschaftsordnung",
+      "Neufassung",
+      "Urkundenrolle"
+    ]
+  },
+  {
+    "code": "aufteilungsplan",
+    "category_code": "02",
+    "subfolder_code": "05",
+    "name": "Aufteilungsplan",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Aufteilungsplan",
+      "Aufteilungspläne",
+      "Änderung Aufteilungsplan",
+      "Einheitsnummer",
+      "Maßstab"
+    ]
+  },
+  {
+    "code": "abgeschlossenheitsbescheinigung",
+    "category_code": "02",
+    "subfolder_code": "05",
+    "name": "Abgeschlossenheitsbescheinigung",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Abgeschlossenheitsbescheinigung",
+      "Abgeschlossenheit",
+      "Bauaufsichtsbehörde",
+      "in sich abgeschlossen"
+    ]
+  },
+  {
+    "code": "sondernutzungsrecht",
+    "category_code": "02",
+    "subfolder_code": "05",
+    "name": "Zuordnung der Sondernutzungsrechte",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Sondernutzungsrecht",
+      "Sondernutzungsrechte",
+      "Sondernutzungsplan",
+      "Sondernutzungsfläche",
+      "Gartenfläche",
+      "Stellplatz"
+    ]
+  },
+  {
+    "code": "kostenverteilungsschluessel",
+    "category_code": "02",
+    "subfolder_code": "05",
+    "name": "Übersicht der Kostenverteilungsschlüssel",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Kostenverteilungsschlüssel",
+      "Verteilerschlüssel",
+      "Kostentragungsregelung",
+      "Erhaltungspflicht",
+      "Umlageschlüssel"
+    ]
+  },
+  {
+    "code": "einladung_eigentuemerversammlung",
+    "category_code": "02",
+    "subfolder_code": "06",
+    "name": "Einladung zur Eigentümerversammlung mit Tagesordnung",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Einladung",
+      "Eigentümerversammlung",
+      "Tagesordnung",
+      "TOP",
+      "laden wir Sie ein"
+    ]
+  },
+  {
+    "code": "versandnachweis",
+    "category_code": "02",
+    "subfolder_code": "06",
+    "name": "Versandnachweis",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Versandnachweis",
+      "Einlieferungsbeleg",
+      "Postausgangsbuch",
+      "Zustellnachweis",
+      "Versandliste"
+    ]
+  },
+  {
+    "code": "anwesenheitsliste",
+    "category_code": "02",
+    "subfolder_code": "06",
+    "name": "Anwesenheitsliste der Eigentümerversammlung",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Anwesenheitsliste",
+      "Teilnehmerliste",
+      "Präsenzliste",
+      "anwesend oder vertreten",
+      "Unterschrift"
+    ]
+  },
+  {
+    "code": "umlaufbeschluss",
+    "category_code": "02",
+    "subfolder_code": "06",
+    "name": "Umlaufbeschluss mit Beschlusstext und Abstimmungserklärungen",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Umlaufbeschluss",
+      "Umlaufverfahren",
+      "Beschlusstext",
+      "Abstimmungserklärung",
+      "schriftliche Abstimmung"
+    ]
+  },
+  {
+    "code": "umlaufbeschluss_auswertung",
+    "category_code": "02",
+    "subfolder_code": "06",
+    "name": "Auswertung der Umlaufabstimmung und Beschlussverkündung",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Auswertung Umlaufabstimmung",
+      "Abstimmungsergebnis",
+      "Beschlussverkündung",
+      "Bekanntgabe",
+      "zustande gekommen"
+    ]
+  },
+  {
+    "code": "gestattung_bauliche_veraenderung",
+    "category_code": "02",
+    "subfolder_code": "06",
+    "name": "Beschluss oder Gestattung baulicher Veränderungen",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "bauliche Veränderung",
+      "Gestattung",
+      "Wallbox",
+      "Klimagerät",
+      "Gemeinschaftseigentum",
+      "Vereinbarung"
+    ]
+  },
+  {
+    "code": "hausordnung",
+    "category_code": "02",
+    "subfolder_code": "07",
+    "name": "Hausordnung",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Hausordnung",
+      "Ruhezeiten",
+      "Treppenhaus",
+      "Bewohner",
+      "Stand"
+    ]
+  },
+  {
+    "code": "nutzungsregelung",
+    "category_code": "02",
+    "subfolder_code": "07",
+    "name": "Nutzungsregelung für Gemeinschaftsflächen",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Waschküchenordnung",
+      "Garagenordnung",
+      "Nutzungsregelung",
+      "Gemeinschaftsraum",
+      "Müllplatz",
+      "Fahrradkeller"
+    ]
+  },
+  {
+    "code": "haftpflichtversicherung",
+    "category_code": "02",
+    "subfolder_code": "08",
+    "name": "Haus- und Grundbesitzerhaftpflichtversicherung",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Haus- und Grundbesitzerhaftpflicht",
+      "Haftpflichtversicherung",
+      "Gewässerschadenhaftpflicht",
+      "Deckungssumme",
+      "Versicherungsschein"
+    ]
+  },
+  {
+    "code": "weitere_objektversicherung",
+    "category_code": "02",
+    "subfolder_code": "08",
+    "name": "Weitere Objektversicherung",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Glasversicherung",
+      "Leitungswasserversicherung",
+      "Elementarschadenversicherung",
+      "Öltankversicherung",
+      "Versicherungsschein"
+    ]
+  },
+  {
+    "code": "versicherungsbedingungen",
+    "category_code": "02",
+    "subfolder_code": "08",
+    "name": "Versicherungsbedingungen und Nachträge",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Versicherungsbedingungen",
+      "Allgemeine Bedingungen",
+      "VGB",
+      "Nachtrag zum Versicherungsschein",
+      "Klauselbogen"
+    ]
+  },
+  {
+    "code": "versicherungsuebersicht",
+    "category_code": "02",
+    "subfolder_code": "08",
+    "name": "Versicherungsübersicht",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Versicherungsübersicht",
+      "Versicherer",
+      "Vertragsnummer",
+      "Deckungsumfang",
+      "Selbstbehalt",
+      "Ansprechpartner"
+    ]
+  },
+  {
+    "code": "versorgungsvertrag",
+    "category_code": "02",
+    "subfolder_code": "09",
+    "name": "Versorgungsvertrag (Strom, Gas, Wärme, Wasser)",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Stromliefervertrag",
+      "Gasliefervertrag",
+      "Wärmelieferungsvertrag",
+      "Wasserversorgungsvertrag",
+      "Allgemeinstrom",
+      "Preisanpassung"
+    ]
+  },
+  {
+    "code": "versorger_vertragsuebersicht",
+    "category_code": "02",
+    "subfolder_code": "09",
+    "name": "Übersicht Laufzeiten und Kündigungsfristen Versorger",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Vertragsübersicht",
+      "Laufzeit",
+      "Kündigungsfrist",
+      "Versorgungsverträge"
+    ]
+  },
+  {
+    "code": "messdienstvertrag",
+    "category_code": "02",
+    "subfolder_code": "09",
+    "name": "Messdienstvertrag und Gerätemietvertrag",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Messdienstvertrag",
+      "Gerätemietvertrag",
+      "Heizkostenverteiler",
+      "Liegenschaftsnummer",
+      "Wärmedienst",
+      "Ablesevertrag"
+    ]
+  },
+  {
+    "code": "zaehlerverzeichnis",
+    "category_code": "02",
+    "subfolder_code": "09",
+    "name": "Zähler- und Geräteverzeichnis",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Zählerliste",
+      "Geräteverzeichnis",
+      "Gerätenummer",
+      "Einbauort",
+      "Zählernummer"
+    ]
+  },
+  {
+    "code": "eichnachweis",
+    "category_code": "02",
+    "subfolder_code": "09",
+    "name": "Austausch- und Eichnachweis",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Eichnachweis",
+      "Zählerwechsel",
+      "Gerätetausch",
+      "Montagebescheinigung",
+      "Eichfrist"
+    ]
+  },
+  {
+    "code": "hausmeistervertrag",
+    "category_code": "02",
+    "subfolder_code": "10",
+    "name": "Hausmeistervertrag",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Hausmeistervertrag",
+      "Hauswartvertrag",
+      "Objektbetreuung",
+      "Hausmeisterleistungen"
+    ]
+  },
+  {
+    "code": "reinigungsvertrag",
+    "category_code": "02",
+    "subfolder_code": "10",
+    "name": "Reinigungsvertrag",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Reinigungsvertrag",
+      "Treppenhausreinigung",
+      "Gebäudereinigung",
+      "Unterhaltsreinigung"
+    ]
+  },
+  {
+    "code": "winterdienstvertrag",
+    "category_code": "02",
+    "subfolder_code": "10",
+    "name": "Winterdienstvertrag",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Winterdienstvertrag",
+      "Räum- und Streupflicht",
+      "Schneeräumung",
+      "Winterdienst"
+    ]
+  },
+  {
+    "code": "gartenpflegevertrag",
+    "category_code": "02",
+    "subfolder_code": "10",
+    "name": "Gartenpflegevertrag",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Gartenpflegevertrag",
+      "Grünanlagenpflege",
+      "Außenanlagen",
+      "Grünflächenpflege"
+    ]
+  },
+  {
+    "code": "schaedlingsbekaempfungsvertrag",
+    "category_code": "02",
+    "subfolder_code": "10",
+    "name": "Schädlingsbekämpfungsvertrag",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Schädlingsbekämpfung",
+      "Schadnagermonitoring",
+      "Köderstationen",
+      "Taubenabwehr"
+    ]
+  },
+  {
+    "code": "wartungsvertrag",
+    "category_code": "02",
+    "subfolder_code": "10",
+    "name": "Wartungsvertrag technische Anlagen",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Wartungsvertrag",
+      "Vollwartungsvertrag",
+      "Aufzugswartung",
+      "Heizungswartung",
+      "Brandschutz",
+      "Toranlage"
+    ]
+  },
+  {
+    "code": "leistungsbeschreibung",
+    "category_code": "02",
+    "subfolder_code": "10",
+    "name": "Leistungsbeschreibung und Vertragsnachtrag",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Leistungsbeschreibung",
+      "Leistungsverzeichnis",
+      "Nachtrag",
+      "Zusatzvereinbarung",
+      "Preisanpassung"
+    ]
+  },
+  {
+    "code": "dienstleister_vertragsuebersicht",
+    "category_code": "02",
+    "subfolder_code": "10",
+    "name": "Übersicht Laufzeiten und Kündigungsfristen Dienstleister",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Vertragsübersicht",
+      "Laufzeit",
+      "Kündigungsfrist",
+      "Dienstleistungsverträge"
+    ]
+  },
+  {
+    "code": "anlagenverzeichnis",
+    "category_code": "02",
+    "subfolder_code": "11",
+    "name": "Anlagenverzeichnis und Gerätedaten",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Anlagenverzeichnis",
+      "Anlagenliste",
+      "Gerätedaten",
+      "Typenschild",
+      "Baujahr",
+      "Seriennummer"
+    ]
+  },
+  {
+    "code": "bedienungsanleitung",
+    "category_code": "02",
+    "subfolder_code": "11",
+    "name": "Bedienungsanleitung",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Bedienungsanleitung",
+      "Betriebsanleitung",
+      "Montageanleitung",
+      "Benutzerhandbuch"
+    ]
+  },
+  {
+    "code": "installationsplan",
+    "category_code": "02",
+    "subfolder_code": "11",
+    "name": "Installationsplan und Schema",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Installationsplan",
+      "Strangschema",
+      "Schaltplan",
+      "Hydraulikschema",
+      "Stromlaufplan"
+    ]
+  },
+  {
+    "code": "inbetriebnahmeprotokoll",
+    "category_code": "02",
+    "subfolder_code": "11",
+    "name": "Inbetriebnahmeunterlagen",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Inbetriebnahmeprotokoll",
+      "Inbetriebnahme",
+      "Fachunternehmererklärung",
+      "Abnahmeprotokoll Anlage",
+      "Einweisung"
+    ]
+  },
+  {
+    "code": "anlagendokumentation",
+    "category_code": "02",
+    "subfolder_code": "11",
+    "name": "Anlagendokumentation (Heizung, Aufzug, Lüftung, Hebeanlage, Tore, Photovoltaik, weitere)",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Anlagendokumentation",
+      "Konformitätserklärung",
+      "Herstellerbescheinigung",
+      "Aufzug",
+      "Heizung",
+      "Photovoltaik"
+    ]
+  },
+  {
+    "code": "wartungsplan",
+    "category_code": "02",
+    "subfolder_code": "11",
+    "name": "Wartungs- und Prüfplan",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Wartungsplan",
+      "Prüfplan",
+      "Prüftermine",
+      "Wartungsintervalle",
+      "Betreiberpflichten"
+    ]
+  },
+  {
+    "code": "wartungsbericht",
+    "category_code": "02",
+    "subfolder_code": "11",
+    "name": "Wartungsbericht",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Wartungsprotokoll",
+      "Wartungsbericht",
+      "Servicebericht",
+      "Wartungsnachweis",
+      "durchgeführte Arbeiten"
+    ]
+  },
+  {
+    "code": "pruefprotokoll",
+    "category_code": "02",
+    "subfolder_code": "11",
+    "name": "Prüfprotokoll (TÜV, DGUV, Brandschutz, Blitzschutz, Aufzug)",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Prüfprotokoll",
+      "Prüfbericht",
+      "Hauptprüfung",
+      "TÜV",
+      "DGUV Vorschrift 3",
+      "Blitzschutzprüfung"
+    ]
+  },
+  {
+    "code": "trinkwasseruntersuchung",
+    "category_code": "02",
+    "subfolder_code": "11",
+    "name": "Trinkwasseruntersuchung und Legionellenprüfung",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Legionellen",
+      "Trinkwasseruntersuchung",
+      "Gefährdungsanalyse",
+      "Trinkwasserverordnung",
+      "Nachkontrolle",
+      "KBE"
+    ]
+  },
+  {
+    "code": "schliessplan",
+    "category_code": "02",
+    "subfolder_code": "12",
+    "name": "Schließplan",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Schließplan",
+      "Schließanlage",
+      "Schließmatrix",
+      "Zylinder",
+      "Schlüsselgruppen"
+    ]
+  },
+  {
+    "code": "sicherungskarte",
+    "category_code": "02",
+    "subfolder_code": "12",
+    "name": "Sicherungskarte und Schlüsselberechtigung",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Sicherungskarte",
+      "Schlüsselberechtigung",
+      "Nachbestellung",
+      "Schließanlage",
+      "Berechtigungsnachweis"
+    ]
+  },
+  {
+    "code": "schluesselverzeichnis",
+    "category_code": "02",
+    "subfolder_code": "12",
+    "name": "Schlüsselverzeichnis",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Schlüsselverzeichnis",
+      "Schlüsselliste",
+      "Transponder",
+      "Schlüsselnummer",
+      "Verbleib"
+    ]
+  },
+  {
+    "code": "schluesseluebergabe",
+    "category_code": "02",
+    "subfolder_code": "12",
+    "name": "Schlüsselübergabe Verwaltung und Technik",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Schlüsselübergabe",
+      "Übergabeprotokoll",
+      "Schlüsselquittung",
+      "Generalhauptschlüssel",
+      "Technikschlüssel"
+    ]
+  },
+  {
+    "code": "zugangsorganisation",
+    "category_code": "02",
+    "subfolder_code": "12",
+    "name": "Zugangsorganisation und Verweis auf Zugangsdaten",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Zugangsorganisation",
+      "Zutrittskonzept",
+      "Schließzeiten",
+      "Schlüsseltresor",
+      "Passwortmanager",
+      "Zugangsdaten"
+    ]
+  },
+  {
+    "code": "zustandsbericht",
+    "category_code": "02",
+    "subfolder_code": "13",
+    "name": "Gebäudezustandsbericht",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Gebäudezustandsbericht",
+      "Zustandsbericht",
+      "Zustandserfassung",
+      "Bauzustand",
+      "Zustandsbewertung"
+    ]
+  },
+  {
+    "code": "begehungsprotokoll",
+    "category_code": "02",
+    "subfolder_code": "13",
+    "name": "Begehungsprotokoll",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Begehungsprotokoll",
+      "Objektbegehung",
+      "Gebäudebegehung",
+      "Hausbegehung",
+      "Begehung"
+    ]
+  },
+  {
+    "code": "gutachten",
+    "category_code": "02",
+    "subfolder_code": "13",
+    "name": "Gutachten",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Gutachten",
+      "Sachverständigengutachten",
+      "Schadensgutachten",
+      "gutachterliche Stellungnahme",
+      "Sachverständiger"
+    ]
+  },
+  {
+    "code": "instandhaltungshistorie",
+    "category_code": "02",
+    "subfolder_code": "13",
+    "name": "Instandhaltungs- und Maßnahmenhistorie",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Instandhaltungshistorie",
+      "Maßnahmenhistorie",
+      "Maßnahmenübersicht",
+      "Sanierungshistorie",
+      "durchgeführte Maßnahmen"
+    ]
+  },
+  {
+    "code": "sanierungsvorgang",
+    "category_code": "02",
+    "subfolder_code": "13",
+    "name": "Vorgangsakte Sanierung",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Sanierung",
+      "Auftragsbestätigung",
+      "Leistungsverzeichnis",
+      "Bautagebuch",
+      "Sanierungskonzept",
+      "Ausschreibung"
+    ]
+  },
+  {
+    "code": "angebot_kostenvoranschlag",
+    "category_code": "02",
+    "subfolder_code": "13",
+    "name": "Angebot und Kostenvoranschlag",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Angebot",
+      "Kostenvoranschlag",
+      "Kostenschätzung",
+      "Angebotssumme",
+      "Angebotsnummer"
+    ]
+  },
+  {
+    "code": "versicherungsschaden",
+    "category_code": "02",
+    "subfolder_code": "13",
+    "name": "Versicherungsfall (Schadenmeldung und Schadenregulierung)",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Schadenmeldung",
+      "Schadenanzeige",
+      "Schadenregulierung",
+      "Schadennummer",
+      "Versicherungsfall",
+      "Leitungswasserschaden"
+    ]
+  },
+  {
+    "code": "abnahmeprotokoll",
+    "category_code": "02",
+    "subfolder_code": "13",
+    "name": "Abnahmeprotokoll",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Abnahmeprotokoll",
+      "Abnahme",
+      "Bauabnahme",
+      "Werkabnahme",
+      "Schlussabnahme"
+    ]
+  },
+  {
+    "code": "maengelliste",
+    "category_code": "02",
+    "subfolder_code": "13",
+    "name": "Mängelliste und Mängelbeseitigung",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Mängelliste",
+      "Mängelanzeige",
+      "Mängelrüge",
+      "Mängelbeseitigung",
+      "Nachbesserung",
+      "Mängelprotokoll"
+    ]
+  },
+  {
+    "code": "gewaehrleistungsuebersicht",
+    "category_code": "02",
+    "subfolder_code": "13",
+    "name": "Gewährleistungsübersicht",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Gewährleistungsübersicht",
+      "Gewährleistungsfrist",
+      "Gewährleistungsverfolgung",
+      "Ablauf der Gewährleistung",
+      "Gewährleistung"
+    ]
+  },
+  {
+    "code": "buergschaft",
+    "category_code": "02",
+    "subfolder_code": "13",
+    "name": "Sicherheiten und Bürgschaften",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Bürgschaft",
+      "Gewährleistungsbürgschaft",
+      "Vertragserfüllungsbürgschaft",
+      "Sicherheitseinbehalt",
+      "Sicherheitsleistung",
+      "Bürgschaftsurkunde"
+    ]
+  },
+  {
+    "code": "behoerdliche_anordnung",
+    "category_code": "02",
+    "subfolder_code": "14",
+    "name": "Behördliche Anordnung und Bescheid",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Ordnungsverfügung",
+      "Anordnung",
+      "Bescheid",
+      "Bauaufsicht",
+      "Ordnungsamt",
+      "Brandschutz"
+    ]
+  },
+  {
+    "code": "foerderbescheid",
+    "category_code": "02",
+    "subfolder_code": "14",
+    "name": "Förderbescheid",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Förderbescheid",
+      "Zuwendungsbescheid",
+      "Bewilligungsbescheid",
+      "Fördermittel",
+      "Förderzusage",
+      "KfW"
+    ]
+  },
+  {
+    "code": "belegungsbindung",
+    "category_code": "02",
+    "subfolder_code": "14",
+    "name": "Belegungs- und Mietpreisbindung",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Belegungsbindung",
+      "Mietpreisbindung",
+      "Wohnungsbindung",
+      "Bindungsfrist",
+      "öffentlich gefördert",
+      "Bewilligungsmiete"
+    ]
+  },
+  {
+    "code": "denkmalschutz",
+    "category_code": "02",
+    "subfolder_code": "14",
+    "name": "Denkmalschutzunterlagen",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Denkmalschutz",
+      "Baudenkmal",
+      "Denkmalliste",
+      "Denkmalbehörde",
+      "denkmalrechtliche Erlaubnis",
+      "Denkmalpflege"
+    ]
+  },
+  {
+    "code": "nutzungsgenehmigung",
+    "category_code": "02",
+    "subfolder_code": "14",
+    "name": "Nutzungsbeschränkung und Nutzungsgenehmigung",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Nutzungsänderung",
+      "Nutzungsbeschränkung",
+      "Nutzungsgenehmigung",
+      "Zweckentfremdung",
+      "Sondernutzungserlaubnis",
+      "Ausnahmegenehmigung"
+    ]
+  },
+  {
+    "code": "gerichtsverfahren",
+    "category_code": "02",
+    "subfolder_code": "14",
+    "name": "Vorgangsakte Gerichtsverfahren der Gemeinschaft",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Beschlussklage",
+      "Anfechtungsklage",
+      "Klageschrift",
+      "Klageerwiderung",
+      "Rechtsstreit",
+      "Aktenzeichen"
+    ]
+  },
+  {
+    "code": "gerichtsentscheidung",
+    "category_code": "02",
+    "subfolder_code": "14",
+    "name": "Gerichtliche Entscheidung und Vergleich",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Urteil",
+      "Im Namen des Volkes",
+      "Beschluss des Amtsgerichts",
+      "Vergleich",
+      "Kostenfestsetzungsbeschluss",
+      "Versäumnisurteil"
+    ]
+  },
+  {
+    "code": "fristenuebersicht",
+    "category_code": "02",
+    "subfolder_code": "14",
+    "name": "Fristenübersicht",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Fristenübersicht",
+      "Fristenliste",
+      "Fristenkalender",
+      "Fristenkontrolle",
+      "Frist"
+    ]
+  },
+  {
+    "code": "uebergabeprotokoll_verwaltung",
+    "category_code": "02",
+    "subfolder_code": "15",
+    "name": "Übergabeprotokoll der Vorverwaltung",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Übergabeprotokoll",
+      "Vorverwaltung",
+      "Verwalterwechsel",
+      "Verwaltungsübernahme",
+      "Unterlagenübergabe"
+    ]
+  },
+  {
+    "code": "unterlagenverzeichnis",
+    "category_code": "02",
+    "subfolder_code": "15",
+    "name": "Dokumenten- und Unterlagenverzeichnis",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Unterlagenverzeichnis",
+      "Dokumentenverzeichnis",
+      "Aktenverzeichnis",
+      "Übergabeliste",
+      "Unterlagenübersicht"
+    ]
+  },
+  {
+    "code": "fehlunterlagenliste",
+    "category_code": "02",
+    "subfolder_code": "15",
+    "name": "Fehlunterlagenliste",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Fehlunterlagen",
+      "fehlende Unterlagen",
+      "Fehlliste",
+      "Nachforderung von Unterlagen",
+      "ausstehende Unterlagen"
+    ]
+  },
+  {
+    "code": "offene_vorgaenge",
+    "category_code": "02",
+    "subfolder_code": "15",
+    "name": "Übersicht offener Vorgänge",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "offene Aufträge",
+      "offene Schäden",
+      "offene Vorgänge",
+      "offene Aufgaben",
+      "behördliche Anforderungen",
+      "Aufgabenliste"
+    ]
   }
 ]

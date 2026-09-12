@@ -103,3 +103,28 @@ def test_seite_zeigt_sollbestand_und_statusangaben(client_as, admin_user, objekt
     assert "Sollbestand Stammakte" in inhalt
     assert "vorhanden, aber unvollständig oder Aktualität ungeklärt" in inhalt
     assert 'value="not_applicable">nicht anwendbar' in inhalt
+
+
+def test_seed_katalog_und_nachforderungsgruppe(objekt, admin_user):
+    """Die 54 Pruefpositionen der Checkliste liegen als Seed vor; angehakt erscheinen sie im Schreiben unter der
+    Gruppe „Sollbestand der Stammakte“ mit ihrer Zeile."""
+    from apps.requirements.requests import compose
+
+    seeds = CompletenessCheck.objects.filter(category="stammakte", code__startswith="sa_")
+    assert seeds.count() == 54
+    assert all(300 <= c.sort_order <= 399 and c.request_text_block_id for c in seeds)
+    assert set(seeds.filter(management_types__isnull=False).values_list("code", flat=True)) >= {
+        "sa_teilungserklaerung",
+        "sa_inventarverzeichnis",
+        "sa_weg_verwaltung_kontakt",
+    }
+    engine.evaluate_object(objekt, trigger="test")
+    f = CompletenessFinding.objects.get(object=objekt, check_code="sa_energieausweis")
+    assert f.status == "missing" and f.include_in_request is False
+    engine.set_manual(f, admin_user, status=None, reason=None, include_in_request=True)
+    items = [i for i in engine.open_items(objekt) if i["include_in_request"]]
+    letter, _versions = compose(objekt, items, deadline=None, user=admin_user)
+    gruppe = [g for g in letter.groups if g["title"] == "Sollbestand der Stammakte"]
+    assert gruppe and "gültiger Energieausweis des Gebäudes" in gruppe[0]["lines"]
+    # Gruppe steht nach den Pflichtpositionen aus CR 12
+    assert letter.groups[-1]["title"] == "Sollbestand der Stammakte"
