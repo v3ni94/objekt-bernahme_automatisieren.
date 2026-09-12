@@ -18,6 +18,7 @@ mkdir -p "$DEPLOY_DIR"
 # Optionale Secrets (Paperless-ngx, 12.09.2026): leere Platzhalterdatei, falls nicht vorhanden, damit Compose die
 # Secrets einbinden kann; den Inhalt setzt der Admin (docs/betrieb/paperless-sync.md). Leer bedeutet: Anbindung aus.
 # Rechte wie die uebrigen Secrets (0444, root), sonst koennen die unprivilegierten Container sie nicht lesen.
+FEHLENDE_SECRETS=""
 for s in paperless_token paperless_webhook_token; do
   f="/srv/objektakte/secrets/$s"
   if [ ! -e "$f" ] && ! sudo -n test -e "$f" 2>/dev/null; then
@@ -26,12 +27,18 @@ for s in paperless_token paperless_webhook_token; do
     elif [ -w /srv/objektakte/secrets ] && install -m 0444 /dev/null "$f" 2>/dev/null; then
       echo "Secret-Platzhalter angelegt: $s (leer, Anbindung aus)"
     else
-      echo "Abbruch: $f fehlt und kann ohne Root-Rechte nicht angelegt werden."
-      echo "  Einmalig als root ausfuehren: install -m 0444 -o root -g root /dev/null $f"
-      exit 1
+      FEHLENDE_SECRETS="$FEHLENDE_SECRETS $f"
     fi
   fi
 done
+if [ -n "$FEHLENDE_SECRETS" ]; then
+  echo "Abbruch vor dem Container-Bau: Secret-Dateien fehlen und koennen ohne Root-Rechte nicht angelegt werden."
+  echo "  Einmalig als root ausfuehren (leer bedeutet: Anbindung aus, docs/betrieb/paperless-sync.md):"
+  for f in $FEHLENDE_SECRETS; do
+    echo "    install -m 0444 -o root -g root /dev/null $f"
+  done
+  exit 1
+fi
 
 wait_healthy() {   # wait_healthy <sekunden> [dienst ...]
   local end=$((SECONDS + $1)); shift
