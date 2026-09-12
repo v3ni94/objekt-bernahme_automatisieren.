@@ -4,6 +4,8 @@ Review-Entscheidung."""
 
 from __future__ import annotations
 
+from django.db import IntegrityError, transaction
+
 from apps.drive.naming import OwnerFileNamingConfig, OwnerNameInput, OwnerNamePart, build_owner_folder_name
 from apps.parties.models import Owner, OwnerFile, OwnerFileAssignment, OwnerUnitAssignment
 
@@ -70,8 +72,13 @@ def owner_file_unknown_unit(obj, owner: Owner) -> OwnerFile:
         ),
         cfg,
     )
-    return OwnerFile.objects.create(
-        object=obj, owner=owner, file_kind="unknown_unit", folder_name=name, name_basis={"owner": owner.pk}
+    return _create_or_refetch(
+        lambda: OwnerFile.active.filter(object=obj, owner=owner, file_kind="unknown_unit").first(),
+        object=obj,
+        owner=owner,
+        file_kind="unknown_unit",
+        folder_name=name,
+        name_basis={"owner": owner.pk},
     )
 
 
@@ -81,4 +88,24 @@ def owner_file_unassigned(obj) -> OwnerFile:
         return existing
     cfg = OwnerFileNamingConfig.from_settings()
     name = build_owner_folder_name(OwnerNameInput(file_kind="unassigned"), cfg)
-    return OwnerFile.objects.create(object=obj, file_kind="unassigned", folder_name=name, name_basis={})
+    return _create_or_refetch(
+        lambda: OwnerFile.active.filter(object=obj, file_kind="unassigned").first(),
+        object=obj,
+        file_kind="unassigned",
+        folder_name=name,
+        name_basis={},
+    )
+
+
+def _create_or_refetch(lookup, **fields) -> OwnerFile:
+    """Legt die Sonderakte an; hat ein paralleler Entscheidungsjob sie inzwischen angelegt (uq_owner_files_name_active,
+    Praxisfall Objekt 82: „Duplicate entry ... Unzugeordnet“), wird die vorhandene Akte verwendet statt den Job
+    scheitern zu lassen."""
+    try:
+        with transaction.atomic():
+            return OwnerFile.objects.create(**fields)
+    except IntegrityError:
+        existing = lookup()
+        if existing is None:
+            raise
+        return existing
