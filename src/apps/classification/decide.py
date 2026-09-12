@@ -702,6 +702,33 @@ def _decide_core(
             )
             base.move_allowed = not existing
         return base
+    # Kategorie 05 in Mietverwaltung (12.09.2026): ein Eigentuemer je Haus, eine Eigentuemerakte je Objekt; keine
+    # Einheiten- und Zuordnungspruefung, die Akte ist das Ablageziel, der bekannte Eigentuemer wird verknuepft.
+    if obj.management_type == "rental":
+        from apps.parties.unit_files import ensure_object_owner_file, object_owners
+
+        akte = ensure_object_owner_file(obj)
+        owners = object_owners(obj)
+        base.physical_category, base.physical_subfolder = "05", base.subfolder
+        base.physical_owner_file_id = akte.pk
+        if len(owners) == 1:
+            base.links = [
+                LinkPlan(
+                    owners[0].pk,
+                    None,
+                    None,
+                    akte.pk,
+                    base.subfolder,
+                    base.document_type,
+                    None,
+                    None,
+                    1.0,
+                    "confirmed",
+                    primary=True,
+                )
+            ]
+        base.move_allowed = True
+        return base
     # Kategorie 05: Zusatzpruefungen
     links, case = owner_checks(
         ctx, obj, subfolder=base.subfolder, document_type=base.document_type, period=period

@@ -43,8 +43,8 @@ _UNIT_FOLDER_HINTS = {
 
 
 def _prepare_unit_files(obj: ManagedObject, *, user, force: bool = False) -> tuple[str | None, dict]:
-    """Akten-Vorlage (11.09.2026): Einheiten aus der Sollzahl als Platzhalter WE 1 bis WE n, je Einheit eine
-    Eigentuemer- und eine Mieterakte. Ohne force nur mit Schalter owner_file.create_folders_eagerly.
+    """Akten-Vorlage (11.09.2026): Einheiten aus der Sollzahl als Platzhalter WE 1 bis WE n, Akten nach
+    Verwaltungsart (unit_files.file_plan, 12.09.2026). Ohne force nur mit Schalter owner_file.create_folders_eagerly.
     Rueckgabe: Hinweis fuer den Anwender (None, wenn nichts entstand) und Zahlen fuer das Protokoll."""
     if not force and not store.get("owner_file.create_folders_eagerly", False):
         return None, {}
@@ -57,8 +57,20 @@ def _prepare_unit_files(obj: ManagedObject, *, user, force: bool = False) -> tup
     if created:
         parts.append(f"{len(created)} Einheiten WE 1 bis WE {len(created)} als Platzhalter angelegt")
     if stats["owner_files"] or stats["tenant_files"]:
+        akten = []
+        if stats["owner_files"]:
+            akten.append(
+                "eine Eigentümerakte für das Objekt (Mietverwaltung)"
+                if obj.management_type == "rental"
+                else f"{stats['owner_files']} Eigentümerakten"
+            )
+        if stats["tenant_files"]:
+            akten.append(f"{stats['tenant_files']} Mieterakten")
+        parts.append(" und ".join(akten) + " vorbereitet")
+    if stats.get("retired"):
         parts.append(
-            f"{stats['owner_files']} Eigentümerakten und {stats['tenant_files']} Mieterakten vorbereitet"
+            f"{stats['retired']} Platzhalterakten stillgelegt, die die Verwaltungsart nicht vorsieht"
+            " (bereits angelegte Ordner in Drive bleiben unverändert)"
         )
     if not parts:
         return None, counts

@@ -330,10 +330,13 @@ def sync_file_names(obj, *, drive: DriveAdapter, user=None) -> dict[str, int]:
 
 
 def ensure_unit_folders(obj, *, drive: DriveAdapter, user=None) -> dict[str, int]:
-    """Akten-Vorlage in Drive: je Eigentuemerakte der Einheiten den Ordner mit elf Unterordnern unter 05, je
-    Mieterakte den Ordner unter 04, danach Namen abgleichen. Setzt den Ordnerabgleich des Objekts voraus."""
+    """Akten-Vorlage in Drive: je Eigentuemerakte (Einheit oder, bei Mietverwaltung, Objekt) den Ordner mit elf
+    Unterordnern unter 05, je Mieterakte den Ordner unter 04, danach Namen abgleichen. Setzt den Ordnerabgleich
+    des Objekts voraus."""
     stats = {"owner_folders": 0, "tenant_folders": 0}
-    for akte in OwnerFile.active.filter(object=obj, file_kind="unit_owner").order_by("folder_name"):
+    for akte in OwnerFile.active.filter(object=obj, file_kind__in=["unit_owner", "object_owner"]).order_by(
+        "folder_name"
+    ):
         ensure_owner_folder(akte, drive=drive, user=user)
         stats["owner_folders"] += 1
     for akte in TenantFile.active.filter(object=obj, file_kind="unit_tenant").order_by("folder_name"):

@@ -147,8 +147,19 @@ def _name_owner_file(unit: Unit, assignment: OwnerUnitAssignment, user) -> None:
     (Platzhalter WE01 wird zu WE01_Mustermann). Ohne Vorlage (Schalter owner_file.create_folders_eagerly aus und
     keine Platzhalterakte) bleibt es bei der Anlage der Akte mit der ersten Ablage (F 6.3)."""
     from apps.config import store
+    from apps.drive.tasks import trigger_unit_folders
     from apps.parties.models import OwnerFile
 
+    user_id = getattr(user, "pk", None)
+    if unit.object.management_type == "rental":
+        # Mietverwaltung (12.09.2026): eine Eigentuemerakte je Objekt, sie folgt den Eigentuemern des Hauses
+        from apps.parties.unit_files import ensure_object_owner_file
+
+        exists = OwnerFile.active.filter(object=unit.object, file_kind="object_owner").exists()
+        if exists or store.get("owner_file.create_folders_eagerly", False):
+            ensure_object_owner_file(unit.object)
+            transaction.on_commit(lambda: trigger_unit_folders(unit.object_id, user_id=user_id))
+        return
     placeholder = OwnerFile.active.filter(
         unit=unit, file_kind="unit_owner", file_assignments__isnull=True
     ).exists()
@@ -169,9 +180,6 @@ def _name_owner_file(unit: Unit, assignment: OwnerUnitAssignment, user) -> None:
         akte.name_basis = {**(akte.name_basis or {}), "managed_name": True}
         akte.save(update_fields=["name_basis", "updated_at"])
     refresh_owner_file_name(akte, unit, group)
-    from apps.drive.tasks import trigger_unit_folders
-
-    user_id = getattr(user, "pk", None)
     transaction.on_commit(lambda: trigger_unit_folders(unit.object_id, user_id=user_id))
 
 

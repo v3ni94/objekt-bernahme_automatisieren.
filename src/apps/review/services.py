@@ -512,7 +512,15 @@ def apply_decision(
         links: list[DocumentOwnerLink] = []
         owner_file = None
         physical = {"category": target.category, "subfolder": target.subfolder}
-        if target.category == "05":
+        if target.category == "05" and obj is not None and obj.management_type == "rental":
+            # Mietverwaltung (12.09.2026): eine Eigentuemerakte je Objekt
+            from apps.parties.unit_files import ensure_object_owner_file
+
+            owner_file = ensure_object_owner_file(obj)
+            if target.owner_id:
+                links.append(DocumentOwnerLink(owner_id=target.owner_id, owner_file=owner_file))
+            physical["owner_file_id"] = owner_file.pk
+        elif target.category == "05":
             if target.owner_id and target.unit_id:
                 assignment, group = _resolve_assignment(target, doc, user)
                 unit = assignment.unit

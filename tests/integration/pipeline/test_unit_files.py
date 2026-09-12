@@ -42,7 +42,7 @@ def objekt_mit_sollzahl(seeded, drive, admin_user):
         street="Vorlagenweg",
         house_number="1",
         city="Musterstadt",
-        management_type="weg",
+        management_type="weg_with_se",  # beide Akten je Einheit (12.09.2026: reine WEG ohne Mieterakten)
         expected_unit_count=3,
         is_test=True,
     )
@@ -58,7 +58,7 @@ def test_platzhalter_einheiten_und_akten(objekt_mit_sollzahl, drive):
     assert all(u.unit_type == "apartment" and u.data_status == "incomplete" for u in created)
     assert ensure_placeholder_units(obj, 5) == []  # zweiter Aufruf legt nichts nach, Einheiten vorhanden
     stats = ensure_unit_files(obj)
-    assert stats == {"owner_files": 3, "tenant_files": 3}
+    assert stats == {"owner_files": 3, "tenant_files": 3, "retired": 0}
     assert sorted(OwnerFile.active.filter(object=obj).values_list("folder_name", flat=True)) == [
         "WE01",
         "WE02",
@@ -69,7 +69,7 @@ def test_platzhalter_einheiten_und_akten(objekt_mit_sollzahl, drive):
         "WE02",
         "WE03",
     ]
-    assert ensure_unit_files(obj) == {"owner_files": 0, "tenant_files": 0}  # idempotent
+    assert ensure_unit_files(obj) == {"owner_files": 0, "tenant_files": 0, "retired": 0}  # idempotent
     result = ensure_unit_folders(obj, drive=drive)
     assert result["owner_folders"] == 3 and result["tenant_folders"] == 3 and result["renamed"] == 0
     assert _names(drive, obj, "05") == ["WE01", "WE02", "WE03"]
@@ -225,7 +225,7 @@ def test_objektanlage_mit_sollzahl_ueber_die_oberflaeche(
             "house_number": "3",
             "postal_code": "12345",
             "city": "Musterstadt",
-            "management_type": "weg",
+            "management_type": "weg_with_se",
             "status": "new",
             "fiscal_year_start_month": 1,
             "expected_unit_count": 2,
@@ -367,3 +367,95 @@ def test_kuenftige_gruppe_erhaelt_eigene_akte(objekt_mit_sollzahl, drive):
     assert (
         akten["WE02_Jetzt"].name_basis.get("adopted_placeholder") is None
     )  # kein Platzhalter vorhanden gewesen
+
+
+# ---------------------------------------------------------------- Verwaltungsart (12.09.2026)
+
+
+def _objekt(drive, nummer: str, management_type: str, count: int = 3) -> ManagedObject:
+    obj = ManagedObject.objects.create(
+        object_number=nummer,
+        name=f"Musterstadt, Artweg {nummer}",
+        street="Artweg",
+        house_number=nummer,
+        city="Musterstadt",
+        management_type=management_type,
+        expected_unit_count=count,
+        is_test=True,
+    )
+    _reconcile(obj, drive)
+    return obj
+
+
+def test_mietverwaltung_eine_eigentuemerakte_und_mieterakten_je_einheit(seeded, drive, admin_user):
+    """Vorgabe 12.09.2026: In der Mietverwaltung gibt es einen Eigentuemer je Haus, deshalb eine Eigentuemerakte je
+    Objekt; Mieterakten je Einheit bleiben. Der Ordner „Eigentümer“ traegt die elf Unterordner."""
+    store.set("owner_file.create_folders_eagerly", True, user=admin_user, reason="Test")
+    obj = _objekt(drive, "651", "rental", 6)
+    ensure_placeholder_units(obj, 6)
+    stats = ensure_unit_files(obj)
+    assert stats == {"owner_files": 1, "tenant_files": 6, "retired": 0}
+    akten = list(OwnerFile.active.filter(object=obj))
+    assert len(akten) == 1 and akten[0].file_kind == "object_owner" and akten[0].unit_id is None
+    assert akten[0].folder_name == "Eigentümer"
+    assert TenantFile.active.filter(object=obj, file_kind="unit_tenant").count() == 6
+    assert ensure_unit_files(obj) == {"owner_files": 0, "tenant_files": 0, "retired": 0}
+    result = ensure_unit_folders(obj, drive=drive)
+    assert result["owner_folders"] == 1 and result["tenant_folders"] == 6
+    assert _names(drive, obj, "05") == ["Eigentümer"]
+    assert _names(drive, obj, "04") == ["WE01", "WE02", "WE03", "WE04", "WE05", "WE06"]
+    row = DriveNode.objects.get(owner_file=akten[0], node_kind=NodeKind.OWNER_FILE_FOLDER)
+    assert len(drive.list_children(row.drive_file_id, folders_only=True)) == 11
+
+
+def test_mietverwaltung_akte_folgt_dem_eigentuemer_des_hauses(seeded, drive, admin_user):
+    store.set("owner_file.create_folders_eagerly", True, user=admin_user, reason="Test")
+    obj = _objekt(drive, "652", "rental", 2)
+    ensure_placeholder_units(obj, 2)
+    ensure_unit_files(obj)
+    ensure_unit_folders(obj, drive=drive)
+    we1 = Unit.active.get(object=obj, unit_label_normalized="WE1")
+    owner = Owner.objects.create(
+        type="natural_person", first_name="Erik", last_name="Mustermann", search_name="MUSTERMANN ERIK"
+    )
+    party_services.create_assignment(owner=owner, unit=we1, valid_from=date(2020, 1, 1), valid_to=None)
+    akte = OwnerFile.active.get(object=obj, file_kind="object_owner")
+    assert akte.folder_name == "Eigentümer_Mustermann" and akte.owner_id == owner.pk
+    assert OwnerFile.active.filter(object=obj).count() == 1  # keine Akte je Einheit
+    stats = ensure_unit_folders(obj, drive=drive)
+    assert stats["renamed"] == 1 and _names(drive, obj, "05") == ["Eigentümer_Mustermann"]
+    # zweite Einheit desselben Eigentuemers aendert nichts am Namen
+    we2 = Unit.active.get(object=obj, unit_label_normalized="WE2")
+    party_services.create_assignment(owner=owner, unit=we2, valid_from=date(2020, 1, 1), valid_to=None)
+    akte.refresh_from_db()
+    assert akte.folder_name == "Eigentümer_Mustermann"
+
+
+def test_mietverwaltung_stilllegen_falscher_platzhalter(seeded, drive, admin_user):
+    """Praxisfall Objekt 82: sechs Eigentuemerakten je Einheit in einer Mietverwaltung. „Akten anlegen“ legt die
+    unbenutzten Platzhalter still und legt die Objektakte an; Ordner in Drive bleiben."""
+    store.set("owner_file.create_folders_eagerly", True, user=admin_user, reason="Test")
+    obj = _objekt(drive, "653", "weg_with_se", 3)
+    ensure_placeholder_units(obj, 3)
+    assert ensure_unit_files(obj)["owner_files"] == 3
+    ensure_unit_folders(obj, drive=drive)
+    ManagedObject.objects.filter(pk=obj.pk).update(management_type="rental")
+    obj.refresh_from_db()
+    stats = ensure_unit_files(obj)
+    assert stats == {"owner_files": 1, "tenant_files": 0, "retired": 3}
+    assert [a.folder_name for a in OwnerFile.active.filter(object=obj)] == ["Eigentümer"]
+    assert OwnerFile.objects.filter(object=obj, deleted_at__isnull=False).count() == 3
+    assert AuditEvent.objects.filter(action="owner_file.retire", object_id=obj.pk).count() == 3
+    assert _names(drive, obj, "05") == ["WE01", "WE02", "WE03"]  # nichts in Drive geloescht
+    ensure_unit_folders(obj, drive=drive)
+    assert _names(drive, obj, "05") == ["Eigentümer", "WE01", "WE02", "WE03"]
+
+
+def test_reine_weg_ohne_mieterakten(seeded, drive, admin_user):
+    store.set("owner_file.create_folders_eagerly", True, user=admin_user, reason="Test")
+    obj = _objekt(drive, "654", "weg", 2)
+    ensure_placeholder_units(obj, 2)
+    assert ensure_unit_files(obj) == {"owner_files": 2, "tenant_files": 0, "retired": 0}
+    assert not TenantFile.active.filter(object=obj).exists()
+    result = ensure_unit_folders(obj, drive=drive)
+    assert result["tenant_folders"] == 0 and _names(drive, obj, "05") == ["WE01", "WE02"]

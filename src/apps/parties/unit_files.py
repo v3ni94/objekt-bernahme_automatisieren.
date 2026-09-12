@@ -1,7 +1,9 @@
-"""Akten-Vorlage je Einheit (Entscheidung 11.09.2026).
+"""Akten-Vorlage je Einheit (Entscheidung 11.09.2026), nach Verwaltungsart (12.09.2026).
 
 Eigentuemer- und Mieterakte einer Einheit entstehen als Platzhalter mit dem Einheitenkuerzel (etwa WE01), sobald die
-Einheit bekannt ist, und werden umbenannt, sobald Eigentuemer oder Mieter zugeordnet sind. Die Ordner in Drive folgen
+Einheit bekannt ist, und werden umbenannt, sobald Eigentuemer oder Mieter zugeordnet sind. Welche Akten entstehen,
+richtet sich nach der Verwaltungsart (file_plan): Mietverwaltung eine Eigentuemerakte je Objekt (ein Eigentuemer je
+Haus) und Mieterakten je Einheit, WEG Eigentuemerakten je Einheit, WEG mit Sondereigentumsverwaltung beides. Die Ordner in Drive folgen
 ueber apps.drive.folders (ensure_owner_folder, ensure_tenant_folder, sync_file_names). Namensbildung ausschliesslich
 ueber apps.drive.naming, damit Platzhalter und endgueltige Namen demselben Schema folgen.
 """
@@ -19,7 +21,9 @@ from apps.drive.naming import (
     OwnerFileNamingConfig,
     OwnerNameInput,
     OwnerNamePart,
+    build_object_owner_folder_name,
     build_owner_folder_name,
+    object_owner_placeholder,
     unit_token,
 )
 from apps.objects.models import Unit
@@ -141,15 +145,142 @@ def _create_placeholder(model, obj, unit: Unit, file_kind: str, cfg: OwnerFileNa
         return model.active.filter(unit=unit, file_kind=file_kind).order_by("id").first()
 
 
+def file_plan(obj) -> dict[str, bool]:
+    """Akten-Vorlage nach Verwaltungsart (12.09.2026): Mietverwaltung eine Eigentuemerakte je Objekt und Mieterakten je
+    Einheit; WEG Eigentuemerakten je Einheit, keine Mieterakten; WEG mit Sondereigentumsverwaltung beides je Einheit."""
+    management_type = getattr(obj, "management_type", "weg")
+    if management_type == "rental":
+        return {"unit_owner": False, "object_owner": True, "unit_tenant": True}
+    if management_type == "weg_with_se":
+        return {"unit_owner": True, "object_owner": False, "unit_tenant": True}
+    return {"unit_owner": True, "object_owner": False, "unit_tenant": False}
+
+
+def object_owners(obj) -> list:
+    """Eigentuemer des Objekts (Mietverwaltung): alle Eigentuemer mit heute gueltiger Zuordnung auf einer Einheit des
+    Objekts, in der Reihenfolge des Zuordnungsbeginns, jeder einmal."""
+    today = timezone.localdate()
+    qs = OwnerUnitAssignment.active.filter(
+        unit__object=obj, unit__deleted_at__isnull=True, owner__deleted_at__isnull=True
+    )
+    qs = qs.filter(valid_to__isnull=True) | qs.filter(valid_to__gte=today)
+    seen: dict[int, object] = {}
+    for a in qs.select_related("owner").distinct().order_by("valid_from", "owner_id"):
+        seen.setdefault(a.owner_id, a.owner)
+    return list(seen.values())
+
+
+def _object_owner_name(obj, owners, current: str | None, exclude_pk: int | None) -> str:
+    cfg = OwnerFileNamingConfig.from_settings()
+    return build_object_owner_folder_name(
+        OwnerNameInput(
+            file_kind="unit_owner",
+            owner_names=tuple(_party_part(o) for o in owners),
+            existing_names_in_object=_existing_names(OwnerFile, obj, exclude_pk),
+            current_name=current,
+        ),
+        cfg,
+    )
+
+
+def refresh_object_owner_file_name(akte: OwnerFile, obj) -> bool:
+    """Die Eigentuemerakte des Objekts folgt den Eigentuemern (Eigentümer wird zu Eigentümer_Mustermann); ein von Hand
+    vergebener Name (ohne Vorlagenherkunft) bleibt."""
+    basis = akte.name_basis or {}
+    if not (basis.get("placeholder") or basis.get("managed_name")):
+        return False
+    owners = object_owners(obj)
+    if not owners or set(basis.get("owners") or []) == {o.pk for o in owners}:
+        return False
+    akte.folder_name = _object_owner_name(obj, owners, akte.folder_name, akte.pk)
+    akte.owner = owners[0] if len(owners) == 1 else None
+    akte.name_basis = {**basis, "owners": [o.pk for o in owners], "managed_name": True, "placeholder": False}
+    akte.save(update_fields=["folder_name", "owner", "name_basis", "updated_at"])
+    return True
+
+
+def ensure_object_owner_file(obj) -> OwnerFile:
+    """Eigentuemerakte des Objekts (Mietverwaltung): anlegen, falls sie fehlt (Platzhalter „Eigentümer“), und nach den
+    Eigentuemern benennen, sobald welche zugeordnet sind."""
+    akte = OwnerFile.active.filter(object=obj, file_kind="object_owner").order_by("id").first()
+    if akte is None:
+        cfg = OwnerFileNamingConfig.from_settings()
+        try:
+            with transaction.atomic():
+                akte = OwnerFile.objects.create(
+                    object=obj,
+                    unit=None,
+                    file_kind="object_owner",
+                    folder_name=_unique_name(object_owner_placeholder(cfg), OwnerFile, obj),
+                    name_basis={"object_owner": True, "placeholder": True, "owners": []},
+                )
+        except IntegrityError:  # gleichzeitiger Aufruf hat die Akte angelegt
+            akte = OwnerFile.active.filter(object=obj, file_kind="object_owner").order_by("id").first()
+    refresh_object_owner_file_name(akte, obj)
+    return akte
+
+
+def _retire_placeholders(model, obj, file_kind: str, reason: str) -> int:
+    """Platzhalterakten, die die Verwaltungsart nicht vorsieht, stilllegen (Soft-Delete): nur ohne Zuordnung und ohne
+    verknuepfte Dokumente. Ein bereits angelegter Ordner in Drive bleibt bestehen (es wird nie geloescht)."""
+    from apps.documents.models import DocumentOwnerLink, DocumentTenantLink
+
+    retired = 0
+    for akte in model.active.filter(object=obj, file_kind=file_kind, file_assignments__isnull=True):
+        if not (akte.name_basis or {}).get("placeholder"):
+            continue
+        linked = (
+            DocumentOwnerLink.objects.filter(owner_file=akte, deleted_at__isnull=True).exists()
+            if model is OwnerFile
+            else DocumentTenantLink.objects.filter(tenant_file=akte, deleted_at__isnull=True).exists()
+        )
+        if linked:
+            continue
+        akte.deleted_at = timezone.now()
+        akte.delete_reason = reason[:255]
+        akte.save(update_fields=["deleted_at", "delete_reason", "updated_at"])
+        record(
+            "owner_file.retire" if model is OwnerFile else "tenant_file.retire",
+            entity_type="owner_file" if model is OwnerFile else "tenant_file",
+            entity_id=akte.pk,
+            object_id=obj.pk,
+            actor_type="system",
+            reason=reason,
+            before={"folder_name": akte.folder_name, "unit_id": akte.unit_id, "file_kind": file_kind},
+        )
+        retired += 1
+    return retired
+
+
 def ensure_unit_files(obj) -> dict[str, int]:
-    """Je aktive Einheit eine Eigentuemer- und eine Mieterakte. Sind Eigentuemer oder Mieter bereits zugeordnet,
-    entsteht je Gruppe eine Akte mit Namen (aktuelle Gruppe zuerst); sonst ein Platzhalter mit dem Einheitenkuerzel."""
+    """Akten nach Verwaltungsart (file_plan): je aktive Einheit eine Eigentuemer- und/oder Mieterakte, bei
+    Mietverwaltung eine Eigentuemerakte fuer das Objekt. Sind Eigentuemer oder Mieter bereits zugeordnet, entsteht je
+    Gruppe eine Akte mit Namen (aktuelle Gruppe zuerst); sonst ein Platzhalter mit dem Einheitenkuerzel. Platzhalter,
+    die die Verwaltungsart nicht vorsieht, werden stillgelegt (retired), nie deren Ordner in Drive."""
     from apps.classification.ownerfiles import owner_file_for_assignments
 
+    plan = file_plan(obj)
     cfg = OwnerFileNamingConfig.from_settings()
-    stats = {"owner_files": 0, "tenant_files": 0}
+    stats = {"owner_files": 0, "tenant_files": 0, "retired": 0}
+    if plan["object_owner"]:
+        existed = OwnerFile.active.filter(object=obj, file_kind="object_owner").exists()
+        ensure_object_owner_file(obj)
+        if not existed:
+            stats["owner_files"] += 1
+    else:
+        stats["retired"] += _retire_placeholders(
+            OwnerFile, obj, "object_owner", "Akten-Vorlage: Verwaltungsart führt Eigentümerakten je Einheit"
+        )
+    if not plan["unit_owner"]:
+        stats["retired"] += _retire_placeholders(
+            OwnerFile, obj, "unit_owner", "Akten-Vorlage: Mietverwaltung führt eine Eigentümerakte je Objekt"
+        )
+    if not plan["unit_tenant"]:
+        stats["retired"] += _retire_placeholders(
+            TenantFile, obj, "unit_tenant", "Akten-Vorlage: reine WEG-Verwaltung führt keine Mieterakten"
+        )
     for unit in Unit.active.filter(object=obj).order_by("unit_label_normalized"):
-        if not OwnerFile.active.filter(unit=unit, file_kind="unit_owner").exists():
+        if plan["unit_owner"] and not OwnerFile.active.filter(unit=unit, file_kind="unit_owner").exists():
             groups = _owner_groups(current_owner_assignments(unit))
             if groups:
                 for group in groups:
@@ -157,7 +288,7 @@ def ensure_unit_files(obj) -> dict[str, int]:
             else:
                 _create_placeholder(OwnerFile, obj, unit, "unit_owner", cfg)
             stats["owner_files"] += 1
-        if not TenantFile.active.filter(unit=unit, file_kind="unit_tenant").exists():
+        if plan["unit_tenant"] and not TenantFile.active.filter(unit=unit, file_kind="unit_tenant").exists():
             groups = _tenant_groups(current_tenant_assignments(unit))
             if groups:
                 for group in groups:

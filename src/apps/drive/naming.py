@@ -221,3 +221,22 @@ def build_owner_folder_name(inp: OwnerNameInput, cfg: OwnerFileNamingConfig | No
     )
     base = _fit_length(prefix, names, cfg)
     return resolve_collision(base, inp, cfg)
+
+
+def object_owner_placeholder(cfg: OwnerFileNamingConfig | None = None) -> str:
+    """Platzhaltername der Eigentuemerakte eines Objekts in Mietverwaltung (12.09.2026): ein Eigentuemer je Haus,
+    deshalb eine Akte je Objekt statt je Einheit."""
+    cfg = cfg or OwnerFileNamingConfig()
+    return "Eigentuemer" if cfg.transliterate_umlauts else "Eigentümer"
+
+
+def build_object_owner_folder_name(inp: OwnerNameInput, cfg: OwnerFileNamingConfig | None = None) -> str:
+    """Name der Eigentuemerakte eines Objekts: Platzhalter plus Nachnamen der Eigentuemer (Eigentümer_Mustermann),
+    gleiche Laengen- und Kollisionsregeln wie bei den Akten je Einheit."""
+    cfg = cfg or OwnerFileNamingConfig()
+    names = sorted({n for n in (display_name(p, cfg) for p in inp.owner_names) if n}, key=sort_key)
+    prefix = object_owner_placeholder(cfg)
+    if not names:
+        return resolve_collision(prefix, inp, cfg)
+    base = _fit_length(prefix, names, cfg)
+    return resolve_collision(base, inp, cfg)

@@ -189,6 +189,10 @@ class OwnerUnitAssignment(SoftDeleteModel):
 
 class OwnerFileKind(models.TextChoices):
     UNIT_OWNER = "unit_owner", "Einheit und Eigentümer"
+    OBJECT_OWNER = (
+        "object_owner",
+        "Eigentümer des Objekts",
+    )  # Mietverwaltung: eine Akte je Objekt (12.09.2026)
     UNKNOWN_UNIT = "unknown_unit", "Einheit unbekannt"
     UNASSIGNED = "unassigned", "Unzugeordnet"
 
