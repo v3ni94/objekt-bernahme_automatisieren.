@@ -279,25 +279,35 @@ def case_action(request, pk: int):
             services.split(case, request.user, segments, request=request)
             messages.success(request, f"{len(segments)} Segmente angelegt und entschieden.")
         elif action == "transfer":
+            from apps.documents.transfer import TransferError
+
             target_obj = get_object_or_404(ManagedObject.active, pk=request.POST.get("target_object"))
-            services.transfer(
-                case, request.user, target_obj, reason=request.POST.get("reason"), request=request
-            )
+            try:
+                services.transfer(
+                    case, request.user, target_obj, reason=request.POST.get("reason"), request=request
+                )
+            except TransferError as exc:
+                raise services.ReviewError(str(exc)) from exc
             messages.success(request, f"Dokument in Objekt {target_obj.object_number} übernommen.")
         elif action == "assign_object":
+            from apps.documents.transfer import TransferError
             from apps.sync.flows import assign as sync_assign
 
             target_obj = get_object_or_404(ManagedObject.active, pk=request.POST.get("target_object"))
             if case.document is None:
                 raise services.ReviewError("Fall ohne Dokument")
-            new_doc = sync_assign.apply_assignment(
-                case.document,
-                target_obj,
-                user=request.user,
-                case=case,
-                request=request,
-                reason=request.POST.get("reason", ""),
-            )
+            try:
+                new_doc = sync_assign.apply_assignment(
+                    case.document,
+                    target_obj,
+                    user=request.user,
+                    case=case,
+                    request=request,
+                    reason=request.POST.get("reason", ""),
+                )
+            except (sync_assign.AssignmentError, TransferError) as exc:
+                # erledigter Fall oder bereits uebernommenes Dokument: Hinweis statt Serverfehler
+                raise services.ReviewError(str(exc)) from exc
             messages.success(
                 request,
                 f"Dokument dem Objekt {target_obj.object_number} zugeordnet (Dokument {new_doc.pk}); Ablage folgt.",
@@ -305,9 +315,12 @@ def case_action(request, pk: int):
         elif action == "reject_assignment":
             from apps.sync.flows import assign as sync_assign
 
-            sync_assign.reject_proposal(
-                case, user=request.user, request=request, reason=request.POST.get("reason", "")
-            )
+            try:
+                sync_assign.reject_proposal(
+                    case, user=request.user, request=request, reason=request.POST.get("reason", "")
+                )
+            except sync_assign.AssignmentError as exc:
+                raise services.ReviewError(str(exc)) from exc
             messages.info(request, "Vorschlag verworfen; das Dokument bleibt im Eingang.")
         elif action == "resolve_conflict":
             from apps.sync.flows import conflicts

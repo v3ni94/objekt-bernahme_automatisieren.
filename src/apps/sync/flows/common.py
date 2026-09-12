@@ -37,11 +37,13 @@ def raise_mapped(exc: Exception):
 
 
 def client_or_defer():
-    from apps.sync import services
+    from apps.sync import config, services
 
+    if not config.enabled():
+        raise Defer("Hauptschalter paperless.enabled ist aus", seconds=600)
     client = services.get_client()
     if client is None:
-        raise Defer("Paperless nicht konfiguriert oder Hauptschalter aus", seconds=600)
+        raise Defer("Paperless nicht konfiguriert (Adresse oder Token fehlt)", seconds=600)
     return client
 
 

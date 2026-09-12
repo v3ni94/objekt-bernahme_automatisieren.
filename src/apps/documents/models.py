@@ -201,7 +201,10 @@ class Decider(models.TextChoices):
 
 class Document(SoftDeleteModel):
     uuid = models.UUIDField(
-        default=uuid.uuid4, unique=True, editable=False, help_text="unveränderliche Dokument-UUID für externe Systeme"
+        default=uuid.uuid4,
+        unique=True,
+        editable=False,
+        help_text="unveränderliche Dokument-UUID für externe Systeme",
     )
     object = models.ForeignKey(
         "objects.ManagedObject", on_delete=models.PROTECT, db_column="object_id", related_name="documents"

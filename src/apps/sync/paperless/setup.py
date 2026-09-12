@@ -35,12 +35,29 @@ def _by_name(rows: list[dict], name: str) -> dict | None:
     return next((r for r in rows if str(r.get("name", "")).strip().casefold() == wanted), None)
 
 
+def _failed_state(message: str) -> SetupState:
+    """Befund ohne erfolgreiche Verbindung. Die zuletzt bekannte Kennzeichnung (Tag-ID, Feld-IDs, Serverstand)
+    bleibt erhalten, damit laufende Operationen nach einer voruebergehenden Stoerung nicht ohne Felder und Tag
+    weiterarbeiten; ok ist trotzdem False, bis ein Test wieder gelingt."""
+    previous = services.connection_meta()
+    return SetupState(
+        ok=False,
+        message=message,
+        server_version=previous.get("server_version"),
+        api_version=previous.get("api_version"),
+        features=dict(previous.get("features") or {}),
+        tag_id=previous.get("tag_id"),
+        field_ids=dict(previous.get("field_ids") or {}),
+        checked_at=timezone.now().isoformat(),
+    )
+
+
 def check(*, user=None, create: bool = False, request=None) -> SetupState:
     """Prueft die Verbindung und die Kennzeichnung; legt mit create fehlende Tags und Felder an (nicht im Modus
     readonly). Schreibt den Befund nach sync_cursors und ins Audit."""
     client = services.get_client()
     if client is None:
-        state = SetupState(ok=False, message="Paperless ist nicht konfiguriert (Adresse oder Token fehlt)")
+        state = _failed_state("Paperless ist nicht konfiguriert (Adresse oder Token fehlt)")
         services.set_cursor(SyncSystem.PAPERLESS, services.CONNECTION_CURSOR, None, state.as_meta())
         return state
     names = config.field_names()
@@ -49,7 +66,7 @@ def check(*, user=None, create: bool = False, request=None) -> SetupState:
         tags = list(client.list_tags())
         fields = list(client.list_custom_fields())
     except Exception as exc:  # jede Fehlerklasse des Clients wird als Befund gemeldet, nie verschluckt
-        state = SetupState(ok=False, message=f"Verbindung fehlgeschlagen: {type(exc).__name__}: {exc}"[:500])
+        state = _failed_state(f"Verbindung fehlgeschlagen: {type(exc).__name__}: {exc}"[:500])
         services.set_cursor(SyncSystem.PAPERLESS, services.CONNECTION_CURSOR, None, state.as_meta())
         record(
             "sync.paperless_check",

@@ -32,6 +32,8 @@ def resolve(case: ReviewCase, choice: str, *, user, request=None, reason: str = 
         raise ConflictError("Fall ist bereits erledigt")
     if choice not in CHOICES:
         raise ConflictError("unbekannte Entscheidung")
+    if choice not in {key for key, _ in choices_for(case)}:
+        raise ConflictError("Entscheidung für diese Konfliktart nicht zulässig")
     doc = case.document
     ctx = case.context or {}
     subtype = case.case_subtype or ""

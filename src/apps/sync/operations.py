@@ -255,17 +255,21 @@ def release_stale(minutes: int = STALE_MINUTES) -> int:
     )
 
 
-def cancel(op: SyncOperation, *, user=None, reason: str = "") -> None:
+def cancel(op: SyncOperation, *, user=None, reason: str = "") -> bool:
+    """Verwirft eine wartende, blockierte oder fehlgeschlagene Operation. Laufende und abgeschlossene Operationen
+    bleiben unveraendert; dann wird auch kein Audit-Ereignis geschrieben. Liefert, ob verworfen wurde."""
     from apps.audit.services import record
 
     before = {"status": op.status}
-    SyncOperation.objects.filter(
+    updated = SyncOperation.objects.filter(
         pk=op.pk, status__in=[OperationStatus.PENDING, OperationStatus.BLOCKED, OperationStatus.FAILED]
     ).update(
         status=OperationStatus.CANCELLED,
         finished_at=timezone.now(),
         blocked_reason=(reason or op.blocked_reason),
     )
+    if not updated:
+        return False
     record(
         "sync.operation_cancelled",
         entity_type="sync_operation",
@@ -275,19 +279,29 @@ def cancel(op: SyncOperation, *, user=None, reason: str = "") -> None:
         after={"status": "cancelled", "reason": reason},
         actor=user,
     )
+    return True
 
 
-def retry_now(op: SyncOperation, *, user=None) -> None:
+def retry_now(op: SyncOperation, *, user=None) -> bool:
+    """Reiht eine Operation sofort erneut ein (Zaehler und Wartezeit zurueckgesetzt). Eine laufende Operation wird
+    nicht angefasst, sonst liefe sie parallel ein zweites Mal; haengende Laeufe gibt release_stale frei. Liefert,
+    ob die Operation eingereiht wurde."""
     from apps.audit.services import record
 
-    SyncOperation.objects.filter(pk=op.pk).update(
-        status=OperationStatus.PENDING,
-        attempt_count=0,
-        next_attempt_at=timezone.now(),
-        blocked_reason=None,
-        locked_by=None,
-        locked_at=None,
+    updated = (
+        SyncOperation.objects.filter(pk=op.pk)
+        .exclude(status=OperationStatus.RUNNING)
+        .update(
+            status=OperationStatus.PENDING,
+            attempt_count=0,
+            next_attempt_at=timezone.now(),
+            blocked_reason=None,
+            locked_by=None,
+            locked_at=None,
+        )
     )
+    if not updated:
+        return False
     record(
         "sync.operation_retry",
         entity_type="sync_operation",
@@ -296,6 +310,7 @@ def retry_now(op: SyncOperation, *, user=None) -> None:
         actor=user,
     )
     send(op)
+    return True
 
 
 def summary() -> dict:

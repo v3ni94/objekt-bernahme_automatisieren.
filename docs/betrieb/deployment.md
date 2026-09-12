@@ -6,7 +6,7 @@ Verbindliche Beschreibung in docs/betrieb.md Abschnitt 4. Hier die Befehlsfolge.
 
 1. Serverbefund (`scripts/measure_server.sh`) und OCR-Probelauf (`scripts/perf_probe.sh`) nach docs/betrieb/m0-anleitung.md.
 2. Host-Härtung nach docs/betrieb.md Abschnitt 2, DNS-Eintrag vorhanden (V-04).
-3. Verzeichnisse (docs/betrieb.md 3.3), Secrets (3.8), Deploy-Nutzer und GitHub-Schlüssel in einem Lauf: `sudo bash scripts/bootstrap_vps.sh` (docs/betrieb/github-deploy.md); `.env` aus `.env.example` mit den Werten des Ergebnisblatts.
+3. Verzeichnisse (docs/betrieb.md 3.3), Secrets (3.8; optionale Paperless-Secrets siehe Abschnitt unten), Deploy-Nutzer und GitHub-Schlüssel in einem Lauf: `sudo bash scripts/bootstrap_vps.sh` (docs/betrieb/github-deploy.md); `.env` aus `.env.example` mit den Werten des Ergebnisblatts.
 4. Checkout: `sudo mkdir -p /opt/objektakte && sudo chown deploy:deploy /opt/objektakte && git clone [REPO_URL] /opt/objektakte && cd /opt/objektakte`
 5. `scripts/deploy.sh --first-run main` (baut Images, startet db, redis, backup, migriert, lädt Seeds, setzt Tabellenrechte, startet alle Dienste, Smoke-Test).
 6. Ersten Admin anlegen: `docker compose exec web /usr/local/bin/entrypoint.sh app-create-admin --email [ADMIN_ADRESSE]` (`exec` umgeht das ENTRYPOINT, deshalb der ausdrückliche Aufruf; `run` braucht ihn nicht); TOTP beim ersten Login einrichten. Zweiten Admin anlegen.
@@ -19,6 +19,15 @@ Verbindliche Beschreibung in docs/betrieb.md Abschnitt 4. Hier die Befehlsfolge.
 - Schema-Rollback nur als Ausnahme nach docs/betrieb.md 4.4: `docker compose run --rm --no-deps web app-migrate --down <app> <migration>`.
 - Seeds erneut laden: `docker compose run --rm --no-deps web app-seed` (`--force` überschreibt geänderte Werte, protokolliert).
 - Tabellenrechte nachziehen: `docker compose run --rm --no-deps -T web app-grants-sql | docker compose exec -T db sh -c 'mariadb -uroot -p"$(cat /run/secrets/db_root_password)" "$MARIADB_DATABASE"'`
+
+## Secrets der Paperless-Anbindung (optional, Stand 12.09.2026)
+
+Ergänzung zur Secret-Liste in docs/betrieb.md 3.8; Einrichtung und Betrieb in docs/betrieb/paperless-sync.md. Beide Dateien müssen vor `docker compose up` vorhanden sein: `scripts/deploy.sh` legt fehlende Dateien als leere Platzhalter an, sofern es Schreibrechte im Secret-Verzeichnis hat, sonst legt der Admin sie an; ein vom Skript angelegter Platzhalter gehört dem Deploy-Nutzer mit Rechten 0600 und ist danach auf root und `0444` zu setzen. Leer bedeutet Anbindung aus. Rechte wie bei allen Secrets: `0444`, Eigentümer root, Verzeichnis `0700` root. Nach dem Befüllen oder Wechseln `docker compose restart web worker-io` (Werte werden beim Prozessstart gelesen).
+
+| Datei | Inhalt | Erzeugung | Verwendet von |
+|---|---|---|---|
+| `paperless_token` | API-Token eines eigenen Paperless-Benutzers mit Rechten zum Anzeigen, Hinzufügen und Ändern von Dokumenten, Tags und benutzerdefinierten Feldern | Paperless | `web` (Verbindungstest), `worker-io` (Operationen) |
+| `paperless_webhook_token` | Gemeinsames Geheimnis des Webhooks, Kopfzeile `X-MHV-Webhook-Token` im Paperless-Workflow | `openssl rand -hex 32` | `web` (Endpunkt `/webhooks/paperless/`), Paperless-Workflow |
 
 ## Container-Unterbefehle
 

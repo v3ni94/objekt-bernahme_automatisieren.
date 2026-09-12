@@ -75,6 +75,16 @@ case "$ACTION" in
     echo "  Daten, Secrets, Sicherungen: /srv/objektakte ($(du -sh /srv/objektakte 2>/dev/null | cut -f1))"
     ls -1 /srv/objektakte 2>/dev/null | sed 's/^/    /' || echo "    /srv/objektakte nicht lesbar"
     echo "  Ablaufprotokoll der Fernaufrufe: $LOG"
+    # Platzhalter-Secrets der Paperless-Anbindung (12.09.2026): deploy.sh legt sie ueber sudo -n an; ohne
+    # passwortloses sudo muss der Admin sie einmalig als root anlegen (docs/betrieb/paperless-sync.md 3.2).
+    if sudo -n true 2>/dev/null; then echo "  sudo ohne Passwort: ja"; else echo "  sudo ohne Passwort: nein"; fi
+    for s in paperless_token paperless_webhook_token; do
+      if sudo -n test -e "/srv/objektakte/secrets/$s" 2>/dev/null || [ -e "/srv/objektakte/secrets/$s" ]; then
+        echo "  Secret-Datei $s: vorhanden"
+      else
+        echo "  Secret-Datei $s: fehlt (deploy legt sie an, sofern sudo ohne Passwort moeglich ist)"
+      fi
+    done
     # Nur Vorhandensein und Alter, nie der Inhalt: Workflow-Logs sind fuer jeden mit Repository-Zugang lesbar.
     if [ -f /home/deploy/admin-startpasswort.txt ]; then
       echo "  Startpasswort des ersten Admin: /home/deploy/admin-startpasswort.txt vorhanden, geschrieben am $(date -r /home/deploy/admin-startpasswort.txt '+%d.%m.%Y %H:%M') (lesen mit: sudo cat, danach shred -u)"

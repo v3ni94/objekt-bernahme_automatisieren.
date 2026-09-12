@@ -42,6 +42,7 @@ DOCUMENT_FIELDS = (
     "owner",
     "root_document",
     "versions",
+    "deleted_at",
 )
 
 
@@ -190,9 +191,21 @@ class FakePaperless:
             "owner": owner,
             "root_document": root_document,
             "versions": [],
+            "deleted_at": None,
             "_bytes": bytes(content),
         }
         return doc_id
+
+    def trash_document(self, document_id: int) -> None:
+        """Legt ein Dokument in den Papierkorb (deleted_at gesetzt, weiter per ID lesbar, wie in Paperless-ngx)."""
+        doc = self._doc(document_id)
+        doc["deleted_at"] = self._now()
+        self._touch(doc)
+
+    def restore_document(self, document_id: int) -> None:
+        doc = self._doc(document_id)
+        doc["deleted_at"] = None
+        self._touch(doc)
 
     def set_content(self, document_id: int, content: bytes) -> None:
         doc = self._doc(document_id)

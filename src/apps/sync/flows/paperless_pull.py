@@ -1,7 +1,9 @@
 """Eingang aus Paperless: regelmaessiger Abgleich (modified-Cursor) und Webhook-Ereignisse legen je Dokument eine
 Operation an. Bekannte Dokumente werden mit dem zuletzt abgeglichenen Stand verglichen (Inhalt, Objektfeld);
-neue Dokumente werden in das Objekt aus dem Feld Objekt oder in das Eingangsobjekt uebernommen; Loeschungen und
-Papierkorb erzeugen einen Konfliktfall, nie eine lokale Loeschung."""
+neue Dokumente werden in das Objekt aus dem Feld Objekt oder in das Eingangsobjekt uebernommen; eine identische
+Datei (UUID-Feld oder Pruefsumme) wird nur verknuepft, eine zweite Kopie zu einem bereits verknuepften Dokument
+als Konfliktfall gemeldet und nie still umgehaengt; Loeschungen und Papierkorb erzeugen einen Konfliktfall, nie
+eine lokale Loeschung."""
 
 from __future__ import annotations
 
@@ -22,6 +24,7 @@ from apps.sync.flows.common import (
     SYNCED,
     client_or_defer,
     conflict,
+    link_for,
     mark_link,
     raise_mapped,
     upsert_link,
@@ -31,6 +34,36 @@ from apps.sync.operations import Block, Skip, enqueue, handler, op_key
 
 CURSOR_MODIFIED = "modified_cursor"
 CURSOR_LAST_POLL = "last_poll"
+_CORRESPONDENTS: dict[int, str] = {}
+_CORRESPONDENTS_LOADED_AT: list[float] = []
+CORRESPONDENT_CACHE_S = 300
+
+
+def correspondent_name(client, remote: dict) -> str | None:
+    """Name des Korrespondenten aus Paperless (Kennung im Dokument, Aufloesung ueber die Stammdatenliste mit
+    Zwischenspeicher je Prozess); dient der Lernfunktion als Lieferantenmerkmal."""
+    import time
+
+    raw = remote.get("correspondent")
+    if raw in (None, ""):
+        return None
+    try:
+        cid = int(raw)
+    except (TypeError, ValueError):
+        return None
+    now = time.monotonic()
+    stale = not _CORRESPONDENTS_LOADED_AT or now - _CORRESPONDENTS_LOADED_AT[0] > CORRESPONDENT_CACHE_S
+    if cid not in _CORRESPONDENTS or stale:
+        try:
+            rows = list(client.list_correspondents())
+        except Exception:  # Name ist ein Hilfsmerkmal, kein Pflichtschritt
+            return _CORRESPONDENTS.get(cid)
+        _CORRESPONDENTS.clear()
+        _CORRESPONDENTS.update(
+            {int(r["id"]): str(r.get("name") or "") for r in rows if r.get("id") is not None}
+        )
+        _CORRESPONDENTS_LOADED_AT[:] = [now]
+    return _CORRESPONDENTS.get(cid) or None
 
 
 def poll(*, force: bool = False, limit: int = 2000) -> dict:
@@ -121,6 +154,42 @@ def _parse_dt(value):
     return parsed if timezone.is_aware(parsed) else timezone.make_aware(parsed)
 
 
+def _second_copy(local: Document, existing: ExternalLink, remote: dict, remote_id: int, match: str) -> dict:
+    """Zweite Kopie in Paperless zu einem bereits verknuepften Dokument: die Verknuepfung bleibt auf der bekannten
+    Kopie (sonst ginge die Kennung der eigenen Uebertragung verloren), die zweite Kopie wird als Konfliktfall
+    duplicate_remote gemeldet; nichts wird geladen, nichts in Paperless veraendert."""
+    case = conflict(
+        local,
+        "duplicate_remote",
+        str(remote_id),
+        {
+            "paperless_id": str(remote_id),
+            "linked_paperless_id": existing.external_id,
+            "match": match,
+            "title": remote.get("title"),
+        },
+    )
+    record(
+        "sync.paperless_pull",
+        entity_type="document",
+        entity_id=local.pk,
+        object_id=local.object_id,
+        after={
+            "paperless_id": remote_id,
+            "duplicate_remote": True,
+            "linked_paperless_id": existing.external_id,
+            "match": match,
+        },
+    )
+    return {
+        "duplicate_remote": True,
+        "paperless_id": remote_id,
+        "document_id": local.pk,
+        "linked_paperless_id": existing.external_id,
+        "case_id": case.pk if case else None,
+    }
+
+
 def _import_new(client, remote: dict, metadata: dict, meta: dict) -> dict:
     """Neues Paperless-Dokument uebernehmen: identische Datei verknuepfen, sonst Original laden und registrieren."""
     from apps.sync.inbox import ensure_inbox_object
@@ -135,6 +204,9 @@ def _import_new(client, remote: dict, metadata: dict, meta: dict) -> dict:
             .first()
         )
         if local is not None:
+            existing = link_for(local, PAPERLESS)
+            if existing is not None and existing.external_id != str(remote_id):
+                return _second_copy(local, existing, remote, remote_id, "uuid")
             upsert_link(
                 local,
                 system=PAPERLESS,
@@ -142,6 +214,13 @@ def _import_new(client, remote: dict, metadata: dict, meta: dict) -> dict:
                 checksum_sha256=checksum,
                 state=LinkState.LINKED,
                 state_reason="UUID-Feld",
+            )
+            record(
+                "sync.paperless_pull",
+                entity_type="document",
+                entity_id=local.pk,
+                object_id=local.object_id,
+                after={"paperless_id": remote_id, "linked_existing": True, "reason": "uuid"},
             )
             return {"linked": local.pk, "reason": "uuid"}
     if checksum:
@@ -152,6 +231,9 @@ def _import_new(client, remote: dict, metadata: dict, meta: dict) -> dict:
         )
         if same:
             local = same[0]
+            existing = link_for(local, PAPERLESS)
+            if existing is not None and existing.external_id != str(remote_id):
+                return _second_copy(local, existing, remote, remote_id, "checksum")
             upsert_link(
                 local,
                 system=PAPERLESS,
@@ -218,6 +300,7 @@ def _import_new(client, remote: dict, metadata: dict, meta: dict) -> dict:
                 "title": remote.get("title"),
                 "tags": remote.get("tags"),
                 "modified": remote.get("modified"),
+                "correspondent": correspondent_name(client, remote),
                 "object_field": (_object_from_field(remote, meta) or ManagedObject()).object_number or None,
             },
         )
@@ -307,7 +390,12 @@ def _check_known(client, link: ExternalLink, remote: dict, metadata: dict, meta:
         result["proposal"] = wanted_object.pk
     synced = dict(link.synced_fields or {})
     synced.update(
-        {"title": remote.get("title"), "tags": remote.get("tags"), "modified": remote.get("modified")}
+        {
+            "title": remote.get("title"),
+            "tags": remote.get("tags"),
+            "modified": remote.get("modified"),
+            "correspondent": correspondent_name(client, remote),
+        }
     )
     mark_link(
         link,

@@ -1,8 +1,8 @@
 # Admin-Konfiguration (app_settings)
 
-Stand: 11.09.2026, erzeugt aus `src/apps/config/catalog.json` und `db/seeds/app_settings.json` (Definition of Done CR 14: Namensmuster Objektordner, Unterstruktur, Schwellwerte, Duplikat-Option, KI-Provider, Aufbewahrungsfristen). Änderungen erfolgen in der Anwendung unter Konfiguration (Recht `settings.write`), jede Änderung steht im Audit (`setting.update`). Werte wirken ohne Neustart; Ausnahmen stehen in der Spalte Wirkung. Seed-Werte sind Vorschläge (ANNAHME), sofern die Quelle nichts anderes sagt.
+Stand: 12.09.2026, erzeugt aus `src/apps/config/catalog.json` und `db/seeds/app_settings.json` (Definition of Done CR 14: Namensmuster Objektordner, Unterstruktur, Schwellwerte, Duplikat-Option, KI-Provider, Aufbewahrungsfristen). Änderungen erfolgen in der Anwendung unter Konfiguration (Recht `settings.write`), jede Änderung steht im Audit (`setting.update`). Werte wirken ohne Neustart; Ausnahmen stehen in der Spalte Wirkung. Seed-Werte sind Vorschläge (ANNAHME), sofern die Quelle nichts anderes sagt.
 
-Schlüssel: 122 in 18 Gruppen.
+Schlüssel: 149 in 20 Gruppen (seit 12.09.2026 zusätzlich `paperless.*` und `sync.*` für die Synchronisation mit Paperless-ngx und Google Drive).
 
 ## Google Drive und Objektordner (`drive.*`)
 
@@ -216,12 +216,54 @@ Schlüssel: 122 in 18 Gruppen.
 | `security.mfa_required_roles` | list | `["admin"]` | Rollen, für die der zweite Faktor (Authenticator-App) Pflicht ist; andere Rollen können ihn freiwillig unter Konto einrichten. Leer bedeutet keine Pflicht | Entscheidung 12.09.2026 (ersetzt Ü17) | array, Werte admin, sachbearbeiter |
 | `security.store_full_iban` | boolean | `false` | Vollständige IBAN verschlüsselt speichern (sonst nur letzte vier Stellen und Hash) | Frage F16 | boolean |
 
+## Paperless-ngx (`paperless.*`)
+
+Anbindung an Paperless-ngx (Ergänzung vom 12.09.2026, docs/architektur.md Abschnitt 14). Ausgeliefert mit Hauptschalter aus und Modus readonly; der API-Token liegt als Secret `paperless_token`, nie in `app_settings`. Einrichtung, Reihenfolge der Inbetriebnahme und Störungen: docs/betrieb/paperless-sync.md.
+
+| Schlüssel | Typ | Seed | Bedeutung | Quelle | Wertebereich |
+|---|---|---|---|---|---|
+| `paperless.enabled` | boolean | `false` | Anbindung an Paperless-ngx aktiv (Hauptschalter; aus stoppt jeden Abgleich, bereits gesicherte Daten bleiben) | Auftrag Paperless-ngx und Google Drive, 12.09.2026 | boolean |
+| `paperless.base_url` | string | `leer` | Basisadresse der Paperless-ngx-Instanz mit https, ohne /api (Token liegt als Secret PAPERLESS_TOKEN, nie in der Konfiguration) | Auftrag Paperless-ngx und Google Drive, 12.09.2026 | ['string', 'null'] |
+| `paperless.verify_tls` | boolean | `true` | TLS-Zertifikat der Paperless-Instanz prüfen (nur für interne Testinstanzen abschaltbar) | Auftrag Paperless-ngx und Google Drive, 12.09.2026 | boolean |
+| `paperless.timeout_seconds` | integer | `30` | Zeitlimit je API-Aufruf in Sekunden | Auftrag Paperless-ngx und Google Drive, 12.09.2026 | min 5, max 300 |
+| `paperless.page_size` | integer | `100` | Seitengröße für Listenabfragen der Paperless-API | Auftrag Paperless-ngx und Google Drive, 12.09.2026 | min 10, max 500 |
+| `paperless.api_version` | integer | `10` | Angeforderte API-Version (Accept-Header); der Verbindungstest meldet die vom Server gelieferte Version | Auftrag Paperless-ngx und Google Drive, 12.09.2026 | min 1, max 20 |
+| `paperless.mode` | string | `"readonly"` | readonly (nur lesen und inventarisieren), pilot (Schreiben nur für Objekte in paperless.pilot_object_numbers und den Eingang), full (alle Objekte) | Auftrag Paperless-ngx und Google Drive, 12.09.2026 | readonly, pilot, full |
+| `paperless.pilot_object_numbers` | list | `[]` | Objektnummern des Pilotumfangs (nur im Modus pilot wirksam) | Auftrag Paperless-ngx und Google Drive, 12.09.2026 | array |
+| `paperless.tag_name` | string | `"MHV-Sync"` | Name des Kennzeichnungs-Tags in Paperless für Dokumente, die die Anwendung führt | Auftrag Paperless-ngx und Google Drive, 12.09.2026 | string, 1 bis 60 Zeichen |
+| `paperless.field_uuid_name` | string | `"MHV Dokument-UUID"` | Name des benutzerdefinierten Felds für die Dokument-UUID der Anwendung | Auftrag Paperless-ngx und Google Drive, 12.09.2026 | string, 1 bis 60 Zeichen |
+| `paperless.field_object_name` | string | `"MHV Objekt"` | Name des benutzerdefinierten Felds für den Objektbezug (Objektnummer und Bezeichnung) | Auftrag Paperless-ngx und Google Drive, 12.09.2026 | string, 1 bis 60 Zeichen |
+| `paperless.field_status_name` | string | `"MHV Zuordnung"` | Name des benutzerdefinierten Felds für den Zuordnungsstatus | Auftrag Paperless-ngx und Google Drive, 12.09.2026 | string, 1 bis 60 Zeichen |
+| `paperless.field_drive_name` | string | `"MHV Drive-Link"` | Name des benutzerdefinierten Felds für den geschützten Drive-Link | Auftrag Paperless-ngx und Google Drive, 12.09.2026 | string, 1 bis 60 Zeichen |
+| `paperless.poll_interval_minutes` | integer | `5` | Abstand des regelmäßigen API-Abgleichs in Minuten (holt verpasste Webhook-Ereignisse nach) | Auftrag Paperless-ngx und Google Drive, 12.09.2026 | min 1, max 1440 |
+| `paperless.webhook_enabled` | boolean | `true` | Webhook-Endpunkt für Paperless-Workflows annehmen (Kopfzeile X-MHV-Webhook-Token muss dem Secret PAPERLESS_WEBHOOK_TOKEN entsprechen) | Auftrag Paperless-ngx und Google Drive, 12.09.2026 | boolean |
+| `paperless.import_new_documents` | boolean | `true` | In Paperless neu eingegangene Dokumente übernehmen (Download ins Eingangsobjekt oder in das im Feld Objekt genannte Objekt) | Auftrag Paperless-ngx und Google Drive, 12.09.2026 | boolean |
+| `paperless.max_upload_mb` | integer | `100` | Größte Datei in MB, die nach Paperless übertragen wird; größere erhalten einen Indexbeleg | Auftrag Paperless-ngx und Google Drive, 12.09.2026 | min 1, max 2000 |
+
+## Synchronisation (`sync.*`)
+
+Drive-Änderungsprotokoll, Eingangsobjekt und Eingangsordner, Schwellen der Objektzuordnung, Operationsliste und Bestandslauf (Ergänzung vom 12.09.2026). Die Schwellen sind Vorschlagswerte und nach den ersten Pilotobjekten anhand der Tabelle Automatisch zugeordnet und der Korrekturen zu kalibrieren.
+
+| Schlüssel | Typ | Seed | Bedeutung | Quelle | Wertebereich |
+|---|---|---|---|---|---|
+| `sync.drive_changes_enabled` | boolean | `false` | Änderungsprotokoll von Google Drive (Changes-API) regelmäßig lesen und neue oder geänderte Dateien registrieren | Auftrag Paperless-ngx und Google Drive, 12.09.2026 | boolean |
+| `sync.drive_changes_interval_minutes` | integer | `5` | Abstand des Drive-Änderungsabgleichs in Minuten | Auftrag Paperless-ngx und Google Drive, 12.09.2026 | min 1, max 1440 |
+| `sync.inbox_folder_name` | string | `"_Eingang_Nicht_zugeordnet"` | Name des geschützten zentralen Eingangsordners in Drive für nicht zugeordnete Dokumente (Vorschlag, wird unter der Wurzel angelegt) | Auftrag Paperless-ngx und Google Drive, 12.09.2026 | string, 1 bis 120 Zeichen |
+| `sync.inbox_folder_id` | string | `leer` | Folder-ID des Eingangsordners nach Einrichtung | Auftrag Paperless-ngx und Google Drive, 12.09.2026 | ['string', 'null'] |
+| `sync.inbox_object_number` | string | `"0"` | Objektnummer des technischen Eingangsobjekts (nur Ziffern) | Auftrag Paperless-ngx und Google Drive, 12.09.2026 | string, nur Ziffern |
+| `sync.assignment_auto_min` | decimal | `0.85` | Mindestbewertung für eine automatische Objektzuordnung | Auftrag Paperless-ngx und Google Drive, 12.09.2026 | min 0.5, max 1 |
+| `sync.assignment_gap_min` | decimal | `0.25` | Mindestabstand der Bewertung zum zweitbesten Kandidaten für eine automatische Zuordnung | Auftrag Paperless-ngx und Google Drive, 12.09.2026 | min 0, max 1 |
+| `sync.rule_min_confirmations` | integer | `2` | Anzahl bestätigter Beispiele mit gleicher Merkmalskombination, ab der eine Zuordnungsregel entsteht | Auftrag Paperless-ngx und Google Drive, 12.09.2026 | min 2, max 20 |
+| `sync.operation_max_attempts` | integer | `5` | Höchstzahl der Versuche je Synchronisationsoperation, danach sichtbar in der Fehlerliste | Auftrag Paperless-ngx und Google Drive, 12.09.2026 | min 1, max 20 |
+| `sync.inventory_page_size` | integer | `200` | Paketgröße des Bestandslaufs (Dateien je Schritt) | Auftrag Paperless-ngx und Google Drive, 12.09.2026 | min 20, max 1000 |
+
 ## Umgebungsvariablen (.env)
 
-Die Werte in `.env` und die Secrets unter `/srv/objektakte/secrets/` sind in docs/betrieb.md Abschnitt 3 und in `.env.example` beschrieben (Formeln zur Dimensionierung in docs/betrieb.md). Änderungen an `.env` brauchen einen Neustart der betroffenen Container (`docker compose up -d`). Dazu gehören Domain, Datenbank- und Redis-Zugang, Ressourcenlimits, `OPENAI_BASE_URL` und `ANTHROPIC_BASE_URL`, `HVM_SIGNATURE_PATH`, `LISTS_AUTO_GENERATE`, `ALERTS_ENABLED`, `ALERT_EMAIL_TO`, `SMTP_*`, `BACKUP_MAX_AGE_HOURS`, `DISK_RESERVE_GB`.
+Die Werte in `.env` und die Secrets unter `/srv/objektakte/secrets/` sind in docs/betrieb.md Abschnitt 3 und in `.env.example` beschrieben (Formeln zur Dimensionierung in docs/betrieb.md). Änderungen an `.env` brauchen einen Neustart der betroffenen Container (`docker compose up -d`). Dazu gehören Domain, Datenbank- und Redis-Zugang, Ressourcenlimits, `OPENAI_BASE_URL` und `ANTHROPIC_BASE_URL`, `HVM_SIGNATURE_PATH`, `LISTS_AUTO_GENERATE`, `ALERTS_ENABLED`, `ALERT_EMAIL_TO`, `SMTP_*`, `BACKUP_MAX_AGE_HOURS`, `DISK_RESERVE_GB`. Die Pfade `PAPERLESS_TOKEN_FILE` und `PAPERLESS_WEBHOOK_TOKEN_FILE` stehen nicht in `.env`, sondern fest in `docker-compose.yml` (`/run/secrets/paperless_token`, `/run/secrets/paperless_webhook_token`); die Secret-Dateien liegen unter `/srv/objektakte/secrets/`, `scripts/deploy.sh` legt fehlende Dateien leer an (leer bedeutet Anbindung aus). Der API-Token und das Webhook-Geheimnis stehen nie in `app_settings`.
 
 ## Hinweise
 
 - Aufbewahrungsfristen (`retention_policies`) sind ohne Werte ausgeliefert und werden von Geschäftsführung und Steuerberater festgelegt (F31); die Statusseite zeigt den Hinweis, solange Werte fehlen.
 - Die KI-Provider sind erst nach `ai.providers.<p>.enabled = true` und dokumentierter AVV-Freigabe aktiv (F17, V-10 bis V-13); die Preisliste `ai.price_list` ist leer, bis der Auftraggeber Listenpreise einträgt.
 - Textbausteine der Nachforderung (`request_text_blocks`) und der Prüfkatalog (`completeness_checks`) sind Seeds mit eigener Pflege in der Datenbank; im Admin geänderte Textbausteine werden vom Seed nicht überschrieben.
+- Die Paperless-Anbindung ist mit `paperless.enabled = false` und `paperless.mode = readonly` ausgeliefert. Verbindungstest und Trockenläufe brauchen nur `paperless.base_url` und das Secret; Schreibzugriffe erst ab Modus pilot mit `paperless.pilot_object_numbers` und eingeschaltetem Hauptschalter. `sync.inbox_folder_id` wird von der Schaltfläche Eingang einrichten gesetzt, nicht von Hand.

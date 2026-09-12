@@ -141,7 +141,10 @@ def _item(run: InventoryRun, **fields) -> InventoryItem:
 
 
 def _finish(run: InventoryRun, status: str = InventoryStatus.DONE, error: str | None = None) -> None:
-    counters = dict(run.counters or {})
+    # Zaehler aus der Datenbank lesen: das uebergebene Objekt stammt vom Beginn des Schritts, die Seite hat die
+    # Zaehler inzwischen per UPDATE fortgeschrieben (sonst ginge der Stand der letzten Seite verloren).
+    stored = InventoryRun.objects.filter(pk=run.pk).values_list("counters", flat=True).first()
+    counters = dict(stored if stored is not None else (run.counters or {}))
     by_disp = {}
     for row in InventoryItem.objects.filter(run=run).values("disposition"):
         by_disp[row["disposition"]] = by_disp.get(row["disposition"], 0) + 1
@@ -482,18 +485,28 @@ def refresh_dispositions(run: InventoryRun) -> int:
     """Uebertraegt den Ausgang der Operationen in das Manifest (in_progress -> link_existing/import_new/error)."""
     updated = 0
     for item in InventoryItem.objects.filter(run=run, disposition=Disposition.IN_PROGRESS).select_related(
-        "operation"
+        "operation", "document"
     ):
         op = item.operation
         if op is None:
+            # Drive-Zeile ohne Operation: die Datei wurde registriert und laeuft ueber die Pipeline; sobald sie den
+            # Eingangszustand verlassen hat, gilt die Uebernahme als erfolgt
+            doc = item.document
+            if doc is not None and doc.status not in ("registered", "hashed"):
+                InventoryItem.objects.filter(pk=item.pk).update(
+                    disposition=Disposition.ERROR if doc.status == "error" else Disposition.IMPORT_NEW,
+                    error_message="Verarbeitung fehlgeschlagen" if doc.status == "error" else None,
+                )
+                updated += 1
             continue
         if op.status == "done":
             result = op.result or {}
-            disp = (
-                Disposition.LINK_EXISTING
-                if result.get("linked") or result.get("linked_existing")
-                else Disposition.IMPORT_NEW
-            )
+            if result.get("duplicate_remote"):
+                disp = Disposition.DUPLICATE
+            elif result.get("linked") or result.get("linked_existing"):
+                disp = Disposition.LINK_EXISTING
+            else:
+                disp = Disposition.IMPORT_NEW
             InventoryItem.objects.filter(pk=item.pk).update(
                 disposition=disp,
                 target_external_id=str(result.get("paperless_id") or result.get("document_id") or ""),

@@ -786,6 +786,8 @@ def decide_task(job: ProcessingJob) -> dict:
         decision.links = []
         decision.segments = []
         decision.move_allowed = False
+        decision.physical_category = None  # im Eingang gibt es keinen Ablageort, also auch keine Ablage in 06
+        decision.physical_subfolder = None
         final = decide_mod.persist(doc, ctx, s1, s2, decision, run=job.run, dry_run=dry_run)
         if not dry_run:
             enqueue(

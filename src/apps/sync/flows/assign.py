@@ -17,10 +17,22 @@ from apps.objects.models import ManagedObject
 from apps.review.models import CaseStatus, CaseType, ReviewCase
 from apps.sync import config, inbox, services
 from apps.sync.flows.common import open_case
+from apps.sync.models import OperationKind, OperationStatus, SyncOperation
 
 logger = logging.getLogger(__name__)
 
 TEXT_LIMIT = 120_000
+
+
+class AssignmentError(Exception):
+    """Fachlicher Fehler der Zuordnung, der dem Bearbeiter als Hinweis angezeigt wird."""
+
+
+def _ensure_open(case: ReviewCase | None) -> None:
+    """Ein erledigter oder verworfener Fall nimmt keine Entscheidung mehr an (Doppelklick, veraltete Seite); sonst
+    wuerde eine spaete Ablehnung einen erledigten Fall umstellen und ein Gegenbeispiel fuer das Lernen erzeugen."""
+    if case is not None and case.status in (CaseStatus.RESOLVED, CaseStatus.DISMISSED):
+        raise AssignmentError("Fall ist bereits erledigt; zum erneuten Entscheiden bitte wiedereröffnen")
 
 
 def document_text(doc) -> str:
@@ -89,12 +101,8 @@ def mirror_to_inbox_folder(doc, drive) -> str | None:
     return existing.id
 
 
-def build_proposal(doc, *, text: str | None = None):
-    from apps.sync.assignment import candidates as cand
-    from apps.sync.assignment import decide as dec
-    from apps.sync.assignment.learning import active_rules
-
-    text = document_text(doc) if text is None else text
+def _hints_for(doc) -> dict:
+    """Titel und Korrespondent aus den Paperless-Verknuepfungen als Zusatzsignale."""
     hints = {}
     for link in doc.sync_links.all():
         fields = link.synced_fields or {}
@@ -102,6 +110,52 @@ def build_proposal(doc, *, text: str | None = None):
             hints["title"] = fields["title"]
         if fields.get("correspondent"):
             hints["correspondent"] = fields["correspondent"]
+    return hints
+
+
+def document_features(doc, *, text: str | None = None) -> dict:
+    """Merkmale eines Dokuments fuer Lernbeispiele und Regeln (Lieferant aus dem Korrespondenten, Nummernpaare,
+    Adressen). Ohne den Korrespondenten entsteht keine Merkmalskombination und damit nie eine Regel."""
+    from apps.sync.assignment import candidates as cand
+
+    text = document_text(doc) if text is None else text
+    index = cand.build_index(list(candidate_objects()))
+    return _to_plain(
+        cand.extract_features(
+            text,
+            filename=doc.current_name or doc.original_name or "",
+            correspondent=_hints_for(doc).get("correspondent"),
+            index=index,
+        )
+    )
+
+
+def _carry_over_operations(old_doc, new_doc) -> int:
+    """Wartende Operationen der Eingangszeile (etwa die Uebertragung nach Paperless) folgen der Nachfolgezeile.
+    Sonst wuerden sie am Status moved_out uebersprungen und das Dokument im Zielobjekt nie uebertragen."""
+    ids = list(
+        SyncOperation.objects.filter(document=old_doc, status=OperationStatus.PENDING).values_list(
+            "pk", flat=True
+        )
+    )
+    if ids and not config.writes_allowed(new_doc.object):
+        # Zielobjekt ausserhalb von Modus oder Pilotumfang: die Uebertragung entfaellt wie bei einem direkten
+        # Upload dorthin; eine blockierte Operation waere kein Fehler, sondern nur Rauschen in der Warteschlange
+        SyncOperation.objects.filter(pk__in=ids, kind=OperationKind.PAPERLESS_PUSH).update(
+            status=OperationStatus.CANCELLED,
+            blocked_reason="Zielobjekt außerhalb von Modus oder Pilotumfang",
+            finished_at=timezone.now(),
+        )
+    return SyncOperation.objects.filter(pk__in=ids).update(document=new_doc) if ids else 0
+
+
+def build_proposal(doc, *, text: str | None = None):
+    from apps.sync.assignment import candidates as cand
+    from apps.sync.assignment import decide as dec
+    from apps.sync.assignment.learning import active_rules
+
+    text = document_text(doc) if text is None else text
+    hints = _hints_for(doc)
     index = cand.build_index(list(candidate_objects()))
     ranked = cand.score_candidates(
         text,
@@ -122,6 +176,11 @@ def run_for_document(doc, *, job=None) -> dict:
     mirrored = mirror_to_inbox_folder(doc, drive) if drive is not None else None
     proposal, ranked = build_proposal(doc)
     plain = [_to_plain(c) for c in ranked[:5]]
+    try:
+        features = document_features(doc)
+    except Exception:  # Merkmale dienen dem Lernen, nicht der Entscheidung
+        logger.exception("Merkmalsextraktion fehlgeschlagen (Dokument %s)", doc.pk)
+        features = {}
     if proposal.decision == "auto" and proposal.chosen is not None:
         target = ManagedObject.active.filter(pk=proposal.chosen.object_id).first()
         if target is not None:
@@ -133,6 +192,7 @@ def run_for_document(doc, *, job=None) -> dict:
                 reason=f"automatische Objektzuordnung ({proposal.chosen.score:.2f}): "
                 + "; ".join(proposal.reasons)[:200],
             )
+            _carry_over_operations(doc, new_doc)
             ReviewCase.objects.create(
                 object=target,
                 case_type=CaseType.OBJECT_ASSIGNMENT,
@@ -179,7 +239,12 @@ def run_for_document(doc, *, job=None) -> dict:
         subtype=subtype,
         key=f"object_assignment:{doc.pk}",
         document=doc,
-        context={"reasons": proposal.reasons, "decision": proposal.decision, "mirrored": bool(mirrored)},
+        context={
+            "reasons": proposal.reasons,
+            "decision": proposal.decision,
+            "mirrored": bool(mirrored),
+            "features": features,
+        },
         candidates=plain,
         proposed_action={"action": "assign_object", "object_id": proposal.chosen.object_id}
         if proposal.chosen
@@ -201,6 +266,7 @@ def apply_assignment(
     from apps.documents.transfer import transfer_document
     from apps.sync.assignment import learning
 
+    _ensure_open(case)
     proposed_id = None
     if case is not None and case.proposed_action:
         proposed_id = case.proposed_action.get("object_id")
@@ -214,14 +280,13 @@ def apply_assignment(
         features = (case.context or {}).get("features") or {}
     if not features:
         try:
-            from apps.sync.assignment import candidates as cand
-
-            features = _to_plain(cand.extract_features(document_text(doc), filename=doc.current_name or ""))
+            features = document_features(doc)
         except Exception:  # Merkmalsextraktion ist fuer das Beispiel hilfreich, aber nicht Voraussetzung
             features = {}
     new_doc = transfer_document(
         doc, target, user=user, request=request, reason=reason or "Zuordnung im Dokumenteneingang"
     )
+    _carry_over_operations(doc, new_doc)
     learning.record_example(
         new_doc,
         kind=kind,
@@ -255,6 +320,7 @@ def apply_assignment(
 def reject_proposal(case: ReviewCase, *, user, request=None, reason: str = "") -> None:
     from apps.sync.assignment import learning
 
+    _ensure_open(case)
     doc = case.document
     proposed_id = (case.proposed_action or {}).get("object_id")
     if doc is not None and proposed_id:

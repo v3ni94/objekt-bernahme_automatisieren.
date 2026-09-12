@@ -9,7 +9,6 @@ import json
 from allauth.account.decorators import reauthentication_required
 from django.conf import settings
 from django.contrib import messages
-from django.contrib.auth.decorators import login_required
 from django.db.models import Count, Q
 from django.http import HttpResponseBadRequest, HttpResponseNotFound, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -227,11 +226,15 @@ def sync_operation_action(request, pk: int):
     op = get_object_or_404(SyncOperation, pk=pk)
     action = request.POST.get("action")
     if action == "retry":
-        operations.retry_now(op, user=request.user)
-        messages.info(request, f"Operation {op.pk} erneut eingereiht.")
+        if operations.retry_now(op, user=request.user):
+            messages.info(request, f"Operation {op.pk} erneut eingereiht.")
+        else:
+            messages.warning(request, f"Operation {op.pk} läuft gerade und wurde nicht erneut eingereiht.")
     elif action == "cancel":
-        operations.cancel(op, user=request.user, reason=request.POST.get("reason", ""))
-        messages.info(request, f"Operation {op.pk} verworfen.")
+        if operations.cancel(op, user=request.user, reason=request.POST.get("reason", "")):
+            messages.info(request, f"Operation {op.pk} verworfen.")
+        else:
+            messages.warning(request, f"Operation {op.pk} ist erledigt oder läuft gerade; nichts verworfen.")
     else:
         return HttpResponseBadRequest("unbekannt")
     return redirect(request.POST.get("next") or "sync_admin")
@@ -325,7 +328,7 @@ def document_sync_status(doc) -> dict:
     return {
         "eingegangen": True,
         "paperless": p is not None,
-        "paperless_state": p.state if p else None,
+        "paperless_state": p.get_state_display() if p else None,
         "text": text_done,
         "zugeordnet": assigned,
         "drive": in_drive,
@@ -423,7 +426,7 @@ def inbox_list(request):
     )
 
 
-@login_required
+@permission_required("inbox.work")
 def objects_json(request):
     """Objektsuche fuer den Dokumenteneingang: Nummer, Bezeichnung, Strasse, Ort (ab zwei Zeichen)."""
     q = (request.GET.get("q") or "").strip()
