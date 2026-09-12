@@ -109,7 +109,13 @@ def reconcile_all_task(dry_run: bool = True, user_id: int | None = None) -> dict
             results["with_changes"] += 1
     from apps.drive.protocol import write_summary_xlsx
 
-    results["summary_file"] = str(write_summary_xlsx())
+    try:
+        results["summary_file"] = str(write_summary_xlsx())
+    except OSError as exc:
+        # Die Sammelfassung ist Beiwerk: ein schreibgeschuetztes Exportverzeichnis (etwa im Web-Container) darf den
+        # abgeschlossenen Abgleich aller Objekte nicht als Fehler erscheinen lassen.
+        logger.warning("Sammelfassung des Ordnerabgleichs nicht geschrieben: %s", exc)
+        results["summary_error"] = str(exc)
     return results
 
 

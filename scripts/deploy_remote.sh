@@ -338,10 +338,11 @@ PY
   reconcile-all)
     # Ordnerabgleich aller aktiven Objekte (echter Lauf): legt fehlende Struktur an, etwa die 15 Unterordner der
     # Stammakte nach der Katalogerweiterung vom 12.09.2026. Ergebnis je Objekt im Statusbereich und in drive_sync_runs.
-    docker compose exec -T web python manage.py shell <<'PY'
+    # Laeuft im worker-io (Warteschlange io, /data/exports beschreibbar); der Web-Container ist schreibgeschuetzt.
+    docker compose exec -T worker-io python manage.py shell <<'PY'
 from apps.drive.tasks import reconcile_all_task
 result = reconcile_all_task(dry_run=False)
-print({k: v for k, v in result.items() if k != "summary_file"})
+print(result)
 PY
     ;;
   config-set)

@@ -366,3 +366,26 @@ def test_wurzel_fehlt(drive, cfg):
         obj, drive=drive, dry_run=False, cfg=DriveConfig.from_settings(root_folder_id=None)
     )
     assert run.status == "failed" and "root_folder_id" in run.error_message
+
+
+def test_sammellauf_ohne_schreibbares_exportverzeichnis(monkeypatch):
+    """Die Sammelfassung ist Beiwerk: schlaegt das Schreiben fehl (schreibgeschuetztes /data), meldet der Sammellauf
+    den Fehler im Ergebnis, statt nach dem Abgleich aller Objekte abzubrechen (Deploy-Lauf 90 vom 12.09.2026)."""
+    from apps.drive import protocol, tasks
+
+    make_object("623")
+    make_object("624", name="Beispielstadt", city="Beispielstadt", street="Beispielweg", house_number="3")
+    gesehen: list[int] = []
+
+    def fake_reconcile(object_id, dry_run, user_id=None, trigger="manual"):
+        gesehen.append(object_id)
+        return {"status": "done", "no_changes": False}
+
+    def fake_summary():
+        raise OSError(30, "Read-only file system", "/data/exports/drive-sync")
+
+    monkeypatch.setattr(tasks, "reconcile_object_task", fake_reconcile)
+    monkeypatch.setattr(protocol, "write_summary_xlsx", fake_summary)
+    result = tasks.reconcile_all_task(dry_run=False)
+    assert len(gesehen) == 2 and result["runs"] == 2 and result["with_changes"] == 2 and result["failed"] == 0
+    assert "summary_file" not in result and "Read-only file system" in result["summary_error"]
