@@ -38,6 +38,14 @@ class UnitType(models.TextChoices):
     OTHER = "other", "Sonstige"
 
 
+class ObjectActiveManager(ActiveManager):
+    """Aktive Verwaltungsobjekte ohne das technische Eingangsobjekt der Synchronisation (is_system_inbox); das
+    Eingangsobjekt erscheint in keiner Objektliste, keinem Ordnerabgleich und keiner Vollstaendigkeitsbewertung."""
+
+    def get_queryset(self):
+        return super().get_queryset().filter(is_system_inbox=False)
+
+
 class ManagedObject(SoftDeleteModel):
     """Tabelle objects. Der Klassenname vermeidet die Kollision mit dem Python-Typ object."""
 
@@ -68,6 +76,10 @@ class ManagedObject(SoftDeleteModel):
     sepa_used = models.BooleanField(null=True, blank=True)
     special_levies_in_period = models.BooleanField(null=True, blank=True)
     is_test = models.BooleanField(default=False)
+    is_system_inbox = models.BooleanField(
+        default=False,
+        help_text="technisches Eingangsobjekt für nicht zugeordnete Dokumente (Synchronisation)",
+    )
     drive_root_folder_id = models.CharField(max_length=128, null=True, blank=True)
     drive_root_folder_name = models.CharField(max_length=255, null=True, blank=True)
     drive_root_verified_at = models.DateTimeField(null=True, blank=True)
@@ -93,7 +105,7 @@ class ManagedObject(SoftDeleteModel):
     )
 
     objects = models.Manager()
-    active = ActiveManager()
+    active = ObjectActiveManager()
 
     class Meta:
         db_table = "objects"

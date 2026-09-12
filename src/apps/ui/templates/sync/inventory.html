@@ -1,0 +1,19 @@
+{% extends "base.html" %}{% load perms %}{% block title %}Bestandslauf {{ run.pk }} · {{ APP_NAME }}{% endblock %}
+{% block content %}<h1>Bestandslauf {{ run.pk }} <span class="klein">{{ run.get_kind_display }}, {% if run.dry_run %}Trockenlauf{% else %}echter Lauf{% endif %}, {{ run.get_status_display }}</span></h1>
+<div class="raster">
+<div class="karte"><h2>Stand</h2>
+<table><tr><td>gestartet</td><td>{{ run.started_at|date:"d.m.Y H:i" }} {% if run.started_by %}von {{ run.started_by.display_name }}{% endif %}</td></tr>
+<tr><td>beendet</td><td>{{ run.finished_at|date:"d.m.Y H:i"|default:"läuft" }}</td></tr>
+<tr><td>Umfang</td><td class="klein">{{ run.scope|default:"alle" }}</td></tr>
+<tr><td>Ausgangscursor</td><td class="mono klein">{{ run.cursor_before }}</td></tr>
+<tr><td>Fortschritt</td><td class="klein">{{ run.page_state }}</td></tr>
+<tr><td>Zähler</td><td class="klein">{{ run.counters }}</td></tr>
+{% if run.error_message %}<tr><td>Fehler</td><td class="warnung">{{ run.error_message }}</td></tr>{% endif %}</table>
+<form method="post" action="{% url 'sync_inventory_action' run.pk %}" class="inline">{% csrf_token %}<p class="aktionen">{% if run.status == "running" %}<button type="submit" name="action" value="pause">Pausieren</button>{% elif run.status in "paused,failed" %}<button type="submit" name="action" value="resume">Fortsetzen</button>{% endif %} {% if run.status != "done" and run.status != "aborted" %}<button type="submit" name="action" value="abort">Abbrechen</button>{% endif %} {% if can_step and run.status == "running" %}<button type="submit" name="action" value="step">Einen Schritt ausführen</button>{% endif %} <a class="knopf" href="{% url 'sync_admin' %}">Zurück</a></p></form>
+<p class="hinweis">„Vollständig synchronisiert“ gilt erst, wenn keine Zeile mehr offen, in Verarbeitung oder fehlerhaft ist: {% if summary.open %}<strong>{{ summary.open }} offen</strong>{% else %}derzeit keine offenen Zeilen{% endif %}.</p></div>
+<div class="karte"><h2>Manifest</h2>
+<table><tbody>{% for code, name in dispositions %}<tr><td><a href="?stand={{ code }}">{{ name }}</a></td><td class="zahl">{{ summary|get_item:code|default:0 }}</td></tr>{% endfor %}<tr><td><strong>gesamt</strong></td><td class="zahl">{{ summary.total }}</td></tr></tbody></table>
+{% if filter %}<p class="klein">Filter: {{ filter }} <a href="?">alle</a></p>{% endif %}</div>
+</div>
+<div class="karte"><table class="voll"><thead><tr><th>System</th><th>Quell-ID</th><th>Name</th><th>Typ</th><th>Größe</th><th>Prüfsumme</th><th>Objekt</th><th>Stand</th><th>Ziel</th><th>Fehler</th></tr></thead><tbody>{% for r in rows %}<tr class="{% if r.disposition == 'error' %}rot{% elif r.disposition in 'pending,in_progress' %}gelb{% endif %}"><td>{{ r.system }}</td><td class="mono klein">{{ r.external_id }}</td><td>{{ r.name|default:"" }}</td><td class="klein">{{ r.mime_type|default:"" }}</td><td class="zahl">{{ r.size_bytes|default:"" }}</td><td class="mono klein">{{ r.checksum_sha256|default:r.checksum_md5|default:""|slice:":12" }}</td><td>{% if r.object %}{{ r.object.object_number }}{% endif %}</td><td>{{ r.get_disposition_display }}</td><td class="klein">{% if r.document %}<a href="{% url 'document_detail' r.document.pk %}">Dok {{ r.document.pk }}</a>{% endif %} {{ r.target_external_id|default:"" }}</td><td class="klein">{{ r.error_message|default:"" }}</td></tr>{% empty %}<tr><td colspan="10">keine Zeilen</td></tr>{% endfor %}</tbody></table></div>
+{% endblock %}

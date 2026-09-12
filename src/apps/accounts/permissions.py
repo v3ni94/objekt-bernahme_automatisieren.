@@ -31,6 +31,8 @@ PERMISSIONS = {
     "imports.write": "Import hochladen und bestätigen",
     "drive.connect": "Google-Drive-Verbindung herstellen und trennen",
     "drive.cleanup": "Altbestand aufräumen (Dubletten, Temporärdateien und leere Ordner in den Papierkorb)",
+    "sync.manage": "Synchronisation mit Paperless und Drive verwalten (Verbindung, Bestandsläufe, Operationen)",
+    "inbox.work": "Dokumenteneingang bearbeiten (Objektzuordnung, Konflikte, Dublettenverdacht)",
 }
 
 

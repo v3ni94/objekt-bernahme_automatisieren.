@@ -12,6 +12,8 @@ NAV_SECTIONS = (
     ("/eigentuemer/", "eigentuemer"),
     ("/zuordnungen/", "eigentuemer"),
     ("/review/", "review"),
+    ("/eingang/", "eingang"),
+    ("/verwaltung/sync/", "sync"),
     ("/suche/", "suche"),
     ("/berichte/", "berichte"),
     ("/status/", "status"),

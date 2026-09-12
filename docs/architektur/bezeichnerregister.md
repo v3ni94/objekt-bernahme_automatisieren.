@@ -474,6 +474,7 @@ Modell `documents.Document`. documents.
 | deleted_at | datetime(6) | ja |  |
 | deleted_by | bigint | ja | → users.id |
 | delete_reason | varchar(255) | ja |  |
+| uuid | uuid | nein |  |
 | object_id | bigint | nein | → objects.id |
 | sha256 | varchar(64) | ja |  |
 | drive_md5 | varchar(32) | ja |  |
@@ -481,7 +482,7 @@ Modell `documents.Document`. documents.
 | mime_type | varchar(120) | nein |  |
 | original_name | varchar(255) | nein |  |
 | current_name | varchar(255) | nein |  |
-| source | varchar(16) | nein | drive_existing, upload, import, generated, moved_in |
+| source | varchar(16) | nein | drive_existing, upload, import, generated, moved_in, paperless |
 | source_path | varchar(1000) | ja |  |
 | drive_file_id | varchar(128) | ja |  |
 | drive_node_id | bigint | ja | → drive_nodes.id |
@@ -847,6 +848,7 @@ Modell `objects.ManagedObject`. managed objects.
 | sepa_used | tinyint(1) | ja |  |
 | special_levies_in_period | tinyint(1) | ja |  |
 | is_test | tinyint(1) | nein |  |
+| is_system_inbox | tinyint(1) | nein |  |
 | drive_root_folder_id | varchar(128) | ja |  |
 | drive_root_folder_name | varchar(255) | ja |  |
 | drive_root_verified_at | datetime(6) | ja |  |
@@ -1198,7 +1200,7 @@ Modell `pipeline.ProcessingJob`. processing jobs.
 | run_id | bigint | ja | → processing_runs.id |
 | object_id | bigint | nein | → objects.id |
 | document_id | bigint | ja | → documents.id |
-| job_type | varchar(24) | nein | discover, hash, analyze_pages, ocr_chunk, merge_pages, render_previews, extract_entities, classify, classify_ai, decide, file_to_drive, link_segments, generate_lists, evaluate_completeness, reconcile_drive, train_classifier, sweep |
+| job_type | varchar(24) | nein | discover, hash, analyze_pages, ocr_chunk, merge_pages, render_previews, extract_entities, classify, classify_ai, decide, file_to_drive, assign_object, link_segments, generate_lists, evaluate_completeness, reconcile_drive, train_classifier, sweep |
 | idempotency_key | varchar(160) | nein |  |
 | status | varchar(16) | nein | pending, running, done, failed, skipped |
 | priority | smallint | nein |  |
@@ -1379,7 +1381,7 @@ Modell `review.ReviewCase`. review cases.
 | created_at | datetime(6) | nein |  |
 | updated_at | datetime(6) | nein |  |
 | object_id | bigint | ja | → objects.id |
-| case_type | varchar(32) | nein | owner_candidates, missing_metadata, move_proposal, drive_structure, import_row_uncertain, import_candidate, duplicate_object_number, data_consistency, unclear |
+| case_type | varchar(32) | nein | owner_candidates, missing_metadata, move_proposal, drive_structure, import_row_uncertain, import_candidate, duplicate_object_number, data_consistency, object_assignment, sync_conflict, unclear |
 | case_subtype | varchar(32) | ja |  |
 | document_id | bigint | ja | → documents.id |
 | page_from | integer UNSIGNED | ja |  |
@@ -1456,6 +1458,213 @@ Modell `review.ReviewSavedFilter`. review saved filters.
 | sort_order | smallint UNSIGNED | nein |  |
 
 Constraints und Indizes: `uq_review_filters_user_name`
+
+### document_versions
+
+Modell `sync.DocumentVersion`. document versions.
+
+| Spalte | Typ | Null | Verweis oder Wertevorrat |
+|---|---|---|---|
+| id | bigint AUTO_INCREMENT | nein |  |
+| created_at | datetime(6) | nein |  |
+| updated_at | datetime(6) | nein |  |
+| document_id | bigint | nein | → documents.id |
+| version_no | smallint UNSIGNED | nein |  |
+| sha256 | varchar(64) | nein |  |
+| size_bytes | bigint UNSIGNED | ja |  |
+| mime_type | varchar(120) | ja |  |
+| original_name | varchar(255) | ja |  |
+| source_system | varchar(16) | nein | paperless, drive, app |
+| source_external_id | varchar(128) | ja |  |
+| source_version | varchar(128) | ja |  |
+| label | varchar(64) | ja |  |
+| created_by | bigint | ja | → users.id |
+
+Constraints und Indizes: `uq_doc_versions_no`, `uq_doc_versions_hash`, `ck_doc_versions_source`
+
+### sync_assignment_examples
+
+Modell `sync.AssignmentExample`. assignment examples.
+
+| Spalte | Typ | Null | Verweis oder Wertevorrat |
+|---|---|---|---|
+| id | bigint AUTO_INCREMENT | nein |  |
+| created_at | datetime(6) | nein |  |
+| updated_at | datetime(6) | nein |  |
+| document_id | bigint | nein | → documents.id |
+| kind | varchar(16) | nein | confirm, correct, reject |
+| source | varchar(24) | nein | human, auto_verified, import_unverified |
+| previous_object_id | bigint | ja | → objects.id |
+| target_object_id | bigint | ja | → objects.id |
+| proposed_object_id | bigint | ja | → objects.id |
+| decided_by | bigint | ja | → users.id |
+| decided_at | datetime(6) | nein |  |
+| features | json | ja |  |
+| evidence | json | ja |  |
+| rule_version | varchar(40) | ja |  |
+| review_case_id | bigint | ja | → review_cases.id |
+| is_active | tinyint(1) | nein |  |
+
+Constraints und Indizes: `ck_sync_examples_kind`, `ck_sync_examples_source`, `ix_sync_examples_target`
+
+### sync_assignment_rules
+
+Modell `sync.AssignmentRule`. assignment rules.
+
+| Spalte | Typ | Null | Verweis oder Wertevorrat |
+|---|---|---|---|
+| id | bigint AUTO_INCREMENT | nein |  |
+| created_at | datetime(6) | nein |  |
+| updated_at | datetime(6) | nein |  |
+| code | varchar(64) | nein |  |
+| version | smallint UNSIGNED | nein |  |
+| kind | varchar(32) | nein |  |
+| conditions | json | nein |  |
+| object_id | bigint | nein | → objects.id |
+| is_active | tinyint(1) | nein |  |
+| created_from | json | ja |  |
+| created_by | bigint | ja | → users.id |
+| hit_count | integer UNSIGNED | nein |  |
+| last_hit_at | datetime(6) | ja |  |
+| deactivated_at | datetime(6) | ja |  |
+| deactivated_by | bigint | ja | → users.id |
+| notes | varchar(500) | ja |  |
+
+Constraints und Indizes: `uq_sync_rules_version`, `ix_sync_rules_active`
+
+### sync_cursors
+
+Modell `sync.SyncCursor`. sync cursors.
+
+| Spalte | Typ | Null | Verweis oder Wertevorrat |
+|---|---|---|---|
+| id | bigint AUTO_INCREMENT | nein |  |
+| created_at | datetime(6) | nein |  |
+| updated_at | datetime(6) | nein |  |
+| system | varchar(16) | nein | paperless, drive, app |
+| name | varchar(48) | nein |  |
+| value | longtext | ja |  |
+| meta | json | ja |  |
+
+Constraints und Indizes: `uq_sync_cursors_name`, `ck_sync_cursors_system`
+
+### sync_inventory_items
+
+Modell `sync.InventoryItem`. inventory items.
+
+| Spalte | Typ | Null | Verweis oder Wertevorrat |
+|---|---|---|---|
+| id | bigint AUTO_INCREMENT | nein |  |
+| created_at | datetime(6) | nein |  |
+| updated_at | datetime(6) | nein |  |
+| run_id | bigint | nein | → sync_inventory_runs.id |
+| system | varchar(16) | nein | paperless, drive, app |
+| external_id | varchar(128) | nein |  |
+| parent_external_id | varchar(128) | ja |  |
+| name | varchar(255) | ja |  |
+| mime_type | varchar(120) | ja |  |
+| size_bytes | bigint UNSIGNED | ja |  |
+| checksum_sha256 | varchar(64) | ja |  |
+| checksum_md5 | varchar(32) | ja |  |
+| remote_modified_at | datetime(6) | ja |  |
+| object_id | bigint | ja | → objects.id |
+| document_id | bigint | ja | → documents.id |
+| operation_id | bigint | ja | → sync_operations.id |
+| disposition | varchar(16) | nein | pending, link_existing, import_new, duplicate, export_snapshot, index_stub, unsupported, out_of_scope, in_progress, error |
+| target_external_id | varchar(128) | ja |  |
+| error_message | varchar(500) | ja |  |
+| details | json | ja |  |
+
+Constraints und Indizes: `uq_sync_inv_items`, `ck_sync_inv_disp`, `ix_sync_inv_items_disp`
+
+### sync_inventory_runs
+
+Modell `sync.InventoryRun`. inventory runs.
+
+| Spalte | Typ | Null | Verweis oder Wertevorrat |
+|---|---|---|---|
+| id | bigint AUTO_INCREMENT | nein |  |
+| created_at | datetime(6) | nein |  |
+| updated_at | datetime(6) | nein |  |
+| kind | varchar(16) | nein | paperless, drive, app |
+| dry_run | tinyint(1) | nein |  |
+| status | varchar(16) | nein | planned, running, paused, done, failed, aborted |
+| scope | json | ja |  |
+| cursor_before | json | ja |  |
+| page_state | json | ja |  |
+| counters | json | ja |  |
+| started_by | bigint | ja | → users.id |
+| started_at | datetime(6) | ja |  |
+| finished_at | datetime(6) | ja |  |
+| error_message | varchar(500) | ja |  |
+
+Constraints und Indizes: `ck_sync_inv_status`, `ck_sync_inv_kind`
+
+### sync_links
+
+Modell `sync.ExternalLink`. external links.
+
+| Spalte | Typ | Null | Verweis oder Wertevorrat |
+|---|---|---|---|
+| id | bigint AUTO_INCREMENT | nein |  |
+| created_at | datetime(6) | nein |  |
+| updated_at | datetime(6) | nein |  |
+| document_id | bigint | nein | → documents.id |
+| version_id | bigint | ja | → document_versions.id |
+| system | varchar(16) | nein | paperless, drive, app |
+| role | varchar(16) | nein | original, archive, snapshot, index_stub |
+| external_id | varchar(128) | nein |  |
+| external_version | varchar(128) | ja |  |
+| parent_external_id | varchar(128) | ja |  |
+| checksum_sha256 | varchar(64) | ja |  |
+| checksum_md5 | varchar(32) | ja |  |
+| mime_type | varchar(120) | ja |  |
+| size_bytes | bigint UNSIGNED | ja |  |
+| remote_modified_at | datetime(6) | ja |  |
+| last_seen_at | datetime(6) | ja |  |
+| last_synced_at | datetime(6) | ja |  |
+| synced_fields | json | ja |  |
+| state | varchar(16) | nein | pending, linked, synced, changed_remote, conflict, missing, trashed, no_access, tombstone |
+| state_reason | varchar(255) | ja |  |
+| tombstone_at | datetime(6) | ja |  |
+| tombstone_by | bigint | ja | → users.id |
+
+Constraints und Indizes: `uq_sync_links_external`, `uq_sync_links_document`, `ck_sync_links_system`, `ck_sync_links_role`, `ck_sync_links_state`, `ix_sync_links_state`, `ix_sync_links_sha`
+
+### sync_operations
+
+Modell `sync.SyncOperation`. sync operations.
+
+| Spalte | Typ | Null | Verweis oder Wertevorrat |
+|---|---|---|---|
+| id | bigint AUTO_INCREMENT | nein |  |
+| created_at | datetime(6) | nein |  |
+| updated_at | datetime(6) | nein |  |
+| op_key | varchar(200) | nein |  |
+| kind | varchar(32) | nein | paperless_push, paperless_await_task, paperless_push_meta, paperless_pull, paperless_pull_meta, paperless_index_stub, drive_set_props, drive_export_snapshot, drive_register, assign_object |
+| system | varchar(16) | nein | paperless, drive, app |
+| document_id | bigint | ja | → documents.id |
+| link_id | bigint | ja | → sync_links.id |
+| source_system | varchar(16) | ja | paperless, drive, app |
+| source_revision | varchar(128) | ja |  |
+| desired_state | json | ja |  |
+| payload | json | ja |  |
+| status | varchar(16) | nein | pending, running, done, failed, blocked, cancelled, skipped |
+| priority | smallint | nein |  |
+| attempt_count | smallint UNSIGNED | nein |  |
+| max_attempts | smallint UNSIGNED | nein |  |
+| next_attempt_at | datetime(6) | ja |  |
+| locked_by | varchar(80) | ja |  |
+| locked_at | datetime(6) | ja |  |
+| heartbeat_at | datetime(6) | ja |  |
+| started_at | datetime(6) | ja |  |
+| finished_at | datetime(6) | ja |  |
+| last_error | varchar(500) | ja |  |
+| blocked_reason | varchar(255) | ja |  |
+| result | json | ja |  |
+| created_by | bigint | ja | → users.id |
+
+Constraints und Indizes: `ck_sync_ops_kind`, `ck_sync_ops_status`, `ck_sync_ops_system`, `ix_sync_ops_due`, `ix_sync_ops_document`
 
 ## Container und Queues
 
@@ -1586,6 +1795,23 @@ Celery-Queues aus den Settings: `ai`, `classify`, `io`, `lists`, `ocr`
 | owner_file.unit_number_pad | owner_file | integer | `2` |
 | owner_file.unit_prefix_map | owner_file | object | `{"apartment": "WE", "commercial": "GE", "parking": "ST", "garage": "GA", "underground_p...` |
 | owner_file.unit_prefix_mode | owner_file | string | `"always_we"` |
+| paperless.api_version | paperless | integer | `10` |
+| paperless.base_url | paperless | string | `null` |
+| paperless.enabled | paperless | boolean | `false` |
+| paperless.field_drive_name | paperless | string | `"MHV Drive-Link"` |
+| paperless.field_object_name | paperless | string | `"MHV Objekt"` |
+| paperless.field_status_name | paperless | string | `"MHV Zuordnung"` |
+| paperless.field_uuid_name | paperless | string | `"MHV Dokument-UUID"` |
+| paperless.import_new_documents | paperless | boolean | `true` |
+| paperless.max_upload_mb | paperless | integer | `100` |
+| paperless.mode | paperless | string | `"readonly"` |
+| paperless.page_size | paperless | integer | `100` |
+| paperless.pilot_object_numbers | paperless | list | `[]` |
+| paperless.poll_interval_minutes | paperless | integer | `5` |
+| paperless.tag_name | paperless | string | `"MHV-Sync"` |
+| paperless.timeout_seconds | paperless | integer | `30` |
+| paperless.verify_tls | paperless | boolean | `true` |
+| paperless.webhook_enabled | paperless | boolean | `true` |
 | previews.jpeg_quality | previews | integer | `80` |
 | previews.long_edge_px | previews | integer | `1200` |
 | previews.retention_days_after_resolve | previews | integer | `90` |
@@ -1604,6 +1830,16 @@ Celery-Queues aus den Settings: `ai`, `classify`, `io`, `lists`, `ocr`
 | security.log_document_views | security | boolean | `true` |
 | security.mfa_required_roles | security | list | `["admin"]` |
 | security.store_full_iban | security | boolean | `false` |
+| sync.assignment_auto_min | sync | decimal | `0.85` |
+| sync.assignment_gap_min | sync | decimal | `0.25` |
+| sync.drive_changes_enabled | sync | boolean | `false` |
+| sync.drive_changes_interval_minutes | sync | integer | `5` |
+| sync.inbox_folder_id | sync | string | `null` |
+| sync.inbox_folder_name | sync | string | `"_Eingang_Nicht_zugeordnet"` |
+| sync.inbox_object_number | sync | string | `"0"` |
+| sync.inventory_page_size | sync | integer | `200` |
+| sync.operation_max_attempts | sync | integer | `5` |
+| sync.rule_min_confirmations | sync | integer | `2` |
 | tenant_file.subfolders | tenant_file | list | `[]` |
 | units.normalize_strip_leading_zeros | units | boolean | `true` |
 | units.type_prefix_mapping | units | object | `{"WE": "apartment", "WOHNUNG": "apartment", "GE": "commercial", "S": "parking", "ST": "...` |
@@ -1682,6 +1918,32 @@ Celery-Queues aus den Settings: `ai`, `classify`, `io`, `lists`, `ocr`
 | request.withdraw | Nachforderung zurückgezogen |
 | completeness.evaluate | Vollständigkeit bewertet (manuell) |
 | completeness.override | Prüfposition manuell übersteuert |
+| sync.inbox_object_created | technisches Eingangsobjekt angelegt |
+| sync.inbox_folder_set | Eingangsordner in Drive festgelegt |
+| sync.paperless_check | Verbindung zu Paperless geprüft |
+| sync.paperless_setup | Kennzeichnungsfelder und Tag in Paperless eingerichtet |
+| sync.paperless_push | Datei nach Paperless übertragen oder verknüpft |
+| sync.paperless_pull | Dokument aus Paperless übernommen |
+| sync.paperless_meta | Metadaten in Paperless geschrieben |
+| sync.paperless_index_stub | Indexbeleg in Paperless angelegt |
+| sync.drive_props_set | Drive-Kennzeichen (appProperties) gesetzt |
+| sync.drive_changes | Drive-Änderungsprotokoll verarbeitet |
+| sync.drive_snapshot | Exportfassung eines Google-Dokuments erzeugt |
+| sync.version_registered | neue Inhaltsversion eines Dokuments erfasst |
+| sync.webhook | Webhook von Paperless angenommen |
+| sync.operation_cancelled | Synchronisationsoperation verworfen |
+| sync.operation_retry | Synchronisationsoperation erneut eingereiht |
+| sync.inventory_start | Bestandslauf gestartet |
+| sync.inventory_pause | Bestandslauf pausiert |
+| sync.inventory_resume | Bestandslauf fortgesetzt |
+| sync.inventory_done | Bestandslauf abgeschlossen |
+| sync.conflict_resolved | Abgleichskonflikt entschieden |
+| sync.tombstone | Löschung bestätigt (Gegenkopie wird nicht erneut importiert) |
+| inbox.assign | Objektzuordnung im Dokumenteneingang bestätigt |
+| inbox.assign_auto | Objekt automatisch zugeordnet (eindeutige Evidenz) |
+| inbox.reject | Zuordnungsvorschlag verworfen |
+| inbox.rule_created | Zuordnungsregel aus Bestätigungen entstanden |
+| inbox.rule_deactivated | Zuordnungsregel deaktiviert |
 
 ## Startparameter (.env)
 
@@ -1713,3 +1975,5 @@ Celery-Queues aus den Settings: `ai`, `classify`, `io`, `lists`, `ocr`
 | imports.write | Import hochladen und bestätigen |
 | drive.connect | Google-Drive-Verbindung herstellen und trennen |
 | drive.cleanup | Altbestand aufräumen (Dubletten, Temporärdateien und leere Ordner in den Papierkorb) |
+| sync.manage | Synchronisation mit Paperless und Drive verwalten (Verbindung, Bestandsläufe, Operationen) |
+| inbox.work | Dokumenteneingang bearbeiten (Objektzuordnung, Konflikte, Dublettenverdacht) |

@@ -12,7 +12,7 @@ from django.http import HttpRequest, HttpResponse
 from django.shortcuts import redirect
 from django.urls import reverse
 
-EXEMPT_PREFIXES = ("/konto/", "/healthz/", "/readyz/", "/static/")
+EXEMPT_PREFIXES = ("/konto/", "/healthz/", "/readyz/", "/static/", "/webhooks/")
 
 
 class RequireMFAMiddleware:

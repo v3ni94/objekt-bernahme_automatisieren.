@@ -65,6 +65,7 @@ INSTALLED_APPS = [
     "apps.search",
     "apps.reporting",
     "apps.ai",
+    "apps.sync",
 ]
 
 MIDDLEWARE = [
@@ -254,6 +255,28 @@ CELERY_BEAT_SCHEDULE: dict = {
     },
     # Sweeper der Verarbeitung jede Minute (E 10.4); zusaetzlich beim Start jedes Worker-Containers (objektakte.celery)
     "pipeline-sweep": {"task": "pipeline.sweep", "schedule": crontab(minute="*"), "options": {"queue": "io"}},
+    # Synchronisation Paperless und Drive (12.09.2026): Operationsliste minuetlich, Abgleiche alle fuenf Minuten
+    # (das konfigurierte Intervall prueft der Task), Regelableitung naechtlich vor dem Nachtraining
+    "sync-dispatch": {
+        "task": "sync.dispatch_due",
+        "schedule": crontab(minute="*"),
+        "options": {"queue": "io"},
+    },
+    "sync-paperless-poll": {
+        "task": "sync.paperless_poll",
+        "schedule": crontab(minute="*/5"),
+        "options": {"queue": "io"},
+    },
+    "sync-drive-changes": {
+        "task": "sync.drive_changes",
+        "schedule": crontab(minute="2-59/5"),
+        "options": {"queue": "io"},
+    },
+    "sync-derive-rules": {
+        "task": "sync.derive_rules",
+        "schedule": crontab(hour=1, minute=15),
+        "options": {"queue": "io"},
+    },
     "parties-check-assignment-consistency": {
         "task": "parties.check_assignment_consistency",
         "schedule": crontab(hour=3, minute=15),
@@ -288,6 +311,9 @@ OBJEKTAKTE = {
     "DISK_RESERVE_GB": env_int("DISK_RESERVE_GB", 10),
     "HEARTBEAT_FILE": env_str("HEARTBEAT_FILE", "/tmp/heartbeat"),
     "READYZ_TOKEN": read_secret("READYZ_TOKEN", default=""),
+    # Paperless-ngx (Auftrag 12.09.2026): Token und Webhook-Geheimnis nur als Secret, nie in app_settings
+    "PAPERLESS_TOKEN": read_secret("PAPERLESS_TOKEN", default=""),
+    "PAPERLESS_WEBHOOK_TOKEN": read_secret("PAPERLESS_WEBHOOK_TOKEN", default=""),
     "SEED_DIR": REPO_DIR / "db" / "seeds",
     "CATALOG_FILE": SRC_DIR / "apps" / "config" / "catalog.json",
     "HEARTBEAT_STALE_SECONDS": 120,  # ANNAHME A19

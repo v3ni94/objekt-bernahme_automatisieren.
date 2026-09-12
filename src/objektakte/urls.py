@@ -12,6 +12,7 @@ urlpatterns = [
     path("", include("apps.drive.urls")),
     path("", include("apps.documents.urls")),
     path("", include("apps.review.urls")),
+    path("", include("apps.sync.urls")),
     path("", include("apps.requirements.urls")),
     path("", include("apps.lists.urls")),
     path("", include("apps.search.urls")),

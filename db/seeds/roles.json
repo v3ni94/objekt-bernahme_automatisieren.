@@ -7,7 +7,7 @@
       "objects.write", "documents.ingest", "review.decide", "review.dismiss_object_case",
       "demands.write", "demands.approve", "owner_files.read", "tenant_files.read", "masterdata.write",
       "lists.generate", "status.read", "status.operate", "audit.read_all", "audit.read_own", "ai.read",
-      "imports.write", "drive.connect", "drive.cleanup"
+      "imports.write", "drive.connect", "drive.cleanup", "sync.manage", "inbox.work"
     ]
   },
   {
@@ -16,7 +16,7 @@
     "permissions": [
       "objects.write", "documents.ingest", "review.decide", "demands.write",
       "owner_files.read", "tenant_files.read", "masterdata.write", "lists.generate",
-      "status.read", "audit.read_own", "ai.read", "imports.write"
+      "status.read", "audit.read_own", "ai.read", "imports.write", "inbox.work"
     ]
   }
 ]

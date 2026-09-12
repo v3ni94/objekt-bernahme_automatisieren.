@@ -183,6 +183,8 @@ def case_detail(request, pk: int):
             "can_dismiss_object": user_has_permission(request.user, "review.dismiss_object_case"),
             "candidates": case.candidates or [],
             "import_kinds": ImportKind.choices,
+            "conflict_choices": _conflict_choices(case),
+            "sync_links": list(doc.sync_links.all()) if doc else [],
             "documents_same_object": Document.objects.filter(object=obj, deleted_at__isnull=True)
             .exclude(pk=doc.pk if doc else None)
             .order_by("current_name")[:300]
@@ -190,6 +192,14 @@ def case_detail(request, pk: int):
             else [],
         },
     )
+
+
+def _conflict_choices(case: ReviewCase) -> list[tuple[str, str]]:
+    if case.case_type != CaseType.SYNC_CONFLICT:
+        return []
+    from apps.sync.flows import conflicts
+
+    return conflicts.choices_for(case)
 
 
 def _next_url(request, case: ReviewCase, next_id):
@@ -274,6 +284,45 @@ def case_action(request, pk: int):
                 case, request.user, target_obj, reason=request.POST.get("reason"), request=request
             )
             messages.success(request, f"Dokument in Objekt {target_obj.object_number} übernommen.")
+        elif action == "assign_object":
+            from apps.sync.flows import assign as sync_assign
+
+            target_obj = get_object_or_404(ManagedObject.active, pk=request.POST.get("target_object"))
+            if case.document is None:
+                raise services.ReviewError("Fall ohne Dokument")
+            new_doc = sync_assign.apply_assignment(
+                case.document,
+                target_obj,
+                user=request.user,
+                case=case,
+                request=request,
+                reason=request.POST.get("reason", ""),
+            )
+            messages.success(
+                request,
+                f"Dokument dem Objekt {target_obj.object_number} zugeordnet (Dokument {new_doc.pk}); Ablage folgt.",
+            )
+        elif action == "reject_assignment":
+            from apps.sync.flows import assign as sync_assign
+
+            sync_assign.reject_proposal(
+                case, user=request.user, request=request, reason=request.POST.get("reason", "")
+            )
+            messages.info(request, "Vorschlag verworfen; das Dokument bleibt im Eingang.")
+        elif action == "resolve_conflict":
+            from apps.sync.flows import conflicts
+
+            try:
+                conflicts.resolve(
+                    case,
+                    request.POST.get("choice", ""),
+                    user=request.user,
+                    request=request,
+                    reason=request.POST.get("reason", ""),
+                )
+            except conflicts.ConflictError as exc:
+                raise services.ReviewError(str(exc)) from exc
+            messages.success(request, "Konflikt entschieden.")
         elif action == "start_import":
             batch = services.start_import(
                 case, request.user, import_kind=request.POST.get("import_kind") or None, request=request

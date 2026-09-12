@@ -15,6 +15,14 @@ envval() { grep -E "^$1=" .env | head -1 | cut -d= -f2- | awk '{print $1}'; }
 APP_DOMAIN=$(envval APP_DOMAIN)
 [ -n "$APP_DOMAIN" ] || { echo "APP_DOMAIN fehlt in .env"; exit 1; }
 mkdir -p "$DEPLOY_DIR"
+# Optionale Secrets (Paperless-ngx, 12.09.2026): leere Platzhalterdatei, falls nicht vorhanden, damit Compose die
+# Secrets einbinden kann; den Inhalt setzt der Admin (docs/betrieb/paperless-sync.md). Leer bedeutet: Anbindung aus.
+for s in paperless_token paperless_webhook_token; do
+  if [ ! -f "/srv/objektakte/secrets/$s" ]; then
+    (umask 077; : > "/srv/objektakte/secrets/$s") && echo "Secret-Platzhalter angelegt: $s (leer)" \
+      || echo "Hinweis: /srv/objektakte/secrets/$s fehlt und konnte nicht angelegt werden (Rechte pruefen)"
+  fi
+done
 
 wait_healthy() {   # wait_healthy <sekunden> [dienst ...]
   local end=$((SECONDS + $1)); shift

@@ -219,6 +219,8 @@ def maybe_finish_run(run: ProcessingRun) -> bool:
     logger.info("Lauf %s Objekt %s abgeschlossen: %s", run.pk, run.object_id, run.status)
     from apps.requirements.tasks import trigger_evaluation
 
+    if getattr(run.object, "is_system_inbox", False):
+        return  # Eingangsobjekt der Synchronisation: keine Vollstaendigkeitsbewertung, keine Listen
     trigger_evaluation(run.object_id, "run")  # H 3.5: Bewertung nach jedem Verarbeitungslauf
     if not run.dry_run:
         from apps.lists.services import request_generation

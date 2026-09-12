@@ -7,6 +7,8 @@ Seitentext liegt ausschliesslich maskiert vor (D 1, Volltext).
 
 from __future__ import annotations
 
+import uuid
+
 from django.conf import settings
 from django.db import models
 from django.db.models import Case, F, Q, Value, When
@@ -169,6 +171,7 @@ class DocumentSource(models.TextChoices):
     IMPORT = "import", "Import"
     GENERATED = "generated", "erzeugt"
     MOVED_IN = "moved_in", "aus anderem Objekt übernommen"
+    PAPERLESS = "paperless", "aus Paperless übernommen"
 
 
 class DocumentStatus(models.TextChoices):
@@ -197,6 +200,9 @@ class Decider(models.TextChoices):
 
 
 class Document(SoftDeleteModel):
+    uuid = models.UUIDField(
+        default=uuid.uuid4, unique=True, editable=False, help_text="unveränderliche Dokument-UUID für externe Systeme"
+    )
     object = models.ForeignKey(
         "objects.ManagedObject", on_delete=models.PROTECT, db_column="object_id", related_name="documents"
     )

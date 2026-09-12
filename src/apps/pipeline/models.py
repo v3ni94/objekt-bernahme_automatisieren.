@@ -97,6 +97,7 @@ class JobType(models.TextChoices):
     CLASSIFY_AI = "classify_ai", "Klassifikation Stufe 3"
     DECIDE = "decide", "Entscheidung"
     FILE_TO_DRIVE = "file_to_drive", "Ablage in Drive"
+    ASSIGN_OBJECT = "assign_object", "Objektzuordnung"
     LINK_SEGMENTS = "link_segments", "Seitenbereiche verknüpfen"
     GENERATE_LISTS = "generate_lists", "Listen erzeugen"
     EVALUATE_COMPLETENESS = "evaluate_completeness", "Vollständigkeit prüfen"

@@ -48,6 +48,16 @@ WORKER_WRITE = {
     "tenant_file_assignments",
     # Ordnerabgleich im Worker schreibt den erkannten Objektordner an das Objekt
     "objects",
+    # Synchronisation Paperless und Drive (12.09.2026): Operationen, Verknuepfungen, Cursor, Bestandslaeufe und
+    # automatische Zuordnungsbeispiele entstehen in den Workern (Queue io)
+    "document_versions",
+    "sync_links",
+    "sync_operations",
+    "sync_cursors",
+    "sync_inventory_runs",
+    "sync_inventory_items",
+    "sync_assignment_examples",
+    "sync_assignment_rules",
 }
 WORKER_INSERT_ONLY = {"audit_events"}
 # Tabellen, deren Inhalt ein Job je Dokument oder Lauf vollstaendig ersetzt: der alte Bestand wird geloescht und

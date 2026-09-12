@@ -24,6 +24,8 @@ class CaseType(models.TextChoices):
     IMPORT_CANDIDATE = "import_candidate", "Liste erkannt"
     DUPLICATE_OBJECT_NUMBER = "duplicate_object_number", "Objektnummer doppelt"
     DATA_CONSISTENCY = "data_consistency", "Stammdaten widersprüchlich"
+    OBJECT_ASSIGNMENT = "object_assignment", "Objektzuordnung"
+    SYNC_CONFLICT = "sync_conflict", "Abgleichskonflikt"
     UNCLEAR = "unclear", "unklar"
 
 

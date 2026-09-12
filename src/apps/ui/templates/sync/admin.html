@@ -1,0 +1,42 @@
+{% extends "base.html" %}{% load perms %}{% block title %}Paperless · {{ APP_NAME }}{% endblock %}
+{% block content %}<h1>Paperless und Drive: Synchronisation</h1>
+<p class="hinweis">Paperless-ngx ist das DMS (Texterkennung, Metadaten, Suche), Google Drive bleibt die strukturierte Ablage, diese Anwendung koordiniert Zuordnung, Ablageregeln, Abgleichszustand und Konflikte. Schreibzugriffe nach Paperless laufen nur mit Hauptschalter an und im gewählten Modus (readonly: nur lesen; pilot: nur Objekte des Pilotumfangs und der Eingang; full: alle Objekte). Der Hauptschalter aus stoppt jeden Abgleich, bereits gesicherte Daten bleiben.</p>
+<div class="raster">
+<div class="karte"><h2>Verbindung</h2>
+<table><tr><td>Hauptschalter</td><td>{% if enabled %}<span class="ampel gruen">an</span>{% else %}<span class="ampel grau">aus</span>{% endif %} <span class="klein">paperless.enabled</span></td></tr>
+<tr><td>Adresse</td><td class="mono">{{ base_url|default:"nicht gesetzt (paperless.base_url)" }}</td></tr>
+<tr><td>Token</td><td>{% if configured %}vorhanden (Secret PAPERLESS_TOKEN){% elif base_url %}<span class="warnung">fehlt: Secret PAPERLESS_TOKEN auf dem Server</span>{% else %}nicht geprüft{% endif %}</td></tr>
+<tr><td>Modus</td><td>{{ mode }}{% if mode == "pilot" %} <span class="klein">Pilotobjekte: {{ pilot|join:", "|default:"keine" }}</span>{% endif %}</td></tr>
+<tr><td>Letzter Verbindungstest</td><td>{% if state %}{% if state.ok %}<span class="ampel gruen">in Ordnung</span>{% else %}<span class="ampel gelb">{{ state.message }}</span>{% endif %} {% if state.server_version %}Server {{ state.server_version }}, API {{ state.api_version }}{% endif %} <span class="klein">{{ state.checked_at|default:"" }}</span>{% if state.missing %}<br><span class="klein">fehlt: {{ state.missing|join:", " }}</span>{% endif %}{% else %}noch nicht geprüft{% endif %}</td></tr>
+<tr><td>Funktionen</td><td class="klein">{% if state %}{% for k, v in state.features.items %}{{ k }}: {{ v|yesno:"ja,nein" }}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}</td></tr>
+<tr><td>Kennzeichnung</td><td class="klein">Tag {{ field_names.tag }}; Felder {{ field_names.uuid }}, {{ field_names.object }}, {{ field_names.status }}, {{ field_names.drive }}</td></tr>
+<tr><td>Webhook</td><td>{% if webhook_ready %}bereit: POST /webhooks/paperless/ mit Kopfzeile X-MHV-Webhook-Token (Secret PAPERLESS_WEBHOOK_TOKEN){% else %}nicht bereit (Secret PAPERLESS_WEBHOOK_TOKEN fehlt oder paperless.webhook_enabled aus){% endif %}</td></tr></table>
+<p class="aktionen"><form method="post" action="{% url 'sync_check' %}" class="inline">{% csrf_token %}<button type="submit">Verbindung prüfen</button> <button type="submit" name="einrichten" value="1" class="knopf">Kennzeichnung einrichten</button></form> <a class="knopf" href="{% url 'settings_list' %}?kategorie=paperless">Konfiguration</a></p></div>
+<div class="karte"><h2>Eingang (nicht zugeordnet)</h2>
+<table><tr><td>Eingangsobjekt</td><td>{% if inbox_obj %}{{ inbox_obj.object_number }} {{ inbox_obj.name }}{% else %}<span class="ampel gelb">nicht eingerichtet</span>{% endif %}</td></tr>
+<tr><td>Eingangsordner in Drive</td><td class="mono">{{ inbox_folder_id|default:"nicht eingerichtet" }}</td></tr>
+<tr><td>Dokumente im Eingang</td><td class="klein">{% for k, v in inbox_counts.items %}{{ k }}: {{ v }}{% if not forloop.last %}, {% endif %}{% empty %}keine{% endfor %}</td></tr></table>
+<form method="post" action="{% url 'sync_inbox_setup' %}">{% csrf_token %}<p class="aktionen"><button type="submit">Eingang einrichten</button> <span class="klein">legt das technische Eingangsobjekt und den Ordner unter der Drive-Wurzel an (einmalig, Step-up)</span></p></form></div>
+</div>
+<div class="raster">
+<div class="karte"><h2>Abgleich</h2>
+<table><tr><th></th><th>Cursor</th><th>letzter Lauf</th></tr>
+<tr><td>Paperless (modified)</td><td class="mono klein">{{ paperless_cursor.value|default:"noch keiner" }}</td><td class="klein">{{ paperless_poll.value|default:"nie" }} {{ paperless_poll.meta|default:"" }}</td></tr>
+<tr><td>Drive-Änderungsprotokoll {% if not drive_changes_enabled %}<span class="ampel grau">aus</span>{% endif %}</td><td class="mono klein">{{ drive_cursor.value|default:"noch keiner" }}</td><td class="klein">{{ drive_poll.value|default:"nie" }} {{ drive_poll.meta|default:"" }}</td></tr></table>
+<form method="post" action="{% url 'sync_run_now' %}" class="inline">{% csrf_token %}<p class="aktionen"><button type="submit" name="was" value="paperless">Paperless jetzt abgleichen</button> <button type="submit" name="was" value="drive">Drive-Änderungen jetzt lesen</button> <button type="submit" name="was" value="operationen">Fällige Operationen einreihen</button></p></form>
+<h3>Operationen</h3>
+<p>Warteschlange {{ ops.queue }}, fehlgeschlagen oder blockiert {{ ops.failed }}{% if ops.oldest_pending_at %}, älteste wartende seit {{ ops.oldest_pending_at|timesince }}{% endif %}. <span class="klein">{% for k, v in ops.counts.items %}{{ k }} {{ v }}{% if not forloop.last %} · {% endif %}{% endfor %}</span></p>
+<p class="klein">Verknüpfungen: {% for k, v in link_counts.items %}{{ k }} {{ v }}{% if not forloop.last %} · {% endif %}{% empty %}keine{% endfor %}</p></div>
+<div class="karte"><h2>Bestandslauf</h2>
+<form method="post" action="{% url 'sync_inventory_start' %}">{% csrf_token %}
+<p><label>Art</label><select name="art"><option value="paperless">Paperless-Bestand (Inventar, verknüpfen oder übernehmen)</option><option value="drive">Drive-Bestand (Objektordner und Eingang, nach Paperless übertragen)</option></select></p>
+<p><label>Pilotumfang (Objektnummern, leer = alle)</label><input type="text" name="objekte" placeholder="82, 623"></p>
+<p><label class="klein"><input type="checkbox" name="echt" value="1" style="width:auto"> echter Lauf (ohne Haken: Trockenlauf, nur Manifest)</label></p>
+<p class="aktionen"><button type="submit">Bestandslauf starten</button></p></form>
+<table class="voll"><thead><tr><th>Nr.</th><th>Art</th><th>Modus</th><th>Status</th><th>gestartet</th><th>Zähler</th></tr></thead><tbody>{% for r in runs %}<tr data-href="{% url 'sync_inventory' r.pk %}"><td><a href="{% url 'sync_inventory' r.pk %}">{{ r.pk }}</a></td><td>{{ r.get_kind_display }}</td><td>{% if r.dry_run %}Trockenlauf{% else %}echt{% endif %}</td><td>{{ r.get_status_display }}</td><td>{{ r.started_at|date:"d.m.Y H:i" }}</td><td class="klein">{{ r.counters|default:"" }}</td></tr>{% empty %}<tr><td colspan="6">noch kein Bestandslauf</td></tr>{% endfor %}</tbody></table></div>
+</div>
+<div class="karte"><h2>Fehlerwarteschlange</h2>
+<table class="voll"><thead><tr><th>Nr.</th><th>Art</th><th>Dokument</th><th>Status</th><th>Versuche</th><th>Fehler</th><th></th></tr></thead><tbody>{% for op in failed_ops %}<tr class="rot"><td>{{ op.pk }}</td><td>{{ op.get_kind_display }}</td><td>{% if op.document %}<a href="{% url 'document_detail' op.document.pk %}">{{ op.document.current_name }}</a>{% endif %}</td><td>{{ op.get_status_display }}</td><td>{{ op.attempt_count }}/{{ op.max_attempts }}</td><td class="klein">{{ op.blocked_reason|default:op.last_error|default:"" }}</td><td><form method="post" action="{% url 'sync_operation_action' op.pk %}" class="inline">{% csrf_token %}<button type="submit" name="action" value="retry">erneut</button> <button type="submit" name="action" value="cancel">verwerfen</button></form></td></tr>{% empty %}<tr><td colspan="7">keine fehlgeschlagenen Operationen</td></tr>{% endfor %}</tbody></table>
+<h3>Letzte Operationen</h3>
+<table class="voll"><thead><tr><th>Nr.</th><th>Art</th><th>Dokument</th><th>Status</th><th>geändert</th><th>Ergebnis</th></tr></thead><tbody>{% for op in recent_ops %}<tr><td>{{ op.pk }}</td><td>{{ op.get_kind_display }}</td><td>{% if op.document %}{{ op.document.current_name }}{% endif %}</td><td>{{ op.get_status_display }}</td><td>{{ op.updated_at|date:"d.m. H:i" }}</td><td class="klein">{{ op.result|default:op.last_error|default:"" }}</td></tr>{% empty %}<tr><td colspan="6">noch keine Operationen</td></tr>{% endfor %}</tbody></table></div>
+{% endblock %}

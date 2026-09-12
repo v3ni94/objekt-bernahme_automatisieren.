@@ -4,11 +4,16 @@ Zielobjekt, Drive-Verschiebung ueber file_to_drive, Audit beidseitig."""
 
 from __future__ import annotations
 
+import logging
+import uuid
+
 from django.db import transaction
 
 from apps.audit.services import record
 from apps.documents.models import Document, DocumentPage
 from apps.pipeline.jobs import JobType, enqueue, idempotency_key
+
+logger = logging.getLogger(__name__)
 
 
 class TransferError(Exception):
@@ -68,7 +73,13 @@ def transfer_document(
             new  # Verweis auf die Nachfolgezeile (Ergaenzung: Spalte wird fuer beide Verweise genutzt)
         )
         doc.drive_file_id = None
-        doc.save(update_fields=["status", "duplicate_of", "drive_file_id", "updated_at"])
+        # Die Dokument-UUID ist unveraenderlich (Synchronisation): sie geht auf die Nachfolgezeile ueber, die
+        # Altzeile erhaelt eine neue Kennung, damit externe Systeme dasselbe fachliche Dokument wiederfinden.
+        alte_uuid = doc.uuid
+        doc.uuid = uuid.uuid4()
+        doc.save(update_fields=["status", "duplicate_of", "drive_file_id", "uuid", "updated_at"])
+        new.uuid = alte_uuid
+        new.save(update_fields=["uuid", "updated_at"])
         for action, entity, object_id in (
             ("review.transfer_object", doc, doc.object_id),
             ("review.transfer_object", new, target_obj.pk),
@@ -88,6 +99,12 @@ def transfer_document(
                     "old_document_id": doc.pk,
                 },
             )
+    try:
+        from apps.sync import hooks
+
+        hooks.safe("on_document_transferred", doc, new)
+    except Exception:  # Synchronisation darf die Uebernahme nicht scheitern lassen
+        logger.exception("Synchronisations-Hook nach Objektuebernahme fehlgeschlagen")
     if new.status == "ocr_done":
         enqueue(
             JobType.EXTRACT_ENTITIES,

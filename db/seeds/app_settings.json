@@ -7,27 +7,12 @@
   "drive.object_folder_name_pattern": "{number} {city}, {street} {house_number}",
   "drive.object_number_digits_min": 2,
   "drive.object_number_digits_max": 6,
-  "drive.object_number_separators": [
-    " ",
-    "_",
-    ",",
-    ".",
-    "-"
-  ],
+  "drive.object_number_separators": [" ", "_", ",", ".", "-"],
   "drive.object_number_zero_pad_to": null,
-  "drive.legacy_folder_aliases": {
-    "06_Sonstiges": [
-      "05_Sonstiges"
-    ]
-  },
+  "drive.legacy_folder_aliases": {"06_Sonstiges": ["05_Sonstiges"]},
   "drive.legacy_conflict_rename_pattern": null,
   "drive.max_requests_per_second": 5,
-  "drive.backoff": {
-    "base_s": 1,
-    "factor": 2,
-    "max_s": 64,
-    "attempts": 8
-  },
+  "drive.backoff": {"base_s": 1, "factor": 2, "max_s": 64, "attempts": 8},
   "drive.resumable_threshold_bytes": 5242880,
   "drive.upload_chunk_bytes": 8388608,
   "drive.reconcile_on_open_min_interval_minutes": 15,
@@ -40,53 +25,14 @@
   "owner_file.name_unknown_owner": "Unbekannt",
   "owner_file.unit_number_pad": 2,
   "owner_file.unit_prefix_mode": "always_we",
-  "owner_file.unit_prefix_map": {
-    "apartment": "WE",
-    "commercial": "GE",
-    "parking": "ST",
-    "garage": "GA",
-    "underground_parking": "TG",
-    "cellar": "KE",
-    "other": "VE"
-  },
+  "owner_file.unit_prefix_map": {"apartment": "WE", "commercial": "GE", "parking": "ST", "garage": "GA", "underground_parking": "TG", "cellar": "KE", "other": "VE"},
   "owner_file.transliterate_umlauts": false,
   "owner_file.name_max_length": 100,
   "owner_file.collision_suffix_mode": "year_then_counter",
-  "owner_file.legal_form_tokens": [
-    "GmbH",
-    "AG",
-    "KG",
-    "GmbH & Co. KG",
-    "UG",
-    "e.V.",
-    "GbR",
-    "OHG",
-    "eG",
-    "SE",
-    "mbH",
-    "haftungsbeschränkt"
-  ],
+  "owner_file.legal_form_tokens": ["GmbH", "AG", "KG", "GmbH & Co. KG", "UG", "e.V.", "GbR", "OHG", "eG", "SE", "mbH", "haftungsbeschränkt"],
   "owner_file.create_folders_eagerly": true,
   "tenant_file.subfolders": [],
-  "units.type_prefix_mapping": {
-    "WE": "apartment",
-    "WOHNUNG": "apartment",
-    "GE": "commercial",
-    "S": "parking",
-    "ST": "parking",
-    "STP": "parking",
-    "SP": "parking",
-    "STELLPLATZ": "parking",
-    "GA": "garage",
-    "GARAGE": "garage",
-    "TG": "underground_parking",
-    "KE": "cellar",
-    "KELLER": "cellar",
-    "HAUS": "other",
-    "CONTAINER": "other",
-    "LAGERHALLE": "other",
-    "MVW": "other"
-  },
+  "units.type_prefix_mapping": {"WE": "apartment", "WOHNUNG": "apartment", "GE": "commercial", "S": "parking", "ST": "parking", "STP": "parking", "SP": "parking", "STELLPLATZ": "parking", "GA": "garage", "GARAGE": "garage", "TG": "underground_parking", "KE": "cellar", "KELLER": "cellar", "HAUS": "other", "CONTAINER": "other", "LAGERHALLE": "other", "MVW": "other"},
   "units.normalize_strip_leading_zeros": true,
   "classification.threshold_auto_file": 0.9,
   "classification.threshold_stage3_call": 0.9,
@@ -100,12 +46,7 @@
   "classification.stage3_max_tokens": 3000,
   "classification.fuzzy_auto": 90,
   "classification.fuzzy_candidate_min": 78,
-  "classification.label_weights": {
-    "rule": 0.6,
-    "synthetic": 0.3,
-    "ai": 0.5,
-    "review": 1.0
-  },
+  "classification.label_weights": {"rule": 0.6, "synthetic": 0.3, "ai": 0.5, "review": 1.0},
   "classification.retrain_after_new_labels": 50,
   "classification.retrain_f1_tolerance": 0.01,
   "classification.embedding_switch_macro_f1": 0.85,
@@ -117,34 +58,9 @@
   "ocr.two_phase_head_pages": 3,
   "ocr.tessdata_variant": "standard",
   "ocr.dpi_cap": 300,
-  "ai.provider_order": [
-    "openai",
-    "anthropic"
-  ],
-  "ai.providers": {
-    "openai": {
-      "enabled": false,
-      "model": null,
-      "endpoint": null,
-      "region": null,
-      "timeout_s": 30,
-      "max_attempts": 2,
-      "cost_limit_eur_per_object": null
-    },
-    "anthropic": {
-      "enabled": false,
-      "model": null,
-      "endpoint": null,
-      "region": null,
-      "timeout_s": 30,
-      "max_attempts": 2,
-      "cost_limit_eur_per_object": null
-    }
-  },
-  "ai.monthly_budget_eur": {
-    "openai": null,
-    "anthropic": null
-  },
+  "ai.provider_order": ["openai", "anthropic"],
+  "ai.providers": {"openai": {"enabled": false, "model": null, "endpoint": null, "region": null, "timeout_s": 30, "max_attempts": 2, "cost_limit_eur_per_object": null}, "anthropic": {"enabled": false, "model": null, "endpoint": null, "region": null, "timeout_s": 30, "max_attempts": 2, "cost_limit_eur_per_object": null}},
+  "ai.monthly_budget_eur": {"openai": null, "anthropic": null},
   "ai.wall_budget_s": 120,
   "ai.max_input_tokens": 3000,
   "ai.chars_per_token": 3.5,
@@ -152,69 +68,14 @@
   "documents.duplicate_owner_documents_in_drive": false,
   "documents.duplicate_name_pattern": "{original_stem}_S{page_from}-{page_to}.pdf",
   "documents.max_download_bytes": 524288000,
-  "jobs.stale_minutes": {
-    "default": 15,
-    "ocr_chunk": 10,
-    "classify": 3,
-    "classify_ai": 5,
-    "file_to_drive": 5
-  },
+  "jobs.stale_minutes": {"default": 15, "ocr_chunk": 10, "classify": 3, "classify_ai": 5, "file_to_drive": 5},
   "jobs.max_attempts_default": 3,
   "processing.max_parallel_objects": 1,
   "review.snooze_default_days": 7,
   "review.bulk_max_cases": 500,
   "review.list_page_size": 50,
-  "lists.owner_columns": [
-    "Einheit",
-    "Einheitentyp",
-    "Anrede",
-    "Vorname",
-    "Nachname",
-    "Firma",
-    "Straße und Hausnummer",
-    "PLZ",
-    "Ort",
-    "Abweichende Zustelladresse",
-    "Telefon",
-    "Mobil",
-    "E-Mail",
-    "Miteigentumsanteil",
-    "Eigentumsbeginn",
-    "Eigentumsende",
-    "Hausgeld monatlich",
-    "SEPA-Mandat vorhanden",
-    "IBAN (maskiert)",
-    "Mehrere Eigentümer je Einheit",
-    "Bemerkung",
-    "Status",
-    "Quelle"
-  ],
-  "lists.tenant_columns": [
-    "Einheit",
-    "Einheitentyp",
-    "Anrede",
-    "Vorname",
-    "Nachname",
-    "Firma",
-    "Telefon",
-    "Mobil",
-    "E-Mail",
-    "Mietbeginn",
-    "Mietende",
-    "Kaltmiete",
-    "Nebenkostenvorauszahlung",
-    "Heizkostenvorauszahlung",
-    "Gesamtmiete",
-    "Kaution Betrag",
-    "Kaution Anlageform",
-    "Staffel oder Index",
-    "Anzahl Personen",
-    "SEPA-Mandat vorhanden",
-    "IBAN (maskiert)",
-    "Bemerkung",
-    "Status",
-    "Quelle"
-  ],
+  "lists.owner_columns": ["Einheit", "Einheitentyp", "Anrede", "Vorname", "Nachname", "Firma", "Straße und Hausnummer", "PLZ", "Ort", "Abweichende Zustelladresse", "Telefon", "Mobil", "E-Mail", "Miteigentumsanteil", "Eigentumsbeginn", "Eigentumsende", "Hausgeld monatlich", "SEPA-Mandat vorhanden", "IBAN (maskiert)", "Mehrere Eigentümer je Einheit", "Bemerkung", "Status", "Quelle"],
+  "lists.tenant_columns": ["Einheit", "Einheitentyp", "Anrede", "Vorname", "Nachname", "Firma", "Telefon", "Mobil", "E-Mail", "Mietbeginn", "Mietende", "Kaltmiete", "Nebenkostenvorauszahlung", "Heizkostenvorauszahlung", "Gesamtmiete", "Kaution Betrag", "Kaution Anlageform", "Staffel oder Index", "Anzahl Personen", "SEPA-Mandat vorhanden", "IBAN (maskiert)", "Bemerkung", "Status", "Quelle"],
   "lists.owner_list_name_pattern": "00_Eigentuemerliste_{number}.{ext}",
   "lists.tenant_list_name_pattern": "00_Mieterliste_{number}.{ext}",
   "lists.debounce_seconds": 60,
@@ -228,10 +89,7 @@
   "previews.long_edge_px": 1200,
   "previews.jpeg_quality": 80,
   "previews.retention_days_after_resolve": 90,
-  "import.name_split_thresholds": {
-    "high": 0.9,
-    "medium": 0.6
-  },
+  "import.name_split_thresholds": {"high": 0.9, "medium": 0.6},
   "import.column_confidence_min": 0.8,
   "import.ocr_cell_confidence_min": 70,
   "reports.misc_share_target_pct": 5,
@@ -242,343 +100,52 @@
   "security.iban_key_version_current": 1,
   "security.log_document_views": true,
   "retention.hint": "durch Geschäftsführung und Steuerberater festzulegen",
-  "import.column_synonyms": {
-    "unit_label": [
-      "WE",
-      "Einheit",
-      "Whg",
-      "Wohnung",
-      "Nr",
-      "Nr.",
-      "VE",
-      "VE-Beschreibung",
-      "Einheit Nr",
-      "Wohneinheit",
-      "Objekt-Einheit",
-      "ME",
-      "Mieteinheit",
-      "Bezeichnung"
-    ],
-    "external_ref": [
-      "VE-Nr",
-      "VE Nr",
-      "Einheiten-ID",
-      "Einheiten-Nr",
-      "Kennung",
-      "ID"
-    ],
-    "owner_name_raw": [
-      "Eigentuemer",
-      "Eigentümer",
-      "Eigentümer/in",
-      "Name",
-      "Eigentümername",
-      "Eigentuemername",
-      "Miteigentümer"
-    ],
-    "tenant_name_raw": [
-      "Mieter",
-      "Mieter/in",
-      "Mietername",
-      "Bewohner"
-    ],
-    "salutation": [
-      "Anrede",
-      "Briefanrede",
-      "Titel"
-    ],
-    "first_name": [
-      "Vorname",
-      "Vornamen"
-    ],
-    "last_name": [
-      "Nachname",
-      "Name (Nachname)",
-      "Familienname",
-      "Zuname"
-    ],
-    "company_name": [
-      "Firma",
-      "Unternehmen",
-      "Gesellschaft"
-    ],
-    "street": [
-      "Straße",
-      "Strasse",
-      "Str.",
-      "Anschrift",
-      "Adresse",
-      "Straße Hausnummer",
-      "Straße und Hausnummer"
-    ],
-    "house_number": [
-      "Hausnummer",
-      "Haus-Nr",
-      "Nr"
-    ],
-    "postal_code": [
-      "PLZ",
-      "Postleitzahl"
-    ],
-    "city": [
-      "Ort",
-      "Stadt",
-      "Wohnort"
-    ],
-    "country": [
-      "Land",
-      "Staat"
-    ],
-    "delivery_address_raw": [
-      "Zustelladresse",
-      "Abweichende Adresse",
-      "Versandadresse",
-      "Postanschrift"
-    ],
-    "phone": [
-      "Telefon",
-      "Tel",
-      "Tel.",
-      "Telefonnummer",
-      "Festnetz"
-    ],
-    "mobile": [
-      "Mobil",
-      "Handy",
-      "Mobiltelefon",
-      "Mobilnummer"
-    ],
-    "email": [
-      "E-Mail",
-      "Email",
-      "Mail",
-      "E-Mail-Adresse"
-    ],
-    "co_ownership_share": [
-      "MEA",
-      "Miteigentumsanteil",
-      "Anteil",
-      "Miteigentumsanteile",
-      "MEA Zähler"
-    ],
-    "co_ownership_share_base": [
-      "MEA Nenner",
-      "Nenner",
-      "Gesamt-MEA"
-    ],
-    "valid_from": [
-      "Eigentumsbeginn",
-      "Eigentum seit",
-      "seit",
-      "Beginn",
-      "Kauf",
-      "Eigentümer seit"
-    ],
-    "valid_to": [
-      "Eigentumsende",
-      "Eigentum bis",
-      "bis",
-      "Ende"
-    ],
-    "house_fee_monthly": [
-      "Hausgeld",
-      "Hausgeld_EUR_mtl",
-      "Wohngeld",
-      "Vorschuss",
-      "Hausgeld monatlich",
-      "Hausgeldvorschuss"
-    ],
-    "sepa_mandate_present": [
-      "SEPA",
-      "SEPA-Mandat",
-      "Lastschrift",
-      "Einzug"
-    ],
-    "iban_raw": [
-      "IBAN",
-      "Konto",
-      "Bankverbindung",
-      "Kontonummer"
-    ],
-    "mandate_reference": [
-      "Mandatsreferenz",
-      "Mandat",
-      "Mandats-Ref"
-    ],
-    "notes": [
-      "Bemerkung",
-      "Bemerkungen",
-      "Notiz",
-      "Hinweis",
-      "Kommentar"
-    ],
-    "building": [
-      "Gebaeude",
-      "Gebäude",
-      "Haus"
-    ],
-    "location": [
-      "Lage",
-      "Geschoss",
-      "Etage",
-      "Stockwerk"
-    ],
-    "unit_status": [
-      "Status"
-    ],
-    "object_number": [
-      "Objekt-Nr",
-      "Objektnummer",
-      "Objekt Nr",
-      "Obj-Nr"
-    ],
-    "object_name": [
-      "Objekt",
-      "Objektbezeichnung",
-      "Liegenschaft"
-    ],
-    "management_type": [
-      "Verwaltungsart",
-      "Art der Verwaltung"
-    ],
-    "base_rent": [
-      "Kaltmiete",
-      "Nettokaltmiete",
-      "Grundmiete",
-      "Miete_EUR_mtl",
-      "Miete"
-    ],
-    "utilities_prepayment": [
-      "Nebenkosten",
-      "NK",
-      "Nebenkostenvorauszahlung",
-      "BK",
-      "Betriebskosten"
-    ],
-    "heating_prepayment": [
-      "Heizkosten",
-      "HK",
-      "Heizkostenvorauszahlung"
-    ],
-    "deposit_amount": [
-      "Kaution",
-      "Kautionsbetrag",
-      "Mietkaution"
-    ],
-    "deposit_type": [
-      "Kautionsart",
-      "Anlageform",
-      "Kaution Anlageform"
-    ],
-    "rent_adjustment_type": [
-      "Staffel",
-      "Index",
-      "Staffel/Index",
-      "Mietanpassung"
-    ],
-    "persons_count": [
-      "Personen",
-      "Anzahl Personen",
-      "Pers."
-    ],
-    "start_date": [
-      "Mietbeginn",
-      "Einzug",
-      "Vertragsbeginn"
-    ],
-    "end_date": [
-      "Mietende",
-      "Auszug",
-      "Vertragsende",
-      "gekündigt zum"
-    ]
-  },
-  "import.legal_form_markers": [
-    "GmbH",
-    "AG",
-    "KG",
-    "OHG",
-    "UG",
-    "e.V.",
-    "GbR",
-    "Stiftung",
-    "Genossenschaft",
-    "eG",
-    "Gemeinschaft",
-    "Erbengemeinschaft",
-    "WEG",
-    "Eheleute",
-    "Ehepaar",
-    "Familie",
-    "Verein",
-    "Kirche",
-    "Gemeinde",
-    "Stadt",
-    "Bank",
-    "Sparkasse"
-  ],
-  "import.owner_match_weights": {
-    "same_unit": 15,
-    "same_address": 8,
-    "same_email": 15,
-    "same_iban_hash": 15,
-    "same_first_name": 8
-  },
-  "import.owner_match_thresholds": {
-    "auto": 90,
-    "candidate": 78
-  },
-  "import.unit_status_active_values": [
-    "aktiv"
-  ],
-  "import.deposit_type_synonyms": {
-    "cash_account": [
-      "Kautionskonto",
-      "Konto",
-      "Sparkonto",
-      "Bar",
-      "Barkaution",
-      "Überweisung"
-    ],
-    "savings_book": [
-      "Sparbuch"
-    ],
-    "bank_guarantee": [
-      "Bürgschaft",
-      "Bankbürgschaft"
-    ],
-    "pledge": [
-      "Verpfändung",
-      "verpfändet"
-    ],
-    "insurance": [
-      "Versicherung",
-      "Kautionsversicherung"
-    ]
-  },
+  "import.column_synonyms": {"unit_label": ["WE", "Einheit", "Whg", "Wohnung", "Nr", "Nr.", "VE", "VE-Beschreibung", "Einheit Nr", "Wohneinheit", "Objekt-Einheit", "ME", "Mieteinheit", "Bezeichnung"], "external_ref": ["VE-Nr", "VE Nr", "Einheiten-ID", "Einheiten-Nr", "Kennung", "ID"], "owner_name_raw": ["Eigentuemer", "Eigentümer", "Eigentümer/in", "Name", "Eigentümername", "Eigentuemername", "Miteigentümer"], "tenant_name_raw": ["Mieter", "Mieter/in", "Mietername", "Bewohner"], "salutation": ["Anrede", "Briefanrede", "Titel"], "first_name": ["Vorname", "Vornamen"], "last_name": ["Nachname", "Name (Nachname)", "Familienname", "Zuname"], "company_name": ["Firma", "Unternehmen", "Gesellschaft"], "street": ["Straße", "Strasse", "Str.", "Anschrift", "Adresse", "Straße Hausnummer", "Straße und Hausnummer"], "house_number": ["Hausnummer", "Haus-Nr", "Nr"], "postal_code": ["PLZ", "Postleitzahl"], "city": ["Ort", "Stadt", "Wohnort"], "country": ["Land", "Staat"], "delivery_address_raw": ["Zustelladresse", "Abweichende Adresse", "Versandadresse", "Postanschrift"], "phone": ["Telefon", "Tel", "Tel.", "Telefonnummer", "Festnetz"], "mobile": ["Mobil", "Handy", "Mobiltelefon", "Mobilnummer"], "email": ["E-Mail", "Email", "Mail", "E-Mail-Adresse"], "co_ownership_share": ["MEA", "Miteigentumsanteil", "Anteil", "Miteigentumsanteile", "MEA Zähler"], "co_ownership_share_base": ["MEA Nenner", "Nenner", "Gesamt-MEA"], "valid_from": ["Eigentumsbeginn", "Eigentum seit", "seit", "Beginn", "Kauf", "Eigentümer seit"], "valid_to": ["Eigentumsende", "Eigentum bis", "bis", "Ende"], "house_fee_monthly": ["Hausgeld", "Hausgeld_EUR_mtl", "Wohngeld", "Vorschuss", "Hausgeld monatlich", "Hausgeldvorschuss"], "sepa_mandate_present": ["SEPA", "SEPA-Mandat", "Lastschrift", "Einzug"], "iban_raw": ["IBAN", "Konto", "Bankverbindung", "Kontonummer"], "mandate_reference": ["Mandatsreferenz", "Mandat", "Mandats-Ref"], "notes": ["Bemerkung", "Bemerkungen", "Notiz", "Hinweis", "Kommentar"], "building": ["Gebaeude", "Gebäude", "Haus"], "location": ["Lage", "Geschoss", "Etage", "Stockwerk"], "unit_status": ["Status"], "object_number": ["Objekt-Nr", "Objektnummer", "Objekt Nr", "Obj-Nr"], "object_name": ["Objekt", "Objektbezeichnung", "Liegenschaft"], "management_type": ["Verwaltungsart", "Art der Verwaltung"], "base_rent": ["Kaltmiete", "Nettokaltmiete", "Grundmiete", "Miete_EUR_mtl", "Miete"], "utilities_prepayment": ["Nebenkosten", "NK", "Nebenkostenvorauszahlung", "BK", "Betriebskosten"], "heating_prepayment": ["Heizkosten", "HK", "Heizkostenvorauszahlung"], "deposit_amount": ["Kaution", "Kautionsbetrag", "Mietkaution"], "deposit_type": ["Kautionsart", "Anlageform", "Kaution Anlageform"], "rent_adjustment_type": ["Staffel", "Index", "Staffel/Index", "Mietanpassung"], "persons_count": ["Personen", "Anzahl Personen", "Pers."], "start_date": ["Mietbeginn", "Einzug", "Vertragsbeginn"], "end_date": ["Mietende", "Auszug", "Vertragsende", "gekündigt zum"]},
+  "import.legal_form_markers": ["GmbH", "AG", "KG", "OHG", "UG", "e.V.", "GbR", "Stiftung", "Genossenschaft", "eG", "Gemeinschaft", "Erbengemeinschaft", "WEG", "Eheleute", "Ehepaar", "Familie", "Verein", "Kirche", "Gemeinde", "Stadt", "Bank", "Sparkasse"],
+  "import.owner_match_weights": {"same_unit": 15, "same_address": 8, "same_email": 15, "same_iban_hash": 15, "same_first_name": 8},
+  "import.owner_match_thresholds": {"auto": 90, "candidate": 78},
+  "import.unit_status_active_values": ["aktiv"],
+  "import.deposit_type_synonyms": {"cash_account": ["Kautionskonto", "Konto", "Sparkonto", "Bar", "Barkaution", "Überweisung"], "savings_book": ["Sparbuch"], "bank_guarantee": ["Bürgschaft", "Bankbürgschaft"], "pledge": ["Verpfändung", "verpfändet"], "insurance": ["Versicherung", "Kautionsversicherung"]},
   "processing.work_orphan_hours": 48,
   "processing.heartbeat_seconds": 30,
   "ocr.language": "deu",
   "ocr.image_cover_ratio": 0.9,
-  "classification.own_company_names": [
-    "Hausverwaltung Müller GmbH",
-    "Müller Holding AG"
-  ],
+  "classification.own_company_names": ["Hausverwaltung Müller GmbH", "Müller Holding AG"],
   "classification.contract_partners": [],
   "classification.first_pages": 3,
   "classification.text_max_chars": 4000,
   "classification.ner_support_bonus": 0.05,
-  "classification.segment_types": [
-    "gesamtjahresabrechnung",
-    "gesamtwirtschaftsplan",
-    "versammlungsprotokoll"
-  ],
+  "classification.segment_types": ["gesamtjahresabrechnung", "gesamtwirtschaftsplan", "versammlungsprotokoll"],
   "classification.segments_require_review": true,
-  "ai.price_list": {
-    "version": "nicht-festgelegt",
-    "models": {}
-  },
+  "ai.price_list": {"version": "nicht-festgelegt", "models": {}},
   "ai.reclassify_enabled": false,
   "ai.extract_lease_facts": true,
-  "requests.attachment_threshold": 25
+  "requests.attachment_threshold": 25,
+  "paperless.enabled": false,
+  "paperless.base_url": null,
+  "paperless.verify_tls": true,
+  "paperless.timeout_seconds": 30,
+  "paperless.page_size": 100,
+  "paperless.api_version": 10,
+  "paperless.mode": "readonly",
+  "paperless.pilot_object_numbers": [],
+  "paperless.tag_name": "MHV-Sync",
+  "paperless.field_uuid_name": "MHV Dokument-UUID",
+  "paperless.field_object_name": "MHV Objekt",
+  "paperless.field_status_name": "MHV Zuordnung",
+  "paperless.field_drive_name": "MHV Drive-Link",
+  "paperless.poll_interval_minutes": 5,
+  "paperless.webhook_enabled": true,
+  "paperless.import_new_documents": true,
+  "paperless.max_upload_mb": 100,
+  "sync.drive_changes_enabled": false,
+  "sync.drive_changes_interval_minutes": 5,
+  "sync.inbox_folder_name": "_Eingang_Nicht_zugeordnet",
+  "sync.inbox_folder_id": null,
+  "sync.inbox_object_number": "0",
+  "sync.assignment_auto_min": 0.85,
+  "sync.assignment_gap_min": 0.25,
+  "sync.rule_min_confirmations": 2,
+  "sync.operation_max_attempts": 5,
+  "sync.inventory_page_size": 200
 }

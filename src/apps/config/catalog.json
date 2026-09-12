@@ -1623,6 +1623,327 @@
       "schema": {
         "type": "boolean"
       }
+    },
+    {
+      "key": "paperless.enabled",
+      "category": "paperless",
+      "value_type": "boolean",
+      "description": "Anbindung an Paperless-ngx aktiv (Hauptschalter; aus stoppt jeden Abgleich, bereits gesicherte Daten bleiben)",
+      "source": "Auftrag Paperless-ngx und Google Drive, 12.09.2026",
+      "schema": {
+        "type": "boolean"
+      }
+    },
+    {
+      "key": "paperless.base_url",
+      "category": "paperless",
+      "value_type": "string",
+      "description": "Basisadresse der Paperless-ngx-Instanz mit https, ohne /api (Token liegt als Secret PAPERLESS_TOKEN, nie in der Konfiguration)",
+      "source": "Auftrag Paperless-ngx und Google Drive, 12.09.2026",
+      "schema": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "nullable": true
+    },
+    {
+      "key": "paperless.verify_tls",
+      "category": "paperless",
+      "value_type": "boolean",
+      "description": "TLS-Zertifikat der Paperless-Instanz prüfen (nur für interne Testinstanzen abschaltbar)",
+      "source": "Auftrag Paperless-ngx und Google Drive, 12.09.2026",
+      "schema": {
+        "type": "boolean"
+      }
+    },
+    {
+      "key": "paperless.timeout_seconds",
+      "category": "paperless",
+      "value_type": "integer",
+      "description": "Zeitlimit je API-Aufruf in Sekunden",
+      "source": "Auftrag Paperless-ngx und Google Drive, 12.09.2026",
+      "schema": {
+        "type": "integer",
+        "minimum": 5,
+        "maximum": 300
+      }
+    },
+    {
+      "key": "paperless.page_size",
+      "category": "paperless",
+      "value_type": "integer",
+      "description": "Seitengröße für Listenabfragen der Paperless-API",
+      "source": "Auftrag Paperless-ngx und Google Drive, 12.09.2026",
+      "schema": {
+        "type": "integer",
+        "minimum": 10,
+        "maximum": 500
+      }
+    },
+    {
+      "key": "paperless.api_version",
+      "category": "paperless",
+      "value_type": "integer",
+      "description": "Angeforderte API-Version (Accept-Header); der Verbindungstest meldet die vom Server gelieferte Version",
+      "source": "Auftrag Paperless-ngx und Google Drive, 12.09.2026",
+      "schema": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 20
+      }
+    },
+    {
+      "key": "paperless.mode",
+      "category": "paperless",
+      "value_type": "string",
+      "description": "readonly (nur lesen und inventarisieren), pilot (Schreiben nur für Objekte in paperless.pilot_object_numbers und den Eingang), full (alle Objekte)",
+      "source": "Auftrag Paperless-ngx und Google Drive, 12.09.2026",
+      "schema": {
+        "type": "string",
+        "enum": [
+          "readonly",
+          "pilot",
+          "full"
+        ]
+      }
+    },
+    {
+      "key": "paperless.pilot_object_numbers",
+      "category": "paperless",
+      "value_type": "list",
+      "description": "Objektnummern des Pilotumfangs (nur im Modus pilot wirksam)",
+      "source": "Auftrag Paperless-ngx und Google Drive, 12.09.2026",
+      "schema": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    {
+      "key": "paperless.tag_name",
+      "category": "paperless",
+      "value_type": "string",
+      "description": "Name des Kennzeichnungs-Tags in Paperless für Dokumente, die die Anwendung führt",
+      "source": "Auftrag Paperless-ngx und Google Drive, 12.09.2026",
+      "schema": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 60
+      }
+    },
+    {
+      "key": "paperless.field_uuid_name",
+      "category": "paperless",
+      "value_type": "string",
+      "description": "Name des benutzerdefinierten Felds für die Dokument-UUID der Anwendung",
+      "source": "Auftrag Paperless-ngx und Google Drive, 12.09.2026",
+      "schema": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 60
+      }
+    },
+    {
+      "key": "paperless.field_object_name",
+      "category": "paperless",
+      "value_type": "string",
+      "description": "Name des benutzerdefinierten Felds für den Objektbezug (Objektnummer und Bezeichnung)",
+      "source": "Auftrag Paperless-ngx und Google Drive, 12.09.2026",
+      "schema": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 60
+      }
+    },
+    {
+      "key": "paperless.field_status_name",
+      "category": "paperless",
+      "value_type": "string",
+      "description": "Name des benutzerdefinierten Felds für den Zuordnungsstatus",
+      "source": "Auftrag Paperless-ngx und Google Drive, 12.09.2026",
+      "schema": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 60
+      }
+    },
+    {
+      "key": "paperless.field_drive_name",
+      "category": "paperless",
+      "value_type": "string",
+      "description": "Name des benutzerdefinierten Felds für den geschützten Drive-Link",
+      "source": "Auftrag Paperless-ngx und Google Drive, 12.09.2026",
+      "schema": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 60
+      }
+    },
+    {
+      "key": "paperless.poll_interval_minutes",
+      "category": "paperless",
+      "value_type": "integer",
+      "description": "Abstand des regelmäßigen API-Abgleichs in Minuten (holt verpasste Webhook-Ereignisse nach)",
+      "source": "Auftrag Paperless-ngx und Google Drive, 12.09.2026",
+      "schema": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 1440
+      }
+    },
+    {
+      "key": "paperless.webhook_enabled",
+      "category": "paperless",
+      "value_type": "boolean",
+      "description": "Webhook-Endpunkt für Paperless-Workflows annehmen (Kopfzeile X-MHV-Webhook-Token muss dem Secret PAPERLESS_WEBHOOK_TOKEN entsprechen)",
+      "source": "Auftrag Paperless-ngx und Google Drive, 12.09.2026",
+      "schema": {
+        "type": "boolean"
+      }
+    },
+    {
+      "key": "paperless.import_new_documents",
+      "category": "paperless",
+      "value_type": "boolean",
+      "description": "In Paperless neu eingegangene Dokumente übernehmen (Download ins Eingangsobjekt oder in das im Feld Objekt genannte Objekt)",
+      "source": "Auftrag Paperless-ngx und Google Drive, 12.09.2026",
+      "schema": {
+        "type": "boolean"
+      }
+    },
+    {
+      "key": "paperless.max_upload_mb",
+      "category": "paperless",
+      "value_type": "integer",
+      "description": "Größte Datei in MB, die nach Paperless übertragen wird; größere erhalten einen Indexbeleg",
+      "source": "Auftrag Paperless-ngx und Google Drive, 12.09.2026",
+      "schema": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 2000
+      }
+    },
+    {
+      "key": "sync.drive_changes_enabled",
+      "category": "sync",
+      "value_type": "boolean",
+      "description": "Änderungsprotokoll von Google Drive (Changes-API) regelmäßig lesen und neue oder geänderte Dateien registrieren",
+      "source": "Auftrag Paperless-ngx und Google Drive, 12.09.2026",
+      "schema": {
+        "type": "boolean"
+      }
+    },
+    {
+      "key": "sync.drive_changes_interval_minutes",
+      "category": "sync",
+      "value_type": "integer",
+      "description": "Abstand des Drive-Änderungsabgleichs in Minuten",
+      "source": "Auftrag Paperless-ngx und Google Drive, 12.09.2026",
+      "schema": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 1440
+      }
+    },
+    {
+      "key": "sync.inbox_folder_name",
+      "category": "sync",
+      "value_type": "string",
+      "description": "Name des geschützten zentralen Eingangsordners in Drive für nicht zugeordnete Dokumente (Vorschlag, wird unter der Wurzel angelegt)",
+      "source": "Auftrag Paperless-ngx und Google Drive, 12.09.2026",
+      "schema": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 120
+      }
+    },
+    {
+      "key": "sync.inbox_folder_id",
+      "category": "sync",
+      "value_type": "string",
+      "description": "Folder-ID des Eingangsordners nach Einrichtung",
+      "source": "Auftrag Paperless-ngx und Google Drive, 12.09.2026",
+      "schema": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "nullable": true
+    },
+    {
+      "key": "sync.inbox_object_number",
+      "category": "sync",
+      "value_type": "string",
+      "description": "Objektnummer des technischen Eingangsobjekts (nur Ziffern)",
+      "source": "Auftrag Paperless-ngx und Google Drive, 12.09.2026",
+      "schema": {
+        "type": "string",
+        "pattern": "^[0-9]+$"
+      }
+    },
+    {
+      "key": "sync.assignment_auto_min",
+      "category": "sync",
+      "value_type": "decimal",
+      "description": "Mindestbewertung für eine automatische Objektzuordnung",
+      "source": "Auftrag Paperless-ngx und Google Drive, 12.09.2026",
+      "schema": {
+        "type": "number",
+        "minimum": 0.5,
+        "maximum": 1
+      }
+    },
+    {
+      "key": "sync.assignment_gap_min",
+      "category": "sync",
+      "value_type": "decimal",
+      "description": "Mindestabstand der Bewertung zum zweitbesten Kandidaten für eine automatische Zuordnung",
+      "source": "Auftrag Paperless-ngx und Google Drive, 12.09.2026",
+      "schema": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1
+      }
+    },
+    {
+      "key": "sync.rule_min_confirmations",
+      "category": "sync",
+      "value_type": "integer",
+      "description": "Anzahl bestätigter Beispiele mit gleicher Merkmalskombination, ab der eine Zuordnungsregel entsteht",
+      "source": "Auftrag Paperless-ngx und Google Drive, 12.09.2026",
+      "schema": {
+        "type": "integer",
+        "minimum": 2,
+        "maximum": 20
+      }
+    },
+    {
+      "key": "sync.operation_max_attempts",
+      "category": "sync",
+      "value_type": "integer",
+      "description": "Höchstzahl der Versuche je Synchronisationsoperation, danach sichtbar in der Fehlerliste",
+      "source": "Auftrag Paperless-ngx und Google Drive, 12.09.2026",
+      "schema": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 20
+      }
+    },
+    {
+      "key": "sync.inventory_page_size",
+      "category": "sync",
+      "value_type": "integer",
+      "description": "Paketgröße des Bestandslaufs (Dateien je Schritt)",
+      "source": "Auftrag Paperless-ngx und Google Drive, 12.09.2026",
+      "schema": {
+        "type": "integer",
+        "minimum": 20,
+        "maximum": 1000
+      }
     }
   ]
 }

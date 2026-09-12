@@ -3,6 +3,10 @@
 Alle Aufrufe mit supportsAllDrives und includeItemsFromAllDrives, Felderauswahl, Escaping in q, Paginierung bis leerer
 Token, Backoff und Ratenbegrenzung (apps.drive.backoff), Metrikzaehler, strukturierte Protokollzeilen ohne Inhalte und
 Token. Der HTTP-Transport ist injizierbar (Tests mit HttpMockSequence). Kein Aufruf loescht endgueltig.
+
+Synchronisation (12.09.2026): Aenderungsprotokoll ueber changes.getStartPageToken und changes.list (Cursor je
+Ablage), appProperties setzen, Export von Google-Dokumenten, Revisionsangaben (headRevisionId, version,
+sha256Checksum, driveId). Ein ungueltiger Cursor (404) wird als DriveCursorInvalid gemeldet.
 """
 
 from __future__ import annotations
@@ -16,18 +20,27 @@ from pathlib import Path
 from apps.drive.adapter import (
     FOLDER_MIME,
     AuthError,
+    ChangePage,
+    DriveChange,
+    DriveCursorInvalid,
     DriveNode,
     NotFound,
     PermanentError,
     RateLimited,
     TransientError,
+    normalize_app_properties,
+    revision_info,
     sort_deterministic,
 )
 from apps.drive.backoff import BackoffConfig, CallMetrics, RateLimiter, retry_call
 
 logger = logging.getLogger(__name__)
-FIELDS = "id, name, mimeType, parents, trashed, size, md5Checksum, sha256Checksum, modifiedTime, createdTime, shortcutDetails, appProperties"
+FIELDS = (
+    "id, name, mimeType, parents, trashed, size, md5Checksum, sha256Checksum, modifiedTime, createdTime, "
+    "shortcutDetails, appProperties, headRevisionId, version, driveId"
+)
 LIST_FIELDS = f"nextPageToken, files({FIELDS})"
+CHANGE_FIELDS = f"nextPageToken, newStartPageToken, changes(fileId, removed, time, driveId, file({FIELDS}))"
 PAGE_SIZE = 1000  # ANNAHME A-24: API-Hoechstwert zum Umsetzungszeitpunkt pruefen
 RETRY_REASONS = {"rateLimitExceeded", "userRateLimitExceeded", "backendError", "internalError"}
 NO_RETRY_403 = {
@@ -58,6 +71,22 @@ def _to_node(item: dict) -> DriveNode:
         created_time=item.get("createdTime", ""),
         shortcut_target_id=shortcut.get("targetId"),
         app_properties=dict(item.get("appProperties") or {}),
+        sha256=item.get("sha256Checksum"),
+        head_revision_id=item.get("headRevisionId"),
+        version=str(item["version"]) if item.get("version") is not None else None,
+        drive_id=item.get("driveId"),
+    )
+
+
+def _to_change(item: dict) -> DriveChange:
+    """Eintrag von changes.list; bei removed=True oder entfallenem Zugriff fehlt file."""
+    file_item = item.get("file")
+    return DriveChange(
+        file_id=item["fileId"],
+        removed=bool(item.get("removed", False)),
+        time=item.get("time", ""),
+        node=_to_node(file_item) if file_item else None,
+        drive_id=item.get("driveId") or (file_item or {}).get("driveId"),
     )
 
 
@@ -315,6 +344,105 @@ class GoogleDriveAdapter:
             yield node, list(path)
             if node.is_folder:
                 yield from self._walk(node.id, [*path, node.id])
+
+    # --- Synchronisation (12.09.2026) -----------------------------------------------------------
+    def start_page_token(self, drive_id: str | None = None) -> str:
+        """changes.getStartPageToken; driveId wie bei den Listenaufrufen aus der Konfiguration (drive.root_drive_id),
+        wenn kein Parameter uebergeben wird."""
+        params: dict = {"supportsAllDrives": True}
+        effective = drive_id or self.drive_id
+        if effective:
+            params["driveId"] = effective
+        result = self._execute(
+            "changes.getStartPageToken", self.service.changes().getStartPageToken(**params)
+        )
+        token = result.get("startPageToken")
+        if not token:
+            raise TransientError("changes.getStartPageToken lieferte keinen startPageToken")
+        return str(token)
+
+    def list_changes(
+        self, page_token: str, *, drive_id: str | None = None, page_size: int = 1000
+    ) -> ChangePage:
+        """Eine Seite von changes.list. Der Aufrufer folgt next_page_token, bis new_start_page_token vorliegt.
+        404 bedeutet abgelaufener oder ungueltiger Cursor und wird als DriveCursorInvalid gemeldet."""
+        params: dict = {
+            "pageToken": page_token,
+            "pageSize": page_size,
+            "includeItemsFromAllDrives": True,
+            "supportsAllDrives": True,
+            "includeRemoved": True,
+            "restrictToMyDrive": False,
+            "spaces": "drive",
+            "fields": CHANGE_FIELDS,
+        }
+        effective = drive_id or self.drive_id
+        if effective:
+            params["driveId"] = effective
+        try:
+            page = self._execute("changes.list", self.service.changes().list(**params))
+        except NotFound as exc:
+            raise DriveCursorInvalid(
+                f"Cursor des Aenderungsprotokolls ungueltig oder abgelaufen: {exc}",
+                status=exc.status,
+                reason=exc.reason,
+            ) from exc
+        return ChangePage(
+            changes=[_to_change(c) for c in page.get("changes", [])],
+            next_page_token=page.get("nextPageToken") or None,
+            new_start_page_token=page.get("newStartPageToken") or None,
+        )
+
+    def set_app_properties(self, file_id: str, properties: dict) -> DriveNode:
+        """files.update mit appProperties; None-Werte werden als null gesendet und entfernen den Schluessel."""
+        body = {"appProperties": normalize_app_properties(properties)}
+        return _to_node(
+            self._execute(
+                "files.update",
+                self.service.files().update(fileId=file_id, body=body, fields=FIELDS, supportsAllDrives=True),
+            )
+        )
+
+    def export(self, file_id: str, mime_type: str, target_path: Path) -> Path:
+        """files.export_media fuer Google-Dokumente in Bloecken wie download; andere Dateien sind nicht exportierbar."""
+        import io
+
+        from googleapiclient.http import MediaIoBaseDownload
+
+        node = self.get(file_id)
+        if node is None:
+            raise NotFound(f"{file_id} nicht gefunden", status=404, reason="notFound")
+        if not node.is_google_doc:
+            raise PermanentError(
+                f"{file_id} ist kein Google-Dokument ({node.mime_type}); export nicht moeglich, download verwenden",
+                status=403,
+                reason="fileNotExportable",
+            )
+        Path(target_path).parent.mkdir(parents=True, exist_ok=True)
+        with open(target_path, "wb") as fh:
+            buffer = io.BufferedWriter(fh)  # type: ignore[arg-type]
+            downloader = MediaIoBaseDownload(
+                buffer,
+                self.service.files().export_media(fileId=file_id, mimeType=mime_type),
+                chunksize=self.chunk_bytes,
+            )
+            done = False
+            while not done:
+                _status, done = retry_call(
+                    lambda: downloader.next_chunk(),
+                    config=self.backoff,
+                    sleep=self._sleep,
+                    metrics=self.metrics,
+                )
+            buffer.flush()
+        return Path(target_path)
+
+    def get_revision_info(self, file_id: str) -> dict:
+        """headRevisionId, version, modifiedTime, md5, sha256 und size aus files.get."""
+        node = self.get(file_id)
+        if node is None:
+            raise NotFound(f"{file_id} nicht gefunden", status=404, reason="notFound")
+        return revision_info(node)
 
 
 def build_service(credentials, http=None):

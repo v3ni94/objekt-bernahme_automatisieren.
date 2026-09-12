@@ -7,7 +7,7 @@ export DJANGO_SETTINGS_MODULE="${DJANGO_SETTINGS_MODULE:-objektakte.settings.tes
 $PY manage.py migrate --noinput
 # Rueckwaerts in Abhaengigkeitsreihenfolge, dann wieder vorwaerts
 # Fachtabellen zuerst (Django nimmt abhaengige Migrationen automatisch mit zurueck), danach Sicherheit und Konfiguration
-for app in requirements lists ai review imports pipeline drive documents parties objects appconfig audit mfa account accounts; do
+for app in sync requirements lists ai review imports pipeline drive documents parties objects appconfig audit mfa account accounts; do
   $PY manage.py migrate --noinput "$app" zero
 done
 $PY manage.py migrate --noinput

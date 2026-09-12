@@ -37,6 +37,7 @@ QUEUE_FOR = {
     JobType.CLASSIFY_AI: "ai",
     JobType.DECIDE: "classify",
     JobType.FILE_TO_DRIVE: "io",
+    JobType.ASSIGN_OBJECT: "io",
     JobType.LINK_SEGMENTS: "classify",
     JobType.GENERATE_LISTS: "lists",
     JobType.EVALUATE_COMPLETENESS: "classify",

@@ -205,6 +205,7 @@ def hash_document(job: ProcessingJob) -> dict:
         doc.size_bytes = size
         doc.status = "hashed"
         doc.save(update_fields=["sha256", "size_bytes", "status", "updated_at"])
+    _sync_hook("on_document_hashed", doc)
     elsewhere = (
         Document.objects.filter(sha256=digest, deleted_at__isnull=True)
         .exclude(object=doc.object)
@@ -216,6 +217,18 @@ def hash_document(job: ProcessingJob) -> dict:
     key = idempotency_key(JobType.ANALYZE_PAGES, job.object_id, digest)
     enqueue(JobType.ANALYZE_PAGES, job.object, key=key, document=doc, run=job.run)
     return result
+
+
+def _sync_hook(name: str, doc) -> None:
+    """Synchronisation Paperless und Drive (12.09.2026): Einhaengepunkt ohne Rueckwirkung auf die Pipeline."""
+    try:
+        from apps.sync import hooks
+
+        hooks.safe(name, doc)
+    except (
+        Exception
+    ):  # Import- oder Konfigurationsfehler der Synchronisation duerfen die Pipeline nicht stoppen
+        logger.exception("Synchronisations-Hook %s nicht ausfuehrbar", name)
 
 
 # ---------------------------------------------------------------- 3 analyze_pages
@@ -766,6 +779,23 @@ def decide_task(job: ProcessingJob) -> dict:
         s3.status = "lease_facts"
     dry_run = bool(job.run and job.run.dry_run)
     decision = decide_mod.decide(ctx, s1, s2, doc, s3=s3)
+    if getattr(job.object, "is_system_inbox", False):
+        # Eingangsobjekt (Synchronisation): nur Kategorie und Art festhalten, keine Faelle, keine Akten, keine
+        # Ablage; die Objektzuordnung folgt als eigener Job und uebernimmt das Dokument in das Zielobjekt.
+        decision.cases = []
+        decision.links = []
+        decision.segments = []
+        decision.move_allowed = False
+        final = decide_mod.persist(doc, ctx, s1, s2, decision, run=job.run, dry_run=dry_run)
+        if not dry_run:
+            enqueue(
+                JobType.ASSIGN_OBJECT,
+                job.object,
+                key=idempotency_key(JobType.ASSIGN_OBJECT, job.object_id, doc.sha256),
+                document=doc,
+                run=job.run,
+            )
+        return {"category": decision.category, "document_type": decision.document_type, "inbox": True}
     final = decide_mod.persist(doc, ctx, s1, s2, decision, run=job.run, dry_run=dry_run)
     result = {
         "category": decision.category,
@@ -960,6 +990,7 @@ def file_to_drive(job: ProcessingJob) -> dict:
         )
     finally:
         cache.delete(lock_key)
+    _sync_hook("on_document_filed", doc)
     return {"action": action, "target": target.drive_file_id, "target_name": target.drive_name}
 
 
