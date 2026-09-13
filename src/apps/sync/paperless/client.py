@@ -486,6 +486,7 @@ class PaperlessClient:
         ordering: str,
         fields: Iterable[str] | None,
         custom_field: tuple[str, str] | None = None,
+        storage_path: int | None = None,
     ) -> dict:
         return {
             "modified__gt": _iso(modified_after),
@@ -493,6 +494,7 @@ class PaperlessClient:
             "ordering": ordering,
             "fields": ",".join(fields) if fields else None,
             "custom_field_query": custom_field_query(*custom_field) if custom_field else None,
+            "storage_path__id": int(storage_path) if storage_path is not None else None,
         }
 
     def iter_pages(
@@ -506,16 +508,18 @@ class PaperlessClient:
         page_size: int | None = None,
         start_page: int = 1,
         custom_field: tuple[str, str] | None = None,
+        storage_path: int | None = None,
     ) -> Iterator[Page]:
         """Seitenweise Dokumentliste mit Seitennummer, damit ein Inventar nach Abbruch fortgesetzt werden kann.
         custom_field=(Feldname, Wert) begrenzt auf Dokumente mit genau diesem Wert im benutzerdefinierten Feld
-        (custom_field_query, ab Paperless-ngx 2.13)."""
+        (custom_field_query, ab Paperless-ngx 2.13); storage_path auf Dokumente eines Speicherpfads."""
         params = self._document_params(
             modified_after=modified_after,
             added_after=added_after,
             ordering=ordering,
             fields=fields,
             custom_field=custom_field,
+            storage_path=storage_path,
         )
         size = int(page_size or self.page_size)
         if ids is None:
@@ -541,6 +545,7 @@ class PaperlessClient:
         fields: Iterable[str] | None = None,
         page_size: int | None = None,
         custom_field: tuple[str, str] | None = None,
+        storage_path: int | None = None,
     ) -> Iterator[dict]:
         """Alle Dokumente der Filterung, Seite fuer Seite nachgeladen, bis next leer ist."""
         for page in self.iter_pages(
@@ -551,6 +556,7 @@ class PaperlessClient:
             fields=fields,
             page_size=page_size,
             custom_field=custom_field,
+            storage_path=storage_path,
         ):
             yield from page.results
 
@@ -794,6 +800,14 @@ class PaperlessClient:
 
     def list_correspondents(self) -> list[dict]:
         return self._list_all("/api/correspondents/")
+
+    def list_storage_paths(self) -> list[dict]:
+        """Alle Speicherpfade (id, name, path, document_count). Auf grossen Instanzen kann die Liste wegen der
+        Dokumentzaehler laenger dauern; der Aufrufer sollte das Ergebnis zwischenspeichern."""
+        return self._list_all("/api/storage_paths/", {"ordering": "name"})
+
+    def get_storage_path(self, storage_path_id: int) -> dict:
+        return self._get_json(f"/api/storage_paths/{int(storage_path_id)}/")
 
 
 def _header(response: requests.Response, name: str) -> str | None:

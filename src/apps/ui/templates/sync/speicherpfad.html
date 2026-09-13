@@ -1,0 +1,21 @@
+{% extends "base.html" %}{% load perms %}{% block title %}Speicherpfad {{ pk }} · {{ APP_NAME }}{% endblock %}
+{% block content %}<h1>Speicherpfad {% if plan %}„{{ plan.path_name }}“{% else %}{{ pk }}{% endif %}</h1>
+{% if error %}<p class="warnung">{{ error }}</p>{% endif %}
+{% if plan %}
+<div class="raster">
+<div class="karte"><h2>Vorschau</h2>
+<table><tr><td>Objekt</td><td><a href="{% url 'object_detail' plan.object.pk %}">{{ plan.object.object_number }} {{ plan.object.name }}</a></td></tr>
+<tr><td>Dokumente im Pfad</td><td>{{ plan.total }}</td></tr>
+<tr><td>ohne Feld {{ field_names.object }}</td><td>{{ plan.missing|length }} <span class="klein">werden auf {{ plan.object.object_number }} gesetzt</span></td></tr>
+<tr><td>bereits {{ plan.object.object_number }}</td><td>{{ plan.same|length }} <span class="klein">bleiben unverändert</span></td></tr>
+<tr><td>abweichender Wert</td><td>{{ plan.other|length }} <span class="klein">bleiben unverändert, siehe unten</span></td></tr></table>
+<form method="post" action="{% url 'sync_storage_path' pk %}">{% csrf_token %}<p class="aktionen">{% if writes_allowed %}<button type="submit" name="aktion" value="fuellen" onclick="return confirm('Feld {{ field_names.object }} bei {{ plan.missing|length }} Dokumenten auf {{ plan.object.object_number }} setzen und den Bestandslauf für dieses Objekt starten?')">Feld setzen und übernehmen</button>{% else %}<span class="warnung">Objekt außerhalb des Modus oder Pilotumfangs (paperless.mode), keine Befüllung</span>{% endif %} <a class="knopf" href="{% url 'sync_storage_paths' %}">Zurück</a></p></form>
+<p class="klein">Nach dem Setzen meldet der Paperless-Workflow „Dokument aktualisiert“ jedes Dokument an den Webhook; zusätzlich läuft ein echter Bestandslauf nur für die Objektnummer {{ plan.object.object_number }}. Beides zusammen übernimmt die Dokumente in das Objekt und nach Drive; doppelte Einreihungen sind unschädlich.</p></div>
+<div class="karte"><h2>Stand</h2>
+{% if state %}<table><tr><td>Status</td><td>{{ state.status }}</td></tr><tr><td>gesetzt</td><td>{{ state.set|default:0 }} von {{ state.missing|default:0 }}</td></tr><tr><td>abweichend</td><td>{{ state.other|default:0 }}</td></tr>{% if state.inventory_run_id %}<tr><td>Bestandslauf</td><td><a href="{% url 'sync_inventory' state.inventory_run_id %}">{{ state.inventory_run_id }}</a></td></tr>{% endif %}{% if state.inventory_error %}<tr><td>Bestandslauf</td><td class="warnung">{{ state.inventory_error }}</td></tr>{% endif %}{% if state.error %}<tr><td>Fehler</td><td class="warnung">{{ state.error }}</td></tr>{% endif %}<tr><td>Zeit</td><td class="klein">{{ state.started_at|default:state.queued_at|default:"" }} bis {{ state.finished_at|default:"läuft" }}</td></tr></table>{% else %}<p class="klein">noch keine Befüllung für diesen Pfad</p>{% endif %}</div>
+</div>
+{% if other_rows %}<div class="karte"><h2>Abweichende Werte (höchstens 50)</h2>
+<table class="voll"><thead><tr><th>Paperless-ID</th><th>Wert im Feld {{ field_names.object }}</th></tr></thead><tbody>{% for doc_id, value in other_rows %}<tr><td class="mono">{{ doc_id }}</td><td>{{ value }}</td></tr>{% endfor %}</tbody></table>
+<p class="klein">Diese Dokumente werden nicht verändert. Prüfen Sie in Paperless, ob der Wert oder der Speicherpfad stimmt.</p></div>{% endif %}
+{% endif %}
+{% endblock %}

@@ -244,11 +244,14 @@ class FakePaperless:
         ids: Iterable[int] | None,
         ordering: str,
         custom_field: tuple[str, str] | None = None,
+        storage_path: int | None = None,
     ) -> list[dict]:
         docs = list(self.documents.values())
         if ids is not None:
             wanted = {int(i) for i in ids}
             docs = [d for d in docs if d["id"] in wanted]
+        if storage_path is not None:
+            docs = [d for d in docs if d.get("storage_path") == int(storage_path)]
         if custom_field is not None:
             field_name, value = custom_field
             field = next(
@@ -285,6 +288,7 @@ class FakePaperless:
         page_size: int | None = None,
         start_page: int = 1,
         custom_field: tuple[str, str] | None = None,
+        storage_path: int | None = None,
     ) -> Iterator[Page]:
         self._record(
             "iter_pages",
@@ -295,6 +299,7 @@ class FakePaperless:
             page_size=page_size,
             start_page=start_page,
             custom_field=None if custom_field is None else tuple(custom_field),
+            storage_path=storage_path,
         )
         ids_list = None if ids is None else [int(i) for i in ids]
         docs = self._filtered(
@@ -303,6 +308,7 @@ class FakePaperless:
             ids=ids_list,
             ordering=ordering,
             custom_field=custom_field,
+            storage_path=storage_path,
         )
         size = int(page_size or self.page_size)
         field_list = list(fields) if fields else None
@@ -334,6 +340,7 @@ class FakePaperless:
         fields: Iterable[str] | None = None,
         page_size: int | None = None,
         custom_field: tuple[str, str] | None = None,
+        storage_path: int | None = None,
     ) -> Iterator[dict]:
         self._record(
             "list_documents", modified_after=modified_after, added_after=added_after, ordering=ordering
@@ -346,6 +353,7 @@ class FakePaperless:
             fields=fields,
             page_size=page_size,
             custom_field=custom_field,
+            storage_path=storage_path,
         ):
             yield from page.results
 
@@ -696,6 +704,32 @@ class FakePaperless:
         self._record("get_correspondent", correspondent_id)
         row = self.correspondents.get(int(correspondent_id))
         return deepcopy(row) if row else None
+
+    def create_storage_path(self, name: str, path: str | None = None) -> dict:
+        self._record("create_storage_path", name)
+        return self._create_named(self.storage_paths, "storage_path", name, path=path or name)
+
+    def list_storage_paths(self) -> list[dict]:
+        self._record("list_storage_paths")
+        rows = []
+        for row in sorted(self.storage_paths.values(), key=lambda r: r["name"].casefold()):
+            out = deepcopy(row)
+            out["document_count"] = sum(
+                1 for d in self.documents.values() if d.get("storage_path") == row["id"]
+            )
+            rows.append(out)
+        return rows
+
+    def get_storage_path(self, storage_path_id: int) -> dict:
+        self._record("get_storage_path", storage_path_id)
+        row = self.storage_paths.get(int(storage_path_id))
+        if row is None:
+            raise PaperlessNotFound(
+                f"Paperless GET /api/storage_paths/{storage_path_id}/: HTTP 404", status_code=404
+            )
+        out = deepcopy(row)
+        out["document_count"] = sum(1 for d in self.documents.values() if d.get("storage_path") == row["id"])
+        return out
 
     def list_correspondents(self) -> list[dict]:
         self._record("list_correspondents")

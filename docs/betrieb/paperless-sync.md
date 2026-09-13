@@ -209,15 +209,21 @@ Start auf `/verwaltung/sync/` (Bestandslauf starten, POST `/verwaltung/sync/best
 
 Empfohlene Abfolge im Pilot: Modus readonly, Trockenlauf Paperless und Drive, Manifest sichten; Modus pilot mit Pilotobjekten und Hauptschalter an; echter Drive-Lauf für die Pilotobjekte; Fehlerwarteschlange und Dokumenteneingang prüfen; erst danach Umfang erweitern.
 
-### 6.1 Altbestand aus Paperless je Objekt übernehmen
+### 6.1 Altbestand aus Paperless je Objekt übernehmen (Seite Speicherpfade)
 
-Reihenfolge je Objekt, jeweils erst das nächste Objekt, wenn das vorige sauber durch ist:
+Seite `/verwaltung/sync/speicherpfade/` (Recht `sync.manage`, Link auf der Paperless-Seite bei Bestandslauf). Die Anwendung liest die Speicherpfade aus Paperless (`GET /api/storage_paths/`, mit Dokumentzählern, Zwischenspeicher im Cursor `storage_paths` für eine Stunde, „Speicherpfade neu lesen“ liest frisch), nimmt den führenden Zahlenblock des Pfadnamens als Objektnummer („82 – Shalomweg 3, Hückelhoven“ ergibt 82, „082 Ratheim“ ebenfalls) und prüft, ob dazu ein aktives Objekt in der Anwendung existiert. Pfade ohne führende Nummer (Holding, Steuer, Privat) oder ohne angelegtes Objekt sind in der Tabelle sichtbar, aber ohne Aktion.
 
-1. Objekt in der Anwendung anlegen (Objektübernahme aus Drive) und warten, bis der Ordnerabgleich durch ist. Ohne Objekt in der Anwendung bleibt jedes Paperless-Dokument mit dieser Nummer `out_of_scope`.
-2. In Paperless die Dokumente des Objekts filtern (in der Regel über den Speicherpfad), alle auswählen und über die Massenbearbeitung das Zusatzfeld MHV Objekt mit der Objektnummer als Zahl setzen (zum Beispiel `82`, ohne Zusatz). Der Wert muss der Objektnummer entsprechen; die Anwendung nimmt den ersten Zahlenblock.
-3. Was danach automatisch passiert: Der Paperless-Workflow „Dokument aktualisiert“ meldet jede Änderung an den Webhook, die Anwendung reiht je Dokument eine Übernahme ein (`paperless_pull`), lädt das Original, legt es im Objekt ab, führt es durch die Pipeline und schreibt Tag, UUID und Zuordnung nach Paperless zurück. Zusätzlich greift der regelmäßige Abgleich über `modified`, sofern Paperless bei der Massenbearbeitung das Änderungsdatum fortschreibt.
-4. Kontrolle nach einigen Minuten auf `/verwaltung/sync/`: Zähler der Operationen, Fehlerwarteschlange, Verknüpfungen `paperless:synced`. Fehlen Dokumente, Bestandslauf Art Paperless mit der Objektnummer im Feld Umfang starten, zuerst als Trockenlauf (Manifest zeigt je Dokument `import_new`, `link_existing`, `out_of_scope` mit Grund), dann als echter Lauf. Der Lauf liest nur die Dokumente mit dieser Nummer im Feld und ist damit auch bei großem Gesamtbestand in Minuten durch.
-5. Review Center und Dokumenteneingang prüfen: Dokumente ohne eindeutige Kategorie warten dort auf eine Entscheidung; nichts wird gelöscht oder überschrieben.
+Reihenfolge je Objekt:
+
+1. Objekt in der Anwendung anlegen (Objektübernahme aus Drive) und den Ordnerabgleich abwarten. Ohne Objekt bleibt der Pfad in der Tabelle als „kein aktives Objekt“ stehen.
+2. Auf der Seite Speicherpfade beim Pfad des Objekts „Vorschau“ öffnen. Die Vorschau liest nur `id` und `custom_fields` der Dokumente des Pfads (`storage_path__id`) und teilt sie ein: ohne Feld MHV Objekt (werden gesetzt), bereits mit dieser Nummer (bleiben), abweichender Wert (bleiben unverändert, werden mit Paperless-ID gelistet). Die Vorschau schreibt nichts.
+3. „Feld setzen und übernehmen“ (Bestätigung). Die Anwendung setzt das Feld MHV Objekt per `bulk_edit modify_custom_fields` in Paketen von 100 Dokumenten auf die geführte Objektnummer, nur bei Dokumenten ohne Wert, und startet danach einen echten Bestandslauf mit Umfang genau dieser Objektnummer. Im Betrieb läuft das als Celery-Aufgabe `sync.storage_path_fill` (Warteschlange io); der Stand je Pfad (queued, running, done, failed, gesetzt x von y, Bestandslauf-Nr., Fehler) steht in der Tabelle und auf der Vorschauseite (Cursor `field_fill:<Pfad-ID>`), Protokoll `sync.paperless_field_fill` am Objekt.
+4. Was danach automatisch passiert: Der Paperless-Workflow „Dokument aktualisiert“ meldet jede Feldänderung an den Webhook, der Bestandslauf reiht dieselben Dokumente ein (doppelte Einreihungen sind unschädlich, verknüpfte Dokumente werden nur verglichen). Jedes Dokument wird geladen, im Objekt abgelegt, durch die Pipeline geführt und mit Tag, UUID und Zuordnung nach Paperless zurückgeschrieben.
+5. Kontrolle auf `/verwaltung/sync/`: Bestandslauf `done` und `complete`, Fehlerwarteschlange, Verknüpfungen `paperless:synced`; Review Center für Dokumente ohne eindeutige Kategorie.
+
+Grenzen und Schutz: Vorhandene Werte im Feld werden nie überschrieben, auch nicht bei abweichender Nummer. Befüllung nur mit Hauptschalter an und `writes_allowed` für das Objekt (Modus `full`, oder `pilot` mit der Nummer im Pilotumfang). Bricht Paperless während der Pakete ab, steht der Pfad auf `failed` mit der Zahl der bereits gesetzten Dokumente; ein erneuter Klick setzt nur die restlichen. Der Pfadname muss mit der Nummer beginnen; ein Pfad wie „2024 Jahresabschluss“ ergibt die Nummer 2024 und bleibt ohne Objekt dieser Nummer ohne Aktion.
+
+Ohne Speicherpfad mit Nummer bleibt der Weg von Hand: in Paperless filtern, Massenbearbeitung Zusatzfeld MHV Objekt auf die Objektnummer setzen (Wert als Zahl, erster Zahlenblock zählt), dann Bestandslauf Art Paperless mit der Nummer im Feld Umfang (Trockenlauf, dann echt).
 
 Nicht nötig: `paperless.pilot_object_numbers` pflegen (im Modus `full` ohne Wirkung), Cursor zurücksetzen, den vollständigen Bestandslauf ohne Umfang wiederholen.
 

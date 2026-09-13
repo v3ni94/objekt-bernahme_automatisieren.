@@ -1,0 +1,18 @@
+{% extends "base.html" %}{% load perms %}{% block title %}Speicherpfade · {{ APP_NAME }}{% endblock %}
+{% block content %}<h1>Speicherpfade in Paperless <span class="klein">Altbestand je Objekt zuordnen</span></h1>
+<p class="hinweis">Der führende Zahlenblock eines Speicherpfads („82 – Shalomweg 3“) wird als Objektnummer gelesen und mit den aktiven Objekten der Anwendung abgeglichen. Für einen zugeordneten Pfad setzt „Feld setzen und übernehmen“ das Feld {{ field_names.object }} bei allen Dokumenten ohne Wert in einem Zug (ohne Download) und startet danach den Bestandslauf für dieses Objekt. Vorhandene Werte werden nie überschrieben; abweichende Werte bleiben als Befund sichtbar. Pfade ohne führende Nummer oder ohne angelegtes Objekt bleiben unberührt.</p>
+{% if not enabled %}<p class="warnung">Hauptschalter paperless.enabled ist aus; Befüllung nicht möglich.</p>{% endif %}
+<div class="karte">
+<p>{{ rows|length }} Speicherpfade, davon {{ matched_count }} einem Objekt zugeordnet ({{ matched_docs }} von {{ total_docs }} Dokumenten). <span class="klein">gelesen {{ read_at|default:"noch nicht" }}, Modus {{ mode }}</span></p>
+<form method="post" action="{% url 'sync_storage_paths' %}" class="inline">{% csrf_token %}<p class="aktionen"><button type="submit" name="aktion" value="neu_lesen">Speicherpfade neu lesen</button> <a class="knopf" href="{% url 'sync_admin' %}">Zurück</a></p></form>
+<table class="voll"><thead><tr><th>Speicherpfad</th><th>Dokumente</th><th>Nummer</th><th>Objekt</th><th>Stand</th><th></th></tr></thead><tbody>
+{% for r in rows %}<tr>
+<td>{{ r.name }}<br><span class="mono klein">{{ r.path }}</span></td>
+<td>{{ r.document_count }}</td>
+<td>{{ r.number|default:"" }}</td>
+<td>{% if r.object %}<a href="{% url 'object_detail' r.object.pk %}">{{ r.object.object_number }} {{ r.object.name }}</a>{% elif r.number %}<span class="ampel gelb">kein aktives Objekt {{ r.number }}</span>{% else %}<span class="klein">ohne Objektnummer</span>{% endif %}</td>
+<td class="klein">{% if r.state %}{{ r.state.status }}{% if r.state.set is not None %}, gesetzt {{ r.state.set }}{% endif %}{% if r.state.other %}, abweichend {{ r.state.other }}{% endif %}{% if r.state.inventory_run_id %}, <a href="{% url 'sync_inventory' r.state.inventory_run_id %}">Bestandslauf {{ r.state.inventory_run_id }}</a>{% endif %}{% if r.state.error %}<br><span class="warnung">{{ r.state.error }}</span>{% endif %}{% else %}offen{% endif %}</td>
+<td>{% if r.object %}<a class="knopf" href="{% url 'sync_storage_path' r.id %}">Vorschau</a>{% endif %}</td>
+</tr>{% empty %}<tr><td colspan="6">keine Speicherpfade gelesen</td></tr>{% endfor %}
+</tbody></table></div>
+{% endblock %}

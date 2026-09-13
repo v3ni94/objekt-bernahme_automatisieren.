@@ -53,6 +53,19 @@ def inventory_step_task(run_id: int) -> dict:
     return result
 
 
+@shared_task(name="sync.storage_path_fill", queue="io", soft_time_limit=1500, time_limit=1620)
+def storage_path_fill_task(path_id: int, user_id: int | None = None) -> dict:
+    from django.contrib.auth import get_user_model
+
+    from apps.sync import storage_paths
+
+    user = get_user_model().objects.filter(pk=user_id).first() if user_id else None
+    try:
+        return storage_paths.fill(int(path_id), user=user)
+    except storage_paths.StoragePathError as exc:
+        return {"status": "failed", "error": str(exc)}
+
+
 @shared_task(name="sync.derive_rules", queue="io")
 def derive_rules_task() -> dict:
     from apps.sync.assignment import learning

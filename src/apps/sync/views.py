@@ -22,7 +22,7 @@ from apps.config import store
 from apps.documents.models import Document
 from apps.objects.models import ManagedObject
 from apps.review.models import CaseStatus, CaseType, ReviewCase
-from apps.sync import config, inbox, inventory, operations, services
+from apps.sync import config, inbox, inventory, operations, services, storage_paths
 from apps.sync.models import (
     Disposition,
     ExternalLink,
@@ -296,6 +296,84 @@ def inventory_start(request):
         request, f"Bestandslauf {run.pk} ({kind}, {'Trockenlauf' if dry_run else 'echter Lauf'}) gestartet."
     )
     return redirect("sync_inventory", pk=run.pk)
+
+
+# ---------------------------------------------------------------- Speicherpfade (Altbestand je Objekt)
+@permission_required("sync.manage")
+def storage_paths_list(request):
+    """Speicherpfade aus Paperless mit abgeleiteter Objektnummer und Stand der Feldbefuellung. GET liest aus dem
+    Zwischenspeicher, POST neu_lesen liest frisch aus Paperless."""
+    refresh = request.method == "POST" and request.POST.get("aktion") == "neu_lesen"
+    rows: list = []
+    read_at = None
+    try:
+        rows, read_at = storage_paths.overview(refresh=refresh)
+    except storage_paths.StoragePathError as exc:
+        messages.error(request, str(exc))
+    if refresh:
+        return redirect("sync_storage_paths")
+    matched = [r for r in rows if r.matched]
+    return render(
+        request,
+        "sync/speicherpfade.html",
+        {
+            "NAV_ACTIVE": "sync",
+            "rows": rows,
+            "read_at": read_at,
+            "matched_count": len(matched),
+            "matched_docs": sum(r.document_count for r in matched),
+            "total_docs": sum(r.document_count for r in rows),
+            "field_names": config.field_names(),
+            "mode": config.mode(),
+            "enabled": config.enabled(),
+        },
+    )
+
+
+@permission_required("sync.manage")
+def storage_path_detail(request, pk: int):
+    """Vorschau je Speicherpfad (ohne Wert, gleicher Wert, abweichender Wert) und Start der Befuellung."""
+    if request.method == "POST" and request.POST.get("aktion") == "fuellen":
+        try:
+            result = storage_paths.dispatch_fill(pk, user=request.user, request=request)
+        except storage_paths.StoragePathError as exc:
+            messages.error(request, str(exc))
+            return redirect("sync_storage_path", pk=pk)
+        if result is None:
+            messages.success(
+                request, f"Feldbefüllung für Speicherpfad {pk} eingereiht; Stand auf dieser Seite."
+            )
+        else:
+            text = f"Feld {config.field_names().object} bei {result['set']} Dokumenten gesetzt"
+            if result.get("other"):
+                text += f", {result['other']} mit abweichendem Wert unverändert"
+            if result.get("inventory_run_id"):
+                text += f"; Bestandslauf {result['inventory_run_id']} gestartet"
+            elif result.get("inventory_error"):
+                text += f"; Bestandslauf nicht gestartet: {result['inventory_error']}"
+            messages.success(request, text + ".")
+        return redirect("sync_storage_paths")
+    fill_plan = None
+    error = None
+    try:
+        fill_plan = storage_paths.plan(pk)
+    except storage_paths.StoragePathError as exc:
+        error = str(exc)
+    state = storage_paths.states().get(int(pk), {})
+    return render(
+        request,
+        "sync/speicherpfad.html",
+        {
+            "NAV_ACTIVE": "sync",
+            "pk": pk,
+            "plan": fill_plan,
+            "error": error,
+            "state": state,
+            "field_names": config.field_names(),
+            "writes_allowed": bool(fill_plan and config.writes_allowed(fill_plan.object)),
+            "other_rows": sorted(fill_plan.other.items())[:50] if fill_plan else [],
+        },
+    )
 
 
 @permission_required("sync.manage")

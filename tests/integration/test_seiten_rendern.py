@@ -25,6 +25,7 @@ SEITEN = [
     "drive_admin",
     "takeover_sources",
     "sync_admin",
+    "sync_storage_paths",
     "inbox_list",
 ]
 

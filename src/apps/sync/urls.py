@@ -13,6 +13,8 @@ urlpatterns = [
     path("verwaltung/sync/bestand/starten/", views.inventory_start, name="sync_inventory_start"),
     path("verwaltung/sync/bestand/<int:pk>/", views.inventory_detail, name="sync_inventory"),
     path("verwaltung/sync/bestand/<int:pk>/aktion/", views.inventory_action, name="sync_inventory_action"),
+    path("verwaltung/sync/speicherpfade/", views.storage_paths_list, name="sync_storage_paths"),
+    path("verwaltung/sync/speicherpfade/<int:pk>/", views.storage_path_detail, name="sync_storage_path"),
     path("eingang/", views.inbox_list, name="inbox_list"),
     path("eingang/objekte.json", views.objects_json, name="inbox_objects_json"),
 ]
