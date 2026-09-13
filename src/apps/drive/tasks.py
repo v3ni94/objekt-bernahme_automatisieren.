@@ -206,6 +206,21 @@ def trigger_object_folders(
     return "queued"
 
 
+@shared_task(name="drive.takeover_all", queue="io", soft_time_limit=21600, time_limit=21900)
+def takeover_all_task(user_id: int | None = None) -> dict:
+    """„Alles aufarbeiten“: alle Altbestand-Quellordner mit Objekt nacheinander uebernehmen."""
+    from django.contrib.auth import get_user_model
+
+    from apps.drive import takeover
+
+    user = get_user_model().objects.filter(pk=user_id).first() if user_id else None
+    try:
+        return takeover.run_all(user=user)
+    except takeover.TakeoverError as exc:
+        takeover._set_all_state({"status": "failed", "error": str(exc)})
+        return {"status": "failed", "error": str(exc)}
+
+
 @shared_task(name="drive.auto_cleanup", queue="io", soft_time_limit=1500, time_limit=1620)
 def auto_cleanup_task(object_id: int, trigger: str = "run") -> dict:
     """Nachraeumen des Objektordners und der aufgearbeiteten Quellordner nach einem Verarbeitungslauf."""

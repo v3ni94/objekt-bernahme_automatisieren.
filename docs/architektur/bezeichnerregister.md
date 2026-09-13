@@ -1880,6 +1880,7 @@ Celery-Queues aus den Settings: `ai`, `classify`, `io`, `lists`, `ocr`
 | drive.create_folder | Ordner in Drive angelegt |
 | drive.upload | Datei nach Drive hochgeladen |
 | drive.takeover | Bestand aus Drive-Ordner übernommen |
+| drive.takeover_all | Alle Altbestand-Ordner mit Objekt nacheinander aufgearbeitet |
 | drive.takeover_source_add | Altbestand-Ordner in die Tabelle aufgenommen |
 | drive.takeover_source_remove | Altbestand-Ordner aus der Tabelle entfernt |
 | drive.takeover_source_prune | Altbestand-Ordner aus der Tabelle entfernt (in Drive nicht mehr vorhanden oder leer) |
@@ -1888,6 +1889,7 @@ Celery-Queues aus den Settings: `ai`, `classify`, `io`, `lists`, `ocr`
 | drive.trash_failed | Verschieben in den Drive-Papierkorb fehlgeschlagen |
 | document.ingest | Dokument hochgeladen (Upload in die Verarbeitung) |
 | processing.start | Verarbeitungslauf angefordert |
+| processing.start_all | Verarbeitungsläufe für alle Objekte mit offener Arbeit eingereiht |
 | processing.sweep | Sweeper manuell ausgeführt |
 | document.view | Dokument aus Eigentümerakte angesehen (nur bei security.log_document_views) |
 | document.download | Dokument aus Eigentümerakte heruntergeladen (nur bei security.log_document_views) |

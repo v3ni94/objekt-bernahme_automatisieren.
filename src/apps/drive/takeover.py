@@ -19,7 +19,7 @@ from django.utils import timezone
 from apps.audit.services import record
 from apps.config import store
 from apps.documents.models import Document
-from apps.drive.adapter import DriveAdapter, DriveNode, sort_deterministic
+from apps.drive.adapter import DriveAdapter, DriveError, DriveNode, sort_deterministic
 from apps.objects.models import ManagedObject
 from apps.pipeline.jobs import JobType, enqueue, idempotency_key, send
 from apps.pipeline.models import ProcessingRun, RunStatus, RunType
@@ -857,3 +857,129 @@ def run_source(src, drive: DriveAdapter, *, user=None, request=None) -> Takeover
         ]
     )
     return result
+
+
+# ---------------------------------------------------------------- Alles aufarbeiten (13.09.2026)
+ALL_STATE_KEY = "takeover_all:state"
+ALL_LOCK_KEY = "takeover_all:lock"
+ALL_STATE_SECONDS = 7 * 24 * 3600
+
+
+def all_state() -> dict:
+    return dict(cache.get(ALL_STATE_KEY) or {})
+
+
+def _set_all_state(state: dict) -> None:
+    cache.set(ALL_STATE_KEY, dict(state), timeout=ALL_STATE_SECONDS)
+
+
+def runnable_sources() -> list:
+    """Quellordner mit zugeordnetem, nicht archiviertem Objekt, in Anzeigereihenfolge (Nummer, Name)."""
+    from apps.drive.models import TakeoverSource
+
+    return sorted_sources(
+        TakeoverSource.objects.filter(object__isnull=False, object__deleted_at__isnull=True).select_related(
+            "object"
+        )
+    )
+
+
+def run_all(*, user=None, request=None, dry_run: bool = False) -> dict:
+    """„Alles aufarbeiten“: alle Quellordner mit Objekt nacheinander wie „Aufarbeiten“ je Zeile. Ein Fehler eines
+    Ordners haelt die anderen nicht an; Ordner, deren Objekt gerade gesperrt ist (Uebernahme oder Nachraeumen),
+    kommen am Ende noch einmal an die Reihe. Bereits registrierte Dateien werden uebersprungen, in Drive wird
+    nichts geloescht. Stand im Cache (takeover_all:state), Protokoll drive.takeover_all."""
+    sources = runnable_sources()
+    summary: dict = {
+        "status": "running",
+        "dry_run": dry_run,
+        "started_at": timezone.now().isoformat(),
+        "total": len(sources),
+        "done": 0,
+        "registered": 0,
+        "skipped": 0,
+        "runs": [],
+        "errors": [],
+        "current": None,
+        "per_source": [
+            {
+                "id": s.pk,
+                "name": s.name or s.drive_folder_id,
+                "object_number": s.object.object_number,
+                "status": s.status,
+                "files_registered": s.files_registered,
+            }
+            for s in sources
+        ],
+    }
+    if dry_run:
+        summary["status"] = "done"
+        summary["finished_at"] = timezone.now().isoformat()
+        return summary
+    from apps.drive import oauth
+
+    drive = oauth.get_adapter()
+    if drive is None:
+        raise TakeoverError("Keine Google-Verbindung.")
+    if not cache.add(ALL_LOCK_KEY, "1", timeout=6 * 3600):
+        raise TakeoverError("„Alles aufarbeiten“ läuft bereits; Stand auf der Altbestand-Seite.")
+    try:
+        _set_all_state(summary)
+        queue = list(sources)
+        retried: set[int] = set()
+        while queue:
+            src = queue.pop(0)
+            summary["current"] = src.name or src.drive_folder_id
+            _set_all_state(summary)
+            try:
+                result = run_source(src, drive, user=user, request=request)
+            except TakeoverError as exc:
+                text = str(exc)
+                if "läuft gerade" in text and src.pk not in retried:
+                    retried.add(src.pk)
+                    queue.append(src)  # spaeter noch einmal, wenn die Objektsperre frei ist
+                    continue
+                summary["errors"].append(f"{src.name or src.drive_folder_id}: {text}")
+                continue
+            except DriveError as exc:
+                summary["errors"].append(f"{src.name or src.drive_folder_id}: Drive-Fehler {exc}")
+                continue
+            summary["done"] += 1
+            summary["registered"] += result.registered
+            summary["skipped"] += (
+                result.skipped_registered + result.skipped_shortcuts + result.skipped_ignored
+            )
+            if result.run_id and result.run_id not in summary["runs"]:
+                summary["runs"].append(result.run_id)
+            _set_all_state(summary)
+        summary["current"] = None
+        summary["status"] = "done"
+        summary["finished_at"] = timezone.now().isoformat()
+        _set_all_state(summary)
+        record(
+            "drive.takeover_all",
+            entity_type="takeover_source",
+            request=request,
+            actor=user,
+            after={k: v for k, v in summary.items() if k != "per_source"},
+        )
+    finally:
+        cache.delete(ALL_LOCK_KEY)
+    return summary
+
+
+def dispatch_run_all(*, user=None, request=None) -> dict | None:
+    """Sammelaufarbeitung im Hintergrund (Celery, Warteschlange io) oder sofort ohne Celery."""
+    from django.conf import settings
+
+    if all_state().get("status") in ("queued", "running"):
+        raise TakeoverError("„Alles aufarbeiten“ läuft bereits; Stand auf der Altbestand-Seite.")
+    if settings.OBJEKTAKTE.get("JOB_DISPATCH", "celery") == "celery":
+        from apps.drive.tasks import takeover_all_task
+
+        _set_all_state(
+            {"status": "queued", "queued_at": timezone.now().isoformat(), "total": len(runnable_sources())}
+        )
+        takeover_all_task.apply_async(args=[getattr(user, "pk", None)], queue="io")
+        return None
+    return run_all(user=user, request=request)

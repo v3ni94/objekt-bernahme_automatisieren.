@@ -383,8 +383,37 @@ def takeover_sources(request):
             "counts": counts,
             "connected": oauth.token_status().get("status") == "active",
             "limit": takeover.max_files(),
+            "all_state": takeover.all_state(),
+            "runnable": sum(1 for r in rows if r.object_id is not None and r.object.deleted_at is None),
         },
     )
+
+
+@permission_required("objects.write")
+@require_POST
+def takeover_run_all(request):
+    """„Alles aufarbeiten“: alle Quellordner mit Objekt nacheinander (Hintergrund, Stand auf der Seite)."""
+    from apps.drive import takeover
+
+    if oauth.get_adapter() is None:
+        messages.error(request, "Keine Google-Verbindung.")
+        return _altbestand_zurueck()
+    try:
+        result = takeover.dispatch_run_all(user=request.user, request=request)
+    except takeover.TakeoverError as exc:
+        messages.error(request, str(exc))
+        return _altbestand_zurueck()
+    if result is None:
+        messages.success(request, "„Alles aufarbeiten“ eingereiht; der Stand steht oben auf dieser Seite.")
+    else:
+        text = (
+            f"Alles aufarbeiten: {result['done']} von {result['total']} Ordnern, {result['registered']} Datei(en) "
+            f"übernommen, {result['skipped']} übersprungen"
+        )
+        if result["errors"]:
+            text += f", {len(result['errors'])} Fehler (siehe Zeilen)"
+        messages.success(request, text + ".")
+    return _altbestand_zurueck()
 
 
 @permission_required("objects.write")

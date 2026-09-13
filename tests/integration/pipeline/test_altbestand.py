@@ -670,3 +670,56 @@ def test_nachraeumen_leerer_quellordner_wird_aus_der_tabelle_entfernt(objekt, dr
         TakeoverSource.objects.filter(pk=offen.pk).exists() and not drive.get(offen.drive_folder_id).trashed
     )
     assert AuditEvent.objects.filter(action="drive.takeover_source_prune", entity_id=src.pk).exists()
+
+
+# ---------------------------------------------------------------- Alles aufarbeiten (13.09.2026)
+def test_alles_aufarbeiten_uebernimmt_alle_ordner_mit_objekt(
+    client_as, clerk_user, objekt, drive, altordner, admin_user, capsys, monkeypatch
+):
+    """Sammelaufarbeitung: Vorschau listet nur Ordner mit Objekt; der echte Lauf arbeitet sie nacheinander ab,
+    ein Fehler eines Ordners haelt die anderen nicht an, bereits Uebernommenes wird uebersprungen."""
+    from django.core.cache import cache
+
+    monkeypatch.setattr(oauth, "token_status", lambda: {"status": "active", "ok": True})
+    zweiter = drive.add_folder(drive.get(altordner["o623"]).parent_id, "623 Nachlieferung")
+    drive.add_file(zweiter, "Nachtrag.pdf", b"n" * 8)
+    kaputt = drive.add_folder(drive.get(altordner["o623"]).parent_id, "623 kaputt")
+    refs = takeover.parse_folder_refs("\n".join([altordner["o623"], altordner["o700"], zweiter, kaputt]))
+    takeover.add_sources(refs)
+    for src in TakeoverSource.objects.all():
+        takeover.resolve_source(src, drive)
+    drive.set_trashed(kaputt, True)  # Ordner verschwindet nach dem Aufloesen aus Drive
+    assert TakeoverSource.objects.filter(object__isnull=False).count() == 3
+
+    call_command("altbestand_aufarbeiten")
+    out = capsys.readouterr().out
+    assert "Vorschau: 3 Quellordner mit Objekt" in out and "0700" not in out
+    assert not Document.objects.filter(source="drive_existing").exists()
+
+    result = takeover.run_all(user=admin_user)
+    assert result["status"] == "done" and result["total"] == 3 and result["done"] == 2
+    assert result["registered"] == 3 and result["skipped"] == 0
+    assert len(result["errors"]) == 1 and "kaputt" in result["errors"][0]
+    assert sorted(
+        Document.objects.filter(object=objekt, source="drive_existing").values_list("current_name", flat=True)
+    ) == ["Nachtrag.pdf", "Protokoll 2023.pdf", "Rechnung Dach.pdf"]
+    assert TakeoverSource.objects.filter(status="done").count() == 2
+    assert TakeoverSource.objects.get(drive_folder_id=kaputt).status == "failed"
+    assert TakeoverSource.objects.get(drive_folder_id=altordner["o700"]).status == "new"
+    assert takeover.all_state()["status"] == "done" and takeover.all_state()["registered"] == 3
+    ereignis = AuditEvent.objects.get(action="drive.takeover_all")
+    assert ereignis.after_state["done"] == 2 and ereignis.after_state["registered"] == 3
+    assert not [op for op in drive.ops if op[0] in ("trash", "delete")]
+
+    # zweiter Lauf: nichts Neues, alles uebersprungen; Knopf laeuft im Test sofort
+    client = client_as(clerk_user)
+    resp = client.post("/verwaltung/altbestand/alles-aufarbeiten/", follow=True)
+    assert resp.status_code == 200
+    texte = [m.message for m in resp.context["messages"]]
+    assert any("0 Datei(en) übernommen, 3 übersprungen" in t for t in texte)
+    assert "Alles aufarbeiten" in resp.content.decode()
+    # laufender Sammellauf sperrt einen zweiten
+    cache.set(takeover.ALL_STATE_KEY, {"status": "running"}, timeout=60)
+    resp = client.post("/verwaltung/altbestand/alles-aufarbeiten/", follow=True)
+    assert any("läuft bereits" in m.message for m in resp.context["messages"])
+    cache.delete(takeover.ALL_STATE_KEY)

@@ -232,3 +232,62 @@ def maybe_finish_run(run: ProcessingRun) -> bool:
         trigger_auto_cleanup(run.object_id, trigger="run")
     schedule_runs()
     return True
+
+
+WORK_STATUSES = ("registered", "hashed", "ocr_done", "error")
+
+
+def objects_with_open_work():
+    """Aktive Objekte (ohne Eingangsobjekt) mit Dokumenten, die noch durch die Kette muessen oder auf Fehler stehen,
+    und ohne wartenden oder laufenden Objektlauf."""
+    from apps.objects.models import ManagedObject
+
+    busy = set(
+        ProcessingRun.objects.filter(
+            status__in=[RunStatus.PENDING, RunStatus.RUNNING], run_type__in=SERIAL_TYPES
+        ).values_list("object_id", flat=True)
+    )
+    with_work = set(
+        Document.objects.filter(deleted_at__isnull=True, status__in=WORK_STATUSES)
+        .values_list("object_id", flat=True)
+        .distinct()
+    )
+    return [
+        obj
+        for obj in ManagedObject.active.filter(is_system_inbox=False).order_by("object_number_numeric", "id")
+        if obj.pk in with_work and obj.pk not in busy
+    ]
+
+
+def start_runs_for_all(*, user=None, run_type: str = RunType.INCREMENTAL, dry_run: bool = False) -> dict:
+    """„Verarbeitung für alle Objekte starten“: je Objekt mit offener Arbeit ein Nachlauf (wartende Laeufe werden
+    nach processing.max_parallel_objects nacheinander gestartet). Objekte mit bereits wartendem oder laufendem
+    Lauf und Objekte ohne offene Dokumente werden ausgelassen. Protokoll processing.start_all."""
+    from apps.audit.services import record
+
+    candidates = objects_with_open_work()
+    summary = {
+        "run_type": run_type,
+        "dry_run": dry_run,
+        "objects": [o.object_number for o in candidates],
+        "started": [],
+        "runs": [],
+    }
+    if dry_run:
+        return summary
+    for obj in candidates:
+        run = ProcessingRun.objects.create(
+            object=obj, run_type=run_type, status=RunStatus.PENDING, dry_run=False, triggered_by=user
+        )
+        summary["started"].append(obj.object_number)
+        summary["runs"].append(run.pk)
+    started_now = schedule_runs()
+    summary["running_now"] = started_now
+    if summary["runs"]:
+        record(
+            "processing.start_all",
+            entity_type="processing_run",
+            actor=user,
+            after={k: v for k, v in summary.items() if k != "objects"} | {"objects": len(candidates)},
+        )
+    return summary

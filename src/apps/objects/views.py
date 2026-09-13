@@ -117,7 +117,12 @@ def object_list(request):
     return render(
         request,
         "objects/list.html",
-        {"objects": objects, "q": q, "can_write": user_has_permission(request.user, "objects.write")},
+        {
+            "objects": objects,
+            "q": q,
+            "can_write": user_has_permission(request.user, "objects.write"),
+            "can_ingest": user_has_permission(request.user, "documents.ingest"),
+        },
     )
 
 

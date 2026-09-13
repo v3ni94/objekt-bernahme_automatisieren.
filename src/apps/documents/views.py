@@ -126,6 +126,25 @@ def document_upload(request, pk: int):
 
 @permission_required("documents.ingest")
 @require_POST
+def processing_start_all(request):
+    """Verarbeitung fuer alle Objekte mit offener Arbeit starten (Nachlauf je Objekt, nacheinander)."""
+    from apps.pipeline.runs import start_runs_for_all
+
+    result = start_runs_for_all(user=request.user)
+    if result["runs"]:
+        messages.success(
+            request,
+            f"Verarbeitung für {len(result['runs'])} Objekt(e) eingereiht ({', '.join(result['started'][:12])}"
+            f"{', …' if len(result['started']) > 12 else ''}); {len(result.get('running_now') or [])} laufen sofort, "
+            "die übrigen folgen nacheinander.",
+        )
+    else:
+        messages.info(request, "Kein Objekt mit offener Verarbeitung; nichts gestartet.")
+    return redirect("object_list")
+
+
+@permission_required("documents.ingest")
+@require_POST
 def processing_start(request, pk: int):
     obj = get_object_or_404(ManagedObject.active, pk=pk)
     run_type = request.POST.get("run_type", RunType.INCREMENTAL)
