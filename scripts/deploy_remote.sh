@@ -26,7 +26,7 @@
 #   reconcile-all <branch>    Ordnerabgleich aller aktiven Objekte (legt fehlende Struktur an)
 #   config-set <branch> <schluessel=wert>  Konfigurationswert setzen (Wert als JSON: true, 5, "text"); Audit
 #   altbestand-import <branch>  Quellordner aus db/seeds/altbestand_ordner.txt in die Altbestand-Tabelle
-#   altbestand-objekte <branch> Objekte fuer Altbestand-Quellen ohne Objekt anlegen (ARGUMENT=echt, sonst Vorschau)
+#   altbestand-objekte <branch> [echt]  Objekte fuer Altbestand-Quellen ohne Objekt anlegen (echt = anlegen, sonst Vorschau)
 #                             aufnehmen (ohne Doppelte) und Namen aus Drive lesen
 # Jede andere Eingabe wird abgewiesen.
 set -euo pipefail
@@ -386,7 +386,7 @@ PY
     ;;
   altbestand-objekte)
     # Objekte fuer alle Altbestand-Quellen ohne Objekt anlegen; Argument "echt" legt an, sonst nur Vorschau
-    if [ "${ARGUMENT:-}" = "echt" ]; then
+    if [ "${ARG:-}" = "echt" ]; then
       docker compose exec -T web python manage.py altbestand_objekte_anlegen --echt
     else
       docker compose exec -T web python manage.py altbestand_objekte_anlegen
