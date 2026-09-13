@@ -253,7 +253,12 @@ def _import_new(client, remote: dict, metadata: dict, meta: dict) -> dict:
             return {"linked": local.pk, "reason": "checksum"}
     if not config.import_new_documents():
         raise Skip("Übernahme neuer Paperless-Dokumente ist abgeschaltet")
-    target = _object_from_field(remote, meta) or ensure_inbox_object()
+    from_field = _object_from_field(remote, meta)
+    if from_field is None and config.import_only_with_object():
+        raise Skip(
+            "ohne Feld MHV Objekt in Paperless; Übernahme nur mit Objektbezug (paperless.import_only_with_object)"
+        )
+    target = from_field or ensure_inbox_object()
     name = safe_filename(
         remote.get("original_file_name") or metadata.get("original_filename") or f"paperless-{remote_id}.pdf"
     )

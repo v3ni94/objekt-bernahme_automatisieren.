@@ -120,6 +120,8 @@ def paperless(seeded, monkeypatch, admin_user, objekt):
     store.set("paperless.enabled", True, user=admin_user, reason="Test")
     store.set("paperless.mode", "pilot", user=admin_user, reason="Test")
     store.set("paperless.pilot_object_numbers", [objekt.object_number], user=admin_user, reason="Test")
+    # Tests des Eingangs brauchen die Uebernahme ohne Objektfeld; der Produktionsstandard ist der Schutz (True)
+    store.set("paperless.import_only_with_object", False, user=admin_user, reason="Test")
     from apps.sync.paperless import setup
 
     state = setup.check(user=admin_user, create=True)

@@ -137,6 +137,7 @@
   "paperless.poll_interval_minutes": 5,
   "paperless.webhook_enabled": true,
   "paperless.import_new_documents": true,
+  "paperless.import_only_with_object": true,
   "paperless.max_upload_mb": 100,
   "sync.drive_changes_enabled": false,
   "sync.drive_changes_interval_minutes": 5,

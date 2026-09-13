@@ -86,6 +86,7 @@ AUDIT_ACTIONS: dict[str, str] = {
     "sync.drive_snapshot": "Exportfassung eines Google-Dokuments erzeugt",
     "sync.version_registered": "neue Inhaltsversion eines Dokuments erfasst",
     "sync.webhook": "Webhook von Paperless angenommen",
+    "sync.cursor_set": "Abgleichscursor von Hand gesetzt",
     "sync.operation_cancelled": "Synchronisationsoperation verworfen",
     "sync.operation_retry": "Synchronisationsoperation erneut eingereiht",
     "sync.inventory_start": "Bestandslauf gestartet",

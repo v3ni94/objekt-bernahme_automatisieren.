@@ -283,6 +283,21 @@ def _classify_paperless(run: InventoryRun, client, remote: dict) -> None:
             **fields,
         )
     else:
+        from apps.sync.flows.paperless_pull import _object_from_field
+
+        if (
+            config.import_only_with_object()
+            and _object_from_field(remote, services.connection_meta()) is None
+        ):
+            _item(
+                run,
+                system=SyncSystem.PAPERLESS,
+                external_id=remote_id,
+                disposition=Disposition.OUT_OF_SCOPE,
+                details={"reason": "ohne Feld MHV Objekt (paperless.import_only_with_object)"},
+                **fields,
+            )
+            return
         item = _item(
             run,
             system=SyncSystem.PAPERLESS,

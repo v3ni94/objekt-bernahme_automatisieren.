@@ -77,6 +77,11 @@ def import_new_documents() -> bool:
     return bool(store.get("paperless.import_new_documents", True))
 
 
+def import_only_with_object() -> bool:
+    """Neue Paperless-Dokumente nur uebernehmen, wenn sie dort das Feld Objekt tragen (kein Eingang ohne Bezug)."""
+    return bool(store.get("paperless.import_only_with_object", True))
+
+
 def webhook_enabled() -> bool:
     return bool(store.get("paperless.webhook_enabled", True))
 

@@ -8,6 +8,7 @@ urlpatterns = [
     path("verwaltung/sync/pruefen/", views.sync_check, name="sync_check"),
     path("verwaltung/sync/eingang-einrichten/", views.sync_inbox_setup, name="sync_inbox_setup"),
     path("verwaltung/sync/jetzt/", views.sync_run_now, name="sync_run_now"),
+    path("verwaltung/sync/cursor-jetzt/", views.sync_cursor_now, name="sync_cursor_now"),
     path("verwaltung/sync/operationen/<int:pk>/", views.sync_operation_action, name="sync_operation_action"),
     path("verwaltung/sync/bestand/starten/", views.inventory_start, name="sync_inventory_start"),
     path("verwaltung/sync/bestand/<int:pk>/", views.inventory_detail, name="sync_inventory"),

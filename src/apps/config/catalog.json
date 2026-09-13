@@ -1815,6 +1815,16 @@
       }
     },
     {
+      "key": "paperless.import_only_with_object",
+      "category": "paperless",
+      "value_type": "boolean",
+      "description": "Aus Paperless nur Dokumente übernehmen, die dort das Feld MHV Objekt tragen; ohne Feld bleibt das Dokument in Paperless (kein Eingang). Schutz vor der Übernahme eines ganzen DMS-Bestands ohne Objektbezug",
+      "source": "Pilotbefund 13.09.2026: Trockenlauf mit 96.145 Dokumenten ohne Objektbezug",
+      "schema": {
+        "type": "boolean"
+      }
+    },
+    {
       "key": "paperless.max_upload_mb",
       "category": "paperless",
       "value_type": "integer",

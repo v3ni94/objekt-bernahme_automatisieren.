@@ -222,6 +222,36 @@ def sync_run_now(request):
 
 @permission_required("sync.manage")
 @require_POST
+def sync_cursor_now(request):
+    """Setzt den Paperless-Abgleichscursor auf jetzt: der Altbestand wird nicht Dokument fuer Dokument geprueft,
+    nur Aenderungen ab diesem Zeitpunkt. Der Bestand kommt gesteuert ueber das Feld Objekt oder den Bestandslauf."""
+    from apps.sync.flows.paperless_pull import CURSOR_MODIFIED
+
+    vorher = services.get_cursor(SyncSystem.PAPERLESS, CURSOR_MODIFIED)
+    jetzt = timezone.now().isoformat()
+    services.set_cursor(
+        SyncSystem.PAPERLESS,
+        CURSOR_MODIFIED,
+        jetzt,
+        {"set_by": request.user.email, "set_at": jetzt, "reason": "Altbestand übersprungen"},
+    )
+    record(
+        "sync.cursor_set",
+        entity_type="sync",
+        before={"modified_cursor": vorher.value if vorher else None},
+        after={"modified_cursor": jetzt},
+        actor=request.user,
+        request=request,
+    )
+    messages.info(
+        request,
+        f"Paperless-Abgleich beginnt ab jetzt ({jetzt[:19]}); ältere Änderungen werden nicht geprüft.",
+    )
+    return redirect("sync_admin")
+
+
+@permission_required("sync.manage")
+@require_POST
 def sync_operation_action(request, pk: int):
     op = get_object_or_404(SyncOperation, pk=pk)
     action = request.POST.get("action")

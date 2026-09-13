@@ -1803,6 +1803,7 @@ Celery-Queues aus den Settings: `ai`, `classify`, `io`, `lists`, `ocr`
 | paperless.field_status_name | paperless | string | `"MHV Zuordnung"` |
 | paperless.field_uuid_name | paperless | string | `"MHV Dokument-UUID"` |
 | paperless.import_new_documents | paperless | boolean | `true` |
+| paperless.import_only_with_object | paperless | boolean | `true` |
 | paperless.max_upload_mb | paperless | integer | `100` |
 | paperless.mode | paperless | string | `"readonly"` |
 | paperless.page_size | paperless | integer | `100` |
@@ -1931,6 +1932,7 @@ Celery-Queues aus den Settings: `ai`, `classify`, `io`, `lists`, `ocr`
 | sync.drive_snapshot | Exportfassung eines Google-Dokuments erzeugt |
 | sync.version_registered | neue Inhaltsversion eines Dokuments erfasst |
 | sync.webhook | Webhook von Paperless angenommen |
+| sync.cursor_set | Abgleichscursor von Hand gesetzt |
 | sync.operation_cancelled | Synchronisationsoperation verworfen |
 | sync.operation_retry | Synchronisationsoperation erneut eingereiht |
 | sync.inventory_start | Bestandslauf gestartet |

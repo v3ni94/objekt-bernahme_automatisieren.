@@ -12,6 +12,7 @@ import json
 from pathlib import Path
 
 import pytest
+from django.urls import reverse
 from django.utils import timezone
 from tests.integration.sync.conftest import WEBHOOK_TOKEN, pdf_bytes
 
@@ -602,3 +603,35 @@ def test_papierkorb_in_paperless_erzeugt_konflikt_ohne_lokale_loeschung(objekt, 
     ops()
     link.refresh_from_db()
     assert link.state == LinkState.SYNCED and Document.objects.filter(source="paperless").count() == 1
+
+
+def test_schutz_nur_mit_objektfeld_uebernehmen(objekt, paperless, eingang, ops, admin_user, client_as):
+    """Produktionsstandard: ohne Feld MHV Objekt bleibt ein neues Paperless-Dokument in Paperless (kein Eingang),
+    mit Feld wird es direkt in das Objekt uebernommen."""
+    store.set("paperless.import_only_with_object", True, user=admin_user, reason="Test")
+    ohne = paperless.add_document(
+        "Ohne Bezug", content=pdf_bytes(LINES_EINGANG), original_file_name="ohne.pdf"
+    )
+    feld = services.connection_meta()["field_ids"]["object"]
+    mit = paperless.add_document(
+        "Mit Bezug",
+        content=pdf_bytes(),
+        custom_fields={feld: objekt.object_number},
+        original_file_name="mit.pdf",
+    )
+    paperless_pull.poll(force=True)
+    ops()
+    ops_ohne = _pull_ops().get(payload__paperless_id=ohne)
+    assert ops_ohne.status == OperationStatus.SKIPPED and "MHV Objekt" in ops_ohne.result["skipped"]
+    assert not Document.objects.filter(source="paperless", object=eingang).exists()
+    doc = _link(mit).document
+    assert doc.object_id == objekt.pk and doc.source == "paperless"
+    assert paperless.call_names().count("download") == 1
+    # Cursor von Hand auf jetzt: aeltere Aenderungen werden nicht mehr geprueft, Protokoll vorhanden
+    client = client_as(admin_user)
+    resp = client.post(reverse("sync_cursor_now"))
+    assert resp.status_code == 302
+    cursor = services.get_cursor(SyncSystem.PAPERLESS, paperless_pull.CURSOR_MODIFIED)
+    assert cursor.value and cursor.meta["reason"] == "Altbestand übersprungen"
+    paperless.add_document("Alt", content=b"alt", created="2024-01-01")
+    assert AuditEvent.objects.filter(action="sync.cursor_set", user_id=admin_user.pk).exists()
