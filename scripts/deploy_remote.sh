@@ -26,6 +26,7 @@
 #   reconcile-all <branch>    Ordnerabgleich aller aktiven Objekte (legt fehlende Struktur an)
 #   config-set <branch> <schluessel=wert>  Konfigurationswert setzen (Wert als JSON: true, 5, "text"); Audit
 #   altbestand-import <branch>  Quellordner aus db/seeds/altbestand_ordner.txt in die Altbestand-Tabelle
+#   altbestand-objekte <branch> Objekte fuer Altbestand-Quellen ohne Objekt anlegen (ARGUMENT=echt, sonst Vorschau)
 #                             aufnehmen (ohne Doppelte) und Namen aus Drive lesen
 # Jede andere Eingabe wird abgewiesen.
 set -euo pipefail
@@ -383,5 +384,13 @@ PY
     # Quellordner der bisherigen Ablage in die Altbestand-Tabelle aufnehmen; idempotent, nur Folder-IDs und Namen
     docker compose exec -T web python manage.py altbestand_import --aufloesen
     ;;
-  *) echo "Nur check, pull, befund, env-init, ps, logs, smoke, cert-retry, db-status, db-reset, first-run, deploy, rollback, create-admin, oauth-check, deploy-tests, doc-status, config-set, altbestand-import oder reconcile-all erlaubt"; exit 2 ;;
+  altbestand-objekte)
+    # Objekte fuer alle Altbestand-Quellen ohne Objekt anlegen; Argument "echt" legt an, sonst nur Vorschau
+    if [ "${ARGUMENT:-}" = "echt" ]; then
+      docker compose exec -T web python manage.py altbestand_objekte_anlegen --echt
+    else
+      docker compose exec -T web python manage.py altbestand_objekte_anlegen
+    fi
+    ;;
+  *) echo "Nur check, pull, befund, env-init, ps, logs, smoke, cert-retry, db-status, db-reset, first-run, deploy, rollback, create-admin, oauth-check, deploy-tests, doc-status, config-set, altbestand-import, altbestand-objekte oder reconcile-all erlaubt"; exit 2 ;;
 esac

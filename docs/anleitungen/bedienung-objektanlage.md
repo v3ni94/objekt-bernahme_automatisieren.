@@ -129,6 +129,8 @@ Für die Übernahme der bisherigen Ablage führt die Anwendung unter „Altbesta
 
 Hinweise: Ein zweites „Aufarbeiten“ übernimmt nur neue Dateien, bereits registrierte werden übersprungen. Fehlt der Objektordner noch, wird er angelegt und die Ablage wartet, bis er steht (Job zeigt „wartet: Ablageziel noch nicht vorhanden“). Mehr als `drive.takeover_max_files` Dateien in einem Ordner: Grenze in der Konfiguration anheben oder Unterordner einzeln über „Bestand aus Drive übernehmen“ holen. Liegt der alte Ordner direkt im Wurzelordner und trägt die Objektnummer, übernimmt ihn der Ordnerabgleich als Objektordner und inventarisiert seinen Inhalt ohnehin; „Aufarbeiten“ übernimmt dann nur, was noch fehlt.
 
+Massenanlage (einmalig, Admin über den Deploy-Workflow, Aktion `altbestand-objekte`): legt für jede Nummer der Altbestand-Tabelle ohne Objekt ein Objekt an. Bezeichnung und Verwaltungsart kommen aus dem Objektregister (`db/seeds/objektregister.csv`, Immoware24-Export 01.07.2026), sonst aus dem Ordnernamen mit Vorgabe WEG; jedes so angelegte Objekt trägt in den Notizen den Hinweis „Stammdaten bitte nachpflegen“ samt Registerstand (aktiv, nur Abrechnung, abgegeben). Quellordner mit der Nummer werden gebunden, der Objektordner in Drive entsteht wie bei der Anlage von Hand. Ohne Argument zeigt die Aktion nur die Vorschau; „Aufarbeiten“ bleibt je Ordner ein eigener Schritt.
+
 ## 4. Eigentümer- oder Mieterliste importieren
 
 Angenommene Formate: Excel, CSV, PDF (digital und gescannt), Exporte aus Immoware24; für Domus liegt noch keine Beispieldatei vor (F11), dieses Profil ist nur manuell wählbar. Nichts wird ohne Bestätigung übernommen.

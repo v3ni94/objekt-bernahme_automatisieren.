@@ -387,3 +387,108 @@ def test_aufraeumen_sperren_und_rechte(
     assert resp.status_code == 200
     assert any("3 Dateien und 1 Ordner in den Papierkorb" in m.message for m in resp.context["messages"])
     assert drive.get(z["kopie_id"]).trashed
+
+
+@pytest.mark.parametrize(
+    ("text", "erwartet"),
+    [
+        (
+            "Aachener Straße 25, Erkelenz",
+            {"street": "Aachener Straße", "house_number": "25", "postal_code": "", "city": "Erkelenz"},
+        ),
+        (
+            "Ratheim, Shalomweg 3",
+            {"street": "Shalomweg", "house_number": "3", "postal_code": "", "city": "Ratheim"},
+        ),
+        ("Aachener Straße 119 (GmbH)", {"street": "Aachener Straße", "house_number": "119"}),
+        (
+            "Am Fließ 6 41812 Erkelenz",
+            {"street": "Am Fließ", "house_number": "6", "postal_code": "41812", "city": "Erkelenz"},
+        ),
+        (
+            "Heiligenberger Straße 5 10318 Berlin",
+            {
+                "street": "Heiligenberger Straße",
+                "house_number": "5",
+                "postal_code": "10318",
+                "city": "Berlin",
+            },
+        ),
+        ("Giesenkirchener Str. 124 und 126", {}),
+        ("Aachenerstraße 21, 23, 23a", {}),
+        ("Graf-Reinald-Str. 34, 36, 38, 40, 42, 41812 Erkelenz", {}),
+        ("Gladbacher Straße 95", {"street": "Gladbacher Straße", "house_number": "95"}),
+        ("Musterstadt Musterstraße 49 alt", {}),
+        ("", {}),
+    ],
+)
+def test_anschrift_aus_bezeichnung(text, erwartet):
+    from apps.drive.management.commands.altbestand_objekte_anlegen import parse_address
+
+    assert parse_address(text) == erwartet
+
+
+def test_massenanlage_der_objekte_aus_dem_altbestand(drive, altordner, objekt, tmp_path, capsys, monkeypatch):
+    """Einmalige Anlage aller Objekte aus der Altbestand-Tabelle (13.09.2026): Vorschau ohne Wirkung, echte Anlage
+    mit Bezeichnung und Verwaltungsart aus dem Objektregister, Bindung der Quellordner, Ordneranlage, idempotent."""
+    monkeypatch.setattr(oauth, "token_status", lambda: {"status": "active", "ok": True})
+    refs = takeover.parse_folder_refs("\n".join([altordner["o623"], altordner["o700"], altordner["ohne"]]))
+    takeover.add_sources(refs)
+    for src in TakeoverSource.objects.all():
+        takeover.resolve_source(src, drive)
+    register = tmp_path / "objektregister.csv"
+    register.write_text(
+        "nummer;objekt;verwaltungsart;status\n700;Beispielstadt, Neuweg 1;Mietverwaltung;archiv\n",
+        encoding="utf-8",
+    )
+    # 623 ist beim Aufloesen bereits an das vorhandene Objekt gebunden; offen bleiben 700 und der Ordner ohne Nummer
+    assert TakeoverSource.objects.get(drive_folder_id=altordner["o623"]).object_id == objekt.pk
+    # Vorschau: nichts angelegt
+    call_command("altbestand_objekte_anlegen", register=str(register))
+    out = capsys.readouterr().out
+    assert (
+        "Vorschau" in out
+        and "700: neu „Beispielstadt, Neuweg 1“ (Mietverwaltung, Register archiv; Neuweg 1, Beispielstadt)"
+        in out
+    )
+    assert "ohne Nummer, bleibt offen: Sonstige Unterlagen" in out
+    assert not ManagedObject.objects.filter(object_number="700").exists()
+    assert TakeoverSource.objects.filter(object__isnull=False).count() == 1
+
+    call_command("altbestand_objekte_anlegen", register=str(register), echt=True)
+    out = capsys.readouterr().out
+    assert "Angelegt: 1 Objekte; Quellordner gebunden: 1" in out
+    obj = ManagedObject.objects.get(object_number="700")
+    assert obj.name == "Beispielstadt, Neuweg 1" and obj.management_type == "rental" and obj.status == "new"
+    assert (obj.city, obj.street, obj.house_number, obj.postal_code) == ("Beispielstadt", "Neuweg", "1", None)
+    assert "Stammdaten bitte nachpflegen" in obj.notes and "abgegeben" in obj.notes
+    assert "Anschrift aus Bezeichnung abgeleitet" in obj.notes
+    src700 = TakeoverSource.objects.get(drive_folder_id=altordner["o700"])
+    src623 = TakeoverSource.objects.get(drive_folder_id=altordner["o623"])
+    assert src700.object_id == obj.pk and src700.status == "linked"
+    assert src623.object_id == objekt.pk and src623.status == "linked"
+    ereignis = AuditEvent.objects.get(action="object.create", entity_id=obj.pk)
+    assert ereignis.after_state["source"] == "altbestand_bulk" and ereignis.after_state["sources"] == [
+        src700.pk
+    ]
+    # Ordneranlage lief (Celery im Test sofort): Objektordner mit Struktur
+    obj.refresh_from_db()
+    assert obj.drive_root_folder_id
+    assert any(c.name.startswith("02_") for c in drive.list_children(obj.drive_root_folder_id))
+    # zweiter Lauf: nichts mehr offen
+    call_command("altbestand_objekte_anlegen", register=str(register), echt=True)
+    out = capsys.readouterr().out
+    assert "Angelegt: 0 Objekte" in out and ManagedObject.objects.filter(object_number="700").count() == 1
+    # ohne Register: Bezeichnung aus dem Ordnernamen, Vorgabe WEG mit Hinweis
+    drive_id = drive.add_folder(drive.get(altordner["o700"]).parent_id, "0810 Neustadt, Ringstraße 2")
+    takeover.add_sources(takeover.parse_folder_refs(drive_id))
+    takeover.resolve_source(TakeoverSource.objects.get(drive_folder_id=drive_id), drive)
+    call_command("altbestand_objekte_anlegen", register=str(tmp_path / "fehlt.csv"), echt=True)
+    neu = ManagedObject.objects.get(object_number="810")
+    assert neu.name == "Neustadt, Ringstraße 2" and neu.management_type == "weg"
+    assert (neu.city, neu.street, neu.house_number) == ("Neustadt", "Ringstraße", "2")
+    assert "Nicht im Objektregister" in neu.notes
+    neu.refresh_from_db()
+    assert (
+        neu.drive_root_folder_id and drive.get(neu.drive_root_folder_id).name == "810 Neustadt, Ringstraße 2"
+    )
