@@ -372,6 +372,22 @@ def test_paperless_umfang_echtlauf_uebernimmt_nur_das_objekt(
     assert [c[1][0] for c in paperless.calls if c[0] == "download"] == [pid_a]
 
 
+def test_echtlauf_nutzt_wartende_uebernahme_statt_zweiter_operation(drei_dokumente, paperless, admin_user):
+    """Hat der Webhook ein Dokument bereits eingereiht, verweist das Manifest auf diese Operation statt eine
+    zweite anzulegen."""
+    from apps.sync.flows.paperless_pull import enqueue_from_webhook
+
+    d = drei_dokumente
+    wartend, _ = enqueue_from_webhook(d.pid_b, event="updated")
+    run = inventory.start("paperless", dry_run=False, user=admin_user)
+    _bis_ende(run)
+    pulls = SyncOperation.objects.filter(kind=OperationKind.PAPERLESS_PULL).order_by("id")
+    assert sorted(p.payload["paperless_id"] for p in pulls) == sorted([d.pid_a, d.pid_b])
+    item_b = _items(run)[str(d.pid_b)]
+    assert item_b.operation_id == wartend.pk and item_b.disposition == Disposition.IN_PROGRESS
+    assert pulls.filter(payload__paperless_id=d.pid_b).count() == 1
+
+
 def test_pause_und_fortsetzung_ohne_doppelte_zeilen(drei_dokumente, paperless, admin_user):
     d = drei_dokumente
     run = inventory.start("paperless", dry_run=True, user=admin_user)

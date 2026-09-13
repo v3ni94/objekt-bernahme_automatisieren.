@@ -167,7 +167,7 @@ Jede Schreib- oder Leseaktion gegen ein externes System ist eine dauerhafte Oper
 | `paperless_push` | Hash eines Dokuments (nicht aus Paperless), echter Bestandslauf, Entscheidung reupload | prüft zuerst per UUID-Suche, ob die Kopie schon in Paperless liegt; sonst Upload mit Tag und Feldern oder Weiche zu Exportfassung oder Indexbeleg |
 | `paperless_await_task` | nach jedem Upload, 5 Sekunden verzögert | verfolgt die Paperless-Aufgabe, legt die Verknüpfung an, erkennt Dubletten |
 | `paperless_push_meta` | Ablage in Drive, Objektübernahme, Verknüpfung, Entscheidung push_local_object | schreibt die vier Felder und den Tag; unveränderter Stand löst keinen Schreibzugriff aus |
-| `paperless_pull` | Webhook, regelmäßiger Abgleich, echter Bestandslauf | übernimmt neue Dokumente, verknüpft identische Dateien, meldet zweite Kopien als Konflikt, vergleicht bekannte, vermerkt Löschung und Papierkorb |
+| `paperless_pull` | Webhook, regelmäßiger Abgleich, echter Bestandslauf | übernimmt neue Dokumente, verknüpft identische Dateien, meldet zweite Kopien als Konflikt, vergleicht bekannte, vermerkt Löschung und Papierkorb; wartet für dasselbe Paperless-Dokument bereits eine Übernahme (pending oder running), reihen Webhook, Abgleich und Bestandslauf keine zweite ein, das Manifest verweist auf die wartende Operation |
 | `paperless_index_stub` | nicht übertragbare Datei | Indexbeleg als PDF nach Paperless |
 | `drive_export_snapshot` | natives Google-Dokument | PDF-Export nach Paperless |
 | `drive_set_props` | Ablage in Drive (bei aktiver Anbindung oder Drive-Änderungsabgleich) | technische Kennzeichen an der Drive-Datei, Drive-Verknüpfung |

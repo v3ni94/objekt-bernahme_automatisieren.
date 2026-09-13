@@ -14,7 +14,7 @@ from apps.documents.models import Document
 from apps.drive.adapter import FOLDER_MIME, DriveError
 from apps.objects.models import ManagedObject
 from apps.sync import config, inbox, services
-from apps.sync.flows.paperless_pull import CURSOR_MODIFIED
+from apps.sync.flows.paperless_pull import CURSOR_MODIFIED, pending_pull
 from apps.sync.models import (
     Disposition,
     ExternalLink,
@@ -375,6 +375,15 @@ def _classify_paperless(run: InventoryRun, client, remote: dict) -> None:
             **fields,
         )
     if not run.dry_run:
+        waiting = pending_pull(int(remote_id))
+        if waiting is not None:  # Webhook oder Abgleich haben die Uebernahme schon eingereiht
+            InventoryItem.objects.filter(pk=item.pk).update(
+                operation=waiting,
+                disposition=Disposition.IN_PROGRESS
+                if item.disposition == Disposition.IMPORT_NEW
+                else item.disposition,
+            )
+            return
         op, _ = enqueue(
             OperationKind.PAPERLESS_PULL,
             system=SyncSystem.PAPERLESS,

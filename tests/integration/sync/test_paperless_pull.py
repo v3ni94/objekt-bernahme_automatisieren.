@@ -308,13 +308,14 @@ def test_webhook_prueft_token_und_merkt_genau_eine_operation_vor(
         assert antwort.status_code == 202
         assert antwort.json() == {"accepted": True, "operation": op.pk, "created": False}
         assert _pull_ops().count() == 1
-    # Bearer-Schreibweise wird ebenfalls angenommen; ein anderes Ereignis ergibt eine eigene Operation
+    # Bearer-Schreibweise wird ebenfalls angenommen; solange die Uebernahme wartet, verweist auch ein anderes
+    # Ereignis auf dieselbe Operation (13.09.2026: kein zweites Pull fuer ein wartendes Dokument)
     antwort = _webhook(
         client, {"doc_id": remote_id, "event": "updated"}, Authorization=f"Bearer {WEBHOOK_TOKEN}"
     )
-    assert antwort.status_code == 202 and antwort.json()["created"] is True
-    op_update = SyncOperation.objects.get(pk=antwort.json()["operation"])
-    assert op_update.payload == {"paperless_id": remote_id, "event": "updated"}
+    assert antwort.status_code == 202
+    assert antwort.json() == {"accepted": True, "operation": op.pk, "created": False}
+    assert _pull_ops().count() == 1
 
     # ohne doc_id oder mit ungueltigem JSON: 400, keine Operation
     assert _webhook(client, {"foo": "bar"}, **{"X-MHV-Webhook-Token": WEBHOOK_TOKEN}).status_code == 400
@@ -346,14 +347,22 @@ def test_webhook_prueft_token_und_merkt_genau_eine_operation_vor(
 
     ops()
     op.refresh_from_db()
-    op_update.refresh_from_db()
     op_url.refresh_from_db()
     op_fremd.refresh_from_db()
     assert op.status == OperationStatus.DONE and op.result["inbox"] is True
-    assert op_update.status == OperationStatus.DONE and "conflict" not in op_update.result
     assert op_url.status == OperationStatus.SKIPPED and "nicht" in op_url.result["skipped"]
     assert op_fremd.status == OperationStatus.SKIPPED and "nicht" in op_fremd.result["skipped"]
     assert not SyncOperation.objects.filter(status=OperationStatus.PENDING).exists()
+    # nach dem Abschluss zaehlt ein neues Ereignis wieder und laeuft ohne Konflikt durch
+    antwort = _webhook(
+        client, {"doc_id": remote_id, "event": "updated"}, Authorization=f"Bearer {WEBHOOK_TOKEN}"
+    )
+    assert antwort.status_code == 202 and antwort.json()["created"] is True
+    op_update = SyncOperation.objects.get(pk=antwort.json()["operation"])
+    assert op_update.payload == {"paperless_id": remote_id, "event": "updated"}
+    ops()
+    op_update.refresh_from_db()
+    assert op_update.status == OperationStatus.DONE and "conflict" not in op_update.result
     docs = Document.objects.filter(source="paperless")
     assert docs.count() == 1 and docs.get().object_id == eingang.pk
     link = _link(remote_id)
@@ -361,7 +370,7 @@ def test_webhook_prueft_token_und_merkt_genau_eine_operation_vor(
     assert not Document.objects.filter(original_name="erfunden.pdf").exists()
     assert not ExternalLink.objects.filter(external_id__in=["5", "999"]).exists()
     # jede Operation liest das Dokument selbst ueber die API; Angaben aus dem Body werden nie uebernommen
-    assert [c[1][0] for c in paperless.calls if c[0] == "get_document"] == [remote_id, remote_id, 5, 999]
+    assert [c[1][0] for c in paperless.calls if c[0] == "get_document"] == [remote_id, 5, 999, remote_id]
     assert paperless.call_names().count("download") == 1
 
 
@@ -635,3 +644,23 @@ def test_schutz_nur_mit_objektfeld_uebernehmen(objekt, paperless, eingang, ops, 
     assert cursor.value and cursor.meta["reason"] == "Altbestand übersprungen"
     paperless.add_document("Alt", content=b"alt", created="2024-01-01")
     assert AuditEvent.objects.filter(action="sync.cursor_set", user_id=admin_user.pk).exists()
+
+
+def test_wartende_uebernahme_wird_nicht_doppelt_eingereiht(objekt, paperless, ops, admin_user):
+    """Webhook und Abgleich reihen fuer ein Dokument mit wartender Uebernahme keine zweite Operation ein; nach dem
+    Abschluss der Operation zaehlt ein neues Ereignis wieder (Massenbearbeitung 13.09.2026)."""
+    from apps.sync.flows.paperless_pull import enqueue_from_webhook, pending_pull, poll
+
+    pid = paperless.add_document("Rechnung", pdf_bytes(["Rechnung Objekt 623"]), original_file_name="R.pdf")
+    op1, created1 = enqueue_from_webhook(pid, event="added")
+    op2, created2 = enqueue_from_webhook(pid, event="updated")
+    assert created1 is True and created2 is False and op2.pk == op1.pk
+    assert pending_pull(pid).pk == op1.pk
+    services.set_cursor(SyncSystem.PAPERLESS, "modified_cursor", "2000-01-01T00:00:00+00:00")
+    poll(force=True)
+    assert SyncOperation.objects.filter(kind=OperationKind.PAPERLESS_PULL).count() == 1
+    ops()
+    op1.refresh_from_db()
+    assert op1.status == OperationStatus.DONE and pending_pull(pid) is None
+    op3, created3 = enqueue_from_webhook(pid, event="updated")
+    assert created3 is True and op3.pk != op1.pk

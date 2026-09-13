@@ -29,7 +29,15 @@ from apps.sync.flows.common import (
     raise_mapped,
     upsert_link,
 )
-from apps.sync.models import ExternalLink, LinkRole, LinkState, OperationKind, SyncSystem
+from apps.sync.models import (
+    ExternalLink,
+    LinkRole,
+    LinkState,
+    OperationKind,
+    OperationStatus,
+    SyncOperation,
+    SyncSystem,
+)
 from apps.sync.operations import Block, Skip, enqueue, handler, op_key
 
 CURSOR_MODIFIED = "modified_cursor"
@@ -82,18 +90,19 @@ def poll(*, force: bool = False, limit: int = 2000) -> dict:
         for remote in client.list_documents(modified_after=since, ordering="modified"):
             count += 1
             modified = str(remote.get("modified") or "")
-            enqueue(
-                OperationKind.PAPERLESS_PULL,
-                system=SyncSystem.PAPERLESS,
-                key=op_key(OperationKind.PAPERLESS_PULL, remote.get("id"), modified or "x"),
-                source_system=SyncSystem.PAPERLESS,
-                source_revision=modified or None,
-                payload={
-                    "paperless_id": remote.get("id"),
-                    "modified": modified,
-                    "deleted_at": remote.get("deleted_at"),
-                },
-            )
+            if pending_pull(int(remote.get("id"))) is None:
+                enqueue(
+                    OperationKind.PAPERLESS_PULL,
+                    system=SyncSystem.PAPERLESS,
+                    key=op_key(OperationKind.PAPERLESS_PULL, remote.get("id"), modified or "x"),
+                    source_system=SyncSystem.PAPERLESS,
+                    source_revision=modified or None,
+                    payload={
+                        "paperless_id": remote.get("id"),
+                        "modified": modified,
+                        "deleted_at": remote.get("deleted_at"),
+                    },
+                )
             if modified and (newest is None or modified > newest):
                 newest = modified
             if count >= limit:
@@ -109,7 +118,25 @@ def poll(*, force: bool = False, limit: int = 2000) -> dict:
     return {"enqueued": count, "cursor": newest}
 
 
+def pending_pull(paperless_id: int):
+    """Wartende oder laufende Uebernahme desselben Paperless-Dokuments, unabhaengig vom Schluessel. Webhook,
+    Abgleich und Bestandslauf reihen dann kein zweites Mal ein: die wartende Operation liest ohnehin den aktuellen
+    Stand (Massenbearbeitung 13.09.2026: rund 10.800 Feldaenderungen erzeugen Webhook und Bestandslauf zugleich)."""
+    return (
+        SyncOperation.objects.filter(
+            kind=OperationKind.PAPERLESS_PULL,
+            status__in=[OperationStatus.PENDING, OperationStatus.RUNNING],
+            payload__paperless_id=int(paperless_id),
+        )
+        .order_by("id")
+        .first()
+    )
+
+
 def enqueue_from_webhook(paperless_id: int, *, event: str = "webhook") -> tuple:
+    waiting = pending_pull(paperless_id)
+    if waiting is not None:
+        return waiting, False
     return enqueue(
         OperationKind.PAPERLESS_PULL,
         system=SyncSystem.PAPERLESS,
