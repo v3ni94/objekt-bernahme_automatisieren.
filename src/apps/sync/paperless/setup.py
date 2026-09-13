@@ -87,7 +87,8 @@ def check(*, user=None, create: bool = False, request=None) -> SetupState:
     can_write = create and config.mode() != config.MODE_READONLY
     created: list[str] = []
     if tag is None and can_write:
-        tag = client.create_tag(names.tag)
+        # matching_algorithm 0 (None): Paperless darf den Kennzeichnungs-Tag nie selbst an Dokumente vergeben
+        tag = client.create_tag(names.tag, matching_algorithm=0, is_inbox_tag=False)
         created.append(f"tag:{names.tag}")
     field_ids: dict[str, int] = {}
     missing: list[str] = []
