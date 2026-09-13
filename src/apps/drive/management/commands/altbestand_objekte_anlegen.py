@@ -58,7 +58,7 @@ def read_register(path: Path) -> dict[int, dict]:
 
 _HOUSE = r"\d+\s*[a-zA-Z]?(?:\s*[-–/]\s*\d+\s*[a-zA-Z]?)*"
 _STREET_NR = re.compile(rf"^(?P<street>[^\d]*?[^\d\s])\s+(?P<nr>{_HOUSE})$")
-_PLZ_CITY = re.compile(r"^(?:(?P<plz>\d{5})\s+)?(?P<city>[^\d].*)$")
+_PLZ_CITY = re.compile(r"^(?:(?P<plz>\d{5})\s+)?(?P<city>[^\d]+)$")
 _STREET_NR_PLZ_CITY = re.compile(
     rf"^(?P<street>.*?[^\d\s])\s+(?P<nr>{_HOUSE})\s+(?P<plz>\d{{5}})\s+(?P<city>.+)$"
 )
@@ -67,8 +67,9 @@ _STREET_NR_PLZ_CITY = re.compile(
 def parse_address(text: str | None) -> dict:
     """Konservative Anschrift aus einer Bezeichnung: „Aachener Straße 25, Erkelenz“ und „Ratheim, Shalomweg 3“
     (Strasse mit Hausnummer und Ort in beliebiger Reihenfolge, durch Komma getrennt), „Am Fließ 6 41812 Erkelenz“
-    (mit Postleitzahl) oder nur „Gladbacher Straße 95“ (ohne Ort). Klammerzusaetze werden entfernt. Was nicht
-    eindeutig ist, bleibt leer; die Ordneranlage wartet dann auf die Nachpflege."""
+    (mit Postleitzahl). Nur vollstaendige Anschriften (Strasse, Hausnummer, Ort) werden uebernommen; der Ortsteil
+    darf keine Ziffern enthalten. Klammerzusaetze werden entfernt. Was nicht eindeutig ist, bleibt leer; die
+    Ordneranlage wartet dann auf die Nachpflege."""
     clean = re.sub(r"\s*\([^)]*\)\s*", " ", text or "").strip(" ,;")
     clean = " ".join(clean.split())
     if not clean:
@@ -98,10 +99,24 @@ def parse_address(text: str | None) -> dict:
                 "postal_code": m.group("plz"),
                 "city": m.group("city").strip(),
             }
-        m = _STREET_NR.match(clean)
-        if m:
-            return {"street": m.group("street").strip(), "house_number": " ".join(m.group("nr").split())}
     return {}
+
+
+def _tokens(text: str | None) -> set[str]:
+    words = re.findall(r"[^\W\d_]+", (text or "").casefold())
+    return {w for w in words if len(w) >= 4 and w not in {"weg", "strasse", "straße", "str"}}
+
+
+def names_match(register_name: str | None, folder_name: str | None) -> bool:
+    """Registerbezeichnung und Ordnername gelten als zusammengehoerig, wenn sie ein Wort (ab vier Buchstaben) oder
+    einen gemeinsamen Wortanfang von fuenf Buchstaben teilen (Kesselstraße und Kesselstr.). Sonst gilt der
+    Ordnername, damit eine abweichende Nummerierung im Register kein falsches Objekt benennt."""
+    a, b = _tokens(register_name), _tokens(folder_name)
+    if not a or not b:
+        return False
+    if a & b:
+        return True
+    return any(x[:5] == y[:5] for x in a for y in b if len(x) >= 5 and len(y) >= 5)
 
 
 def folder_label(name: str | None) -> str:
@@ -171,14 +186,24 @@ class Command(BaseCommand):
                     f"  {numeric}: Objekt vorhanden ({vorhanden.name or ''}), {n} Quellordner gebunden"
                 )
                 continue
-            eintrag = register.get(numeric)
-            name = (eintrag or {}).get("name") or folder_label(srcs[0].name)
+            register_row = register.get(numeric)
+            labels = [folder_label(s.name) for s in srcs]
+            passt = register_row is not None and any(names_match(register_row["name"], s.name) for s in srcs)
+            eintrag = register_row if passt else None
+            name = (eintrag or {}).get("name") or labels[0]
             art = (eintrag or {}).get("management_type") or default_type
             hinweise = [
-                "Angelegt aus dem Altbestand (Massenanlage 13.09.2026), Stammdaten bitte nachpflegen."
+                "Angelegt aus dem Altbestand (Massenanlage 13.09.2026), Stammdaten bitte nachpflegen.",
+                "Quellordner: " + "; ".join((s.name or s.drive_folder_id) for s in srcs) + ".",
             ]
+            if register_row is not None and not passt:
+                hinweise.append(
+                    f"Objektregister 01.07.2026 führt unter dieser Nummer „{register_row['name']}“ "
+                    f"({REGISTER_STATUS.get(register_row['status'], register_row['status'])}); passt nicht zum "
+                    "Ordnernamen, daher Bezeichnung aus dem Ordnernamen und Verwaltungsart als Vorgabe, bitte prüfen."
+                )
             adresse: dict = {}
-            for kandidat in [(eintrag or {}).get("name")] + [folder_label(s.name) for s in srcs]:
+            for kandidat in [(eintrag or {}).get("name")] + labels:
                 geparst = parse_address(kandidat)
                 if geparst.get("city") and geparst.get("street"):
                     adresse = geparst
@@ -197,7 +222,7 @@ class Command(BaseCommand):
                 )
                 if not eintrag.get("management_type"):
                     hinweise.append("Verwaltungsart nicht aus dem Register bestimmbar, bitte prüfen.")
-            else:
+            elif register_row is None:
                 hinweise.append(
                     f"Nicht im Objektregister; Verwaltungsart {ManagementType(art).label} als Vorgabe, bitte prüfen."
                 )
@@ -207,7 +232,8 @@ class Command(BaseCommand):
             anschrift = ", ".join(x for x in (strasse, ort) if x) or "Anschrift offen"
             self.stdout.write(
                 f"  {numeric}: neu „{name}“ ({ManagementType(art).label}"
-                f"{', Register ' + eintrag['status'] if eintrag else ', ohne Registereintrag'}; {anschrift}) aus {quelle}"
+                f"{', Register ' + eintrag['status'] if eintrag else (', Register passt nicht' if register_row else ', ohne Registereintrag')}; "
+                f"{anschrift}) aus {quelle}"
             )
             if not echt:
                 angelegt += 1

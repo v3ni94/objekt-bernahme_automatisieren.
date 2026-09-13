@@ -400,7 +400,14 @@ def test_aufraeumen_sperren_und_rechte(
             "Ratheim, Shalomweg 3",
             {"street": "Shalomweg", "house_number": "3", "postal_code": "", "city": "Ratheim"},
         ),
-        ("Aachener Straße 119 (GmbH)", {"street": "Aachener Straße", "house_number": "119"}),
+        ("Aachener Straße 119 (GmbH)", {}),
+        ("Windmühlenstraße 31, Kaiserstraße 77 u. 79", {}),
+        ("Seesen Jacobsonstraße 24", {}),
+        ("Wandlitz, Richard-Wagner-Weg 8_9", {}),
+        (
+            "Wacholderstr 28, 45770 Marl",
+            {"street": "Wacholderstr", "house_number": "28", "postal_code": "45770", "city": "Marl"},
+        ),
         (
             "Am Fließ 6 41812 Erkelenz",
             {"street": "Am Fließ", "house_number": "6", "postal_code": "41812", "city": "Erkelenz"},
@@ -417,7 +424,7 @@ def test_aufraeumen_sperren_und_rechte(
         ("Giesenkirchener Str. 124 und 126", {}),
         ("Aachenerstraße 21, 23, 23a", {}),
         ("Graf-Reinald-Str. 34, 36, 38, 40, 42, 41812 Erkelenz", {}),
-        ("Gladbacher Straße 95", {"street": "Gladbacher Straße", "house_number": "95"}),
+        ("Gladbacher Straße 95", {}),
         ("Musterstadt Musterstraße 49 alt", {}),
         ("", {}),
     ],
@@ -426,6 +433,24 @@ def test_anschrift_aus_bezeichnung(text, erwartet):
     from apps.drive.management.commands.altbestand_objekte_anlegen import parse_address
 
     assert parse_address(text) == erwartet
+
+
+@pytest.mark.parametrize(
+    ("register_name", "folder_name", "erwartet"),
+    [
+        ("WEG Kesselstraße 58-60", "462 Essen, Kesselstr. 58-60", True),
+        ("In Gerderhahn 105", "394 Erkelenz, In Gerderhahn 106", True),
+        ("R31 Rigaer Straße 31", "503 R31 RigaerStr", True),
+        ("Schenkendorfstraße 6", "499 Richard-Wagner-Strasse 8_9, 16348 Wandlitz", False),
+        ("WEG Erkelenzer Straße 127", "523 Bedburg Dr. Harald Fett Bauernhof Projekt", False),
+        ("Am Fließ 6", "602 Am Fließ 6, 50181 Bedburg", True),
+        ("", "623 Musterstadt", False),
+    ],
+)
+def test_registerbezeichnung_passt_zum_ordnernamen(register_name, folder_name, erwartet):
+    from apps.drive.management.commands.altbestand_objekte_anlegen import names_match
+
+    assert names_match(register_name, folder_name) is erwartet
 
 
 def test_massenanlage_der_objekte_aus_dem_altbestand(drive, altordner, objekt, tmp_path, capsys, monkeypatch):
@@ -479,16 +504,169 @@ def test_massenanlage_der_objekte_aus_dem_altbestand(drive, altordner, objekt, t
     call_command("altbestand_objekte_anlegen", register=str(register), echt=True)
     out = capsys.readouterr().out
     assert "Angelegt: 0 Objekte" in out and ManagedObject.objects.filter(object_number="700").count() == 1
-    # ohne Register: Bezeichnung aus dem Ordnernamen, Vorgabe WEG mit Hinweis
+    # Registereintrag passt nicht zum Ordnernamen: Bezeichnung aus dem Ordnernamen, Vorgabe WEG, Hinweis mit beidem
     drive_id = drive.add_folder(drive.get(altordner["o700"]).parent_id, "0810 Neustadt, Ringstraße 2")
     takeover.add_sources(takeover.parse_folder_refs(drive_id))
     takeover.resolve_source(TakeoverSource.objects.get(drive_folder_id=drive_id), drive)
-    call_command("altbestand_objekte_anlegen", register=str(tmp_path / "fehlt.csv"), echt=True)
+    register.write_text(
+        "nummer;objekt;verwaltungsart;status\n810;Schenkendorfstraße 6;Mietverwaltung;archiv\n",
+        encoding="utf-8",
+    )
+    call_command("altbestand_objekte_anlegen", register=str(register), echt=True)
+    out = capsys.readouterr().out
+    assert "810: neu „Neustadt, Ringstraße 2“ (WEG, Register passt nicht; Ringstraße 2, Neustadt)" in out
     neu = ManagedObject.objects.get(object_number="810")
     assert neu.name == "Neustadt, Ringstraße 2" and neu.management_type == "weg"
     assert (neu.city, neu.street, neu.house_number) == ("Neustadt", "Ringstraße", "2")
-    assert "Nicht im Objektregister" in neu.notes
+    assert "passt nicht zum Ordnernamen" in neu.notes and "Schenkendorfstraße 6" in neu.notes
+    assert "Quellordner: 0810 Neustadt, Ringstraße 2." in neu.notes
+    # ohne Register: Hinweis, Bezeichnung aus dem Ordnernamen
+    drive_id2 = drive.add_folder(drive.get(altordner["o700"]).parent_id, "0811 Altstadt Marktplatz 4")
+    takeover.add_sources(takeover.parse_folder_refs(drive_id2))
+    takeover.resolve_source(TakeoverSource.objects.get(drive_folder_id=drive_id2), drive)
+    call_command("altbestand_objekte_anlegen", register=str(tmp_path / "fehlt.csv"), echt=True)
+    ohne = ManagedObject.objects.get(object_number="811")
+    assert ohne.name == "Altstadt Marktplatz 4" and ohne.city is None and ohne.street is None
+    assert "Nicht im Objektregister" in ohne.notes and "Anschrift unvollständig" in ohne.notes
+    assert ohne.drive_root_folder_id is None  # Ordner wartet auf die Nachpflege der Anschrift
     neu.refresh_from_db()
     assert (
         neu.drive_root_folder_id and drive.get(neu.drive_root_folder_id).name == "810 Neustadt, Ringstraße 2"
     )
+
+
+# ---------------------------------------------------------------- Nachraeumen (13.09.2026)
+def test_nachraeumen_entfernt_nur_leere_altordner_und_systemdateien(objekt, drive, aufgeraeumt):
+    """Nach der Verteilung gehen leere Ordner ausserhalb der Struktur und Systemdateien in den Papierkorb; Dubletten,
+    Dateien in Pruefung, ihre Ordner, der Quellordner und die Sollstruktur bleiben. Nichts wird endgueltig geloescht."""
+    from apps.drive import auto_cleanup
+    from apps.drive.models import DriveNode, NodeStatus
+
+    z = aufgeraeumt
+    vorschau = auto_cleanup.sweep(objekt, drive=drive, dry_run=True)
+    assert vorschau["status"] == "done" and vorschau["files"] == 0 and vorschau["folders"] == 0
+    assert [t["root"] for t in vorschau["trees"]] == [
+        drive.get(objekt.drive_root_folder_id).name,
+        "623 Musterstadt Musterstraße 49 alt",
+    ]
+    quelle = vorschau["trees"][1]
+    assert (
+        quelle["junk"] == 2
+        and quelle["empty_folders"] == 1
+        and quelle["kept"] == 2
+        and quelle["blocker"] is None
+    )
+    assert (
+        not drive.get(z["thumbs"]).trashed
+        and not AuditEvent.objects.filter(action="drive.auto_cleanup").exists()
+    )
+
+    result = auto_cleanup.sweep(objekt, drive=drive, trigger="test")
+    assert (
+        result["status"] == "done"
+        and result["files"] == 2
+        and result["folders"] == 1
+        and result["errors"] == []
+    )
+    assert drive.get(z["thumbs"]).trashed and drive.get(z["tmp"]).trashed and drive.get(z["leer"]).trashed
+    assert not drive.get(z["kopie_id"]).trashed and not drive.get(z["pruefung"].drive_file_id).trashed
+    assert not drive.get(z["rechnungen"]).trashed and not drive.get(z["quelle"]).trashed
+    assert (
+        not drive.get(z["original"].drive_file_id).trashed
+        and not drive.get(objekt.drive_root_folder_id).trashed
+    )
+    for row in DriveNode.objects.filter(object=objekt, status=NodeStatus.ACTIVE):
+        assert not drive.get(row.drive_file_id).trashed
+    assert TakeoverSource.objects.filter(pk=z["src"].pk).exists()
+    ev = AuditEvent.objects.get(action="drive.auto_cleanup", object_id=objekt.pk)
+    assert (
+        ev.after_state["files"] == 2
+        and ev.after_state["folders"] == 1
+        and ev.after_state["trigger"] == "test"
+    )
+    bewegungen = [
+        e for e in AuditEvent.objects.filter(action="drive.trash") if e.after_state.get("trigger") == "test"
+    ]
+    assert sorted(e.after_state["kind"] for e in bewegungen) == ["empty_folder", "junk", "junk"]
+    assert not [op for op in drive.ops if op[0] == "delete"]
+    # zweiter Durchgang: nichts mehr zu tun, kein zweites Protokoll
+    wieder = auto_cleanup.sweep(objekt, drive=drive)
+    assert (
+        wieder["files"] == 0 and wieder["folders"] == 0 and wieder["kept"] == 3
+    )  # Dublette, Prüfdatei, Original in 02
+    assert AuditEvent.objects.filter(action="drive.auto_cleanup").count() == 1
+    # Dublette bleibt dem Aufraeumen von Hand vorbehalten
+    plan = takeover.plan_cleanup(z["src"], drive)
+    assert [d.document_id for d in plan.duplicates] == [z["kopie"].pk] and not plan.junk
+
+
+def test_nachraeumen_im_objektordner_mit_sperren_und_schalter(objekt, drive, admin_user):
+    """Fremde Ordner im Objektordner: leere und solche mit nur Systemdateien gehen in den Papierkorb, Ordner mit
+    unbekannten Dateien bleiben (auch wenn ein leerer Unterordner darin entfernt wird); Strukturordner sind tabu.
+    Offene Jobs, der Schalter und die Objektsperre halten das Nachraeumen an."""
+    from django.core.cache import cache
+
+    from apps.drive import auto_cleanup
+    from apps.drive.models import DriveNode, NodeStatus
+
+    root = objekt.drive_root_folder_id
+    alt = drive.add_folder(root, "Alt")
+    scans = drive.add_folder(root, "Scans")
+    thumbs = drive.add_file(scans, "Thumbs.db", b"t" * 4)
+    wichtig = drive.add_folder(root, "Wichtig")
+    vertrag = drive.add_file(wichtig, "Vertrag.pdf", b"v" * 8)
+    tief = drive.add_folder(wichtig, "Leer tief")
+    struktur = DriveNode.objects.filter(object=objekt, status=NodeStatus.ACTIVE).first()
+
+    ProcessingJob.objects.create(
+        object=objekt, job_type=JobType.FILE_TO_DRIVE, idempotency_key="t-auto", status=JobStatus.PENDING
+    )
+    assert auto_cleanup.sweep(objekt, drive=drive)["reason"] == "offene Verarbeitungsjobs"
+    ProcessingJob.objects.filter(idempotency_key="t-auto").update(status=JobStatus.DONE)
+    store.set("drive.auto_cleanup_enabled", False, user=admin_user, reason="Test")
+    assert auto_cleanup.sweep(objekt, drive=drive)["reason"] == "drive.auto_cleanup_enabled aus"
+    assert auto_cleanup.trigger_auto_cleanup(objekt.pk) == "disabled"
+    store.set("drive.auto_cleanup_enabled", True, user=admin_user, reason="Test")
+    assert cache.add(f"takeover:{objekt.pk}", "test", timeout=60)
+    assert "gesperrt" in auto_cleanup.sweep(objekt, drive=drive)["reason"]
+    cache.delete(f"takeover:{objekt.pk}")
+    assert not drive.get(alt).trashed
+
+    # Ausloeser nach einem Verarbeitungslauf laeuft im Test sofort
+    assert auto_cleanup.trigger_auto_cleanup(objekt.pk, trigger="run") == "done"
+    assert drive.get(alt).trashed and drive.get(scans).trashed and drive.get(thumbs).trashed
+    assert drive.get(tief).trashed
+    assert not drive.get(wichtig).trashed and not drive.get(vertrag).trashed
+    assert not drive.get(root).trashed and not drive.get(struktur.drive_file_id).trashed
+    for row in DriveNode.objects.filter(object=objekt, status=NodeStatus.ACTIVE):
+        assert not drive.get(row.drive_file_id).trashed
+    ev = AuditEvent.objects.get(action="drive.auto_cleanup", object_id=objekt.pk)
+    assert (
+        ev.after_state["files"] == 1 and ev.after_state["folders"] == 3 and ev.after_state["trigger"] == "run"
+    )
+    assert ev.after_state["kept"] == 1
+
+
+def test_nachraeumen_leerer_quellordner_wird_aus_der_tabelle_entfernt(objekt, drive):
+    from apps.drive import auto_cleanup
+
+    alt = drive.add_folder(drive.root_id, "Altbestand")
+    quelle = drive.add_folder(alt, "623 alt leer")
+    unter = drive.add_folder(quelle, "Unter")
+    src = TakeoverSource.objects.create(
+        drive_folder_id=quelle, name="623 alt leer", object=objekt, status="done"
+    )
+    offen = TakeoverSource.objects.create(
+        drive_folder_id=drive.add_folder(alt, "623 noch nicht"),
+        name="623 noch nicht",
+        object=objekt,
+        status="linked",
+    )
+    result = auto_cleanup.sweep(objekt, drive=drive)
+    assert result["folders"] == 2 and result["sources_pruned"] == 1 and result["errors"] == []
+    assert drive.get(quelle).trashed and drive.get(unter).trashed and not drive.get(alt).trashed
+    assert not TakeoverSource.objects.filter(pk=src.pk).exists()
+    assert (
+        TakeoverSource.objects.filter(pk=offen.pk).exists() and not drive.get(offen.drive_folder_id).trashed
+    )
+    assert AuditEvent.objects.filter(action="drive.takeover_source_prune", entity_id=src.pk).exists()

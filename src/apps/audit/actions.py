@@ -36,6 +36,7 @@ AUDIT_ACTIONS: dict[str, str] = {
     "drive.takeover_source_remove": "Altbestand-Ordner aus der Tabelle entfernt",
     "drive.takeover_source_prune": "Altbestand-Ordner aus der Tabelle entfernt (in Drive nicht mehr vorhanden oder leer)",
     "drive.trash": "Datei oder Ordner in den Drive-Papierkorb verschoben",
+    "drive.auto_cleanup": "Nachräumen nach Verarbeitungslauf (leere Altordner, Systemdateien in den Papierkorb)",
     "drive.trash_failed": "Verschieben in den Drive-Papierkorb fehlgeschlagen",
     "document.ingest": "Dokument hochgeladen (Upload in die Verarbeitung)",
     "processing.start": "Verarbeitungslauf angefordert",

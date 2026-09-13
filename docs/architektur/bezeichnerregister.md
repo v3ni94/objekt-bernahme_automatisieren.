@@ -1735,6 +1735,7 @@ Celery-Queues aus den Settings: `ai`, `classify`, `io`, `lists`, `ocr`
 | documents.duplicate_name_pattern | documents | string | `"{original_stem}_S{page_from}-{page_to}.pdf"` |
 | documents.duplicate_owner_documents_in_drive | documents | boolean | `false` |
 | documents.max_download_bytes | documents | integer | `524288000` |
+| drive.auto_cleanup_enabled | drive | boolean | `true` |
 | drive.backoff | drive | object | `{"base_s": 1, "factor": 2, "max_s": 64, "attempts": 8}` |
 | drive.create_folders_on_object_create | drive | boolean | `true` |
 | drive.legacy_conflict_rename_pattern | drive | string | `null` |
@@ -1883,6 +1884,7 @@ Celery-Queues aus den Settings: `ai`, `classify`, `io`, `lists`, `ocr`
 | drive.takeover_source_remove | Altbestand-Ordner aus der Tabelle entfernt |
 | drive.takeover_source_prune | Altbestand-Ordner aus der Tabelle entfernt (in Drive nicht mehr vorhanden oder leer) |
 | drive.trash | Datei oder Ordner in den Drive-Papierkorb verschoben |
+| drive.auto_cleanup | Nachräumen nach Verarbeitungslauf (leere Altordner, Systemdateien in den Papierkorb) |
 | drive.trash_failed | Verschieben in den Drive-Papierkorb fehlgeschlagen |
 | document.ingest | Dokument hochgeladen (Upload in die Verarbeitung) |
 | processing.start | Verarbeitungslauf angefordert |

@@ -206,6 +206,17 @@ def trigger_object_folders(
     return "queued"
 
 
+@shared_task(name="drive.auto_cleanup", queue="io", soft_time_limit=1500, time_limit=1620)
+def auto_cleanup_task(object_id: int, trigger: str = "run") -> dict:
+    """Nachraeumen des Objektordners und der aufgearbeiteten Quellordner nach einem Verarbeitungslauf."""
+    from apps.drive.auto_cleanup import sweep
+
+    obj = ManagedObject.objects.filter(pk=object_id).first()
+    if obj is None:
+        return {"status": "missing"}
+    return sweep(obj, trigger=trigger)
+
+
 @shared_task(name="drive.ensure_unit_folders", queue="io", bind=True, max_retries=30)
 def ensure_unit_folders_task(self, object_id: int, user_id: int | None = None) -> dict:
     """Akten-Vorlage in Drive fuer ein Objekt: Akten je Einheit als Datensaetze sicherstellen, Ordner unter 05 und

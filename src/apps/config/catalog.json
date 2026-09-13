@@ -41,6 +41,16 @@
       }
     },
     {
+      "key": "drive.auto_cleanup_enabled",
+      "category": "drive",
+      "value_type": "boolean",
+      "description": "Nach jedem abgeschlossenen Verarbeitungslauf leere Ordner außerhalb der Sollstruktur und nicht registrierte Temporär- und Systemdateien im Objektordner und in aufgearbeiteten Altbestand-Ordnern in den Drive-Papierkorb verschieben",
+      "source": "Anforderung 13.09.2026 (Altordner nach Verteilung entfernen)",
+      "schema": {
+        "type": "boolean"
+      }
+    },
+    {
       "key": "drive.takeover_ignore_patterns",
       "category": "drive",
       "value_type": "list",

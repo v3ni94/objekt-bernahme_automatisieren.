@@ -226,5 +226,9 @@ def maybe_finish_run(run: ProcessingRun) -> bool:
         from apps.lists.services import request_generation
 
         request_generation(run.object_id, "run")  # CR 12a: Listen nach jedem Verarbeitungslauf (entprellt)
+        from apps.drive.auto_cleanup import trigger_auto_cleanup
+
+        # 13.09.2026: leere Altordner und Systemdateien nach der Verteilung in den Papierkorb (nie Struktur, nie Dokumente)
+        trigger_auto_cleanup(run.object_id, trigger="run")
     schedule_runs()
     return True
