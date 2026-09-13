@@ -293,6 +293,85 @@ def test_paperless_echtlauf_uebernimmt_und_verknuepft(
     assert inventory.refresh_dispositions(run) == 0
 
 
+def _objektfeld_id() -> int:
+    return int(services.connection_meta()["field_ids"]["object"])
+
+
+def test_paperless_umfang_liest_nur_dokumente_mit_objektfeld(
+    objekt, anderes_objekt, paperless, admin_user, seitengroesse_zwei
+):
+    """Mit Objektnummern fragt der Paperless-Lauf je Nummer nur die Dokumente mit passendem Feld MHV Objekt ab
+    (custom_field_query), statt den gesamten Bestand zu lesen; Seitenstand je Wert, Fremde bleiben ungelesen."""
+    store.set("paperless.import_only_with_object", True, user=admin_user, reason="Test")
+    fid = _objektfeld_id()
+    pid_a = paperless.add_document("Rechnung 623", pdf_bytes(["A 623"]), custom_fields={fid: "623"})
+    pid_a2 = paperless.add_document("Protokoll 623", pdf_bytes(["A2 623"]), custom_fields={fid: "623"})
+    pid_a3 = paperless.add_document("Angebot 623", pdf_bytes(["A3 623"]), custom_fields={fid: "623"})
+    pid_b = paperless.add_document("Rechnung 624", pdf_bytes(["B 624"]), custom_fields={fid: "624"})
+    pid_c = paperless.add_document("Ohne Feld", pdf_bytes(["C"]))
+    pid_d = paperless.add_document("Unbekannt 999", pdf_bytes(["D 999"]), custom_fields={fid: "999"})
+    paperless.reset_calls()
+
+    run = inventory.start(
+        "paperless", dry_run=True, scope={"object_numbers": ["623", "999"]}, user=admin_user
+    )
+    ergebnisse = _bis_ende(run)
+    # 623: drei Dokumente bei Seitengroesse zwei, also zwei Seiten; 999: eine Seite
+    assert [e["continue"] for e in ergebnisse] == [True, True, False]
+    assert [e["scope_value"] for e in ergebnisse] == ["623", "623", "999"]
+    assert ergebnisse[-1]["count"] == 4
+    assert run.status == InventoryStatus.DONE and run.counters["seen"] == 4
+    assert run.counters["complete"] is True
+    assert run.page_state["scope_values"] == ["623", "999"] and run.page_state["scope_index"] == 2
+
+    items = _items(run)
+    assert set(items) == {str(pid_a), str(pid_a2), str(pid_a3), str(pid_d)}
+    assert str(pid_b) not in items and str(pid_c) not in items
+    assert all(items[str(p)].disposition == Disposition.IMPORT_NEW for p in (pid_a, pid_a2, pid_a3))
+    fremd = items[str(pid_d)]
+    assert fremd.disposition == Disposition.OUT_OF_SCOPE and fremd.details["object_field"] == "999"
+    assert "kein aktives Objekt" in fremd.details["reason"]
+    filter_aufrufe = [c[2]["custom_field"] for c in paperless.calls if c[0] == "iter_pages"]
+    assert filter_aufrufe == [("MHV Objekt", "623"), ("MHV Objekt", "623"), ("MHV Objekt", "999")]
+    assert [c[2]["start_page"] for c in paperless.calls if c[0] == "iter_pages"] == [1, 2, 1]
+    assert sorted(_metadaten_aufrufe(paperless)) == sorted([pid_a, pid_a2, pid_a3, pid_d])
+    assert not SyncOperation.objects.exists() and not Document.objects.filter(source="paperless").exists()
+
+
+def test_paperless_umfang_echtlauf_uebernimmt_nur_das_objekt(
+    objekt, anderes_objekt, paperless, ops, admin_user
+):
+    """Echter Lauf mit Objektnummer (auch mit fuehrenden Nullen oder Leerzeichen eingegeben): nur die Dokumente
+    dieses Objekts werden als paperless_pull eingereiht und landen im Objekt, nicht im Eingang."""
+    store.set("paperless.import_only_with_object", True, user=admin_user, reason="Test")
+    fid = _objektfeld_id()
+    pid_a = paperless.add_document(
+        "Rechnung 623", pdf_bytes(["Rechnung 623"]), custom_fields={fid: "623"}, original_file_name="R623.pdf"
+    )
+    pid_b = paperless.add_document("Rechnung 624", pdf_bytes(["Rechnung 624"]), custom_fields={fid: "624"})
+    paperless.reset_calls()
+
+    run = inventory.start("paperless", dry_run=False, scope={"object_numbers": [" 0623 "]}, user=admin_user)
+    ergebnisse = _bis_ende(run)
+    # Schreibweise 0623 (kein Treffer) und Objektnummer 623 (ein Treffer)
+    assert run.page_state["scope_values"] == ["0623", "623"]
+    assert [e["continue"] for e in ergebnisse] == [True, False]
+    assert run.status == InventoryStatus.DONE
+    pulls = list(SyncOperation.objects.filter(kind=OperationKind.PAPERLESS_PULL).order_by("id"))
+    assert [p.payload["paperless_id"] for p in pulls] == [pid_a]
+    assert _items(run)[str(pid_a)].disposition == Disposition.IN_PROGRESS
+    assert str(pid_b) not in _items(run)
+
+    ops()
+    pulls[0].refresh_from_db()
+    assert pulls[0].status == OperationStatus.DONE
+    neu = Document.objects.get(source="paperless")
+    assert neu.object_id == objekt.pk and neu.original_name == "R623.pdf"
+    assert inventory.refresh_dispositions(run) == 1
+    assert _items(run)[str(pid_a)].disposition == Disposition.IMPORT_NEW
+    assert [c[1][0] for c in paperless.calls if c[0] == "download"] == [pid_a]
+
+
 def test_pause_und_fortsetzung_ohne_doppelte_zeilen(drei_dokumente, paperless, admin_user):
     d = drei_dokumente
     run = inventory.start("paperless", dry_run=True, user=admin_user)

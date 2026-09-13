@@ -173,6 +173,17 @@ def test_iter_pages_liefert_seitenstand_und_wiederaufnahme():
     assert s.calls[0]["query"]["page"] == 3
 
 
+def test_feldfilter_wird_als_custom_field_query_uebergeben():
+    s = FakeSession()
+    s.add("GET", "/api/documents/", page([{"id": 7}]))
+    c = make_client(s)
+    docs = list(c.list_documents(custom_field=("MHV Objekt", "82")))
+    assert [d["id"] for d in docs] == [7]
+    q = s.calls[0]["query"]
+    assert json.loads(q["custom_field_query"]) == ["MHV Objekt", "exact", "82"]
+    assert q["ordering"] == "id" and "modified__gt" not in q
+
+
 def test_ids_filter_wird_in_bloecke_zerlegt():
     s = FakeSession()
     s.add(

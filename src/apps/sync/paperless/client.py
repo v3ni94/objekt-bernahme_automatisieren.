@@ -64,6 +64,11 @@ class ServerInfo:
         return bool(self.features.get(feature, False))
 
 
+def custom_field_query(field_name: str, value: str) -> str:
+    """Filterausdruck fuer den exakten Wert eines benutzerdefinierten Feldes (Parameter custom_field_query)."""
+    return json.dumps([field_name, "exact", str(value)])
+
+
 @dataclass(frozen=True)
 class Page:
     """Eine Ergebnisseite einer paginierten Liste; number ist die Seitennummer fuer die Wiederaufnahme."""
@@ -480,12 +485,14 @@ class PaperlessClient:
         added_after: datetime | str | None,
         ordering: str,
         fields: Iterable[str] | None,
+        custom_field: tuple[str, str] | None = None,
     ) -> dict:
         return {
             "modified__gt": _iso(modified_after),
             "added__gt": _iso(added_after),
             "ordering": ordering,
             "fields": ",".join(fields) if fields else None,
+            "custom_field_query": custom_field_query(*custom_field) if custom_field else None,
         }
 
     def iter_pages(
@@ -498,10 +505,17 @@ class PaperlessClient:
         fields: Iterable[str] | None = None,
         page_size: int | None = None,
         start_page: int = 1,
+        custom_field: tuple[str, str] | None = None,
     ) -> Iterator[Page]:
-        """Seitenweise Dokumentliste mit Seitennummer, damit ein Inventar nach Abbruch fortgesetzt werden kann."""
+        """Seitenweise Dokumentliste mit Seitennummer, damit ein Inventar nach Abbruch fortgesetzt werden kann.
+        custom_field=(Feldname, Wert) begrenzt auf Dokumente mit genau diesem Wert im benutzerdefinierten Feld
+        (custom_field_query, ab Paperless-ngx 2.13)."""
         params = self._document_params(
-            modified_after=modified_after, added_after=added_after, ordering=ordering, fields=fields
+            modified_after=modified_after,
+            added_after=added_after,
+            ordering=ordering,
+            fields=fields,
+            custom_field=custom_field,
         )
         size = int(page_size or self.page_size)
         if ids is None:
@@ -526,6 +540,7 @@ class PaperlessClient:
         ordering: str = "id",
         fields: Iterable[str] | None = None,
         page_size: int | None = None,
+        custom_field: tuple[str, str] | None = None,
     ) -> Iterator[dict]:
         """Alle Dokumente der Filterung, Seite fuer Seite nachgeladen, bis next leer ist."""
         for page in self.iter_pages(
@@ -535,6 +550,7 @@ class PaperlessClient:
             ordering=ordering,
             fields=fields,
             page_size=page_size,
+            custom_field=custom_field,
         ):
             yield from page.results
 
@@ -542,7 +558,7 @@ class PaperlessClient:
         """Sucht ein Dokument ueber den exakten Wert eines benutzerdefinierten Feldes (custom_field_query, ab
         Paperless-ngx 2.13). Liefert das erste Dokument oder None; ein Server ohne diesen Filter meldet
         PaperlessUnsupported statt eines stillen Fehltreffers."""
-        query = json.dumps([field_name, "exact", str(value)])
+        query = custom_field_query(field_name, value)
         try:
             payload = self._get_json(
                 "/api/documents/",

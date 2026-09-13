@@ -243,11 +243,27 @@ class FakePaperless:
         added_after: datetime | str | None,
         ids: Iterable[int] | None,
         ordering: str,
+        custom_field: tuple[str, str] | None = None,
     ) -> list[dict]:
         docs = list(self.documents.values())
         if ids is not None:
             wanted = {int(i) for i in ids}
             docs = [d for d in docs if d["id"] in wanted]
+        if custom_field is not None:
+            field_name, value = custom_field
+            field = next(
+                (f for f in self.custom_fields.values() if f["name"].casefold() == field_name.casefold()),
+                None,
+            )
+            field_id = field["id"] if field else None
+            docs = [
+                d
+                for d in docs
+                if any(
+                    int(cf["field"]) == field_id and str(cf.get("value")) == str(value)
+                    for cf in d["custom_fields"]
+                )
+            ]
         threshold = _parse_dt(modified_after)
         if threshold is not None:
             docs = [d for d in docs if _parse_dt(d["modified"]) > threshold]
@@ -268,6 +284,7 @@ class FakePaperless:
         fields: Iterable[str] | None = None,
         page_size: int | None = None,
         start_page: int = 1,
+        custom_field: tuple[str, str] | None = None,
     ) -> Iterator[Page]:
         self._record(
             "iter_pages",
@@ -277,10 +294,15 @@ class FakePaperless:
             ordering=ordering,
             page_size=page_size,
             start_page=start_page,
+            custom_field=None if custom_field is None else tuple(custom_field),
         )
         ids_list = None if ids is None else [int(i) for i in ids]
         docs = self._filtered(
-            modified_after=modified_after, added_after=added_after, ids=ids_list, ordering=ordering
+            modified_after=modified_after,
+            added_after=added_after,
+            ids=ids_list,
+            ordering=ordering,
+            custom_field=custom_field,
         )
         size = int(page_size or self.page_size)
         field_list = list(fields) if fields else None
@@ -311,6 +333,7 @@ class FakePaperless:
         ordering: str = "id",
         fields: Iterable[str] | None = None,
         page_size: int | None = None,
+        custom_field: tuple[str, str] | None = None,
     ) -> Iterator[dict]:
         self._record(
             "list_documents", modified_after=modified_after, added_after=added_after, ordering=ordering
@@ -322,6 +345,7 @@ class FakePaperless:
             ordering=ordering,
             fields=fields,
             page_size=page_size,
+            custom_field=custom_field,
         ):
             yield from page.results
 

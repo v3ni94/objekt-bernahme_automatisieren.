@@ -120,7 +120,8 @@ def enqueue_from_webhook(paperless_id: int, *, event: str = "webhook") -> tuple:
     )
 
 
-def _object_from_field(remote: dict, meta: dict) -> ManagedObject | None:
+def _object_number_from_field(remote: dict, meta: dict) -> str | None:
+    """Objektnummer aus dem Feld MHV Objekt (erster Zahlenblock), None ohne Feld oder ohne Zahl."""
     field_id = (meta.get("field_ids") or {}).get("object")
     if not field_id:
         return None
@@ -128,10 +129,15 @@ def _object_from_field(remote: dict, meta: dict) -> ManagedObject | None:
         if int(cf.get("field", 0)) == int(field_id) and cf.get("value"):
             number = str(cf["value"]).split(",")[0].split(" ")[0].strip()
             if number.isdigit():
-                return ManagedObject.active.filter(
-                    object_number_numeric=int(number), is_system_inbox=False
-                ).first()
+                return number
     return None
+
+
+def _object_from_field(remote: dict, meta: dict) -> ManagedObject | None:
+    number = _object_number_from_field(remote, meta)
+    if number is None:
+        return None
+    return ManagedObject.active.filter(object_number_numeric=int(number), is_system_inbox=False).first()
 
 
 def _uuid_from_field(remote: dict, meta: dict) -> str | None:
@@ -255,6 +261,12 @@ def _import_new(client, remote: dict, metadata: dict, meta: dict) -> dict:
         raise Skip("Übernahme neuer Paperless-Dokumente ist abgeschaltet")
     from_field = _object_from_field(remote, meta)
     if from_field is None and config.import_only_with_object():
+        number = _object_number_from_field(remote, meta)
+        if number is not None:
+            raise Skip(
+                f"Feld MHV Objekt = {number}, aber kein aktives Objekt mit dieser Nummer angelegt; "
+                "Übernahme nur mit Objektbezug (paperless.import_only_with_object)"
+            )
         raise Skip(
             "ohne Feld MHV Objekt in Paperless; Übernahme nur mit Objektbezug (paperless.import_only_with_object)"
         )

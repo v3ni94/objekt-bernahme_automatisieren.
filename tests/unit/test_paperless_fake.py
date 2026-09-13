@@ -101,6 +101,21 @@ def test_dublette_wird_abgewiesen_oder_angelegt(tmp_path):
     assert p2.get_task(t2)["status"] == "SUCCESS" and len(p2.documents) == 2
 
 
+def test_feldfilter_liefert_nur_dokumente_mit_genau_diesem_wert():
+    p = FakePaperless(page_size=2)
+    feld = p.create_custom_field("MHV Objekt", "string")
+    a = p.add_document("A", b"a", custom_fields={feld["id"]: "82"})
+    b = p.add_document("B", b"b", custom_fields={feld["id"]: "82"})
+    p.add_document("C", b"c", custom_fields={feld["id"]: "823"})
+    p.add_document("D", b"d")
+    assert [d["id"] for d in p.list_documents(custom_field=("mhv objekt", "82"))] == [a, b]
+    assert list(p.list_documents(custom_field=("MHV Objekt", "8"))) == []
+    assert list(p.list_documents(custom_field=("Unbekannt", "82"))) == []
+    seiten = list(p.iter_pages(custom_field=("MHV Objekt", "82")))
+    assert len(seiten) == 1 and seiten[0].count == 2 and not seiten[0].has_next
+    assert p.calls[-1][2]["custom_field"] == ("MHV Objekt", "82")
+
+
 def test_filter_pagination_und_modified_fortschreibung():
     p = FakePaperless(page_size=2)
     ids = [p.add_document(f"Dok {i}", str(i).encode()) for i in range(1, 6)]

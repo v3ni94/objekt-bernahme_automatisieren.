@@ -184,6 +184,30 @@ def step(run_id: int) -> dict:
 
 
 # ---------------------------------------------------------------- Paperless
+def paperless_scope_values(numbers) -> list[str]:
+    """Feldwerte, unter denen der Paperless-Lauf Dokumente eines Objektumfangs sucht: die eingegebene Nummer,
+    ihre Schreibweise ohne fuehrende Nullen und die in der Anwendung gefuehrte Objektnummer. Reihenfolge stabil,
+    ohne Doppelte."""
+    values: list[str] = []
+    for raw in numbers or []:
+        text = str(raw).strip()
+        if not text:
+            continue
+        candidates = [text]
+        if text.isdigit():
+            candidates.append(str(int(text)))
+            candidates.extend(
+                ManagedObject.active.filter(object_number_numeric=int(text), is_system_inbox=False)
+                .order_by("id")
+                .values_list("object_number", flat=True)
+            )
+        for value in candidates:
+            value = str(value).strip()
+            if value and value not in values:
+                values.append(value)
+    return values
+
+
 def _paperless_step(run: InventoryRun) -> dict:
     client = services.get_client()
     if client is None:
@@ -191,18 +215,58 @@ def _paperless_step(run: InventoryRun) -> dict:
     state = dict(run.page_state or {})
     page_no = int(state.get("next_page") or 1)
     page_size = min(config.inventory_page_size(), 200)
-    page = next(iter(client.iter_pages(ordering="id", page_size=page_size, start_page=page_no)), None)
     counters = dict(run.counters or {})
-    if page is None:
+    numbers = (run.scope or {}).get("object_numbers") or []
+    if not numbers:
+        page = next(iter(client.iter_pages(ordering="id", page_size=page_size, start_page=page_no)), None)
+        if page is None:
+            return {"continue": False}
+        for remote in page.results:
+            counters["seen"] = counters.get("seen", 0) + 1
+            _classify_paperless(run, client, remote)
+        counters["steps"] = counters.get("steps", 0) + 1
+        state["next_page"] = page.next_number
+        state["count"] = page.count
+        InventoryRun.objects.filter(pk=run.pk).update(page_state=state, counters=counters)
+        return {"continue": page.has_next, "page": page.number, "count": page.count}
+    # Objektumfang: je Feldwert eine gefilterte Liste (custom_field_query auf das Feld MHV Objekt) statt des
+    # gesamten Bestands; der Seitenstand merkt sich Wert (scope_index) und Seite.
+    if "scope_values" not in state:
+        state["scope_values"] = paperless_scope_values(numbers)
+    values = list(state["scope_values"])
+    index = int(state.get("scope_index") or 0)
+    if index >= len(values):
         return {"continue": False}
-    for remote in page.results:
+    value = values[index]
+    field_name = config.field_names().object
+    page = next(
+        iter(
+            client.iter_pages(
+                ordering="id", page_size=page_size, start_page=page_no, custom_field=(field_name, value)
+            )
+        ),
+        None,
+    )
+    results = list(page.results) if page is not None else []
+    for remote in results:
         counters["seen"] = counters.get("seen", 0) + 1
         _classify_paperless(run, client, remote)
     counters["steps"] = counters.get("steps", 0) + 1
-    state["next_page"] = page.next_number
-    state["count"] = page.count
+    if page is not None and page.number == 1:
+        state["count"] = int(state.get("count") or 0) + int(page.count or 0)
+    if page is not None and page.has_next:
+        state["next_page"] = page.next_number
+    else:
+        index += 1
+        state["scope_index"] = index
+        state["next_page"] = 1
     InventoryRun.objects.filter(pk=run.pk).update(page_state=state, counters=counters)
-    return {"continue": page.has_next, "page": page.number, "count": page.count}
+    return {
+        "continue": index < len(values),
+        "page": page.number if page is not None else page_no,
+        "count": int(state.get("count") or 0),
+        "scope_value": value,
+    }
 
 
 def _classify_paperless(run: InventoryRun, client, remote: dict) -> None:
@@ -283,18 +347,22 @@ def _classify_paperless(run: InventoryRun, client, remote: dict) -> None:
             **fields,
         )
     else:
-        from apps.sync.flows.paperless_pull import _object_from_field
+        from apps.sync.flows.paperless_pull import _object_from_field, _object_number_from_field
 
-        if (
-            config.import_only_with_object()
-            and _object_from_field(remote, services.connection_meta()) is None
-        ):
+        meta = services.connection_meta()
+        if config.import_only_with_object() and _object_from_field(remote, meta) is None:
+            number = _object_number_from_field(remote, meta)
+            reason = (
+                f"Feld MHV Objekt = {number}, kein aktives Objekt mit dieser Nummer angelegt"
+                if number is not None
+                else "ohne Feld MHV Objekt (paperless.import_only_with_object)"
+            )
             _item(
                 run,
                 system=SyncSystem.PAPERLESS,
                 external_id=remote_id,
                 disposition=Disposition.OUT_OF_SCOPE,
-                details={"reason": "ohne Feld MHV Objekt (paperless.import_only_with_object)"},
+                details={"reason": reason, "object_field": number},
                 **fields,
             )
             return

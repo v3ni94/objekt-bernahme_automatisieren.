@@ -31,7 +31,7 @@
 <div class="karte"><h2>Bestandslauf</h2>
 <form method="post" action="{% url 'sync_inventory_start' %}">{% csrf_token %}
 <p><label>Art</label><select name="art"><option value="paperless">Paperless-Bestand (Inventar, verknüpfen oder übernehmen)</option><option value="drive">Drive-Bestand (Objektordner und Eingang, nach Paperless übertragen)</option></select></p>
-<p><label>Pilotumfang (Objektnummern, leer = alle)</label><input type="text" name="objekte" placeholder="82, 623"></p>
+<p><label>Umfang (Objektnummern, leer = alle)</label><input type="text" name="objekte" placeholder="82, 91"> <span class="klein">Paperless: nur Dokumente, deren Feld MHV Objekt genau diese Nummer trägt; Drive: nur diese Objektordner</span></p>
 <p><label class="klein"><input type="checkbox" name="echt" value="1" style="width:auto"> echter Lauf (ohne Haken: Trockenlauf, nur Manifest)</label></p>
 <p class="aktionen"><button type="submit">Bestandslauf starten</button></p></form>
 <table class="voll"><thead><tr><th>Nr.</th><th>Art</th><th>Modus</th><th>Status</th><th>gestartet</th><th>Zähler</th></tr></thead><tbody>{% for r in runs %}<tr data-href="{% url 'sync_inventory' r.pk %}"><td><a href="{% url 'sync_inventory' r.pk %}">{{ r.pk }}</a></td><td>{{ r.get_kind_display }}</td><td>{% if r.dry_run %}Trockenlauf{% else %}echt{% endif %}</td><td>{{ r.get_status_display }}</td><td>{{ r.started_at|date:"d.m.Y H:i" }}</td><td class="klein">{{ r.counters|default:"" }}</td></tr>{% empty %}<tr><td colspan="6">noch kein Bestandslauf</td></tr>{% endfor %}</tbody></table></div>
