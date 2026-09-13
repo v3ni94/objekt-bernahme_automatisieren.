@@ -303,7 +303,29 @@ def inventory_start(request):
 def storage_paths_list(request):
     """Speicherpfade aus Paperless mit abgeleiteter Objektnummer und Stand der Feldbefuellung. GET liest aus dem
     Zwischenspeicher, POST neu_lesen liest frisch aus Paperless."""
-    refresh = request.method == "POST" and request.POST.get("aktion") == "neu_lesen"
+    aktion = request.POST.get("aktion") if request.method == "POST" else None
+    if aktion == "alle_fuellen":
+        try:
+            result = storage_paths.dispatch_fill_all(user=request.user, request=request)
+        except storage_paths.StoragePathError as exc:
+            messages.error(request, str(exc))
+            return redirect("sync_storage_paths")
+        if result is None:
+            messages.success(
+                request, "Gesamtlauf über alle zugeordneten Speicherpfade eingereiht; Stand auf dieser Seite."
+            )
+        else:
+            text = (
+                f"Gesamtlauf: {result['done']} Pfade, Feld bei {result['set']} Dokumenten gesetzt, "
+                f"{result['other']} mit abweichendem Wert unverändert"
+            )
+            if result.get("inventory_run_id"):
+                text += f"; Bestandslauf {result['inventory_run_id']} gestartet"
+            elif result.get("inventory_error"):
+                text += f"; Bestandslauf nicht gestartet: {result['inventory_error']}"
+            messages.success(request, text + ".")
+        return redirect("sync_storage_paths")
+    refresh = aktion == "neu_lesen"
     rows: list = []
     read_at = None
     try:
@@ -323,6 +345,7 @@ def storage_paths_list(request):
             "matched_count": len(matched),
             "matched_docs": sum(r.document_count for r in matched),
             "total_docs": sum(r.document_count for r in rows),
+            "all_state": storage_paths.all_state(),
             "field_names": config.field_names(),
             "mode": config.mode(),
             "enabled": config.enabled(),

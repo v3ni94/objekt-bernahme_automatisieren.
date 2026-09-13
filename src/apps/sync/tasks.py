@@ -66,6 +66,20 @@ def storage_path_fill_task(path_id: int, user_id: int | None = None) -> dict:
         return {"status": "failed", "error": str(exc)}
 
 
+@shared_task(name="sync.storage_path_fill_all", queue="io", soft_time_limit=10800, time_limit=10900)
+def storage_path_fill_all_task(user_id: int | None = None) -> dict:
+    from django.contrib.auth import get_user_model
+
+    from apps.sync import storage_paths
+
+    user = get_user_model().objects.filter(pk=user_id).first() if user_id else None
+    try:
+        return storage_paths.fill_all(user=user)
+    except storage_paths.StoragePathError as exc:
+        storage_paths._set_all_state({"status": "failed", "error": str(exc)})
+        return {"status": "failed", "error": str(exc)}
+
+
 @shared_task(name="sync.derive_rules", queue="io")
 def derive_rules_task() -> dict:
     from apps.sync.assignment import learning

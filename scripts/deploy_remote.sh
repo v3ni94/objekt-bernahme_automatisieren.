@@ -27,6 +27,7 @@
 #   config-set <branch> <schluessel=wert>  Konfigurationswert setzen (Wert als JSON: true, 5, "text"); Audit
 #   altbestand-import <branch>  Quellordner aus db/seeds/altbestand_ordner.txt in die Altbestand-Tabelle
 #   altbestand-objekte <branch> [echt]  Objekte fuer Altbestand-Quellen ohne Objekt anlegen (echt = anlegen, sonst Vorschau)
+#   paperless-feld-alle <branch> [echt] Feld MHV Objekt fuer alle zugeordneten Speicherpfade setzen und Bestandslauf starten
 #                             aufnehmen (ohne Doppelte) und Namen aus Drive lesen
 # Jede andere Eingabe wird abgewiesen.
 set -euo pipefail
@@ -384,6 +385,14 @@ PY
     # Quellordner der bisherigen Ablage in die Altbestand-Tabelle aufnehmen; idempotent, nur Folder-IDs und Namen
     docker compose exec -T web python manage.py altbestand_import --aufloesen
     ;;
+  paperless-feld-alle)
+    # Feld MHV Objekt fuer alle zugeordneten Paperless-Speicherpfade; Argument "echt" setzt und startet den Bestandslauf
+    if [ "${ARG:-}" = "echt" ]; then
+      docker compose exec -T web python manage.py paperless_feld_setzen --echt
+    else
+      docker compose exec -T web python manage.py paperless_feld_setzen
+    fi
+    ;;
   altbestand-objekte)
     # Objekte fuer alle Altbestand-Quellen ohne Objekt anlegen; Argument "echt" legt an, sonst nur Vorschau
     if [ "${ARG:-}" = "echt" ]; then
@@ -392,5 +401,5 @@ PY
       docker compose exec -T web python manage.py altbestand_objekte_anlegen
     fi
     ;;
-  *) echo "Nur check, pull, befund, env-init, ps, logs, smoke, cert-retry, db-status, db-reset, first-run, deploy, rollback, create-admin, oauth-check, deploy-tests, doc-status, config-set, altbestand-import, altbestand-objekte oder reconcile-all erlaubt"; exit 2 ;;
+  *) echo "Nur check, pull, befund, env-init, ps, logs, smoke, cert-retry, db-status, db-reset, first-run, deploy, rollback, create-admin, oauth-check, deploy-tests, doc-status, config-set, altbestand-import, altbestand-objekte, paperless-feld-alle oder reconcile-all erlaubt"; exit 2 ;;
 esac

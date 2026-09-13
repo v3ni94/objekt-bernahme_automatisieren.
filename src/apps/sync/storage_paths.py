@@ -307,6 +307,123 @@ def fill(path_id: int, *, user=None, request=None, start_inventory: bool = True)
     return meta
 
 
+# ---------------------------------------------------------------- Gesamtlauf ueber alle zugeordneten Pfade
+ALL_STATE = "field_fill:all"
+
+
+def all_state() -> dict:
+    row = services.get_cursor(SyncSystem.PAPERLESS, ALL_STATE)
+    return dict(row.meta or {}) if row else {}
+
+
+def _set_all_state(meta: dict) -> None:
+    services.set_cursor(SyncSystem.PAPERLESS, ALL_STATE, str(meta.get("status") or ""), meta)
+
+
+def fill_all(*, user=None, request=None, dry_run: bool = False) -> dict:
+    """Alle Speicherpfade mit zugeordnetem Objekt nacheinander befuellen (nie ueberschreiben), danach ein einziger
+    echter Bestandslauf mit allen betroffenen Objektnummern. dry_run liest nur und zaehlt. Der Stand steht im Cursor
+    field_fill:all; je Pfad bleibt der eigene Stand erhalten."""
+    if not config.active():
+        raise StoragePathError("Hauptschalter paperless.enabled aus oder Paperless nicht konfiguriert")
+    rows, _read_at = overview(refresh=True)
+    matched = [r for r in rows if r.matched]
+    summary: dict = {
+        "status": "running",
+        "dry_run": dry_run,
+        "started_at": timezone.now().isoformat(),
+        "paths": len(matched),
+        "done": 0,
+        "total": 0,
+        "missing": 0,
+        "set": 0,
+        "same": 0,
+        "other": 0,
+        "numbers": [],
+        "skipped": [],
+        "errors": [],
+        "per_path": [],
+    }
+    if not dry_run:
+        _set_all_state(summary)
+    for row in matched:
+        if not config.writes_allowed(row.object):
+            summary["skipped"].append(f"{row.name}: Objekt außerhalb des Modus oder Pilotumfangs")
+            continue
+        try:
+            if dry_run:
+                res = plan(row.id).summary()
+                res["set"] = 0
+            else:
+                res = fill(row.id, user=user, request=request, start_inventory=False)
+        except StoragePathError as exc:
+            summary["errors"].append(f"{row.name}: {exc}")
+            continue
+        summary["done"] += 1
+        for key in ("total", "missing", "set", "same", "other"):
+            summary[key] += int(res.get(key) or 0)
+        if res.get("total") and res["object_number"] not in summary["numbers"]:
+            summary["numbers"].append(res["object_number"])
+        summary["per_path"].append(
+            {
+                "path_id": res["path_id"],
+                "path": res["path_name"],
+                "object_number": res["object_number"],
+                "total": res["total"],
+                "missing": res["missing"],
+                "set": res.get("set", 0),
+                "same": res["same"],
+                "other": res["other"],
+            }
+        )
+        if not dry_run:
+            _set_all_state(summary)
+    if not dry_run and summary["numbers"]:
+        try:
+            run = inventory.start(
+                SyncSystem.PAPERLESS,
+                dry_run=False,
+                scope={"object_numbers": list(summary["numbers"])},
+                user=user,
+                request=request,
+            )
+            summary["inventory_run_id"] = run.pk
+            known = states()
+            for entry in summary["per_path"]:
+                state = known.get(int(entry["path_id"]))
+                if state is not None:
+                    _set_state(int(entry["path_id"]), {**state, "inventory_run_id": run.pk})
+        except inventory.InventoryError as exc:
+            summary["inventory_error"] = str(exc)
+    summary["status"] = "done"
+    summary["finished_at"] = timezone.now().isoformat()
+    if not dry_run:
+        _set_all_state(summary)
+        record(
+            "sync.paperless_field_fill",
+            entity_type="sync_cursor",
+            after={k: v for k, v in summary.items() if k != "per_path"} | {"scope": "alle Speicherpfade"},
+            actor=user,
+            request=request,
+        )
+    return summary
+
+
+def dispatch_fill_all(*, user=None, request=None) -> dict | None:
+    """Gesamtlauf im Hintergrund (Celery, Warteschlange io) oder sofort ohne Celery."""
+    if not config.active():
+        raise StoragePathError("Hauptschalter paperless.enabled aus oder Paperless nicht konfiguriert")
+    if all_state().get("status") in ("queued", "running"):
+        raise StoragePathError("Ein Gesamtlauf läuft bereits; Stand auf dieser Seite")
+    if settings.OBJEKTAKTE.get("JOB_DISPATCH", "celery") == "celery":
+        from apps.sync.tasks import storage_path_fill_all_task
+
+        _set_all_state({"status": "queued", "queued_at": timezone.now().isoformat()})
+        storage_path_fill_all_task.apply_async(args=[getattr(user, "pk", None)], queue="io")
+        return None
+    return fill_all(user=user, request=request)
+
+
 def dispatch_fill(path_id: int, *, user=None, request=None) -> dict | None:
     """Befuellung im Hintergrund (Celery, Warteschlange io); ohne Celery sofort. Liefert das Ergebnis, wenn es
     sofort vorliegt, sonst None."""

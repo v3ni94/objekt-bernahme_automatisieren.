@@ -225,6 +225,8 @@ Grenzen und Schutz: Vorhandene Werte im Feld werden nie überschrieben, auch nic
 
 Ohne Speicherpfad mit Nummer bleibt der Weg von Hand: in Paperless filtern, Massenbearbeitung Zusatzfeld MHV Objekt auf die Objektnummer setzen (Wert als Zahl, erster Zahlenblock zählt), dann Bestandslauf Art Paperless mit der Nummer im Feld Umfang (Trockenlauf, dann echt).
 
+Gesamtlauf über alle zugeordneten Pfade: Der Knopf „Alle zugeordneten Pfade: Feld setzen und übernehmen“ (Bestätigung) beziehungsweise die Deploy-Aktion `paperless-feld-alle` (ohne Argument Vorschau je Pfad mit Zählern, Argument `echt` führt aus; Kommando `manage.py paperless_feld_setzen [--echt]`) arbeitet alle Speicherpfade mit zugeordnetem Objekt nacheinander ab, setzt das Feld nur bei Dokumenten ohne Wert und startet danach genau einen echten Bestandslauf mit allen betroffenen Objektnummern (Celery-Aufgabe `sync.storage_path_fill_all`, Stand im Cursor `field_fill:all`, Protokoll `sync.paperless_field_fill` mit `scope` „alle Speicherpfade“). Läuft bereits ein Bestandslauf, meldet der Gesamtlauf das (`inventory_error`); die Übernahme läuft dann über den Webhook und den nächsten Bestandslauf. Ein zweiter Gesamtlauf setzt nichts doppelt.
+
 Nicht nötig: `paperless.pilot_object_numbers` pflegen (im Modus `full` ohne Wirkung), Cursor zurücksetzen, den vollständigen Bestandslauf ohne Umfang wiederholen.
 
 ## 7 Konflikte und Löschungen

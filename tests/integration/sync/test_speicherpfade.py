@@ -5,6 +5,7 @@ MHV Objekt in Paketen ohne Ueberschreiben, Start des objektbezogenen Bestandslau
 from __future__ import annotations
 
 import pytest
+from django.core.management import call_command
 from django.urls import reverse
 from tests.integration.sync.conftest import pdf_bytes
 
@@ -214,3 +215,60 @@ def test_oberflaeche_uebersicht_vorschau_und_befuellung(
         302,
         403,
     )
+
+
+def test_gesamtlauf_setzt_alle_zugeordneten_pfade_und_startet_einen_bestandslauf(
+    pfade, objekt, anderes_objekt, paperless, admin_user
+):
+    """Gesamtlauf: Vorschau liest und zaehlt ohne Schreiben; der echte Lauf setzt das Feld in allen zugeordneten
+    Pfaden (nie ueberschreiben) und startet genau einen Bestandslauf mit allen betroffenen Objektnummern."""
+    vorschau = storage_paths.fill_all(dry_run=True)
+    assert vorschau["status"] == "done" and vorschau["dry_run"] is True
+    assert vorschau["paths"] == 2 and vorschau["done"] == 2 and vorschau["total"] == 6
+    assert (
+        vorschau["missing"] == 4 and vorschau["same"] == 1 and vorschau["other"] == 1 and vorschau["set"] == 0
+    )
+    assert vorschau["numbers"] == ["623", "624"] and "inventory_run_id" not in vorschau
+    assert "bulk_edit" not in paperless.call_names() and not InventoryRun.objects.exists()
+    assert storage_paths.all_state() == {}  # Vorschau hinterlaesst keinen Stand
+
+    result = storage_paths.fill_all(user=admin_user)
+    assert result["status"] == "done" and result["set"] == 4 and result["same"] == 1 and result["other"] == 1
+    assert [r["path"] for r in result["per_path"]] == [
+        "623 – Musterstadt, Musterstraße 49",
+        "0624 Beispielhausen",
+    ]
+    run = InventoryRun.objects.get(pk=result["inventory_run_id"])
+    assert run.dry_run is False and run.scope == {"object_numbers": ["623", "624"]}
+    assert InventoryRun.objects.count() == 1
+    stand = storage_paths.states()
+    assert stand[pfade["sp_623"]]["set"] == 3 and stand[pfade["sp_623"]]["inventory_run_id"] == run.pk
+    assert stand[pfade["sp_624"]]["set"] == 1 and stand[pfade["sp_624"]]["inventory_run_id"] == run.pk
+    gesamt = storage_paths.all_state()
+    assert gesamt["status"] == "done" and gesamt["set"] == 4 and gesamt["inventory_run_id"] == run.pk
+    protokoll = AuditEvent.objects.filter(action="sync.paperless_field_fill").order_by("id")
+    assert protokoll.count() == 3 and protokoll.last().after_state["scope"] == "alle Speicherpfade"
+    # zweiter Gesamtlauf: nichts mehr zu setzen, zweiter Bestandslauf abgewiesen, solange der erste laeuft
+    paperless.reset_calls()
+    wieder = storage_paths.fill_all(user=admin_user)
+    assert wieder["set"] == 0 and wieder["same"] == 5 and "bulk_edit" not in paperless.call_names()
+    assert "bereits ein Bestandslauf" in wieder["inventory_error"]
+
+
+def test_gesamtlauf_ueber_oberflaeche_und_kommando(pfade, paperless, client_as, admin_user, capsys):
+    c = client_as(admin_user)
+    resp = c.get(reverse("sync_storage_paths"))
+    assert "Alle zugeordneten Pfade" in resp.content.decode()
+    call_command("paperless_feld_setzen")
+    out = capsys.readouterr().out
+    assert "Vorschau: 2 zugeordnete Speicherpfade" in out and "Würde setzen: 4" in out
+    assert "0624 Beispielhausen: Objekt 624, 1 Dokumente, ohne Feld 1" in out
+    assert "bulk_edit" not in paperless.call_names()
+    resp = c.post(reverse("sync_storage_paths"), {"aktion": "alle_fuellen"})
+    assert resp.status_code == 302
+    assert storage_paths.all_state()["set"] == 4
+    resp = c.post(reverse("sync_storage_paths"), {"aktion": "alle_fuellen"}, follow=True)
+    assert any("0 Pfade" not in m.message for m in resp.context["messages"])
+    call_command("paperless_feld_setzen", echt=True)
+    out = capsys.readouterr().out
+    assert "Gesetzt: 0; bereits gesetzt: 5" in out
