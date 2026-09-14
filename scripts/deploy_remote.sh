@@ -307,6 +307,9 @@ for j in ProcessingJob.objects.filter(status="pending", last_error__startswith="
     print(f"  wartet {j.job_type} Job {j.pk}: {(j.last_error or '')[:120]}")
 laeufe = ProcessingRun.objects.values("status").annotate(c=Count("id"))
 print("Laeufe:", ", ".join(f"{r['status']}={r['c']}" for r in laeufe) or "keine")
+for run in ProcessingRun.objects.filter(status="running").select_related("object").order_by("id"):
+    offen = ProcessingJob.objects.filter(object=run.object, status="pending")
+    print(f"Lauf {run.pk} Objekt {run.object.object_number} laeuft seit {run.started_at:%d.%m. %H:%M}: Dokumente {run.documents_total}, offene Jobs {offen.count()} (am Lauf {offen.filter(run=run).count()}, ohne Lauf {offen.filter(run__isnull=True).count()}, an anderem Lauf {offen.exclude(run=run).exclude(run__isnull=True).count()}, nie versandt {offen.filter(dispatched_at__isnull=True).count()}), laufende Jobs {ProcessingJob.objects.filter(object=run.object, status='running').count()}")
 # Ordnerabgleiche je Objekt (letzte drei), Struktur in drive_nodes, offene Faelle nach Art; ohne Dateinamen
 from apps.drive.models import DriveNode, DriveSyncRun
 from apps.review.models import ReviewCase
