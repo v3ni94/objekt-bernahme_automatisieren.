@@ -399,10 +399,31 @@ def _after_done(job: ProcessingJob) -> None:
 
     try:
         refresh_progress(job.object)
-        if job.run_id:
-            maybe_finish_run(job.run)
+        finished = maybe_finish_run(job.run) if job.run_id else False
+        if job.job_type == JobType.FILE_TO_DRIVE and not finished:
+            _after_filing(job)
     except Exception:  # Zaehler und Laufabschluss duerfen den Job nicht scheitern lassen
         logger.exception("Nachlauf zu Job %s fehlgeschlagen", job.pk)
+
+
+def _after_filing(job: ProcessingJob) -> None:
+    """Letzte Ablage nach einem bereits abgeschlossenen Lauf: Nachraeumen des Objektordners anstossen. Seit dem
+    14.09.2026 endet ein Lauf, sobald nur noch Ablagejobs offen sind; das Nachraeumen beim Laufabschluss ueberspringt
+    Objekte mit offenen Jobs und wuerde sonst ausbleiben."""
+    from apps.pipeline.models import RunStatus
+
+    run = job.run
+    if run is None or run.status not in (RunStatus.DONE, RunStatus.FAILED) or run.dry_run:
+        return
+    if ProcessingJob.objects.filter(
+        object_id=job.object_id, status__in=[JobStatus.PENDING, JobStatus.RUNNING]
+    ).exists():
+        return
+    if getattr(job.object, "is_system_inbox", False):
+        return
+    from apps.drive.auto_cleanup import trigger_auto_cleanup
+
+    trigger_auto_cleanup(job.object_id, trigger="filing")
 
 
 def stale_minutes(job_type: str) -> int:

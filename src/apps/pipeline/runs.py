@@ -230,29 +230,25 @@ def repair_interrupted_runs(min_age_minutes: int = REPAIR_AFTER_MINUTES) -> list
 
 
 def maybe_finish_run(run: ProcessingRun) -> bool:
-    """Lauf abschliessen, wenn kein Job des Objekts mehr offen ist; KPIs speichern (D 7.1)."""
+    """Lauf abschliessen, wenn kein Job des Objekts ausser Ablagejobs mehr offen ist; KPIs speichern (D 7.1)."""
     if run.status != RunStatus.RUNNING:
         return False
     open_jobs = ProcessingJob.objects.filter(
         object=run.object, status__in=[JobStatus.PENDING, JobStatus.RUNNING]
     )
-    # Ablagejobs, die auf den Objektordner warten (Anschrift unvollstaendig, kein Ordner), halten den Lauf nicht
-    # offen (14.09.2026): der Lauf gibt seinen Platz frei, die Jobs laufen nach Anlage des Ordners von selbst weiter
-    waiting_for_folder = open_jobs.filter(
-        status=JobStatus.PENDING,
-        job_type=JobType.FILE_TO_DRIVE,
-        next_attempt_at__gt=timezone.now(),
-        last_error__contains="Objektordner unbekannt",
-    )
-    if open_jobs.exclude(pk__in=waiting_for_folder.values("pk")).exists():
+    # Ablagejobs halten den Lauf nicht offen (14.09.2026, Freigabe Geschaeftsfuehrung): die Ablage nach Drive laeuft
+    # je Objekt seriell und unabhaengig vom Lauf weiter, der Lauf gibt seinen Platz frei, sobald OCR, Klassifikation
+    # und Entscheidung erledigt sind. Zuvor hielten acht Objekte in der Ablagephase alle Plaetze, 68 warteten, die
+    # OCR-Prozesse standen still. Das Nachraeumen des Objektordners folgt mit der letzten Ablage (jobs._after_filing).
+    if open_jobs.exclude(job_type=JobType.FILE_TO_DRIVE).exists():
         return False
-    waiting_count = waiting_for_folder.count()
-    if waiting_count:
-        logger.warning(
-            "Lauf %s Objekt %s: %s Ablagejobs warten auf den Objektordner, Lauf wird abgeschlossen",
+    filing_count = open_jobs.filter(job_type=JobType.FILE_TO_DRIVE).count()
+    if filing_count:
+        logger.info(
+            "Lauf %s Objekt %s: %s Ablagejobs laufen nach dem Abschluss weiter",
             run.pk,
             run.object_id,
-            waiting_count,
+            filing_count,
         )
     with transaction.atomic():
         run = ProcessingRun.objects.select_for_update().get(pk=run.pk)

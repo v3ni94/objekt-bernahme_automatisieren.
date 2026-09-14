@@ -347,10 +347,19 @@ def test_sweep_versorgt_unterbrochene_laeufe_und_verwaiste_jobs_nach(drei_objekt
     assert repair_interrupted_runs() == []
 
 
-def test_lauf_endet_trotz_ablage_die_auf_den_objektordner_wartet(drei_objekte):
-    """14.09.2026: Ablagejobs, die auf den Objektordner warten (Anschrift unvollstaendig), halten den Lauf nicht
-    offen; der Lauf gibt seinen Platz frei, die Jobs laufen nach Anlage des Ordners weiter. Andere offene Jobs und
-    faellige Ablagejobs halten den Lauf weiterhin offen."""
+def test_lauf_endet_trotz_ablage_die_auf_den_objektordner_wartet(drei_objekte, monkeypatch):
+    """14.09.2026 (Freigabe Geschaeftsfuehrung): Ablagejobs halten den Lauf nicht offen, ob sie auf den Objektordner
+    warten oder faellig sind; der Lauf gibt seinen Platz frei, die Ablage laeuft weiter. Andere offene Jobs halten
+    den Lauf offen. Das Nachraeumen des Objektordners folgt mit der letzten Ablage des abgeschlossenen Laufs."""
+    from apps.drive import auto_cleanup as cleanup_mod
+    from apps.pipeline.jobs import _after_done
+
+    ausgeloest: list[tuple] = []
+    monkeypatch.setattr(
+        cleanup_mod,
+        "trigger_auto_cleanup",
+        lambda object_id, trigger="run": ausgeloest.append((object_id, trigger)),
+    )
     a, _, _ = drei_objekte
     lauf = ProcessingRun.objects.create(
         object=a, run_type=RunType.INCREMENTAL, status=RunStatus.RUNNING, started_at=timezone.now()
@@ -375,14 +384,33 @@ def test_lauf_endet_trotz_ablage_die_auf_den_objektordner_wartet(drei_objekte):
     )
     assert maybe_finish_run(lauf) is False
     ProcessingJob.objects.filter(pk=anderer.pk).update(status=JobStatus.DONE)
-    # faelliger Ablagejob (Wartezeit abgelaufen) haelt offen
+    # auch ein faelliger Ablagejob haelt den Lauf nicht mehr offen
     ProcessingJob.objects.filter(pk=wartend.pk).update(next_attempt_at=timezone.now() - timedelta(seconds=1))
-    assert maybe_finish_run(lauf) is False
-    ProcessingJob.objects.filter(pk=wartend.pk).update(next_attempt_at=timezone.now() + timedelta(minutes=10))
     assert maybe_finish_run(lauf) is True
     lauf.refresh_from_db()
     wartend.refresh_from_db()
     assert lauf.status == RunStatus.DONE and wartend.status == JobStatus.PENDING
+    assert ausgeloest == [
+        (a.pk, "run")
+    ]  # Nachraeumen beim Laufabschluss (ueberspringt bei offenen Jobs selbst)
+    # zweite Ablage noch offen: kein Nachraeumen nach der ersten erledigten Ablage
+    zweite = ProcessingJob.objects.create(
+        object=a,
+        document=dok,
+        run=lauf,
+        job_type=JobType.FILE_TO_DRIVE,
+        idempotency_key=f"file:{a.pk}:zweite",
+        status=JobStatus.PENDING,
+    )
+    ProcessingJob.objects.filter(pk=wartend.pk).update(status=JobStatus.DONE)
+    wartend.refresh_from_db()
+    _after_done(wartend)
+    assert ausgeloest == [(a.pk, "run")]
+    # letzte Ablage des abgeschlossenen Laufs erledigt: Nachraeumen mit Ausloeser filing
+    ProcessingJob.objects.filter(pk=zweite.pk).update(status=JobStatus.DONE)
+    zweite.refresh_from_db()
+    _after_done(zweite)
+    assert ausgeloest == [(a.pk, "run"), (a.pk, "filing")]
 
 
 def test_sammelstart_stoesst_ordneranlage_fuer_objekte_ohne_ordner_an(drei_objekte, admin_user, monkeypatch):
