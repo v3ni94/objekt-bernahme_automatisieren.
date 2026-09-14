@@ -1000,9 +1000,10 @@ def file_to_drive(job: ProcessingJob) -> dict:
 # ---------------------------------------------------------------- Sweeper
 @shared_task(name="pipeline.sweep", queue="io")
 def sweep() -> dict:
-    from apps.pipeline.runs import maybe_finish_run, schedule_runs
+    from apps.pipeline.runs import maybe_finish_run, repair_interrupted_runs, schedule_runs
 
     result = sweep_stale_jobs()
+    result["runs_repaired"] = len(repair_interrupted_runs())
     result["redispatched"] = redispatch_lost_jobs()
     result["orphans_removed"] = remove_orphan_work_dirs()
     result["sync_runs_aborted"] = abort_stale_sync_runs()

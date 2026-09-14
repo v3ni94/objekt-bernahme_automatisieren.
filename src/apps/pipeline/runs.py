@@ -7,6 +7,7 @@ ueber Cache-Sperre und Datenbankpruefung; weitere Objekte warten pending mit sic
 from __future__ import annotations
 
 import logging
+from datetime import timedelta
 from decimal import Decimal
 
 from django.conf import settings
@@ -175,6 +176,29 @@ def dispatch_run(run: ProcessingRun) -> int:
     run.documents_total = Document.objects.filter(object=obj, deleted_at__isnull=True).count()
     run.save(update_fields=["documents_total", "updated_at"])
     return count
+
+
+REPAIR_AFTER_MINUTES = 10
+
+
+def repair_interrupted_runs(min_age_minutes: int = REPAIR_AFTER_MINUTES) -> list[int]:
+    """Laufende Laeufe, deren Jobversand nie zu Ende kam (documents_total leer; dispatch_run setzt den Wert erst am
+    Ende), erneut versorgen. 14.09.2026: drei Laeufe wurden beim Sammelstart als laufend markiert, dann brach der
+    Versand am vollen Redis ab; die Jobs hingen ohne Lauf und ohne Nachricht. Nur Laeufe, die aelter als
+    min_age_minutes sind, damit ein gerade laufender Versand nicht doppelt angestossen wird (dispatch_run ist
+    idempotent, unterwegs befindliche Jobs werden nicht erneut versandt)."""
+    grenze = timezone.now() - timedelta(minutes=min_age_minutes)
+    repaired: list[int] = []
+    for run in ProcessingRun.objects.filter(
+        status=RunStatus.RUNNING,
+        run_type__in=SERIAL_TYPES,
+        documents_total__isnull=True,
+        started_at__lt=grenze,
+    ).select_related("object"):
+        count = dispatch_run(run)
+        logger.warning("Lauf %s (Objekt %s) nachversorgt: %s Jobs", run.pk, run.object.object_number, count)
+        repaired.append(run.pk)
+    return repaired
 
 
 def maybe_finish_run(run: ProcessingRun) -> bool:

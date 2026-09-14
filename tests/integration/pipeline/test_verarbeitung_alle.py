@@ -24,7 +24,13 @@ from apps.pipeline.jobs import (
     redispatch_lost_jobs,
 )
 from apps.pipeline.models import JobStatus, JobType, ProcessingJob, ProcessingRun, RunStatus, RunType
-from apps.pipeline.runs import RESET_LIMIT, dispatch_run, objects_with_open_work, start_runs_for_all
+from apps.pipeline.runs import (
+    REPAIR_AFTER_MINUTES,
+    RESET_LIMIT,
+    dispatch_run,
+    objects_with_open_work,
+    start_runs_for_all,
+)
 from apps.review.models import CaseStatus, CaseType, ReviewCase
 
 pytestmark = pytest.mark.django_db
@@ -279,3 +285,52 @@ def test_fehlerdokumente_werden_hoechstens_dreimal_automatisch_wiederaufgenommen
     dok.refresh_from_db()
     assert dok.status == "error"
     assert ReviewCase.objects.filter(document=dok, status=CaseStatus.OPEN).count() == 1
+
+
+def test_sweep_versorgt_unterbrochene_laeufe_und_verwaiste_jobs_nach(drei_objekte, monkeypatch):
+    """14.09.2026: Laeufe wurden als laufend markiert, der Jobversand brach am vollen Redis ab. Ihre Jobs hingen ohne
+    Lauf und ohne Nachricht, documents_total blieb leer. Der Sweep ordnet verwaiste Jobs dem laufenden Lauf zu,
+    versendet sie und versorgt den Lauf mit dispatch_run nach; ein frisch gestarteter Lauf bleibt unangetastet."""
+    a, _, c = drei_objekte
+    alt = timezone.now() - timedelta(minutes=REPAIR_AFTER_MINUTES + 1)
+    lauf_a = ProcessingRun.objects.create(
+        object=a, run_type=RunType.INCREMENTAL, status=RunStatus.RUNNING, started_at=alt
+    )
+    lauf_c = ProcessingRun.objects.create(
+        object=c, run_type=RunType.INCREMENTAL, status=RunStatus.RUNNING, started_at=timezone.now()
+    )
+    # offener Job, damit lauf_c nicht als fertig abgeschlossen wird
+    enqueue(JobType.HASH, c, key=idempotency_key(JobType.HASH, c.pk, "frisch"), run=lauf_c, dispatch=False)
+    verwaist, _ = enqueue(
+        JobType.DISCOVER, a, key=idempotency_key(JobType.DISCOVER, a.pk, "verwaist", ""), dispatch=False
+    )
+    assert verwaist.run_id is None and verwaist.dispatched_at is None and lauf_a.documents_total is None
+
+    gesendet: list[int] = []
+
+    def _send(job, countdown=None):
+        gesendet.append(job.pk)
+        ProcessingJob.objects.filter(pk=job.pk).update(dispatched_at=timezone.now())
+
+    monkeypatch.setattr(jobs_mod, "send", _send)
+    monkeypatch.setattr(runs_mod, "send", _send)
+    from apps.pipeline.tasks import sweep
+
+    result = sweep()
+    assert result["runs_repaired"] == 1  # nur der alte Lauf; lauf_c ist zu frisch
+    lauf_a.refresh_from_db()
+    lauf_c.refresh_from_db()
+    assert (
+        lauf_a.documents_total == Document.objects.filter(object=a).count() and lauf_c.documents_total is None
+    )
+    verwaist.refresh_from_db()
+    assert verwaist.run_id == lauf_a.pk and verwaist.dispatched_at is not None and verwaist.pk in gesendet
+    # die Startjobs der Dokumente des Objekts sind angelegt und versandt
+    assert (
+        ProcessingJob.objects.filter(object=a, status=JobStatus.PENDING, dispatched_at__isnull=True).count()
+        == 0
+    )
+    # zweiter Sweep: nichts mehr zu reparieren, nichts doppelt versandt
+    vorher = len(gesendet)
+    result = sweep()
+    assert result["runs_repaired"] == 0 and result["redispatched"] == 0 and len(gesendet) == vorher

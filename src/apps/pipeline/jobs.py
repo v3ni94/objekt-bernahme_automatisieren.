@@ -214,9 +214,15 @@ def redispatch_lost_jobs(limit: int = 500, hours: int = REDISPATCH_HOURS) -> int
     angekommen (Redis geleert). Hoechstens `limit` je Aufruf (Beat-Sweep jede Minute), damit eine tiefe, aber
     intakte Warteschlange nicht durch Doppelte waechst. Doppelte sind unschaedlich: reserve nimmt einen Job nur
     einmal."""
-    from apps.pipeline.models import RunStatus
+    from apps.pipeline.models import ProcessingRun, RunStatus
 
     now = timezone.now()
+    # Wartende Jobs ohne Lauf, deren Objekt einen laufenden Lauf hat (Versand beim Start abgebrochen, etwa durch
+    # volles Redis am 14.09.2026), dem Lauf zuordnen; sie zaehlen dann wie nie versandte Jobs des Laufs
+    for run in ProcessingRun.objects.filter(status=RunStatus.RUNNING).only("id", "object_id"):
+        ProcessingJob.objects.filter(
+            object_id=run.object_id, status=JobStatus.PENDING, run__isnull=True
+        ).update(run=run)
     jobs = (
         ProcessingJob.objects.filter(status=JobStatus.PENDING, run__status=RunStatus.RUNNING)
         .filter(models_q_next_attempt(now))
