@@ -528,7 +528,11 @@ def test_massenanlage_der_objekte_aus_dem_altbestand(drive, altordner, objekt, t
     ohne = ManagedObject.objects.get(object_number="811")
     assert ohne.name == "Altstadt Marktplatz 4" and ohne.city is None and ohne.street is None
     assert "Nicht im Objektregister" in ohne.notes and "Anschrift unvollständig" in ohne.notes
-    assert ohne.drive_root_folder_id is None  # Ordner wartet auf die Nachpflege der Anschrift
+    # 14.09.2026: Objektordner vorlaeufig nach dem Ersatzmuster drive.object_folder_fallback_pattern ({number} {name}),
+    # die Anschrift wird nachgepflegt; zuvor blieb das Objekt ohne Ordner und blockierte die Ablage
+    assert (
+        ohne.drive_root_folder_id and drive.get(ohne.drive_root_folder_id).name == "811 Altstadt Marktplatz 4"
+    )
     neu.refresh_from_db()
     assert (
         neu.drive_root_folder_id and drive.get(neu.drive_root_folder_id).name == "810 Neustadt, Ringstraße 2"
