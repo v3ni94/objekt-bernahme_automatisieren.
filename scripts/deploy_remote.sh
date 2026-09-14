@@ -295,6 +295,11 @@ offen = ProcessingJob.objects.filter(status__in=["pending", "running"]).values("
 print("Jobs offen:", ", ".join(f"{r['job_type']}/{r['status']}={r['c']}" for r in offen) or "keine")
 fehl = ProcessingJob.objects.filter(status="failed").values("job_type").annotate(c=Count("id"))
 print("Jobs fehlgeschlagen:", ", ".join(f"{r['job_type']}={r['c']}" for r in fehl) or "keine")
+rep = ProcessingJob.objects.filter(idempotency_key__contains="#").values("job_type", "status").annotate(c=Count("id")).order_by("job_type", "status")
+print("Wiederholungsjobs (#n):", ", ".join(f"{r['job_type']}/{r['status']}={r['c']}" for r in rep) or "keine")
+for t in ProcessingJob.objects.values("document_id", "object__object_number", "job_type").annotate(c=Count("id")).filter(c__gt=3).order_by("-c")[:8]:
+    stati = ", ".join(f"{r['status']}={r['c']}" for r in ProcessingJob.objects.filter(document_id=t["document_id"], job_type=t["job_type"]).values("status").annotate(c=Count("id")).order_by("status"))
+    print(f"Mehrfachjobs Dokument {t['document_id']} (Objekt {t['object__object_number']}) {t['job_type']}: {t['c']} Jobs ({stati})")
 for j in ProcessingJob.objects.filter(status="failed").order_by("-id")[:5]:
     print(f"  Fehler {j.job_type} Job {j.pk}: {(j.last_error or '')[:160]}")
 for j in ProcessingJob.objects.filter(status="pending", last_error__startswith="wartet").order_by("-id")[:3]:
