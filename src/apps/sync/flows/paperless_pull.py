@@ -360,7 +360,7 @@ def _import_new(client, remote: dict, metadata: dict, meta: dict) -> dict:
                 "inbox": target.is_system_inbox,
             },
         )
-    ensure_run(target)
+    ensure_run(target, documents=[doc])
     return {"document_id": doc.pk, "object_id": target.pk, "inbox": target.is_system_inbox}
 
 

@@ -408,3 +408,48 @@ def test_sammelstart_stoesst_ordneranlage_fuer_objekte_ohne_ordner_an(drei_objek
     assert result["without_folder"] == ["701"] and aufrufe == [(a.pk, "start_all", True)]
     assert result["folders_requested"] == [{"object": "701", "status": "queued"}]
     assert len(result["runs"]) == 2
+
+
+def test_dokumenteneingang_versorgt_laufenden_lauf_nur_mit_dem_neuen_dokument(
+    drei_objekte, admin_user, monkeypatch
+):
+    """14.09.2026: ensure_run rief fuer einen laufenden Lauf dispatch_run ueber alle Dokumente des Objekts auf, bei
+    Objekt 216 (4.733 Dokumente) je Paperless-Uebernahme; fuer Dokumente mit erledigtem Startjob entstanden dabei
+    Wiederholungsjobs (#n) und wartende Jobs wurden erneut versandt. Jetzt erhaelt der laufende Lauf nur den
+    Startjob des neuen Dokuments; ohne Dokumente bleibt der volle Nachversand."""
+    from apps.documents import ingest as ingest_mod
+
+    a, b, c = drei_objekte
+    start_runs_for_all(user=admin_user)
+    lauf = ProcessingRun.objects.get(object=a, status=RunStatus.RUNNING)
+    # Lage waehrend des Laufs: Startjobs erledigt, die Dokumente warten auf den naechsten Schritt
+    ProcessingJob.objects.filter(object=a).update(status=JobStatus.DONE)
+    vorher = ProcessingJob.objects.filter(object=a).count()
+    gesendet: list[int] = []
+
+    def _send(job, countdown=None):
+        gesendet.append(job.pk)
+        ProcessingJob.objects.filter(pk=job.pk).update(dispatched_at=timezone.now())
+
+    monkeypatch.setattr(jobs_mod, "send", _send)
+    monkeypatch.setattr(runs_mod, "send", _send)
+    neu = Document.objects.create(
+        object=a,
+        size_bytes=8,
+        mime_type="application/pdf",
+        original_name="p1.pdf",
+        current_name="p1.pdf",
+        source="paperless",
+        status="registered",
+        first_seen_at=timezone.now(),
+    )
+    assert ingest_mod.ensure_run(a, documents=[neu]) == lauf
+    job = ProcessingJob.objects.get(document=neu)
+    assert job.job_type == JobType.HASH and job.run == lauf and gesendet == [job.pk]
+    # kein Durchlauf ueber die uebrigen Dokumente: keine Wiederholungsjobs, keine weiteren Nachrichten
+    assert ProcessingJob.objects.filter(object=a).count() == vorher + 1
+    assert not ProcessingJob.objects.filter(object=a, idempotency_key__contains="#").exists()
+    # ohne Dokumente bleibt der volle Nachversand
+    aufrufe: list[int] = []
+    monkeypatch.setattr(ingest_mod, "dispatch_run", lambda run: aufrufe.append(run.pk))
+    assert ingest_mod.ensure_run(a) == lauf and aufrufe == [lauf.pk]

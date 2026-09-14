@@ -185,7 +185,7 @@
       "key": "drive.max_requests_per_second",
       "category": "drive",
       "value_type": "integer",
-      "description": "Clientseitige Ratenbegrenzung je Prozess",
+      "description": "Clientseitige Ratenbegrenzung je Adapteraufruf (Burst innerhalb einer Aufgabe, nicht Summe über Threads)",
       "source": "ANNAHME A15",
       "schema": {
         "type": "integer",

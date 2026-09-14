@@ -99,17 +99,20 @@ def document_upload(request, pk: int):
     form = DocumentUploadForm(request.POST or None, request.FILES or None)
     if request.method == "POST" and form.is_valid():
         accepted, errors = 0, []
+        neue = []
         run = None
         for f in form.cleaned_data["files"]:
             try:
-                ingest.register_upload(
-                    obj, filename=f.name, data=f.read(), user=request.user, request=request
+                neue.append(
+                    ingest.register_upload(
+                        obj, filename=f.name, data=f.read(), user=request.user, request=request
+                    )
                 )
                 accepted += 1
             except ingest.IngestError as exc:
                 errors.append(f"{f.name}: {exc}")
         if accepted:
-            run = ingest.ensure_run(obj, user=request.user)
+            run = ingest.ensure_run(obj, user=request.user, documents=neue)
             pos = queue_position(run)
             if run.status == RunStatus.RUNNING:
                 messages.success(request, f"{accepted} Datei(en) angenommen, Lauf {run.pk} verarbeitet.")

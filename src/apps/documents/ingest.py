@@ -19,7 +19,7 @@ from apps.config import store
 from apps.documents.models import Document, DocumentSource, DocumentStatus
 from apps.pipeline import storage
 from apps.pipeline.models import ProcessingRun, RunStatus, RunType
-from apps.pipeline.runs import SERIAL_TYPES, dispatch_run, schedule_runs
+from apps.pipeline.runs import SERIAL_TYPES, dispatch_run, enqueue_start_job, schedule_runs
 
 ALLOWED_SUFFIXES = {
     ".pdf",
@@ -88,15 +88,23 @@ def register_upload(obj, *, filename: str, data: bytes, user=None, request=None)
     return doc
 
 
-def ensure_run(obj, *, user=None, run_type: str = RunType.INCREMENTAL) -> ProcessingRun:
-    """Liefert den offenen Lauf des Objekts oder legt einen neuen an; ein laufender Lauf erhaelt die neuen Jobs."""
+def ensure_run(obj, *, user=None, run_type: str = RunType.INCREMENTAL, documents=()) -> ProcessingRun:
+    """Liefert den offenen Lauf des Objekts oder legt einen neuen an. Ein laufender Lauf erhaelt nur die Startjobs
+    der uebergebenen neuen Dokumente (14.09.2026: zuvor lief je Eingang dispatch_run ueber alle Dokumente des
+    Objekts, bei Objekt 216 mit 4.733 Dokumenten je Paperless-Uebernahme; das legte fuer Dokumente mit erledigtem
+    Startjob Wiederholungsjobs an und versandte wartende Jobs doppelt). Ohne Dokumente bleibt der volle Nachversand."""
     running = (
         ProcessingRun.objects.filter(object=obj, status=RunStatus.RUNNING, run_type__in=SERIAL_TYPES)
         .order_by("-created_at")
         .first()
     )
     if running is not None:
-        dispatch_run(running)
+        neue = list(documents)
+        if neue:
+            for doc in neue:
+                enqueue_start_job(doc, running, dispatch=True)
+        else:
+            dispatch_run(running)
         return running
     pending = (
         ProcessingRun.objects.filter(object=obj, status=RunStatus.PENDING, run_type__in=SERIAL_TYPES)
@@ -119,5 +127,5 @@ def ingest_upload(
     obj, *, filename: str, data: bytes, user=None, request=None
 ) -> tuple[Document, ProcessingRun]:
     doc = register_upload(obj, filename=filename, data=data, user=user, request=request)
-    run = ensure_run(obj, user=user)
+    run = ensure_run(obj, user=user, documents=[doc])
     return doc, run

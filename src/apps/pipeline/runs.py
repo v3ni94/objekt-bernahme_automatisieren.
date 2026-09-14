@@ -128,43 +128,53 @@ def reset_failed_documents(run: ProcessingRun) -> int:
     return reset
 
 
+def enqueue_start_job(doc: Document, run: ProcessingRun, *, dispatch: bool = False) -> ProcessingJob:
+    """Startjob eines Dokuments nach seinem Status: Bestandsdatei aus Drive -> discover, sonst registered -> hash,
+    hashed -> analyze_pages, ocr_done -> extract_entities. Idempotent ueber den Schluessel (enqueue)."""
+    obj = run.object
+    if doc.status == "registered" and doc.source == "drive_existing":
+        key = idempotency_key(JobType.DISCOVER, obj.pk, doc.drive_file_id, doc.drive_md5 or "")
+        job, _ = enqueue(
+            JobType.DISCOVER,
+            obj,
+            key=key,
+            document=doc,
+            run=run,
+            payload={"drive_file_id": doc.drive_file_id, "md5": doc.drive_md5},
+            dispatch=dispatch,
+        )
+    elif doc.status == "registered":
+        key = idempotency_key(JobType.HASH, obj.pk, doc.drive_file_id or f"upload-{doc.pk}")
+        job, _ = enqueue(
+            JobType.HASH,
+            obj,
+            key=key,
+            document=doc,
+            run=run,
+            payload={"source_path": doc.source_path},
+            dispatch=dispatch,
+        )
+    elif doc.status == "hashed":
+        key = idempotency_key(JobType.ANALYZE_PAGES, obj.pk, doc.sha256)
+        job, _ = enqueue(JobType.ANALYZE_PAGES, obj, key=key, document=doc, run=run, dispatch=dispatch)
+    else:
+        key = idempotency_key(JobType.EXTRACT_ENTITIES, obj.pk, doc.sha256)
+        job, _ = enqueue(JobType.EXTRACT_ENTITIES, obj, key=key, document=doc, run=run, dispatch=dispatch)
+    return job
+
+
 def dispatch_run(run: ProcessingRun) -> int:
     """Reiht die offenen Jobs des Objekts ein; Dokumente ohne Job erhalten den passenden Startjob.
-    Dokumente im Status error werden zuvor zurueckgesetzt (reset_failed_documents)."""
+    Dokumente im Status error werden zuvor zurueckgesetzt (reset_failed_documents). Fuer ein einzelnes neues
+    Dokument waehrend eines laufenden Laufs genuegt enqueue_start_job (ingest.ensure_run), ein Durchlauf ueber alle
+    Dokumente des Objekts legt fuer Dokumente mit erledigtem Startjob Wiederholungsjobs an."""
     obj = run.object
     count = 0
     reset_failed_documents(run)
     for doc in Document.objects.filter(
         object=obj, deleted_at__isnull=True, status__in=["registered", "hashed", "ocr_done"]
     ):
-        if doc.status == "registered" and doc.source == "drive_existing":
-            key = idempotency_key(JobType.DISCOVER, obj.pk, doc.drive_file_id, doc.drive_md5 or "")
-            job, _ = enqueue(
-                JobType.DISCOVER,
-                obj,
-                key=key,
-                document=doc,
-                run=run,
-                payload={"drive_file_id": doc.drive_file_id, "md5": doc.drive_md5},
-                dispatch=False,
-            )
-        elif doc.status == "registered":
-            key = idempotency_key(JobType.HASH, obj.pk, doc.drive_file_id or f"upload-{doc.pk}")
-            job, _ = enqueue(
-                JobType.HASH,
-                obj,
-                key=key,
-                document=doc,
-                run=run,
-                payload={"source_path": doc.source_path},
-                dispatch=False,
-            )
-        elif doc.status == "hashed":
-            key = idempotency_key(JobType.ANALYZE_PAGES, obj.pk, doc.sha256)
-            job, _ = enqueue(JobType.ANALYZE_PAGES, obj, key=key, document=doc, run=run, dispatch=False)
-        else:
-            key = idempotency_key(JobType.EXTRACT_ENTITIES, obj.pk, doc.sha256)
-            job, _ = enqueue(JobType.EXTRACT_ENTITIES, obj, key=key, document=doc, run=run, dispatch=False)
+        enqueue_start_job(doc, run)
         count += 1
     pending = ProcessingJob.objects.filter(object=obj, status=JobStatus.PENDING, run__isnull=True)
     pending.update(run=run)
