@@ -42,6 +42,7 @@ AUDIT_ACTIONS: dict[str, str] = {
     "document.ingest": "Dokument hochgeladen (Upload in die Verarbeitung)",
     "processing.start": "Verarbeitungslauf angefordert",
     "processing.start_all": "Verarbeitungsläufe für alle Objekte mit offener Arbeit eingereiht",
+    "processing.jobs_dedupe": "Überzählige wartende Wiederholungsjobs bereinigt",
     "processing.sweep": "Sweeper manuell ausgeführt",
     "document.view": "Dokument aus Eigentümerakte angesehen (nur bei security.log_document_views)",
     "document.download": "Dokument aus Eigentümerakte heruntergeladen (nur bei security.log_document_views)",

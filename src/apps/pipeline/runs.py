@@ -93,12 +93,26 @@ def restart_status(doc: Document) -> str:
     return "registered"
 
 
+RESET_LIMIT = 3
+
+
 def reset_failed_documents(run: ProcessingRun) -> int:
     """Dokumente im Status error wieder in die Kette nehmen (Abbruch durch Umgebungsfehler, etwa fehlende
     Datenbankrechte oder Drive nicht erreichbar). Der Fall job_failed im Review Center wird als erledigt
     geschlossen; scheitert der neue Versuch, entsteht mit dem neuen Job ein neuer Fall."""
     reset = 0
     for doc in Document.objects.filter(object=run.object, deleted_at__isnull=True, status="error"):
+        # Begrenzung (14.09.2026): nach RESET_LIMIT automatischen Wiederaufnahmen bleibt das Dokument mit offenem
+        # Fall job_failed stehen, statt bei jedem Eingang erneut Jobs zu erzeugen, die wieder scheitern
+        frueher = ReviewCase.objects.filter(
+            document=doc, case_subtype="job_failed", status=CaseStatus.RESOLVED
+        ).values_list("resolution", flat=True)
+        if (
+            sum(1 for res in frueher if isinstance(res, dict) and res.get("action") == "reprocess")
+            >= RESET_LIMIT
+        ):
+            logger.info("Dokument %s bleibt nach %s Wiederaufnahmen im Status error", doc.pk, RESET_LIMIT)
+            continue
         doc.status = restart_status(doc)
         doc.error_message = None
         doc.save(update_fields=["status", "error_message", "updated_at"])

@@ -30,6 +30,7 @@
 #   paperless-feld-alle <branch> [echt] Feld MHV Objekt fuer alle zugeordneten Speicherpfade setzen und Bestandslauf starten
 #   altbestand-aufarbeiten <branch> [echt] Alle Altbestand-Ordner mit Objekt aufarbeiten (echt = Celery-Aufgabe, sonst Vorschau)
 #   verarbeitung-alle <branch> [echt] Verarbeitungslaeufe fuer alle Objekte mit offener Arbeit (echt = einreihen)
+#   jobs-bereinigen <branch> [echt] Ueberzaehlige wartende Wiederholungsjobs (#n) bereinigen (echt = ausfuehren, sonst Vorschau)
 #   redis-status <branch>     Redis: Speicher, Schluesselzahl, Warteschlangenlaengen, groesste Schluessel (nur lesend)
 #   env-set <branch> <SCHLUESSEL=wert>  Freigegebenen Betriebswert in .env setzen (Ressourcen, Parallelitaet);
 #                             wirksam erst mit deploy; Sicherung .env.bak
@@ -427,6 +428,14 @@ PY
       docker compose exec -T web python manage.py altbestand_objekte_anlegen
     fi
     ;;
+  jobs-bereinigen)
+    # Ueberzaehlige wartende Wiederholungsjobs (#n) auf skipped setzen; Argument "echt" bereinigt, sonst Vorschau
+    if [ "${ARG:-}" = "echt" ]; then
+      docker compose exec -T web python manage.py jobs_bereinigen --echt
+    else
+      docker compose exec -T web python manage.py jobs_bereinigen
+    fi
+    ;;
   redis-status)
     # Redis-Speicher und Warteschlangen (Broker und Cache teilen sich eine Instanz); Passwort nur ueber Umgebungsvariable
     docker compose exec -T redis sh -c '
@@ -463,5 +472,5 @@ PY
     echo "$KEY: ${OLD:-leer} -> $NEU (wirksam mit der Aktion deploy; Sicherung .env.bak)"
     echo "$(date -Is) env-set $KEY ${OLD:-leer} -> $NEU" >> "$LOG"
     ;;
-  *) echo "Nur check, pull, befund, env-init, ps, logs, smoke, cert-retry, db-status, db-reset, first-run, deploy, rollback, create-admin, oauth-check, deploy-tests, doc-status, config-set, altbestand-import, altbestand-objekte, altbestand-aufarbeiten, verarbeitung-alle, paperless-feld-alle, redis-status, env-set oder reconcile-all erlaubt"; exit 2 ;;
+  *) echo "Nur check, pull, befund, env-init, ps, logs, smoke, cert-retry, db-status, db-reset, first-run, deploy, rollback, create-admin, oauth-check, deploy-tests, doc-status, config-set, altbestand-import, altbestand-objekte, altbestand-aufarbeiten, verarbeitung-alle, paperless-feld-alle, redis-status, env-set, jobs-bereinigen oder reconcile-all erlaubt"; exit 2 ;;
 esac

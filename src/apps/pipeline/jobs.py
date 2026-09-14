@@ -113,6 +113,22 @@ def enqueue(
     max_attempts = int(store.get("jobs.max_attempts_default", 3))
     existing = ProcessingJob.objects.filter(idempotency_key=key).only("status").first()
     if existing is not None and existing.status in TERMINAL_STATUSES and repeat:
+        # Ein offener Wiederholungsjob (#n, pending oder running) gilt als derselbe Job: kein weiterer. 14.09.2026:
+        # zuvor legte jeder Aufruf (dispatch_run bei jedem Dokumenteneingang) einen weiteren #n an, solange der
+        # vorige in der Warteschlange wartete; je Eingang entstanden so 134 neue Jobs fuer dieselben Dokumente.
+        open_repeat = (
+            ProcessingJob.objects.filter(idempotency_key__startswith=f"{key}#")
+            .exclude(status__in=TERMINAL_STATUSES)
+            .order_by("-id")
+            .first()
+        )
+        if open_repeat is not None:
+            if run is not None and open_repeat.run_id is None:
+                open_repeat.run = run
+                open_repeat.save(update_fields=["run", "updated_at"])
+            if dispatch and open_repeat.status == JobStatus.PENDING and open_repeat.dispatched_at is None:
+                send(open_repeat)
+            return open_repeat, False
         n = ProcessingJob.objects.filter(idempotency_key__startswith=f"{key}#").count() + 2
         key = f"{key}#{n}"[:160]
     job, created = ProcessingJob.objects.get_or_create(
@@ -386,6 +402,58 @@ def _after_done(job: ProcessingJob) -> None:
 def stale_minutes(job_type: str) -> int:
     cfg = store.get("jobs.stale_minutes", {}) or {}
     return int(cfg.get(job_type, cfg.get("default", 15)))
+
+
+def dedupe_repeat_jobs(*, dry_run: bool = True) -> dict:
+    """Ueberzaehlige wartende Wiederholungsjobs (#n) zum selben Basisschluessel auf skipped setzen; der aelteste
+    offene Job je Schluessel bleibt. Die Nachrichten der uebrigen liegen weiter in der Warteschlange und enden
+    dort ohne Arbeit (reserve nimmt nur wartende Jobs). Protokoll processing.jobs_dedupe."""
+    from apps.audit.services import record
+
+    now = timezone.now()
+    kept: dict[str, int] = {}
+    extra: list[tuple[int, str]] = []
+    rows = (
+        ProcessingJob.objects.filter(status=JobStatus.PENDING, idempotency_key__contains="#")
+        .order_by("id")
+        .values_list("id", "idempotency_key", "job_type")
+    )
+    for pk, key, job_type in rows:
+        base = key.split("#", 1)[0]
+        if base in kept:
+            extra.append((pk, job_type))
+        else:
+            kept[base] = pk
+    by_type: dict[str, int] = {}
+    for _, job_type in extra:
+        by_type[job_type] = by_type.get(job_type, 0) + 1
+    result = {"dry_run": dry_run, "extra": len(extra), "kept": len(kept), "by_type": by_type}
+    if dry_run or not extra:
+        return result
+    ids = [pk for pk, _ in extra]
+    for start in range(0, len(ids), 1000):
+        chunk = ids[start : start + 1000]
+        updated = ProcessingJob.objects.filter(pk__in=chunk, status=JobStatus.PENDING).update(
+            status=JobStatus.SKIPPED,
+            skip_reason="doppelter Wiederholungsjob",
+            finished_at=now,
+            updated_at=now,
+        )
+        ProcessingJobEvent.objects.bulk_create(
+            [
+                ProcessingJobEvent(
+                    job_id=pk,
+                    from_status=JobStatus.PENDING,
+                    to_status=JobStatus.SKIPPED,
+                    worker_id=worker_id(),
+                    message="doppelter Wiederholungsjob bereinigt",
+                )
+                for pk in chunk
+            ]
+        )
+        result["updated"] = result.get("updated", 0) + updated
+    record("processing.jobs_dedupe", entity_type="processing_job", after=result)
+    return result
 
 
 def sweep_stale_jobs() -> dict:

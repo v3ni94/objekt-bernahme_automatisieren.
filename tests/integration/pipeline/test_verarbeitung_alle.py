@@ -16,9 +16,16 @@ from apps.documents.models import Document
 from apps.objects.models import ManagedObject
 from apps.pipeline import jobs as jobs_mod
 from apps.pipeline import runs as runs_mod
-from apps.pipeline.jobs import REDISPATCH_HOURS, enqueue, idempotency_key, redispatch_lost_jobs
+from apps.pipeline.jobs import (
+    REDISPATCH_HOURS,
+    dedupe_repeat_jobs,
+    enqueue,
+    idempotency_key,
+    redispatch_lost_jobs,
+)
 from apps.pipeline.models import JobStatus, JobType, ProcessingJob, ProcessingRun, RunStatus, RunType
-from apps.pipeline.runs import dispatch_run, objects_with_open_work, start_runs_for_all
+from apps.pipeline.runs import RESET_LIMIT, dispatch_run, objects_with_open_work, start_runs_for_all
+from apps.review.models import CaseStatus, CaseType, ReviewCase
 
 pytestmark = pytest.mark.django_db
 
@@ -151,3 +158,124 @@ def test_versand_merkt_zeitpunkt_und_sweep_versendet_nur_verlorene_jobs(
     ProcessingJob.objects.filter(object=c).update(dispatched_at=alt)
     dispatch_run(lauf_c)
     assert len(gesendet) == 2 * len(erster)
+
+
+def test_enqueue_legt_keinen_weiteren_wiederholungsjob_an_solange_einer_offen_ist(drei_objekte):
+    """14.09.2026: Ist der Job zu einem Schluessel abgeschlossen, entsteht bei repeat ein Wiederholungsjob #n.
+    Wartet dieser noch, liefert jeder weitere Aufruf denselben Job statt #n+1 (zuvor wuchs die Jobtabelle und die
+    Warteschlange mit jedem Dokumenteneingang um einen Job je betroffenem Dokument)."""
+    a, _, _ = drei_objekte
+    dok = _dok(a, "wdh.pdf", "hashed")
+    key = idempotency_key(JobType.ANALYZE_PAGES, a.pk, "sha-wdh")
+    erster, created = enqueue(JobType.ANALYZE_PAGES, a, key=key, document=dok, dispatch=False)
+    assert created and erster.idempotency_key == key
+    ProcessingJob.objects.filter(pk=erster.pk).update(status=JobStatus.DONE)
+    zweiter, created = enqueue(JobType.ANALYZE_PAGES, a, key=key, document=dok, dispatch=False)
+    assert created and zweiter.idempotency_key == f"{key}#2" and zweiter.status == JobStatus.PENDING
+    # solange #2 offen ist: kein #3, auch nicht bei vielen Aufrufen
+    for _ in range(5):
+        wieder, created = enqueue(JobType.ANALYZE_PAGES, a, key=key, document=dok, dispatch=False)
+        assert not created and wieder.pk == zweiter.pk
+    assert ProcessingJob.objects.filter(idempotency_key__startswith=key).count() == 2
+    # ein laufender Wiederholungsjob zaehlt ebenso als offen
+    ProcessingJob.objects.filter(pk=zweiter.pk).update(status=JobStatus.RUNNING)
+    wieder, created = enqueue(JobType.ANALYZE_PAGES, a, key=key, document=dok, dispatch=False)
+    assert not created and wieder.pk == zweiter.pk
+    # erst nach Abschluss von #2 entsteht #3; ein Lauf wird dem offenen Wiederholungsjob nachgetragen
+    ProcessingJob.objects.filter(pk=zweiter.pk).update(status=JobStatus.SKIPPED)
+    lauf = ProcessingRun.objects.create(object=a, run_type=RunType.INCREMENTAL, status=RunStatus.RUNNING)
+    dritter, created = enqueue(JobType.ANALYZE_PAGES, a, key=key, document=dok, dispatch=False)
+    assert created and dritter.idempotency_key == f"{key}#3"
+    ProcessingJob.objects.filter(pk=dritter.pk).update(run=None)
+    wieder, created = enqueue(JobType.ANALYZE_PAGES, a, key=key, document=dok, run=lauf, dispatch=False)
+    wieder.refresh_from_db()
+    assert not created and wieder.pk == dritter.pk and wieder.run_id == lauf.pk
+
+
+def test_jobs_bereinigen_setzt_ueberzaehlige_wiederholungsjobs_auf_skipped(drei_objekte, capsys):
+    """Altbestand aus der Stoerung: mehrere wartende #n-Jobs zum selben Schluessel. Der aelteste bleibt, die
+    uebrigen werden skipped (Grund „doppelter Wiederholungsjob“), Vorschau aendert nichts."""
+    a, _, _ = drei_objekte
+    dok = _dok(a, "mehrfach.pdf", "hashed")
+    key = idempotency_key(JobType.ANALYZE_PAGES, a.pk, "sha-mehrfach")
+    ProcessingJob.objects.create(
+        object=a, document=dok, job_type=JobType.ANALYZE_PAGES, idempotency_key=key, status=JobStatus.DONE
+    )
+    jobs = [
+        ProcessingJob.objects.create(
+            object=a,
+            document=dok,
+            job_type=JobType.ANALYZE_PAGES,
+            idempotency_key=f"{key}#{n}",
+            status=JobStatus.PENDING,
+        )
+        for n in range(2, 6)
+    ]
+    anderer = ProcessingJob.objects.create(
+        object=a,
+        document=dok,
+        job_type=JobType.OCR_CHUNK,
+        idempotency_key=f"ocr:{a.pk}:sha-mehrfach:1#2",
+        status=JobStatus.PENDING,
+    )
+    call_command("jobs_bereinigen")
+    out = capsys.readouterr().out
+    assert "Vorschau: 3 überzählige Wiederholungsjobs (analyze_pages=3)" in out and "nichts geändert" in out
+    assert ProcessingJob.objects.filter(status=JobStatus.SKIPPED).count() == 0
+    result = dedupe_repeat_jobs(dry_run=False)
+    assert result["extra"] == 3 and result["updated"] == 3 and result["kept"] == 2
+    jobs[0].refresh_from_db()
+    assert jobs[0].status == JobStatus.PENDING
+    for j in jobs[1:]:
+        j.refresh_from_db()
+        assert (
+            j.status == JobStatus.SKIPPED and j.skip_reason == "doppelter Wiederholungsjob" and j.finished_at
+        )
+        assert j.events.filter(to_status=JobStatus.SKIPPED).exists()
+    anderer.refresh_from_db()
+    assert anderer.status == JobStatus.PENDING
+    assert AuditEvent.objects.filter(action="processing.jobs_dedupe").count() == 1
+    assert dedupe_repeat_jobs(dry_run=False)["extra"] == 0
+
+
+def test_fehlerdokumente_werden_hoechstens_dreimal_automatisch_wiederaufgenommen(drei_objekte):
+    """Ein Dokument im Status error wird beim Start eines Laufs zurueckgesetzt; nach RESET_LIMIT erledigten Faellen
+    job_failed mit Wiederaufnahme bleibt es stehen, damit ein dauerhaft scheiterndes Dokument nicht bei jedem Eingang
+    neue Jobs erzeugt."""
+    a, _, _ = drei_objekte
+    dok = _dok(a, "kaputt.pdf", "error")
+    lauf = ProcessingRun.objects.create(object=a, run_type=RunType.INCREMENTAL, status=RunStatus.RUNNING)
+    for i in range(RESET_LIMIT - 1):
+        ReviewCase.objects.create(
+            object=a,
+            case_type=CaseType.UNCLEAR,
+            case_subtype="job_failed",
+            document=dok,
+            batch_key=f"job_failed:test-{i}",
+            status=CaseStatus.RESOLVED,
+            resolution={"action": "reprocess", "run_id": 1},
+        )
+    ReviewCase.objects.create(
+        object=a,
+        case_type=CaseType.UNCLEAR,
+        case_subtype="job_failed",
+        document=dok,
+        batch_key="job_failed:offen",
+    )
+    dispatch_run(lauf)
+    dok.refresh_from_db()
+    assert dok.status == "registered"  # zurueckgesetzt; der offene Fall ist erledigt
+    assert ReviewCase.objects.filter(document=dok, status=CaseStatus.RESOLVED).count() == RESET_LIMIT
+    # erneuter Fehler: jetzt ist die Grenze erreicht, das Dokument bleibt error
+    Document.objects.filter(pk=dok.pk).update(status="error")
+    ReviewCase.objects.create(
+        object=a,
+        case_type=CaseType.UNCLEAR,
+        case_subtype="job_failed",
+        document=dok,
+        batch_key="job_failed:offen2",
+    )
+    dispatch_run(lauf)
+    dok.refresh_from_db()
+    assert dok.status == "error"
+    assert ReviewCase.objects.filter(document=dok, status=CaseStatus.OPEN).count() == 1
