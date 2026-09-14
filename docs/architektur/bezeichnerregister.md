@@ -1210,6 +1210,7 @@ Modell `pipeline.ProcessingJob`. processing jobs.
 | locked_at | datetime(6) | ja |  |
 | heartbeat_at | datetime(6) | ja |  |
 | next_attempt_at | datetime(6) | ja |  |
+| dispatched_at | datetime(6) | ja |  |
 | started_at | datetime(6) | ja |  |
 | finished_at | datetime(6) | ja |  |
 | duration_ms | integer UNSIGNED | ja |  |
@@ -1654,6 +1655,7 @@ Modell `sync.SyncOperation`. sync operations.
 | attempt_count | smallint UNSIGNED | nein |  |
 | max_attempts | smallint UNSIGNED | nein |  |
 | next_attempt_at | datetime(6) | ja |  |
+| dispatched_at | datetime(6) | ja |  |
 | locked_by | varchar(80) | ja |  |
 | locked_at | datetime(6) | ja |  |
 | heartbeat_at | datetime(6) | ja |  |

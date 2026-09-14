@@ -147,6 +147,8 @@ class ProcessingJob(TimestampedModel):
     locked_at = models.DateTimeField(null=True, blank=True)
     heartbeat_at = models.DateTimeField(null=True, blank=True)
     next_attempt_at = models.DateTimeField(null=True, blank=True)
+    # letzter Versand an die Warteschlange (send); Grundlage fuer den Nachversand verlorener Nachrichten
+    dispatched_at = models.DateTimeField(null=True, blank=True)
     started_at = models.DateTimeField(null=True, blank=True)
     finished_at = models.DateTimeField(null=True, blank=True)
     duration_ms = models.PositiveIntegerField(null=True, blank=True)

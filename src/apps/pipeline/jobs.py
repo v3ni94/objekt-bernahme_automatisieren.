@@ -139,10 +139,13 @@ def enqueue(
 
 
 def send(job: ProcessingJob, countdown: int | None = None) -> None:
-    """Job-ID an die Queue geben. Versandmodus JOB_DISPATCH: celery (Betrieb) oder none (Tests, lokaler Runner)."""
+    """Job-ID an die Queue geben. Versandmodus JOB_DISPATCH: celery (Betrieb) oder none (Tests, lokaler Runner).
+    Der Versandzeitpunkt (dispatched_at) wird immer gemerkt: Grundlage fuer den Nachversand verlorener Nachrichten
+    (redispatch_lost_jobs) und dafuer, dass dispatch_run unterwegs befindliche Jobs nicht doppelt versendet."""
     from celery import current_app
     from django.conf import settings
 
+    ProcessingJob.objects.filter(pk=job.pk).update(dispatched_at=timezone.now())
     if settings.OBJEKTAKTE.get("JOB_DISPATCH", "celery") == "none":
         return
     task_name = f"pipeline.{job.job_type}"
@@ -177,6 +180,38 @@ def models_q_next_attempt(now):
     from django.db.models import Q
 
     return Q(next_attempt_at__isnull=True) | Q(next_attempt_at__lte=now)
+
+
+REDISPATCH_HOURS = 48
+
+
+def models_q_not_in_flight(now, hours: int = REDISPATCH_HOURS):
+    """Jobs ohne Nachricht unterwegs: nie versandt oder Versand aelter als `hours` Stunden (Warteschlange geleert)."""
+    from django.db.models import Q
+
+    return Q(dispatched_at__isnull=True) | Q(dispatched_at__lt=now - timedelta(hours=hours))
+
+
+def redispatch_lost_jobs(limit: int = 500, hours: int = REDISPATCH_HOURS) -> int:
+    """Wartende, faellige Jobs laufender Laeufe erneut versenden, wenn keine Nachricht unterwegs ist: nie versandt
+    (etwa waehrend eines laufenden Laufs von der Altbestand-Aufarbeitung angelegt) oder seit `hours` Stunden nicht
+    angekommen (Redis geleert). Hoechstens `limit` je Aufruf (Beat-Sweep jede Minute), damit eine tiefe, aber
+    intakte Warteschlange nicht durch Doppelte waechst. Doppelte sind unschaedlich: reserve nimmt einen Job nur
+    einmal."""
+    from apps.pipeline.models import RunStatus
+
+    now = timezone.now()
+    jobs = (
+        ProcessingJob.objects.filter(status=JobStatus.PENDING, run__status=RunStatus.RUNNING)
+        .filter(models_q_next_attempt(now))
+        .filter(models_q_not_in_flight(now, hours))
+        .order_by("id")[:limit]
+    )
+    sent = 0
+    for job in jobs:
+        send(job)
+        sent += 1
+    return sent
 
 
 def heartbeat(job: ProcessingJob, pages: int | None = None) -> None:

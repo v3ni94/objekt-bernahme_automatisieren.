@@ -17,7 +17,7 @@ from django.utils import timezone
 
 from apps.config import store
 from apps.documents.models import Document, DocumentPage
-from apps.pipeline.jobs import enqueue, idempotency_key, send
+from apps.pipeline.jobs import enqueue, idempotency_key, models_q_not_in_flight, send
 from apps.pipeline.models import JobStatus, JobType, ProcessingJob, ProcessingRun, RunStatus, RunType
 from apps.review.models import CaseStatus, ReviewCase
 
@@ -153,7 +153,10 @@ def dispatch_run(run: ProcessingRun) -> int:
         count += 1
     pending = ProcessingJob.objects.filter(object=obj, status=JobStatus.PENDING, run__isnull=True)
     pending.update(run=run)
-    for job in ProcessingJob.objects.filter(object=obj, status=JobStatus.PENDING, run=run):
+    # nur Jobs ohne Nachricht unterwegs; ein fruehere Versand innerhalb des Fensters liegt noch in der Warteschlange
+    for job in ProcessingJob.objects.filter(object=obj, status=JobStatus.PENDING, run=run).filter(
+        models_q_not_in_flight(timezone.now())
+    ):
         send(job)
     run.documents_total = Document.objects.filter(object=obj, deleted_at__isnull=True).count()
     run.save(update_fields=["documents_total", "updated_at"])

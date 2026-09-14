@@ -952,7 +952,7 @@ DB_CPUS=
 DB_MEM=
 REDIS_CPUS=
 REDIS_MEM=
-REDIS_MAXMEMORY=                 # REDIS_MEM minus 56 MiB, Schreibweise z. B. 200mb
+REDIS_MAXMEMORY=                 # Warteschlangen und Cache; mindestens 25 Prozent unter REDIS_MEM (Fragmentierung), z. B. 1024mb bei 1536m. 14.09.2026: 200mb reichten fuer rund 200.000 Nachrichten nicht
 BACKUP_CPUS=
 BACKUP_MEM=
 CLASSIFIER_CPUS=                 # nur bei Profil classifier
@@ -1514,6 +1514,7 @@ Die ausführliche Fassung entsteht in M1 unter `docs/betrieb/runbook.md`.
 | Drive-Quota oder Ratenbegrenzung | Fehler 403/429 im Log von `worker-io`, Jobs in Wiederholung | Fehlerzähler in `processing_jobs`, Zeitfenster | Warten; `IO_CONCURRENCY` senken; Abläufe außerhalb der Arbeitszeit planen |
 | Platte voll oder unter Reserve | Ingest gestoppt, `/readyz/` rot | `df -h /srv`, Belegung je Verzeichnis auf der Statusseite | `work/` per Sweeper räumen, alte Sicherungen prüfen, `previews/` bereinigen; danach Tarif oder Platte erweitern |
 | Worker ohne Fortschritt | Heartbeat alt, Queue nicht leer | `docker compose ps`, `docker compose logs worker --since 30m` | `docker compose restart worker`; Sweeper setzt hängende Jobs zurück |
+| Redis voll | Logs von `worker`, `worker-io`, `beat` mit `OutOfMemoryError: command not allowed when used memory > 'maxmemory'`; Worker starten in Schleife neu, keine Verarbeitung | Deploy-Aktion `redis-status`: belegter Speicher, Nachrichten je Warteschlange (`ocr`, `io`, `classify`) im Vergleich zu den offenen Jobs aus `doc-status` | `env-set REDIS_MEM=…` und `env-set REDIS_MAXMEMORY=…` (Abstand mindestens 25 Prozent), dann `deploy`; die Nachrichten bleiben erhalten (AOF) und werden abgearbeitet. Quelle der Flut beheben; seit 14.09.2026 begrenzen `dispatched_at` je Job und Operation den Mehrfachversand |
 | Fallback-Provider aktiv | Statusseite zeigt Fallback, Alarm nach 1 h | `ai_calls` letzte Fehler, Anbieterstatus | Beobachten; Primärprovider in `app_settings` prüfen; nach Rückkehr Nachklassifikationslauf manuell |
 | Backup fehlgeschlagen | `status.json` mit `failed`, Healthcheck rot | `docker compose logs backup` | Ursache beheben (Platz, Passwort, Rechte), manuellen Lauf starten, Ergebnis prüfen |
 | Zertifikat nicht erneuert | Browserwarnung, Alarm 14 Tage vorher | Traefik-Log (nur lesen), DNS, Port 80 offen bei `httpChallenge` | Mit dem Betreiber von Traefik klären; keine eigene Änderung an Traefik |

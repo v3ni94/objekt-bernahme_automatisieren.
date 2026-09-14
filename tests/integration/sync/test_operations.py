@@ -385,8 +385,13 @@ def test_release_stale_gibt_nur_alte_laufende_operationen_frei(seeded, testhandl
 
 
 def test_dispatch_due_beruecksichtigt_nur_faellige_wartende_operationen(seeded, testhandler, monkeypatch):
+    """Der Dispatcher versendet nur faellige wartende Operationen ohne Nachricht unterwegs: jeder Versand merkt
+    dispatched_at, fuer DISPATCH_WINDOW_MINUTES gilt die Operation als unterwegs, und hoechstens `limit`
+    Operationen sind gleichzeitig unterwegs. 14.09.2026: zuvor gingen jede Minute die 200 aeltesten wartenden
+    Operationen erneut in die Warteschlange, bis Redis voll war."""
     aufrufe: list[str] = []
     testhandler(KIND_A, lambda op: aufrufe.append(op.op_key) or {})
+    alt = timezone.now() - timedelta(minutes=operations.DISPATCH_WINDOW_MINUTES + 1)
     faellig, _ = _enqueue(key="test:faellig")
     _faellig(faellig)
     spaeter, _ = _enqueue(key="test:spaeter", delay_seconds=3600)
@@ -395,12 +400,18 @@ def test_dispatch_due_beruecksichtigt_nur_faellige_wartende_operationen(seeded, 
     laufend, _ = _enqueue(key="test:laufend")
     SyncOperation.objects.filter(pk=laufend.pk).update(status=OperationStatus.RUNNING)
 
-    # Testmodus (JOB_DISPATCH none): der Dispatcher zaehlt die faelligen Operationen, versendet aber nichts an
-    # Celery und fuehrt auch nichts lokal aus; dafuer gibt es run_pending
+    # Einreihen versendet sofort und merkt den Versand; solange die Nachricht als unterwegs gilt, versendet der
+    # Dispatcher nichts erneut
+    assert not SyncOperation.objects.filter(dispatched_at__isnull=True).exists()
     assert settings.OBJEKTAKTE["JOB_DISPATCH"] == "none"
+    assert operations.dispatch_due() == 0
+    # Fenster abgelaufen (Nachricht verloren): genau die faellige wartende Operation wird erneut versandt.
+    # Testmodus (JOB_DISPATCH none): der Dispatcher zaehlt und merkt, versendet aber nichts an Celery und fuehrt
+    # auch nichts lokal aus; dafuer gibt es run_pending
+    SyncOperation.objects.update(dispatched_at=alt)
     assert operations.dispatch_due() == 1
     faellig.refresh_from_db()
-    assert faellig.status == OperationStatus.PENDING and aufrufe == []
+    assert faellig.status == OperationStatus.PENDING and aufrufe == [] and faellig.dispatched_at > alt
 
     # Betriebsmodus: genau die faellige Operation geht an den Celery-Task in der Queue io
     from apps.sync import tasks
@@ -412,14 +423,32 @@ def test_dispatch_due_beruecksichtigt_nur_faellige_wartende_operationen(seeded, 
         "apply_async",
         lambda args=None, countdown=None, queue=None, **kw: versendet.append((tuple(args), countdown, queue)),
     )
+    SyncOperation.objects.update(dispatched_at=alt)
     assert operations.dispatch_due() == 1
     assert versendet == [((faellig.pk,), None, "io")]
-    # Begrenzung: mit limit 0 wird nichts versendet
-    assert operations.dispatch_due(limit=0) == 0 and len(versendet) == 1
-    # wird die Wartezeit faellig, kommt die zurueckgestellte Operation dazu (Reihenfolge nach Prioritaet, ID)
+    # unterwegs: kein zweiter Versand, auch nicht mit grossem Limit
+    assert operations.dispatch_due(limit=50) == 0 and len(versendet) == 1
+    # Begrenzung: hoechstens limit Operationen gleichzeitig unterwegs (Reihenfolge nach Prioritaet, ID)
     _faellig(spaeter)
+    SyncOperation.objects.update(dispatched_at=alt)
+    assert operations.dispatch_due(limit=1) == 1 and versendet[-1][0] == (faellig.pk,)
+    assert operations.dispatch_due(limit=1) == 0
+    assert operations.dispatch_due(limit=2) == 1 and versendet[-1][0] == (spaeter.pk,)
+    assert operations.dispatch_due(limit=0) == 0 and len(versendet) == 3
+    # Wiederholung und Freigabe setzen die Nachricht zurueck: die Operation wird bei Faelligkeit erneut versandt
+    testhandler(KIND_A, _wirft(Retry("Ratenbegrenzung", seconds=0)))
+    monkeypatch.setitem(settings.OBJEKTAKTE, "JOB_DISPATCH", "none")
+    _run(faellig)
+    faellig.refresh_from_db()
+    assert faellig.status == OperationStatus.PENDING and faellig.dispatched_at is None
+    _faellig(faellig)  # Backoff der Wiederholung ueberspringen
+    SyncOperation.objects.filter(pk=laufend.pk).update(heartbeat_at=alt)
+    assert operations.release_stale() == 1
+    laufend.refresh_from_db()
+    assert laufend.dispatched_at is None
+    monkeypatch.setitem(settings.OBJEKTAKTE, "JOB_DISPATCH", "celery")
     assert operations.dispatch_due() == 2
-    assert [v[0][0] for v in versendet[1:]] == [faellig.pk, spaeter.pk]
+    assert sorted(v[0][0] for v in versendet[-2:]) == sorted([faellig.pk, laufend.pk])
     # Einreihen im Betriebsmodus versendet sofort mit der Wartezeit als countdown
     neu, _ = _enqueue(key="test:neu", delay_seconds=45)
     assert versendet[-1] == ((neu.pk,), 45, "io")
@@ -608,8 +637,13 @@ def test_dispatch_due_task_gibt_freigaben_und_versand_zurueck(seeded, testhandle
         heartbeat_at=timezone.now() - timedelta(hours=1),
     )
     spaeter, _ = _enqueue(key="test:spaeter", delay_seconds=3600)
+    # frisch eingereihte Operationen gelten als unterwegs; erst nach Ablauf des Fensters versendet der Task erneut
+    assert dispatch_due_task() == {"released": 1, "dispatched": 1}  # freigegebene Operation ohne Nachricht
+    SyncOperation.objects.update(
+        dispatched_at=timezone.now() - timedelta(minutes=operations.DISPATCH_WINDOW_MINUTES + 1)
+    )
     ergebnis = dispatch_due_task()
-    assert ergebnis == {"released": 1, "dispatched": 2}
+    assert ergebnis == {"released": 0, "dispatched": 2}
     haengend.refresh_from_db()
     assert haengend.status == OperationStatus.PENDING and haengend.locked_by is None
     spaeter.refresh_from_db()

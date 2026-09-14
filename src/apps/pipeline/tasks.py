@@ -30,6 +30,7 @@ from apps.pipeline.jobs import (
     heartbeat,
     idempotency_key,
     job_task,
+    redispatch_lost_jobs,
     sweep_stale_jobs,
 )
 from apps.pipeline.models import JobStatus, JobType, ProcessingJob
@@ -1002,6 +1003,7 @@ def sweep() -> dict:
     from apps.pipeline.runs import maybe_finish_run, schedule_runs
 
     result = sweep_stale_jobs()
+    result["redispatched"] = redispatch_lost_jobs()
     result["orphans_removed"] = remove_orphan_work_dirs()
     result["sync_runs_aborted"] = abort_stale_sync_runs()
     from apps.pipeline.models import ProcessingRun, RunStatus

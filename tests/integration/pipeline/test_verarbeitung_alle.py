@@ -4,6 +4,8 @@ ausgelassen; Knopf auf der Objektliste, Kommando mit Vorschau."""
 
 from __future__ import annotations
 
+from datetime import timedelta
+
 import pytest
 from django.core.management import call_command
 from django.urls import reverse
@@ -12,8 +14,11 @@ from django.utils import timezone
 from apps.audit.models import AuditEvent
 from apps.documents.models import Document
 from apps.objects.models import ManagedObject
-from apps.pipeline.models import ProcessingRun, RunStatus, RunType
-from apps.pipeline.runs import objects_with_open_work, start_runs_for_all
+from apps.pipeline import jobs as jobs_mod
+from apps.pipeline import runs as runs_mod
+from apps.pipeline.jobs import REDISPATCH_HOURS, enqueue, idempotency_key, redispatch_lost_jobs
+from apps.pipeline.models import JobStatus, JobType, ProcessingJob, ProcessingRun, RunStatus, RunType
+from apps.pipeline.runs import dispatch_run, objects_with_open_work, start_runs_for_all
 
 pytestmark = pytest.mark.django_db
 
@@ -73,3 +78,76 @@ def test_sammelstart_ueber_die_objektliste(drei_objekte, client_as, admin_user, 
     assert any("2 Objekt(e) eingereiht" in m.message for m in resp.context["messages"])
     resp = c.post(reverse("processing_start_all"), follow=True)
     assert any("nichts gestartet" in m.message for m in resp.context["messages"])
+
+
+def test_versand_merkt_zeitpunkt_und_sweep_versendet_nur_verlorene_jobs(
+    drei_objekte, admin_user, monkeypatch
+):
+    """14.09.2026: jeder Versand merkt dispatched_at. Der Sweep versendet nur Jobs laufender Laeufe, die nie
+    versandt wurden oder deren Versand aelter als REDISPATCH_HOURS ist (Warteschlange geleert), hoechstens limit je
+    Aufruf; dispatch_run versendet unterwegs befindliche Jobs nicht erneut. Damit waechst die Warteschlange nicht
+    durch Doppelte (Redis war am 13.09.2026 durch Mehrfachversand voll)."""
+    a, b, c = drei_objekte
+    start_runs_for_all(user=admin_user)
+    lauf_a = ProcessingRun.objects.get(object=a)
+    lauf_c = ProcessingRun.objects.get(object=c)
+    assert lauf_a.status == RunStatus.RUNNING and lauf_c.status == RunStatus.PENDING
+    offen_a = ProcessingJob.objects.filter(object=a, status=JobStatus.PENDING)
+    assert offen_a.exists() and all(j.dispatched_at is not None for j in offen_a)
+
+    gesendet: list[int] = []
+
+    def _send(job, countdown=None):
+        gesendet.append(job.pk)
+        ProcessingJob.objects.filter(pk=job.pk).update(dispatched_at=timezone.now())
+
+    monkeypatch.setattr(jobs_mod, "send", _send)
+    monkeypatch.setattr(runs_mod, "send", _send)
+    # alles unterwegs: nichts nachzusenden
+    assert redispatch_lost_jobs() == 0 and gesendet == []
+    # nie versandter Job eines laufenden Laufs (z. B. waehrend des Laufs von der Aufarbeitung angelegt) ...
+    neu = _dok(a, "a3.pdf", "registered")
+    verloren, _ = enqueue(
+        JobType.DISCOVER,
+        a,
+        key=idempotency_key(JobType.DISCOVER, a.pk, neu.drive_file_id, ""),
+        document=neu,
+        run=lauf_a,
+        payload={"drive_file_id": neu.drive_file_id},
+        dispatch=False,
+    )
+    # ... und einer eines wartenden Laufs, der erst mit dessen Start versandt wird
+    wartend, _ = enqueue(
+        JobType.HASH, c, key=idempotency_key(JobType.HASH, c.pk, "warte"), run=lauf_c, dispatch=False
+    )
+    assert verloren.dispatched_at is None and wartend.dispatched_at is None
+    assert redispatch_lost_jobs() == 1 and gesendet == [verloren.pk]
+    assert redispatch_lost_jobs() == 0
+    # Versand aelter als das Fenster: erneut, aber hoechstens limit je Aufruf
+    alt = timezone.now() - timedelta(hours=REDISPATCH_HOURS + 1)
+    ProcessingJob.objects.filter(object=a, status=JobStatus.PENDING).update(dispatched_at=alt)
+    n = ProcessingJob.objects.filter(object=a, status=JobStatus.PENDING).count()
+    assert n >= 2
+    assert redispatch_lost_jobs(limit=1) == 1
+    assert redispatch_lost_jobs() == n - 1
+    assert redispatch_lost_jobs() == 0
+    # der Sweep meldet den Nachversand
+    from apps.pipeline.tasks import sweep
+
+    ProcessingJob.objects.filter(pk=verloren.pk).update(dispatched_at=None)
+    assert sweep()["redispatched"] == 1
+    # dispatch_run: unterwegs befindliche Jobs werden nicht erneut versandt
+    lauf_c.status = RunStatus.RUNNING
+    lauf_c.save(update_fields=["status"])
+    gesendet.clear()
+    dispatch_run(lauf_c)
+    erster = sorted(gesendet)
+    assert (
+        wartend.pk in erster
+        and len(erster) == ProcessingJob.objects.filter(object=c, status=JobStatus.PENDING).count()
+    )
+    dispatch_run(lauf_c)
+    assert sorted(gesendet) == erster
+    ProcessingJob.objects.filter(object=c).update(dispatched_at=alt)
+    dispatch_run(lauf_c)
+    assert len(gesendet) == 2 * len(erster)

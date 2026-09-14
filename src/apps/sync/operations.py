@@ -127,8 +127,11 @@ def enqueue(
 
 
 def send(op: SyncOperation, countdown: int | None = None) -> None:
+    """Nachricht an die Warteschlange; merkt den Versandzeitpunkt (dispatched_at), damit dispatch_due eine
+    unterwegs befindliche Operation nicht erneut versendet."""
     from django.conf import settings
 
+    SyncOperation.objects.filter(pk=op.pk).update(dispatched_at=timezone.now())
     if settings.OBJEKTAKTE.get("JOB_DISPATCH", "celery") != "celery":
         return
     from apps.sync.tasks import run_operation_task
@@ -194,6 +197,7 @@ def run(op_id: int, *, worker: str = "") -> dict:
             last_error=exc.reason,
             locked_by=None,
             locked_at=None,
+            dispatched_at=None,
         )
         return {"op_id": op_id, "deferred": exc.reason}
     except Retry as exc:
@@ -206,6 +210,7 @@ def run(op_id: int, *, worker: str = "") -> dict:
             last_error=str(exc.reason)[:500],
             locked_by=None,
             locked_at=None,
+            dispatched_at=None,
         )
         return {"op_id": op_id, "retry": True}
     except Block as exc:
@@ -227,20 +232,37 @@ def run(op_id: int, *, worker: str = "") -> dict:
             last_error=f"{type(exc).__name__}: {exc}"[:500],
             locked_by=None,
             locked_at=None,
+            dispatched_at=None,
         )
         return {"op_id": op_id, "retry": True}
     _finish(op, OperationStatus.DONE, result=result, last_error=None)
     return {"op_id": op_id, "done": True, "result": result}
 
 
-def dispatch_due(limit: int = 200) -> int:
-    """Reiht faellige Operationen ein (Beat), damit Wiederholungen und verzoegerte Operationen ohne Celery-ETA laufen."""
+DISPATCH_WINDOW_MINUTES = 60
+
+
+def dispatch_due(limit: int = 200, window_minutes: int = DISPATCH_WINDOW_MINUTES) -> int:
+    """Reiht faellige Operationen ein (Beat), damit Wiederholungen und verzoegerte Operationen ohne Celery-ETA laufen.
+    Eine Operation gilt nach dem Versand fuer window_minutes als unterwegs und wird in dieser Zeit nicht erneut
+    versandt; zugleich sind hoechstens `limit` Operationen gleichzeitig unterwegs. So bleibt die Warteschlange
+    begrenzt, auch wenn Tausende Operationen warten und der Verbrauch langsam ist. 14.09.2026: zuvor wurden jede
+    Minute die 200 aeltesten wartenden Operationen erneut versandt, die Warteschlange wuchs um 200 Nachrichten je
+    Minute, bis Redis (200 MB, noeviction) voll war und Worker wie Beat nichts mehr schreiben konnten."""
     now = timezone.now()
+    cutoff = now - timedelta(minutes=window_minutes)
+    in_flight = SyncOperation.objects.filter(
+        status=OperationStatus.PENDING, dispatched_at__gte=cutoff
+    ).count()
+    capacity = max(limit - in_flight, 0)
+    if capacity == 0:
+        return 0
     ids = list(
         SyncOperation.objects.filter(status=OperationStatus.PENDING)
         .filter(Q(next_attempt_at__isnull=True) | Q(next_attempt_at__lte=now))
+        .filter(Q(dispatched_at__isnull=True) | Q(dispatched_at__lt=cutoff))
         .order_by("priority", "id")
-        .values_list("pk", flat=True)[:limit]
+        .values_list("pk", flat=True)[:capacity]
     )
     for pk in ids:
         send(SyncOperation(pk=pk))
@@ -251,7 +273,11 @@ def release_stale(minutes: int = STALE_MINUTES) -> int:
     """Haengende Operationen (Worker verloren) wieder freigeben."""
     limit = timezone.now() - timedelta(minutes=minutes)
     return SyncOperation.objects.filter(status=OperationStatus.RUNNING, heartbeat_at__lt=limit).update(
-        status=OperationStatus.PENDING, locked_by=None, locked_at=None, next_attempt_at=timezone.now()
+        status=OperationStatus.PENDING,
+        locked_by=None,
+        locked_at=None,
+        next_attempt_at=timezone.now(),
+        dispatched_at=None,
     )
 
 
@@ -298,6 +324,7 @@ def retry_now(op: SyncOperation, *, user=None) -> bool:
             blocked_reason=None,
             locked_by=None,
             locked_at=None,
+            dispatched_at=None,
         )
     )
     if not updated:

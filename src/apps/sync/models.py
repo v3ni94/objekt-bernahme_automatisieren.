@@ -186,6 +186,8 @@ class SyncOperation(TimestampedModel):
     attempt_count = models.PositiveSmallIntegerField(default=0)
     max_attempts = models.PositiveSmallIntegerField(default=5)
     next_attempt_at = models.DateTimeField(null=True, blank=True)
+    # letzter Versand an die Warteschlange; leer, wenn keine Nachricht unterwegs ist (dispatch_due, 14.09.2026)
+    dispatched_at = models.DateTimeField(null=True, blank=True)
     locked_by = models.CharField(max_length=80, null=True, blank=True)
     locked_at = models.DateTimeField(null=True, blank=True)
     heartbeat_at = models.DateTimeField(null=True, blank=True)
