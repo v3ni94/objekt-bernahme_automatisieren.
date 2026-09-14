@@ -23,7 +23,7 @@
 #   deploy-tests <branch>     Deployment-Tests T2, T3, T11, T14 (nur lesend)
 #   doc-status <branch> [nr]  Dokumente je Objekt und Status, offene und fehlgeschlagene Jobs (nur lesend);
 #                             mit Objektnummer je Dokument Stufen, Entitaetenzaehler und Faelle, ohne Namen
-#   reconcile-all <branch>    Ordnerabgleich aller aktiven Objekte (legt fehlende Struktur an)
+#   reconcile-all <branch> [ohne-ordner]  Ordnerabgleich aller aktiven Objekte (legt fehlende Struktur an); ohne-ordner = nur Objekte ohne Objektordner
 #   config-set <branch> <schluessel=wert>  Konfigurationswert setzen (Wert als JSON: true, 5, "text"); Audit
 #   altbestand-import <branch>  Quellordner aus db/seeds/altbestand_ordner.txt in die Altbestand-Tabelle
 #   altbestand-objekte <branch> [echt]  Objekte fuer Altbestand-Quellen ohne Objekt anlegen (echt = anlegen, sonst Vorschau)
@@ -32,7 +32,7 @@
 #   verarbeitung-alle <branch> [echt] Verarbeitungslaeufe fuer alle Objekte mit offener Arbeit (echt = einreihen)
 #   jobs-bereinigen <branch> [echt] Ueberzaehlige wartende Wiederholungsjobs (#n) bereinigen (echt = ausfuehren, sonst Vorschau)
 #   redis-status <branch>     Redis: Speicher, Schluesselzahl, Warteschlangenlaengen, groesste Schluessel (nur lesend)
-#   env-set <branch> <SCHLUESSEL=wert>  Freigegebenen Betriebswert in .env setzen (Ressourcen, Parallelitaet);
+#   env-set <branch> <SCHLUESSEL=wert[+SCHLUESSEL=wert]>  Freigegebene Betriebswerte in .env setzen (Ressourcen, Parallelitaet);
 #                             wirksam erst mit deploy; Sicherung .env.bak
 #                             aufnehmen (ohne Doppelte) und Namen aus Drive lesen
 # Jede andere Eingabe wird abgewiesen.
@@ -367,11 +367,26 @@ PY
     # Ordnerabgleich aller aktiven Objekte (echter Lauf): legt fehlende Struktur an, etwa die 15 Unterordner der
     # Stammakte nach der Katalogerweiterung vom 12.09.2026. Ergebnis je Objekt im Statusbereich und in drive_sync_runs.
     # Laeuft im worker-io (Warteschlange io, /data/exports beschreibbar); der Web-Container ist schreibgeschuetzt.
-    docker compose exec -T worker-io python manage.py shell <<'PY'
+    # Argument "ohne-ordner": nur Objekte ohne registrierten Objektordner (schnell, kein Durchlauf aller Baeume).
+    if [ "${ARG:-}" = "ohne-ordner" ]; then
+      docker compose exec -T worker-io python manage.py shell <<'PY'
+from apps.drive.models import DriveNode, NodeKind, NodeStatus
+from apps.drive.tasks import reconcile_object_task
+from apps.objects.models import ManagedObject
+mit = set(DriveNode.objects.filter(node_kind=NodeKind.OBJECT_ROOT, status=NodeStatus.ACTIVE).values_list("object_id", flat=True))
+objs = [o for o in ManagedObject.active.filter(status__in=["new", "takeover", "active"]).order_by("object_number_numeric") if o.pk not in mit]
+print(f"Objekte ohne Objektordner: {len(objs)}")
+for o in objs:
+    r = reconcile_object_task(o.pk, False, None, trigger="bulk")
+    print(o.object_number, r.get("status"), r.get("error") or "")
+PY
+    else
+      docker compose exec -T worker-io python manage.py shell <<'PY'
 from apps.drive.tasks import reconcile_all_task
 result = reconcile_all_task(dry_run=False)
 print(result)
 PY
+    fi
     ;;
   config-set)
     # Konfigurationswert aus dem Katalog setzen, Argument schluessel=wert; der Wert wird als JSON gelesen
@@ -455,25 +470,30 @@ PY
     '
     ;;
   env-set)
-    # Betriebswert in .env setzen; nur freigegebene Schluessel (Ressourcen, Parallelitaet), Wert aus Ziffern,
-    # Buchstaben, Punkt, Unterstrich und Bindestrich. Kommentar hinter dem Wert bleibt erhalten. Wirksam erst mit deploy.
+    # Betriebswerte in .env setzen; mehrere Paare mit + getrennt (OCR_PROCESSES=6+IO_CONCURRENCY=12). Nur freigegebene
+    # Schluessel (Ressourcen, Parallelitaet), Wert aus Ziffern, Buchstaben, Punkt, Unterstrich und Bindestrich.
+    # Kommentar hinter dem Wert bleibt erhalten. Wirksam erst mit deploy. Sicherung .env.bak vor der ersten Aenderung.
     case "${ARG:-}" in *=*) ;; *) echo "Argument SCHLUESSEL=wert fehlt"; exit 2 ;; esac
-    KEY="${ARG%%=*}"; VAL="${ARG#*=}"
-    case "$KEY" in
-      REDIS_MEM|REDIS_MAXMEMORY|REDIS_CPUS|OCR_PROCESSES|IO_CONCURRENCY|NLP_CONCURRENCY|GUNICORN_TIMEOUT|GUNICORN_WORKERS| \
-      WORKER_MEM|WORKER_CPUS|WORKER_NLP_MEM|WORKER_NLP_CPUS|WORKER_IO_MEM|WORKER_IO_CPUS|WEB_MEM|WEB_CPUS|DB_MEM|DB_CPUS| \
-      JOBS_VISIBILITY_TIMEOUT_S|LOG_MAX_SIZE|LOG_MAX_FILE) ;;
-      *) echo "Schluessel $KEY ist fuer env-set nicht freigegeben"; exit 2 ;;
-    esac
-    case "$VAL" in ""|*[!A-Za-z0-9._-]*) echo "unzulaessiger Wert fuer $KEY"; exit 2 ;; esac
-    grep -qE "^$KEY=" .env || { echo "$KEY fehlt in .env"; exit 2; }
-    OLD="$(envval "$KEY")"
     cp .env .env.bak && chmod 600 .env.bak
-    sed -i -E "s|^($KEY=)[^ #]*|\1$VAL|" .env
-    NEU="$(envval "$KEY")"
-    [ "$NEU" = "$VAL" ] || { echo "Schreiben fehlgeschlagen ($KEY=$NEU)"; exit 1; }
-    echo "$KEY: ${OLD:-leer} -> $NEU (wirksam mit der Aktion deploy; Sicherung .env.bak)"
-    echo "$(date -Is) env-set $KEY ${OLD:-leer} -> $NEU" >> "$LOG"
+    IFS='+' read -r -a PAARE <<<"$ARG"
+    for PAAR in "${PAARE[@]}"; do
+      KEY="${PAAR%%=*}"; VAL="${PAAR#*=}"
+      case "$KEY" in
+        REDIS_MEM|REDIS_MAXMEMORY|REDIS_CPUS|OCR_PROCESSES|IO_CONCURRENCY|NLP_CONCURRENCY|GUNICORN_TIMEOUT|GUNICORN_WORKERS| \
+        WORKER_MEM|WORKER_CPUS|WORKER_NLP_MEM|WORKER_NLP_CPUS|WORKER_IO_MEM|WORKER_IO_CPUS|WEB_MEM|WEB_CPUS|DB_MEM|DB_CPUS| \
+        JOBS_VISIBILITY_TIMEOUT_S|LOG_MAX_SIZE|LOG_MAX_FILE) ;;
+        *) echo "Schluessel $KEY ist fuer env-set nicht freigegeben"; exit 2 ;;
+      esac
+      case "$VAL" in ""|*[!A-Za-z0-9._-]*) echo "unzulaessiger Wert fuer $KEY"; exit 2 ;; esac
+      grep -qE "^$KEY=" .env || { echo "$KEY fehlt in .env"; exit 2; }
+      OLD="$(envval "$KEY")"
+      sed -i -E "s|^($KEY=)[^ #]*|\1$VAL|" .env
+      NEU="$(envval "$KEY")"
+      [ "$NEU" = "$VAL" ] || { echo "Schreiben fehlgeschlagen ($KEY=$NEU)"; exit 1; }
+      echo "$KEY: ${OLD:-leer} -> $NEU"
+      echo "$(date -Is) env-set $KEY ${OLD:-leer} -> $NEU" >> "$LOG"
+    done
+    echo "wirksam mit der Aktion deploy; Sicherung .env.bak"
     ;;
   *) echo "Nur check, pull, befund, env-init, ps, logs, smoke, cert-retry, db-status, db-reset, first-run, deploy, rollback, create-admin, oauth-check, deploy-tests, doc-status, config-set, altbestand-import, altbestand-objekte, altbestand-aufarbeiten, verarbeitung-alle, paperless-feld-alle, redis-status, env-set, jobs-bereinigen oder reconcile-all erlaubt"; exit 2 ;;
 esac

@@ -979,12 +979,12 @@
       "key": "processing.max_parallel_objects",
       "category": "processing",
       "value_type": "integer",
-      "description": "Gleichzeitig verarbeitete Objekte",
+      "description": "Gleichzeitig verarbeitete Objekte (Obergrenze 8 seit 14.09.2026; OCR-Prozesse und Ablage-Threads passend dimensionieren)",
       "source": "ANNAHME A20, Frage F18",
       "schema": {
         "type": "integer",
         "minimum": 1,
-        "maximum": 4
+        "maximum": 8
       }
     },
     {
