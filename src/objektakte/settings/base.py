@@ -246,21 +246,25 @@ CELERY_BEAT_SCHEDULE: dict = {
     "drive-hourly-read-test": {
         "task": "drive.hourly_read_test",
         "schedule": crontab(minute=7),
-        "options": {"queue": "io"},
+        "options": {"queue": "control"},
     },
     "drive-daily-forced-refresh": {
         "task": "drive.daily_forced_refresh",
         "schedule": crontab(hour=4, minute=0),
-        "options": {"queue": "io"},
+        "options": {"queue": "control"},
     },
     # Sweeper der Verarbeitung jede Minute (E 10.4); zusaetzlich beim Start jedes Worker-Containers (objektakte.celery)
-    "pipeline-sweep": {"task": "pipeline.sweep", "schedule": crontab(minute="*"), "options": {"queue": "io"}},
+    "pipeline-sweep": {
+        "task": "pipeline.sweep",
+        "schedule": crontab(minute="*"),
+        "options": {"queue": "control"},
+    },
     # Synchronisation Paperless und Drive (12.09.2026): Operationsliste minuetlich, Abgleiche alle fuenf Minuten
     # (das konfigurierte Intervall prueft der Task), Regelableitung naechtlich vor dem Nachtraining
     "sync-dispatch": {
         "task": "sync.dispatch_due",
         "schedule": crontab(minute="*"),
-        "options": {"queue": "io"},
+        "options": {"queue": "control"},
     },
     "sync-paperless-poll": {
         "task": "sync.paperless_poll",
@@ -275,7 +279,7 @@ CELERY_BEAT_SCHEDULE: dict = {
     "sync-derive-rules": {
         "task": "sync.derive_rules",
         "schedule": crontab(hour=1, minute=15),
-        "options": {"queue": "io"},
+        "options": {"queue": "control"},
     },
     "parties-check-assignment-consistency": {
         "task": "parties.check_assignment_consistency",
@@ -292,7 +296,7 @@ CELERY_BEAT_SCHEDULE: dict = {
     "status-check-alerts": {
         "task": "status.check_alerts",
         "schedule": crontab(minute="*/5"),
-        "options": {"queue": "io"},
+        "options": {"queue": "control"},
     },
 }
 

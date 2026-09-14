@@ -34,7 +34,7 @@ def _on_worker_ready(sender=None, **kwargs) -> None:
     start_heartbeat_thread(service, redis_client=_redis_client())
     # Sweeper beim Start jedes Worker-Containers (E 10.4): unterbrochene Jobs werden ohne manuelle Aktion fortgesetzt
     try:
-        app.send_task("pipeline.sweep", queue="io")
+        app.send_task("pipeline.sweep", queue="control")
     except Exception as exc:  # Broker noch nicht erreichbar: Beat holt es jede Minute nach
         logging.getLogger(__name__).debug("pipeline.sweep beim Start nicht gesendet: %s", exc)
 

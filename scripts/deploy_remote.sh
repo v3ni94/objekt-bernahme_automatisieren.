@@ -447,7 +447,7 @@ PY
       redis-cli INFO memory | tr -d "\r" | grep -E "^(used_memory_human|used_memory_peak_human|used_memory_dataset|maxmemory_human|maxmemory_policy|mem_fragmentation_ratio):"
       echo "== Schluessel gesamt: $(redis-cli DBSIZE)"
       echo "== Warteschlangen (Nachrichten)"
-      for q in ocr classify io ai lists celery; do echo "  $q: $(redis-cli LLEN "$q")"; done
+      for q in control ocr classify io ai lists celery; do echo "  $q: $(redis-cli LLEN "$q")"; done
       echo "== unbestaetigte Nachrichten: $(redis-cli HLEN unacked) (Index $(redis-cli ZCARD unacked_index))"
       echo "== Cache-Schluessel (Django): $(redis-cli --scan --pattern ":1:*" | wc -l)"
       echo "== groesste Schluessel"

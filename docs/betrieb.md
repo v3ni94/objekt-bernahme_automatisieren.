@@ -24,7 +24,7 @@ Hinweis zur Rechtslage: Abschnitt 8 ist eine Einschätzung aus technischer Sicht
 
 | Nr. | Entscheidung | Begründung (kurz) |
 |---|---|---|
-| 1 | Acht Dienste in einer Compose-Datei: `web`, `worker` (Queue `ocr`), `worker-nlp` (Queue `classify`), `worker-io` (Queues `ai`, `io`, `lists`), `beat`, `redis`, `db`, `backup`; optional `classifier` über ein Compose-Profil. | CR 7 nennt `web`, `worker`, `queue`, `db`, optional `classifier`. Die zusätzlichen Dienste sind Beschluss B-13 des Umsetzungsplans (Frage F2 zur Bestätigung): Netzwerkarbeit belegt keine OCR-Prozesse, Modelle werden nicht in jedem OCR-Prozess geladen, periodische Aufgaben brauchen einen Zeitgeber, Backup ist im CR gefordert. |
+| 1 | Acht Dienste in einer Compose-Datei: `web`, `worker` (Queue `ocr`), `worker-nlp` (Queue `classify`), `worker-io` (Queues `control`, `io`, `ai`, `lists`), `beat`, `redis`, `db`, `backup`; optional `classifier` über ein Compose-Profil. | CR 7 nennt `web`, `worker`, `queue`, `db`, optional `classifier`. Die zusätzlichen Dienste sind Beschluss B-13 des Umsetzungsplans (Frage F2 zur Bestätigung): Netzwerkarbeit belegt keine OCR-Prozesse, Modelle werden nicht in jedem OCR-Prozess geladen, periodische Aufgaben brauchen einen Zeitgeber, Backup ist im CR gefordert. |
 | 2 | Zwei Build-Ziele aus einem Dockerfile: `web` ohne OCR-Binärdateien, `worker` mit Tesseract, ocrmypdf, Ghostscript und Modellen. | Beschluss B-44. Kleineres Angriffs- und Update-Profil für den öffentlich erreichbaren Dienst; identische Codebasis und Migrationen. |
 | 3 | Drei Netze: `data` (Docker `internal: true`), `egress` (ausgehend), `[TRAEFIK_NETWORK]` (vorhanden, nur `web`). Kein Dienst veröffentlicht Host-Ports. | CR 0.1: Traefik ist der einzige öffentlich erreichbare Dienst. `db` und `redis` erreichen das Internet nie. |
 | 4 | Alle persistenten Daten unter `/srv/objektakte/` in 14 Verzeichnissen; `db` und `redis` als benannte Volumes mit Bindung auf diese Pfade. | CR 0.1. Beschluss B-14. Ein Wurzelpfad für Backup, Plattenüberwachung und Wiederherstellung. |
@@ -265,7 +265,7 @@ Nach Abschluss werden die Lesebefehle aus Abschnitt 1.4 erneut ausgeführt und d
 | `web` | Anwendung über gunicorn (gilt bei Stack A): Review Center, Admin, OAuth-Callback, Statusseite, rechtegeprüfte Auslieferung von Seitenbildern und Dateien | `web` | keine | `GUNICORN_WORKERS`, `GUNICORN_THREADS` | `data`, `egress`, `[TRAEFIK_NETWORK]` | HTTP GET `/healthz/` |
 | `worker` | Prozesspool für OCR: discover, hash, Seitenanalyse, Chunking, OCR je Chunk, Merge, Seitenbilder; keine Modelle im Speicher | `worker` | `ocr` | `OCR_PROCESSES` | `data`, `egress` | Heartbeat-Datei jünger als 2 min |
 | `worker-nlp` | Kleiner Pool für Klassifikation: Entitätenerkennung, Gazetteer-Abgleich, lokaler Klassifikator, Entscheidungsalgorithmus, Nachtraining; lädt spaCy und Modell einmal je Prozess | `worker` | `classify` | `NLP_CONCURRENCY` | `data` | Heartbeat-Datei |
-| `worker-io` | Threads für Netzwerkarbeit: Drive-Schreibzugriffe mit Sperre je Objekt, KI-Aufrufe Stufe 3, Listen, Nachforderung, Import-Parsing, Exporte | `worker` | `ai`, `io`, `lists` | `IO_CONCURRENCY` | `data`, `egress` | Heartbeat-Datei |
+| `worker-io` | Threads für Netzwerkarbeit: Drive-Schreibzugriffe mit Sperre je Objekt, KI-Aufrufe Stufe 3, Listen, Nachforderung, Import-Parsing, Exporte | `worker` | `control`, `io`, `ai`, `lists` | `IO_CONCURRENCY` | `data`, `egress` | Heartbeat-Datei |
 | `beat` | Zeitplan: Sweeper jede Minute, Token-Lesetest stündlich, erzwungener Refresh täglich, Vollständigkeitsprüfung und Nachtraining nachts, Bereinigung `work` und `previews`, Alarmierung | `web` | keine | | `data`, `egress` | Heartbeat-Datei |
 | `redis` | Broker und Cache-Versionsschlüssel; AOF, `noeviction`, Passwort | offizielles Image (Redis oder kompatibler Fork, Anhang C) | | | `data` | `redis-cli ping` |
 | `db` | MariaDB, utf8mb4, InnoDB, strikter SQL-Modus, Konfigurationsfragmente | offizielles Image | | | `data` | `healthcheck.sh` des Images |
@@ -569,7 +569,7 @@ services:
         TESSDATA_VARIANT: "${TESSDATA_VARIANT}"
     command: >
       celery -A objektakte worker
-      -Q io,ai,lists -n worker-io@%h
+      -Q control,io,ai,lists -n worker-io@%h
       --pool threads
       --concurrency ${IO_CONCURRENCY}
       --prefetch-multiplier 1

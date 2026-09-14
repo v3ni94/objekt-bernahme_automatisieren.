@@ -310,7 +310,7 @@ def request_schedule() -> list[int] | None:
         return schedule_runs()
     from celery import current_app
 
-    current_app.send_task("pipeline.schedule_runs", queue="io")
+    current_app.send_task("pipeline.schedule_runs", queue="control")
     return None
 
 

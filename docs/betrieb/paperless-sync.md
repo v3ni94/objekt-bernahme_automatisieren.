@@ -156,7 +156,7 @@ Erwartet: 202 mit `operation` und `created`; die Operation erscheint auf `/verwa
 
 Manuell auf `/verwaltung/sync/`: Paperless jetzt abgleichen, Drive-Änderungen jetzt lesen (beide ohne Intervallprüfung), Fällige Operationen einreihen.
 
-Alle Tasks der Synchronisation laufen in der Queue `io` (Dienst `worker-io`, Threads). Nur dieser Worker schreibt nach Paperless und Drive; `web` ruft Paperless nur beim Verbindungstest auf, `beat` nie. Der Drive-Änderungsabgleich setzt beim ersten Lauf nur einen Ausgangspunkt (kein Rückblick) und registriert danach neue Dateien in Objektordnern und im Eingangsordner, vermerkt Papierkorb und Entfernen bekannter Dateien und legt Inhaltsänderungen als Konflikt vor.
+Die Operationen der Synchronisation laufen in der Queue `io` (Dienst `worker-io`, Threads); der Minutentakt `sync-dispatch` und der Sweep der Pipeline laufen in der Queue `control` desselben Dienstes, damit sie nicht hinter einem Rückstau in `io` warten (14.09.2026: rund 11.700 Nachrichten in `io`, der Sweep kam nicht zum Zug). Nur dieser Worker schreibt nach Paperless und Drive; `web` ruft Paperless nur beim Verbindungstest auf, `beat` nie. Der Drive-Änderungsabgleich setzt beim ersten Lauf nur einen Ausgangspunkt (kein Rückblick) und registriert danach neue Dateien in Objektordnern und im Eingangsordner, vermerkt Papierkorb und Entfernen bekannter Dateien und legt Inhaltsänderungen als Konflikt vor.
 
 ### 5.2 Operationsliste
 

@@ -998,7 +998,7 @@ def file_to_drive(job: ProcessingJob) -> dict:
 
 
 # ---------------------------------------------------------------- Sweeper
-@shared_task(name="pipeline.sweep", queue="io")
+@shared_task(name="pipeline.sweep", queue="control")
 def sweep() -> dict:
     from apps.pipeline.runs import maybe_finish_run, repair_interrupted_runs, schedule_runs
 
@@ -1015,7 +1015,7 @@ def sweep() -> dict:
     return result
 
 
-@shared_task(name="pipeline.schedule_runs", queue="io")
+@shared_task(name="pipeline.schedule_runs", queue="control")
 def schedule_runs_task() -> dict:
     """Wartende Laeufe im Hintergrund starten (Sammelstart ueber die Oberflaeche, 14.09.2026). Das Einreihen der
     Jobs eines grossen Objekts dauert Minuten und gehoert nicht in den Web-Request; der Beat-Sweep holt einen

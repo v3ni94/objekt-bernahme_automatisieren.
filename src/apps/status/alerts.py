@@ -199,6 +199,6 @@ def check_alerts(*, check_certificate: bool = True) -> dict:
     }
 
 
-@shared_task(name="status.check_alerts", queue="io")
+@shared_task(name="status.check_alerts", queue="control")
 def check_alerts_task() -> dict:
     return check_alerts()

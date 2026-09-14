@@ -119,7 +119,7 @@ def reconcile_all_task(dry_run: bool = True, user_id: int | None = None) -> dict
     return results
 
 
-@shared_task(name="drive.hourly_read_test", queue="io")
+@shared_task(name="drive.hourly_read_test", queue="control")
 def hourly_read_test() -> dict:
     """Stuendlicher Lesetest auf den Wurzelordner (G 10, B-16): Metadaten lesen, Ergebnis protokollieren."""
     from apps.config import store
@@ -164,7 +164,7 @@ class _NoCreds:
         self.expiry = None
 
 
-@shared_task(name="drive.daily_forced_refresh", queue="io")
+@shared_task(name="drive.daily_forced_refresh", queue="control")
 def daily_forced_refresh() -> dict:
     return oauth.refresh_access_token(force=True, reason="daily_proof")
 

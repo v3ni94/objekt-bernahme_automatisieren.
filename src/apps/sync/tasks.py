@@ -20,7 +20,7 @@ def run_operation_task(op_id: int) -> dict:
     return operations.run(op_id, worker="celery")
 
 
-@shared_task(name="sync.dispatch_due", queue="io")
+@shared_task(name="sync.dispatch_due", queue="control")
 def dispatch_due_task() -> dict:
     return {"released": operations.release_stale(), "dispatched": operations.dispatch_due()}
 

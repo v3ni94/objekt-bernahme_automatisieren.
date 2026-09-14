@@ -280,7 +280,7 @@ services:
         TESSDATA_VARIANT: "${TESSDATA_VARIANT}"
     command: >
       celery -A objektakte worker
-      -Q io,ai,lists -n worker-io@%h
+      -Q control,io,ai,lists -n worker-io@%h
       --pool threads
       --concurrency ${IO_CONCURRENCY}
       --prefetch-multiplier 1
