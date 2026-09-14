@@ -282,10 +282,12 @@ PY
   doc-status)
     # Dokumente je Objekt und Status, offene und fehlgeschlagene Jobs; keine Dateinamen, keine Personendaten
     docker compose exec -T web python manage.py shell <<'PY'
-from django.db.models import Count
+from django.db.models import Count, Q
+from django.utils import timezone
 from apps.documents.models import Document
 from apps.objects.models import ManagedObject
 from apps.pipeline.models import ProcessingJob, ProcessingRun
+jetzt = timezone.now()
 for obj in ManagedObject.objects.order_by("object_number_numeric"):
     rows = Document.objects.filter(object=obj, deleted_at__isnull=True).values("status").annotate(c=Count("id")).order_by("status")
     stat = ", ".join(f"{r['status']}={r['c']}" for r in rows) or "keine Dokumente"
@@ -310,6 +312,19 @@ print("Laeufe:", ", ".join(f"{r['status']}={r['c']}" for r in laeufe) or "keine"
 for run in ProcessingRun.objects.filter(status="running").select_related("object").order_by("id"):
     offen = ProcessingJob.objects.filter(object=run.object, status="pending")
     print(f"Lauf {run.pk} Objekt {run.object.object_number} laeuft seit {run.started_at:%d.%m. %H:%M}: Dokumente {run.documents_total}, offene Jobs {offen.count()} (am Lauf {offen.filter(run=run).count()}, ohne Lauf {offen.filter(run__isnull=True).count()}, an anderem Lauf {offen.exclude(run=run).exclude(run__isnull=True).count()}, nie versandt {offen.filter(dispatched_at__isnull=True).count()}), laufende Jobs {ProcessingJob.objects.filter(object=run.object, status='running').count()}")
+    # nie versandte Jobs des Laufs: Art, Anteil Wiederholungsjobs, Faelligkeit und drei Beispiele (Herkunft klaeren)
+    nie = offen.filter(dispatched_at__isnull=True)
+    if nie.exists():
+        arten = ", ".join(f"{r['job_type']}={r['c']}" for r in nie.values("job_type").annotate(c=Count("id")).order_by("-c"))
+        faellig = nie.filter(Q(next_attempt_at__isnull=True) | Q(next_attempt_at__lte=jetzt)).count()
+        print(f"  nie versandt je Art: {arten}; Wiederholungsjobs {nie.filter(idempotency_key__contains='#').count()}, faellig {faellig}, juengster angelegt {nie.order_by('-id').values_list('created_at', flat=True).first():%d.%m. %H:%M:%S}")
+        for j in nie.order_by("-id")[:3]:
+            basis = "-"
+            if "#" in j.idempotency_key:
+                b = ProcessingJob.objects.filter(idempotency_key=j.idempotency_key.split("#", 1)[0]).values_list("status", flat=True).first()
+                basis = f"#{j.idempotency_key.split('#', 1)[1]} (Basisjob {b})"
+            dok = j.document.status if j.document_id else "-"
+            print(f"    Job {j.pk} {j.job_type} {basis} angelegt {j.created_at:%d.%m. %H:%M:%S} Versuch {j.attempt_count} naechster {j.next_attempt_at} Dokument {dok} Fehler {(j.last_error or '')[:100]!r}")
 # Ordnerabgleiche je Objekt (letzte drei), Struktur in drive_nodes, offene Faelle nach Art; ohne Dateinamen
 from apps.drive.models import DriveNode, DriveSyncRun
 from apps.review.models import ReviewCase
