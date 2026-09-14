@@ -179,6 +179,7 @@ def dispatch_run(run: ProcessingRun) -> int:
 
 
 REPAIR_AFTER_MINUTES = 10
+REPAIR_QUIET_MINUTES = 5  # kein Job des Objekts angelegt oder versandt: der Versand gilt als abgebrochen
 
 
 def repair_interrupted_runs(min_age_minutes: int = REPAIR_AFTER_MINUTES) -> list[int]:
@@ -187,7 +188,8 @@ def repair_interrupted_runs(min_age_minutes: int = REPAIR_AFTER_MINUTES) -> list
     Versand am vollen Redis ab; die Jobs hingen ohne Lauf und ohne Nachricht. Nur Laeufe, die aelter als
     min_age_minutes sind, damit ein gerade laufender Versand nicht doppelt angestossen wird (dispatch_run ist
     idempotent, unterwegs befindliche Jobs werden nicht erneut versandt)."""
-    grenze = timezone.now() - timedelta(minutes=min_age_minutes)
+    now = timezone.now()
+    grenze = now - timedelta(minutes=min_age_minutes)
     repaired: list[int] = []
     for run in ProcessingRun.objects.filter(
         status=RunStatus.RUNNING,
@@ -195,6 +197,12 @@ def repair_interrupted_runs(min_age_minutes: int = REPAIR_AFTER_MINUTES) -> list
         documents_total__isnull=True,
         started_at__lt=grenze,
     ).select_related("object"):
+        # Versand laeuft noch (grosse Objekte brauchen fuer Tausende Jobs laenger als min_age_minutes): wurden in
+        # den letzten Minuten Jobs des Objekts angelegt oder versandt, nicht dazwischenfunken
+        if ProcessingJob.objects.filter(
+            object_id=run.object_id, updated_at__gte=now - timedelta(minutes=REPAIR_QUIET_MINUTES)
+        ).exists():
+            continue
         count = dispatch_run(run)
         logger.warning("Lauf %s (Objekt %s) nachversorgt: %s Jobs", run.pk, run.object.object_number, count)
         repaired.append(run.pk)

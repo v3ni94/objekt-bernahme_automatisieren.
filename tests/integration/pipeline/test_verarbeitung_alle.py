@@ -306,6 +306,8 @@ def test_sweep_versorgt_unterbrochene_laeufe_und_verwaiste_jobs_nach(drei_objekt
         JobType.DISCOVER, a, key=idempotency_key(JobType.DISCOVER, a.pk, "verwaist", ""), dispatch=False
     )
     assert verwaist.run_id is None and verwaist.dispatched_at is None and lauf_a.documents_total is None
+    # kein Job des Objekts in den letzten Minuten angefasst: der Versand gilt als abgebrochen
+    ProcessingJob.objects.filter(object=a).update(updated_at=alt)
 
     gesendet: list[int] = []
 
@@ -335,6 +337,14 @@ def test_sweep_versorgt_unterbrochene_laeufe_und_verwaiste_jobs_nach(drei_objekt
     vorher = len(gesendet)
     result = sweep()
     assert result["runs_repaired"] == 0 and result["redispatched"] == 0 and len(gesendet) == vorher
+    # ein Lauf, dessen Versand gerade laeuft (Jobs in den letzten Minuten angefasst), wird nicht erneut versorgt
+    from apps.pipeline.runs import repair_interrupted_runs
+
+    lauf_d = ProcessingRun.objects.create(
+        object=c, run_type=RunType.FULL, status=RunStatus.RUNNING, started_at=alt
+    )
+    enqueue(JobType.HASH, c, key=idempotency_key(JobType.HASH, c.pk, "laeuft"), run=lauf_d, dispatch=False)
+    assert repair_interrupted_runs() == []
 
 
 def test_lauf_endet_trotz_ablage_die_auf_den_objektordner_wartet(drei_objekte):
