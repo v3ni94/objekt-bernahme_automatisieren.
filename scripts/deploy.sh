@@ -68,6 +68,12 @@ else
   echo "Leere Datenbank, kein Dump vor der ersten Migration"
 fi
 
+# 4b. Redis vor Migration und Seed auf den Stand der .env bringen (Neuerzeugung nur bei geaenderter Konfiguration,
+# Daten bleiben ueber das AOF erhalten). 14.09.2026: der Seed-Schritt scheiterte am noch vollen Redis mit alter
+# Speichergrenze, obwohl die neue Grenze in .env stand; Redis wurde erst in Schritt 6 neu erzeugt.
+docker compose up -d redis
+wait_healthy 120 redis || echo "Hinweis: Redis meldet sich nicht healthy, Deployment laeuft weiter"
+
 # 5. Migration mit dem neuen Image; alte Container laufen weiter (rueckwaertskompatibel)
 docker compose run --rm --no-deps web app-migrate
 # Seeds bei jedem Deployment: idempotent, legt neue Katalogschluessel, Regeln und Textbausteine an und

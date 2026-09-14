@@ -8,6 +8,7 @@ macht den Cache ungueltig.
 from __future__ import annotations
 
 import json
+import logging
 from functools import lru_cache
 from typing import Any
 
@@ -17,6 +18,8 @@ from django.core.cache import cache
 from django.db import transaction
 
 from .models import AppSetting
+
+logger = logging.getLogger(__name__)
 
 VERSION_KEY = "settings:version"
 KEY_PREFIX = "settings:v{version}:{key}"
@@ -74,10 +77,18 @@ def _version() -> int:
 
 
 def invalidate() -> None:
+    """Versionsschluessel erhoehen, damit alle Prozesse ihre Werte neu lesen. Ist der Cache nicht erreichbar oder
+    voll (Redis mit maxmemory, 14.09.2026: Seed im Deployment brach ab), wird nur gewarnt: die zwischengespeicherten
+    Werte laufen ohnehin nach 300 Sekunden aus."""
     try:
         cache.incr(VERSION_KEY)
     except ValueError:
-        cache.set(VERSION_KEY, 2, None)
+        try:
+            cache.set(VERSION_KEY, 2, None)
+        except Exception as exc:  # Cache-Backend nicht erreichbar oder voll
+            logger.warning("Konfigurationscache nicht invalidiert: %s", exc)
+    except Exception as exc:  # Cache-Backend nicht erreichbar oder voll
+        logger.warning("Konfigurationscache nicht invalidiert: %s", exc)
 
 
 def get(key: str, default: Any = None) -> Any:
