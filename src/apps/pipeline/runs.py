@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 from decimal import Decimal
 
+from django.conf import settings
 from django.core.cache import cache
 from django.db import transaction
 from django.db.models import Count
@@ -259,10 +260,24 @@ def objects_with_open_work():
     ]
 
 
+def request_schedule() -> list[int] | None:
+    """Wartende Laeufe starten: im Betrieb (JOB_DISPATCH celery) als Hintergrundtask pipeline.schedule_runs, weil
+    dispatch_run fuer ein grosses Objekt Tausende Jobs anlegt und versendet und im Web-Request in den
+    Gunicorn-Timeout lief (14.09.2026: HTTP 500 beim Sammelstart). Ohne Celery (Tests, lokaler Runner) sofort.
+    Liefert die sofort gestarteten Laeufe oder None, wenn der Start im Hintergrund erfolgt."""
+    if settings.OBJEKTAKTE.get("JOB_DISPATCH", "celery") == "none":
+        return schedule_runs()
+    from celery import current_app
+
+    current_app.send_task("pipeline.schedule_runs", queue="io")
+    return None
+
+
 def start_runs_for_all(*, user=None, run_type: str = RunType.INCREMENTAL, dry_run: bool = False) -> dict:
     """„Verarbeitung für alle Objekte starten“: je Objekt mit offener Arbeit ein Nachlauf (wartende Laeufe werden
     nach processing.max_parallel_objects nacheinander gestartet). Objekte mit bereits wartendem oder laufendem
-    Lauf und Objekte ohne offene Dokumente werden ausgelassen. Protokoll processing.start_all."""
+    Lauf und Objekte ohne offene Dokumente werden ausgelassen. Der Start selbst laeuft im Hintergrund
+    (request_schedule). Protokoll processing.start_all."""
     from apps.audit.services import record
 
     candidates = objects_with_open_work()
@@ -281,8 +296,9 @@ def start_runs_for_all(*, user=None, run_type: str = RunType.INCREMENTAL, dry_ru
         )
         summary["started"].append(obj.object_number)
         summary["runs"].append(run.pk)
-    started_now = schedule_runs()
+    started_now = request_schedule() if summary["runs"] else []
     summary["running_now"] = started_now
+    summary["background"] = started_now is None
     if summary["runs"]:
         record(
             "processing.start_all",

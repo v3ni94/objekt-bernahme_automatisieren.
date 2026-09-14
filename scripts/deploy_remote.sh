@@ -30,6 +30,9 @@
 #   paperless-feld-alle <branch> [echt] Feld MHV Objekt fuer alle zugeordneten Speicherpfade setzen und Bestandslauf starten
 #   altbestand-aufarbeiten <branch> [echt] Alle Altbestand-Ordner mit Objekt aufarbeiten (echt = Celery-Aufgabe, sonst Vorschau)
 #   verarbeitung-alle <branch> [echt] Verarbeitungslaeufe fuer alle Objekte mit offener Arbeit (echt = einreihen)
+#   redis-status <branch>     Redis: Speicher, Schluesselzahl, Warteschlangenlaengen, groesste Schluessel (nur lesend)
+#   env-set <branch> <SCHLUESSEL=wert>  Freigegebenen Betriebswert in .env setzen (Ressourcen, Parallelitaet);
+#                             wirksam erst mit deploy; Sicherung .env.bak
 #                             aufnehmen (ohne Doppelte) und Namen aus Drive lesen
 # Jede andere Eingabe wird abgewiesen.
 set -euo pipefail
@@ -419,5 +422,41 @@ PY
       docker compose exec -T web python manage.py altbestand_objekte_anlegen
     fi
     ;;
-  *) echo "Nur check, pull, befund, env-init, ps, logs, smoke, cert-retry, db-status, db-reset, first-run, deploy, rollback, create-admin, oauth-check, deploy-tests, doc-status, config-set, altbestand-import, altbestand-objekte, altbestand-aufarbeiten, verarbeitung-alle, paperless-feld-alle oder reconcile-all erlaubt"; exit 2 ;;
+  redis-status)
+    # Redis-Speicher und Warteschlangen (Broker und Cache teilen sich eine Instanz); Passwort nur ueber Umgebungsvariable
+    docker compose exec -T redis sh -c '
+      export REDISCLI_AUTH="$(cat /run/secrets/redis_password)"
+      echo "== Speicher"
+      redis-cli INFO memory | tr -d "\r" | grep -E "^(used_memory_human|used_memory_peak_human|used_memory_dataset|maxmemory_human|maxmemory_policy|mem_fragmentation_ratio):"
+      echo "== Schluessel gesamt: $(redis-cli DBSIZE)"
+      echo "== Warteschlangen (Nachrichten)"
+      for q in ocr classify io ai lists celery; do echo "  $q: $(redis-cli LLEN "$q")"; done
+      echo "== unbestaetigte Nachrichten: $(redis-cli HLEN unacked) (Index $(redis-cli ZCARD unacked_index))"
+      echo "== Cache-Schluessel (Django): $(redis-cli --scan --pattern ":1:*" | wc -l)"
+      echo "== groesste Schluessel"
+      redis-cli --bigkeys 2>/dev/null | grep -E "^(Biggest|\[|[0-9]+ [a-z]+ with)" | head -20
+    '
+    ;;
+  env-set)
+    # Betriebswert in .env setzen; nur freigegebene Schluessel (Ressourcen, Parallelitaet), Wert aus Ziffern,
+    # Buchstaben, Punkt, Unterstrich und Bindestrich. Kommentar hinter dem Wert bleibt erhalten. Wirksam erst mit deploy.
+    case "${ARG:-}" in *=*) ;; *) echo "Argument SCHLUESSEL=wert fehlt"; exit 2 ;; esac
+    KEY="${ARG%%=*}"; VAL="${ARG#*=}"
+    case "$KEY" in
+      REDIS_MEM|REDIS_MAXMEMORY|REDIS_CPUS|OCR_PROCESSES|IO_CONCURRENCY|NLP_CONCURRENCY|GUNICORN_TIMEOUT|GUNICORN_WORKERS| \
+      WORKER_MEM|WORKER_CPUS|WORKER_NLP_MEM|WORKER_NLP_CPUS|WORKER_IO_MEM|WORKER_IO_CPUS|WEB_MEM|WEB_CPUS|DB_MEM|DB_CPUS| \
+      JOBS_VISIBILITY_TIMEOUT_S|LOG_MAX_SIZE|LOG_MAX_FILE) ;;
+      *) echo "Schluessel $KEY ist fuer env-set nicht freigegeben"; exit 2 ;;
+    esac
+    case "$VAL" in ""|*[!A-Za-z0-9._-]*) echo "unzulaessiger Wert fuer $KEY"; exit 2 ;; esac
+    grep -qE "^$KEY=" .env || { echo "$KEY fehlt in .env"; exit 2; }
+    OLD="$(envval "$KEY")"
+    cp .env .env.bak && chmod 600 .env.bak
+    sed -i -E "s|^($KEY=)[^ #]*|\1$VAL|" .env
+    NEU="$(envval "$KEY")"
+    [ "$NEU" = "$VAL" ] || { echo "Schreiben fehlgeschlagen ($KEY=$NEU)"; exit 1; }
+    echo "$KEY: ${OLD:-leer} -> $NEU (wirksam mit der Aktion deploy; Sicherung .env.bak)"
+    echo "$(date -Is) env-set $KEY ${OLD:-leer} -> $NEU" >> "$LOG"
+    ;;
+  *) echo "Nur check, pull, befund, env-init, ps, logs, smoke, cert-retry, db-status, db-reset, first-run, deploy, rollback, create-admin, oauth-check, deploy-tests, doc-status, config-set, altbestand-import, altbestand-objekte, altbestand-aufarbeiten, verarbeitung-alle, paperless-feld-alle, redis-status, env-set oder reconcile-all erlaubt"; exit 2 ;;
 esac

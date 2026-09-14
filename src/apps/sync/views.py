@@ -53,20 +53,11 @@ def webhook_paperless(request):
     if not expected or not provided or not hmac.compare_digest(expected, provided):
         record("auth.denied", entity_type="webhook", after={"path": request.path, "reason": "webhook token"})
         return JsonResponse({"accepted": False, "error": "nicht autorisiert"}, status=401)
-    payload: dict = {}
-    if request.content_type and "json" in request.content_type:
-        try:
-            payload = json.loads(request.body or b"{}")
-        except json.JSONDecodeError:
-            return HttpResponseBadRequest("kein gültiges JSON")
-    else:
-        payload = request.POST.dict()
-    raw = payload.get("doc_id") or payload.get("document_id") or payload.get("doc_pk") or payload.get("id")
-    if raw is None and payload.get("doc_url"):
-        raw = str(payload["doc_url"]).rstrip("/").rsplit("/", 1)[-1]
-    try:
-        doc_id = int(str(raw).strip())
-    except (TypeError, ValueError):
+    payload = _webhook_payload(request)
+    if payload is None:
+        return HttpResponseBadRequest("kein gültiges JSON")
+    doc_id = _webhook_doc_id(payload)
+    if doc_id is None:
         return HttpResponseBadRequest("doc_id fehlt")
     if not config.active():
         return JsonResponse({"accepted": True, "ignored": "paperless inaktiv"}, status=202)
@@ -80,6 +71,43 @@ def webhook_paperless(request):
         after={"paperless_id": doc_id, "created": created},
     )
     return JsonResponse({"accepted": True, "operation": op.pk, "created": created}, status=202)
+
+
+def _webhook_payload(request) -> dict | None:
+    """Body eines Paperless-Workflow-Webhooks als Woerterbuch. Paperless sendet je nach Einstellung ein
+    JSON-Objekt, Formularfelder oder einen JSON-String (der Body ist dann ein in Anfuehrungszeichen stehender Text,
+    etwa die Dokument-ID oder erneut kodiertes JSON). Nicht lesbares JSON ergibt None; alles andere wird auf ein
+    Woerterbuch zurueckgefuehrt, damit die Auswertung nie an einem unerwarteten Typ scheitert."""
+    if request.content_type and "json" in request.content_type:
+        try:
+            payload = json.loads(request.body or b"{}")
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            return None
+    else:
+        payload = request.POST.dict()
+    for _ in range(2):  # doppelt kodierte Zeichenketten: '"{\"doc_id\": 5}"'
+        if not isinstance(payload, str):
+            break
+        text = payload.strip()
+        if text.isdigit():
+            return {"doc_id": text}
+        try:
+            payload = json.loads(text)
+        except json.JSONDecodeError:
+            return {"doc_url": text} if "/" in text else {}
+    if isinstance(payload, int) and not isinstance(payload, bool):
+        return {"doc_id": payload}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _webhook_doc_id(payload: dict) -> int | None:
+    raw = payload.get("doc_id") or payload.get("document_id") or payload.get("doc_pk") or payload.get("id")
+    if raw is None and payload.get("doc_url"):
+        raw = str(payload["doc_url"]).rstrip("/").rsplit("/", 1)[-1]
+    try:
+        return int(str(raw).strip())
+    except (TypeError, ValueError):
+        return None
 
 
 # ---------------------------------------------------------------- Verwaltung

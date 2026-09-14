@@ -1012,6 +1012,16 @@ def sweep() -> dict:
     return result
 
 
+@shared_task(name="pipeline.schedule_runs", queue="io")
+def schedule_runs_task() -> dict:
+    """Wartende Laeufe im Hintergrund starten (Sammelstart ueber die Oberflaeche, 14.09.2026). Das Einreihen der
+    Jobs eines grossen Objekts dauert Minuten und gehoert nicht in den Web-Request; der Beat-Sweep holt einen
+    verpassten Aufruf jede Minute nach."""
+    from apps.pipeline.runs import schedule_runs
+
+    return {"runs_started": len(schedule_runs())}
+
+
 STALE_SYNC_RUN_HOURS = 2
 
 

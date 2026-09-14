@@ -23,7 +23,10 @@ class Command(BaseCommand):
             )
             self.stdout.write("Vorschau, nichts geändert. Mit --echt ausführen.")
             return
+        if result.get("background"):
+            start = "Start im Hintergrund (pipeline.schedule_runs, spätestens mit dem nächsten Sweep)"
+        else:
+            start = f"sofort gestartet: {len(result.get('running_now') or [])}"
         self.stdout.write(
-            f"Eingereiht: {len(result['runs'])} Läufe für {', '.join(result['started']) or 'kein Objekt'}; "
-            f"sofort gestartet: {len(result.get('running_now') or [])}"
+            f"Eingereiht: {len(result['runs'])} Läufe für {', '.join(result['started']) or 'kein Objekt'}; {start}"
         )

@@ -374,6 +374,46 @@ def test_webhook_prueft_token_und_merkt_genau_eine_operation_vor(
     assert paperless.call_names().count("download") == 1
 
 
+def test_webhook_nimmt_zeichenketten_und_zahlen_als_body_an(objekt, paperless, eingang, client):
+    """14.09.2026: Paperless-Workflows senden je nach Einstellung keinen JSON-Gegenstand, sondern einen JSON-String
+    (die Dokument-ID oder erneut kodiertes JSON) oder eine nackte Zahl. Frueher: AttributeError und HTTP 500 im
+    Sekundentakt; jetzt werden diese Formen gelesen, Unlesbares ergibt 400."""
+    remote_id = paperless.add_document("Als Zeichenkette gemeldet", content=pdf_bytes())
+    kopf = {"X-MHV-Webhook-Token": WEBHOOK_TOKEN}
+
+    def roh(body: str):
+        return client.post(WEBHOOK_URL, data=body, content_type="application/json", headers=kopf)
+
+    # JSON-String mit der ID
+    antwort = roh(json.dumps(str(remote_id)))
+    assert antwort.status_code == 202 and antwort.json()["created"] is True
+    op = SyncOperation.objects.get(pk=antwort.json()["operation"])
+    assert op.payload["paperless_id"] == remote_id and _pull_ops().count() == 1
+    # doppelt kodiertes JSON und nackte Zahl verweisen auf dieselbe wartende Operation
+    antwort = roh(json.dumps(json.dumps({"doc_id": remote_id, "event": "updated"})))
+    assert antwort.status_code == 202 and antwort.json() == {
+        "accepted": True,
+        "operation": op.pk,
+        "created": False,
+    }
+    antwort = roh(str(remote_id))
+    assert antwort.status_code == 202 and antwort.json()["created"] is False
+    # String mit Dokument-URL
+    antwort = roh(json.dumps(f"https://paperless.example/api/documents/{remote_id}/"))
+    assert antwort.status_code == 202 and antwort.json()["created"] is False
+    assert _pull_ops().count() == 1
+    # Unbrauchbares: 400 statt 500, keine Operation
+    for body in (
+        json.dumps("Wartung Heizung"),
+        json.dumps([1, 2]),
+        json.dumps(True),
+        json.dumps(None),
+        "null",
+    ):
+        assert roh(body).status_code == 400, body
+    assert _pull_ops().count() == 1
+
+
 def test_webhook_abgeschaltet_oder_anbindung_inaktiv_legt_nichts_an(objekt, paperless, client, admin_user):
     store.set("paperless.webhook_enabled", False, user=admin_user, reason="Test")
     remote_id = paperless.add_document("Nicht angenommen", content=pdf_bytes())

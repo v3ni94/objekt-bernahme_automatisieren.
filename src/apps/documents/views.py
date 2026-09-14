@@ -132,11 +132,14 @@ def processing_start_all(request):
 
     result = start_runs_for_all(user=request.user)
     if result["runs"]:
+        if result.get("background"):
+            start = "der Start erfolgt im Hintergrund, die Läufe folgen nacheinander"
+        else:
+            start = f"{len(result.get('running_now') or [])} laufen sofort, die übrigen folgen nacheinander"
         messages.success(
             request,
             f"Verarbeitung für {len(result['runs'])} Objekt(e) eingereiht ({', '.join(result['started'][:12])}"
-            f"{', …' if len(result['started']) > 12 else ''}); {len(result.get('running_now') or [])} laufen sofort, "
-            "die übrigen folgen nacheinander.",
+            f"{', …' if len(result['started']) > 12 else ''}); {start}.",
         )
     else:
         messages.info(request, "Kein Objekt mit offener Verarbeitung; nichts gestartet.")
