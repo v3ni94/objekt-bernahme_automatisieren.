@@ -1743,6 +1743,7 @@ Celery-Queues aus den Settings: `ai`, `classify`, `io`, `lists`, `ocr`
 | drive.legacy_conflict_rename_pattern | drive | string | `null` |
 | drive.legacy_folder_aliases | drive | object | `siehe db/seeds/app_settings.json (einzige Fundstelle der Altbezeichnung)` |
 | drive.max_requests_per_second | drive | integer | `5` |
+| drive.object_folder_fallback_pattern | drive | string | `"{number} {name}"` |
 | drive.object_folder_name_pattern | drive | string | `"{number} {city}, {street} {house_number}"` |
 | drive.object_number_digits_max | drive | integer | `6` |
 | drive.object_number_digits_min | drive | integer | `2` |

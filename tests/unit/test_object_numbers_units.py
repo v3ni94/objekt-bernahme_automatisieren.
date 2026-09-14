@@ -155,3 +155,10 @@ def test_we14_und_we_14_gleich_garage_3_verschieden():
     assert not same_unit("WE 3", "Garage 3")
     assert normalize_label("WE01", strip_leading_zeros=False) == "WE01"
     assert normalize_label("we 01", strip_leading_zeros=False) == "WE01"
+
+
+def test_object_folder_name_mit_bezeichnung_als_ersatzmuster():
+    """Ersatzmuster drive.object_folder_fallback_pattern (14.09.2026): Nummer und Bezeichnung, leere Teile bereinigt."""
+    assert object_folder_name("{number} {name}", number="701", name="Haus am Markt") == "701 Haus am Markt"
+    assert object_folder_name("{number} {name}", number="701", name="") == "701"
+    assert object_folder_name("{number} {city}, {name}", number="701", name="Haus", city="") == "701, Haus"

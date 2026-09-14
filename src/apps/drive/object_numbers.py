@@ -59,11 +59,12 @@ def normalize_object_number(raw: str, *, zero_pad_to: int | None = None) -> str:
 
 
 def object_folder_name(
-    pattern: str, *, number: str, city: str = "", street: str = "", house_number: str = ""
+    pattern: str, *, number: str, city: str = "", street: str = "", house_number: str = "", name: str = ""
 ) -> str:
-    """Name eines neuen Objektordners nach drive.object_folder_name_pattern; leere Teile werden bereinigt."""
+    """Name eines neuen Objektordners nach drive.object_folder_name_pattern (oder dem Ersatzmuster
+    drive.object_folder_fallback_pattern mit {name}); leere Teile werden bereinigt."""
     name = pattern.format(
-        number=number, city=city or "", street=street or "", house_number=house_number or ""
+        number=number, city=city or "", street=street or "", house_number=house_number or "", name=name or ""
     )
     name = re.sub(r"\s+,", ",", name)
     name = re.sub(r",\s*$", "", name)

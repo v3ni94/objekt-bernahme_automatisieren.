@@ -17,6 +17,7 @@ Schlüssel: 149 in 20 Gruppen (seit 12.09.2026 zusätzlich `paperless.*` und `sy
 | `drive.legacy_folder_aliases` | object | siehe db/seeds/app_settings.json (Altbezeichnung nur dort) | Zuordnung Zielordner zu Altbezeichnungen, die beim Abgleich umbenannt werden (CR 9.3); einzige Fundstelle der Altbezeichnung | CR 9.3, Befund 6.4 | object |
 | `drive.max_requests_per_second` | integer | `5` | Clientseitige Ratenbegrenzung je Prozess | ANNAHME A15 | min 1, max 50 |
 | `drive.object_folder_name_pattern` | string | `"{number} {city}, {street} {house_number}"` | Namensmuster neuer Objektordner | CR 2 | string |
+| `drive.object_folder_fallback_pattern` | string | `"{number} {name}"` | Ersatzmuster für neue Objektordner, wenn die Anschrift für das Namensmuster unvollständig ist (`{number}`, `{name}`, `{city}`, `{street}`, `{house_number}`); leer bedeutet keine Anlage ohne vollständige Anschrift; der Ordner wird über die Nummer erkannt, der Name kann in Drive angepasst werden | Anforderung 14.09.2026 | string |
 | `drive.object_number_digits_max` | integer | `6` | Größte Stellenzahl der führenden Objektnummer | Befund 4 | min 1, max 8 |
 | `drive.object_number_digits_min` | integer | `2` | Kleinste Stellenzahl der führenden Objektnummer | Befund 4 | min 1, max 8 |
 | `drive.object_number_separators` | list | `[" ", "_", ",", ".", "-"]` | Zeichen, die die Objektnummer vom Rest des Ordnernamens trennen | Befund 4 | array |

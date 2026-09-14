@@ -48,6 +48,9 @@ class DriveConfig:
     separators: tuple[str, ...] = (" ", "_", ",", ".", "-")
     zero_pad_to: int | None = None
     folder_pattern: str = "{number} {city}, {street} {house_number}"
+    fallback_pattern: str | None = (
+        "{number} {name}"  # Objektordner ohne vollstaendige Anschrift; leer = keine Anlage
+    )
     legacy_aliases: dict[str, list[str]] = field(default_factory=dict)
     legacy_conflict_rename_pattern: str | None = None
 
@@ -63,6 +66,7 @@ class DriveConfig:
             folder_pattern=store.get(
                 "drive.object_folder_name_pattern", "{number} {city}, {street} {house_number}"
             ),
+            fallback_pattern=(store.get("drive.object_folder_fallback_pattern", "{number} {name}") or None),
             legacy_aliases=dict(store.get("drive.legacy_folder_aliases", {}) or {}),
             legacy_conflict_rename_pattern=store.get("drive.legacy_conflict_rename_pattern"),
         )
@@ -93,24 +97,21 @@ def loose_match(name: str, expected: str) -> bool:
     return loose(name) == loose(expected) and loose(name) != ""
 
 
-def render_object_folder_name(obj: ManagedObject, cfg: DriveConfig) -> str:
-    """Anlage nach Namensmuster (F 3.4): fehlende Stammdaten verhindern die Anlage, kein Platzhalter."""
+def _folder_number(obj: ManagedObject, cfg: DriveConfig) -> str:
     number = str(
         obj.object_number_numeric if obj.object_number_numeric is not None else int(obj.object_number)
     )
-    if cfg.zero_pad_to:
-        number = number.zfill(int(cfg.zero_pad_to))
-    fields = {"number": number, "city": obj.city, "street": obj.street, "house_number": obj.house_number}
-    used = set(re.findall(r"\{(\w+)\}", cfg.folder_pattern))
-    missing = [k for k in used if k in fields and not fields[k]]
-    if missing:
-        raise ReconcileError(f"Objektordner nicht angelegt, Stammdaten fehlen: {', '.join(sorted(missing))}")
+    return number.zfill(int(cfg.zero_pad_to)) if cfg.zero_pad_to else number
+
+
+def _checked_folder_name(pattern: str, obj: ManagedObject, cfg: DriveConfig, number: str) -> str:
     name = object_folder_name(
-        cfg.folder_pattern,
+        pattern,
         number=number,
         city=obj.city or "",
         street=obj.street or "",
         house_number=obj.house_number or "",
+        name=obj.name or "",
     )
     name = re.sub(r"[\x00-\x1f/]", "", nfc(name))
     match = parse_object_number(
@@ -119,6 +120,36 @@ def render_object_folder_name(obj: ManagedObject, cfg: DriveConfig) -> str:
     if match is None or match.numeric != int(number):
         raise ReconcileError("Erzeugter Ordnername erfüllt das Erkennungsmuster nicht")
     return name
+
+
+def missing_folder_fields(obj: ManagedObject, cfg: DriveConfig) -> list[str]:
+    """Stammdaten, die das Namensmuster verlangt und die am Objekt fehlen (leer = Anlage nach Muster moeglich)."""
+    fields = {"city": obj.city, "street": obj.street, "house_number": obj.house_number, "name": obj.name}
+    used = set(re.findall(r"\{(\w+)\}", cfg.folder_pattern))
+    return sorted(k for k in used if k in fields and not fields[k])
+
+
+def render_object_folder_name(obj: ManagedObject, cfg: DriveConfig) -> str:
+    """Anlage nach Namensmuster (F 3.4): fehlende Stammdaten verhindern die Anlage, kein Platzhalter."""
+    missing = missing_folder_fields(obj, cfg)
+    if missing:
+        raise ReconcileError(f"Objektordner nicht angelegt, Stammdaten fehlen: {', '.join(missing)}")
+    return _checked_folder_name(cfg.folder_pattern, obj, cfg, _folder_number(obj, cfg))
+
+
+def plan_object_folder_name(obj: ManagedObject, cfg: DriveConfig) -> tuple[str, list[str]]:
+    """Ordnername fuer die Anlage: nach Namensmuster, bei fehlender Anschrift nach dem Ersatzmuster
+    drive.object_folder_fallback_pattern (Vorgabe „{number} {name}“, 14.09.2026: Objekte aus dem Altbestand ohne
+    vollstaendige Anschrift blockierten sonst ihre Ablage). Liefert den Namen und die fehlenden Felder (leer, wenn
+    nach Muster angelegt). Der Ordner wird ueber die Objektnummer erkannt, der vorlaeufige Name kann spaeter in
+    Drive angepasst werden."""
+    missing = missing_folder_fields(obj, cfg)
+    number = _folder_number(obj, cfg)
+    if not missing:
+        return _checked_folder_name(cfg.folder_pattern, obj, cfg, number), []
+    if not cfg.fallback_pattern:
+        raise ReconcileError(f"Objektordner nicht angelegt, Stammdaten fehlen: {', '.join(missing)}")
+    return _checked_folder_name(cfg.fallback_pattern, obj, cfg, number), missing
 
 
 # ---------------------------------------------------------------- Plan
@@ -658,15 +689,22 @@ def _resolve_object_root(
             Action(SyncActionType.FIND_ROOT, note="Treffer nur im Papierkorb, keine Anlage", result="skipped")
         )
         return None, False
-    name = render_object_folder_name(obj, cfg)
+    name, missing = plan_object_folder_name(obj, cfg)
     plan.add(Action(SyncActionType.FIND_ROOT, note="kein Treffer", result="skipped"))
+    note = "Objektordner nach Namensmuster"
+    if missing:
+        note = f"Objektordner vorläufig nach Ersatzmuster, Anschrift unvollständig ({', '.join(missing)})"
+        plan.hints.append(
+            f"Objektordner {name} vorläufig benannt, Anschrift unvollständig ({', '.join(missing)}); "
+            "Erkennung über die Objektnummer, Name kann in Drive angepasst werden"
+        )
     plan.add(
         Action(
             SyncActionType.CREATE_FOLDER,
             parent_ref=root.id,
             name_after=name,
             node_kind=NodeKind.OBJECT_ROOT,
-            note="Objektordner nach Namensmuster",
+            note=note,
         )
     )
     return None, True

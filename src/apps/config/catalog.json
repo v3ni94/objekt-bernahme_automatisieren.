@@ -87,6 +87,16 @@
       }
     },
     {
+      "key": "drive.object_folder_fallback_pattern",
+      "category": "drive",
+      "value_type": "string",
+      "description": "Ersatzmuster für neue Objektordner, wenn die Anschrift für drive.object_folder_name_pattern unvollständig ist ({number}, {name}, {city}, {street}, {house_number}); leer bedeutet keine Anlage ohne vollständige Anschrift",
+      "source": "Anforderung 14.09.2026 (Objektordner auch ohne vollständige Anschrift)",
+      "schema": {
+        "type": "string"
+      }
+    },
+    {
       "key": "drive.object_number_digits_min",
       "category": "drive",
       "value_type": "integer",

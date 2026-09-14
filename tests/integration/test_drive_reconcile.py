@@ -4,6 +4,8 @@ wird ausschliesslich aus der Konfiguration gelesen."""
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pytest
 
 from apps.config import store
@@ -251,8 +253,20 @@ def test_objektordner_erkennung(drive, cfg):
     # 6230 ist nicht 623: kein weiterer Kandidat fuer 623
     assert ReviewCase.objects.filter(object=o623).count() == 1
 
-    unvollstaendig = make_object("701", city=None, street=None, house_number=None)
+    # ohne Anschrift (14.09.2026): vorlaeufiger Ordner nach dem Ersatzmuster aus Nummer und Bezeichnung, Hinweis im
+    # Lauf; der Ordner wird ueber die Nummer erkannt, der Name kann spaeter in Drive angepasst werden
+    unvollstaendig = make_object("701", name="Haus am Markt", city=None, street=None, house_number=None)
     run = reconcile_object(unvollstaendig, drive=drive, dry_run=False, cfg=cfg)
+    unvollstaendig.refresh_from_db()
+    assert run.status == "done" and unvollstaendig.drive_root_folder_name == "701 Haus am Markt"
+    hinweise = " ".join(getattr(run, "hints", None) or run.summary.get("hints", []))
+    assert "vorläufig" in hinweise and "city" in hinweise
+    assert names(drive, unvollstaendig.drive_root_folder_id) == [
+        cat_name(c) for c in ("01", "02", "03", "04", "05", "06")
+    ]
+    # ohne Ersatzmuster gilt die bisherige Regel: keine Anlage ohne vollstaendige Anschrift
+    ohne = make_object("702", city=None, street=None, house_number=None)
+    run = reconcile_object(ohne, drive=drive, dry_run=False, cfg=replace(cfg, fallback_pattern=None))
     assert run.status == "failed" and "Stammdaten fehlen" in run.error_message
 
 

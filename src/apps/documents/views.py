@@ -141,6 +141,14 @@ def processing_start_all(request):
             f"Verarbeitung für {len(result['runs'])} Objekt(e) eingereiht ({', '.join(result['started'][:12])}"
             f"{', …' if len(result['started']) > 12 else ''}); {start}.",
         )
+        if result.get("without_folder"):
+            messages.info(
+                request,
+                f"Ohne Drive-Ordner: {', '.join(result['without_folder'][:12])}"
+                f"{', …' if len(result['without_folder']) > 12 else ''}. Ordneranlage angestoßen; bei unvollständiger "
+                "Anschrift entsteht ein vorläufiger Ordner mit Nummer und Bezeichnung. Die Ablage wartet bis dahin, "
+                "die übrige Verarbeitung läuft.",
+            )
     else:
         messages.info(request, "Kein Objekt mit offener Verarbeitung; nichts gestartet.")
     return redirect("object_list")

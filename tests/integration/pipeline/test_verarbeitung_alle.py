@@ -28,6 +28,7 @@ from apps.pipeline.runs import (
     REPAIR_AFTER_MINUTES,
     RESET_LIMIT,
     dispatch_run,
+    maybe_finish_run,
     objects_with_open_work,
     start_runs_for_all,
 )
@@ -334,3 +335,66 @@ def test_sweep_versorgt_unterbrochene_laeufe_und_verwaiste_jobs_nach(drei_objekt
     vorher = len(gesendet)
     result = sweep()
     assert result["runs_repaired"] == 0 and result["redispatched"] == 0 and len(gesendet) == vorher
+
+
+def test_lauf_endet_trotz_ablage_die_auf_den_objektordner_wartet(drei_objekte):
+    """14.09.2026: Ablagejobs, die auf den Objektordner warten (Anschrift unvollstaendig), halten den Lauf nicht
+    offen; der Lauf gibt seinen Platz frei, die Jobs laufen nach Anlage des Ordners weiter. Andere offene Jobs und
+    faellige Ablagejobs halten den Lauf weiterhin offen."""
+    a, _, _ = drei_objekte
+    lauf = ProcessingRun.objects.create(
+        object=a, run_type=RunType.INCREMENTAL, status=RunStatus.RUNNING, started_at=timezone.now()
+    )
+    dok = _dok(a, "abgelegt.pdf", "classified")
+    wartend = ProcessingJob.objects.create(
+        object=a,
+        document=dok,
+        run=lauf,
+        job_type=JobType.FILE_TO_DRIVE,
+        idempotency_key=f"file:{a.pk}:warte",
+        status=JobStatus.PENDING,
+        next_attempt_at=timezone.now() + timedelta(minutes=10),
+        last_error="wartet: Ablageziel noch nicht vorhanden: Objektordner unbekannt: Ordnerabgleich zuerst ausführen (CR 9)",
+    )
+    anderer = ProcessingJob.objects.create(
+        object=a,
+        run=lauf,
+        job_type=JobType.HASH,
+        idempotency_key=f"hash:{a.pk}:offen",
+        status=JobStatus.PENDING,
+    )
+    assert maybe_finish_run(lauf) is False
+    ProcessingJob.objects.filter(pk=anderer.pk).update(status=JobStatus.DONE)
+    # faelliger Ablagejob (Wartezeit abgelaufen) haelt offen
+    ProcessingJob.objects.filter(pk=wartend.pk).update(next_attempt_at=timezone.now() - timedelta(seconds=1))
+    assert maybe_finish_run(lauf) is False
+    ProcessingJob.objects.filter(pk=wartend.pk).update(next_attempt_at=timezone.now() + timedelta(minutes=10))
+    assert maybe_finish_run(lauf) is True
+    lauf.refresh_from_db()
+    wartend.refresh_from_db()
+    assert lauf.status == RunStatus.DONE and wartend.status == JobStatus.PENDING
+
+
+def test_sammelstart_stoesst_ordneranlage_fuer_objekte_ohne_ordner_an(drei_objekte, admin_user, monkeypatch):
+    """Objekte ohne Objektordner werden nicht uebersprungen, sondern die Ordneranlage wird angestossen (bei
+    unvollstaendiger Anschrift entsteht ein vorlaeufiger Ordner); die Meldung nennt sie."""
+    import apps.drive.tasks as drive_tasks
+    from apps.drive.models import DriveNode as DriveNodeRow
+    from apps.drive.models import NodeKind
+
+    a, _, c = drei_objekte
+    aufrufe: list[tuple] = []
+    monkeypatch.setattr(
+        drive_tasks,
+        "trigger_object_folders",
+        lambda object_id, **kw: aufrufe.append((object_id, kw.get("trigger"), kw.get("force"))) or "queued",
+    )
+    DriveNodeRow.objects.create(
+        object=c, node_kind=NodeKind.OBJECT_ROOT, drive_file_id="root-c", drive_name="703 C", is_folder=True
+    )
+    vorschau = start_runs_for_all(user=admin_user, dry_run=True)
+    assert vorschau["without_folder"] == ["701"] and aufrufe == []
+    result = start_runs_for_all(user=admin_user)
+    assert result["without_folder"] == ["701"] and aufrufe == [(a.pk, "start_all", True)]
+    assert result["folders_requested"] == [{"object": "701", "status": "queued"}]
+    assert len(result["runs"]) == 2

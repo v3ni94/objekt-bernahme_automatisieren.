@@ -207,9 +207,25 @@ def maybe_finish_run(run: ProcessingRun) -> bool:
         return False
     open_jobs = ProcessingJob.objects.filter(
         object=run.object, status__in=[JobStatus.PENDING, JobStatus.RUNNING]
-    ).exists()
-    if open_jobs:
+    )
+    # Ablagejobs, die auf den Objektordner warten (Anschrift unvollstaendig, kein Ordner), halten den Lauf nicht
+    # offen (14.09.2026): der Lauf gibt seinen Platz frei, die Jobs laufen nach Anlage des Ordners von selbst weiter
+    waiting_for_folder = open_jobs.filter(
+        status=JobStatus.PENDING,
+        job_type=JobType.FILE_TO_DRIVE,
+        next_attempt_at__gt=timezone.now(),
+        last_error__contains="Objektordner unbekannt",
+    )
+    if open_jobs.exclude(pk__in=waiting_for_folder.values("pk")).exists():
         return False
+    waiting_count = waiting_for_folder.count()
+    if waiting_count:
+        logger.warning(
+            "Lauf %s Objekt %s: %s Ablagejobs warten auf den Objektordner, Lauf wird abgeschlossen",
+            run.pk,
+            run.object_id,
+            waiting_count,
+        )
     with transaction.atomic():
         run = ProcessingRun.objects.select_for_update().get(pk=run.pk)
         if run.status != RunStatus.RUNNING:
@@ -301,6 +317,16 @@ def objects_with_open_work():
     ]
 
 
+def has_object_folder(obj) -> bool:
+    """Objektordner in Drive bekannt (aktiver Knoten object_root aus dem Ordnerabgleich)."""
+    from apps.drive.models import DriveNode as DriveNodeRow
+    from apps.drive.models import NodeKind, NodeStatus
+
+    return DriveNodeRow.objects.filter(
+        object=obj, node_kind=NodeKind.OBJECT_ROOT, status=NodeStatus.ACTIVE
+    ).exists()
+
+
 def request_schedule() -> list[int] | None:
     """Wartende Laeufe starten: im Betrieb (JOB_DISPATCH celery) als Hintergrundtask pipeline.schedule_runs, weil
     dispatch_run fuer ein grosses Objekt Tausende Jobs anlegt und versendet und im Web-Request in den
@@ -328,9 +354,22 @@ def start_runs_for_all(*, user=None, run_type: str = RunType.INCREMENTAL, dry_ru
         "objects": [o.object_number for o in candidates],
         "started": [],
         "runs": [],
+        "folders_requested": [],
     }
+    without_folder = [o for o in candidates if not has_object_folder(o)]
+    summary["without_folder"] = [o.object_number for o in without_folder]
     if dry_run:
         return summary
+    if without_folder:
+        # Objekte ohne Objektordner (etwa Altbestand mit unvollstaendiger Anschrift): Ordneranlage anstossen, der
+        # Abgleich legt bei fehlender Anschrift einen vorlaeufigen Ordner nach drive.object_folder_fallback_pattern an
+        from apps.drive.tasks import trigger_object_folders
+
+        for obj in without_folder:
+            status = trigger_object_folders(
+                obj.pk, user_id=getattr(user, "pk", None), trigger="start_all", force=True
+            )
+            summary["folders_requested"].append({"object": obj.object_number, "status": status})
     for obj in candidates:
         run = ProcessingRun.objects.create(
             object=obj, run_type=run_type, status=RunStatus.PENDING, dry_run=False, triggered_by=user
