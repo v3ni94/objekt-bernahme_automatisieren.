@@ -18,7 +18,7 @@ from django.utils import timezone
 
 from apps.config import store
 from apps.documents.models import Document, DocumentPage
-from apps.pipeline.jobs import enqueue, idempotency_key, models_q_not_in_flight, send
+from apps.pipeline.jobs import TERMINAL_STATUSES, enqueue, idempotency_key, models_q_not_in_flight, send
 from apps.pipeline.models import JobStatus, JobType, ProcessingJob, ProcessingRun, RunStatus, RunType
 from apps.review.models import CaseStatus, ReviewCase
 
@@ -171,9 +171,19 @@ def dispatch_run(run: ProcessingRun) -> int:
     obj = run.object
     count = 0
     reset_failed_documents(run)
+    # Dokumente mit offenem Job stecken in der Kette und brauchen keinen Startjob: ein Dokument bleibt zum Beispiel
+    # hashed, waehrend seine OCR-Bloecke warten, obwohl der Startjob analyze_pages erledigt ist; ein weiterer
+    # Aufruf legte dafuer je Dokument einen Wiederholungsjob #n an (14.09.2026, Objekt 216: 9.512 nie versandte)
+    in_arbeit = set(
+        ProcessingJob.objects.filter(object=obj, document__isnull=False)
+        .exclude(status__in=TERMINAL_STATUSES)
+        .values_list("document_id", flat=True)
+    )
     for doc in Document.objects.filter(
         object=obj, deleted_at__isnull=True, status__in=["registered", "hashed", "ocr_done"]
     ):
+        if doc.pk in in_arbeit:
+            continue
         enqueue_start_job(doc, run)
         count += 1
     pending = ProcessingJob.objects.filter(object=obj, status=JobStatus.PENDING, run__isnull=True)

@@ -453,3 +453,60 @@ def test_dokumenteneingang_versorgt_laufenden_lauf_nur_mit_dem_neuen_dokument(
     aufrufe: list[int] = []
     monkeypatch.setattr(ingest_mod, "dispatch_run", lambda run: aufrufe.append(run.pk))
     assert ingest_mod.ensure_run(a) == lauf and aufrufe == [lauf.pk]
+
+
+def test_dispatch_run_legt_keinen_startjob_fuer_dokumente_in_der_kette_an(
+    drei_objekte, admin_user, monkeypatch
+):
+    """14.09.2026, Objekt 216: ein Dokument bleibt hashed, waehrend seine OCR-Bloecke warten; der Startjob
+    analyze_pages ist erledigt. dispatch_run legte je Aufruf einen Wiederholungsjob analyze_pages #n an (9.512 nie
+    versandte Jobs). Dokumente mit offenem Job erhalten keinen Startjob; ein Wiederholungsjob analyze_pages wird
+    uebersprungen, solange OCR oder Zusammenfuehrung offen sind."""
+    from apps.pipeline import tasks as tasks_mod
+
+    a, b, c = drei_objekte
+    monkeypatch.setattr(jobs_mod, "send", lambda job, countdown=None: None)
+    monkeypatch.setattr(runs_mod, "send", lambda job, countdown=None: None)
+    start_runs_for_all(user=admin_user)
+    lauf = ProcessingRun.objects.get(object=a, status=RunStatus.RUNNING)
+    doc = Document.objects.get(object=a, original_name="a1.pdf")
+    doc.status, doc.sha256 = "hashed", "ab" * 32
+    doc.save(update_fields=["status", "sha256"])
+    ProcessingJob.objects.filter(document=doc).update(status=JobStatus.DONE)  # discover von a1 erledigt
+    analyse, _ = enqueue(
+        JobType.ANALYZE_PAGES,
+        a,
+        key=idempotency_key(JobType.ANALYZE_PAGES, a.pk, doc.sha256),
+        document=doc,
+        run=lauf,
+    )
+    ProcessingJob.objects.filter(pk=analyse.pk).update(status=JobStatus.DONE)
+    block, _ = enqueue(
+        JobType.OCR_CHUNK,
+        a,
+        key=f"ocr:{a.pk}:{doc.sha256}:1",
+        document=doc,
+        run=lauf,
+        payload={"chunk_no": 1},
+    )
+    vorher = ProcessingJob.objects.filter(object=a).count()
+    dispatch_run(lauf)
+    dispatch_run(lauf)
+    assert ProcessingJob.objects.filter(object=a).count() == vorher
+    assert not ProcessingJob.objects.filter(
+        document=doc, job_type=JobType.ANALYZE_PAGES, idempotency_key__contains="#"
+    ).exists()
+    # ein bereits vorhandener Wiederholungsjob wird uebersprungen, solange der OCR-Block offen ist
+    wieder, _ = enqueue(
+        JobType.ANALYZE_PAGES,
+        a,
+        key=idempotency_key(JobType.ANALYZE_PAGES, a.pk, doc.sha256),
+        document=doc,
+        run=lauf,
+    )
+    assert "#" in wieder.idempotency_key
+    assert tasks_mod.analyze_pages(wieder.pk) == {"job_id": wieder.pk, "skipped": "chain_running"}
+    wieder.refresh_from_db()
+    assert wieder.status == JobStatus.SKIPPED and block.pk in set(
+        ProcessingJob.objects.filter(object=a, status=JobStatus.PENDING).values_list("pk", flat=True)
+    )

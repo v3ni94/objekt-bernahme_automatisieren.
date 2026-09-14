@@ -23,6 +23,7 @@ from apps.pipeline import ocr as ocr_mod
 from apps.pipeline import storage
 from apps.pipeline.entities import build_gazetteer, extract_page, match_iban_owners
 from apps.pipeline.jobs import (
+    TERMINAL_STATUSES,
     DeferJob,
     RetryableError,
     SkipJob,
@@ -238,6 +239,14 @@ def analyze_pages(job: ProcessingJob) -> dict:
     doc = job.document
     if doc is None or doc.status not in ("hashed",) or not doc.sha256:
         raise SkipJob("already_processed")
+    if (
+        ProcessingJob.objects.filter(document=doc, job_type__in=[JobType.OCR_CHUNK, JobType.MERGE_PAGES])
+        .exclude(status__in=TERMINAL_STATUSES)
+        .exists()
+    ):
+        # Wiederholungsjob (#n), waehrend die Kette laeuft: die Seitenanalyse ist erledigt, OCR-Bloecke oder die
+        # Zusammenfuehrung warten; eine erneute Analyse braechte nur Arbeit und doppelte Nachrichten (14.09.2026)
+        raise SkipJob("chain_running")
     original = storage.original_path(doc.sha256)
     if original is None:
         # Arbeitsverzeichnis fehlt (geraeumt oder anderer Host): erneut laden
