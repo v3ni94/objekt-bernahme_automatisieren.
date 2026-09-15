@@ -582,3 +582,44 @@ def test_plattenreserve_pausiert_download_und_transit_kopie_wird_nach_ablage_gel
     assert tasks_mod._remove_transit_copy(doc) is True and not quelle.exists()
     bestand = Document.objects.get(object=a, original_name="a1.pdf")
     assert tasks_mod._remove_transit_copy(bestand) is False
+
+
+def test_transit_bereinigen_loescht_nur_kopien_abgelegter_dokumente(drei_objekte, tmp_path, capsys):
+    """15.09.2026: Transit-Kopien (Upload, Paperless) werden geloescht, sobald das Dokument in Drive liegt; Kopien
+    von Dokumenten in Pruefung bleiben, Bestandsdateien aus Drive sind nicht betroffen. Vorschau ohne --echt."""
+    a, _, _ = drei_objekte
+
+    def _kopie(name, source, status, drive_id):
+        ordner = tmp_path / "transit" / str(a.pk) / "incoming" / name
+        ordner.mkdir(parents=True)
+        datei = ordner / f"{name}.pdf"
+        datei.write_bytes(b"%PDF-1.4 " + name.encode())
+        Document.objects.create(
+            object=a,
+            size_bytes=12,
+            mime_type="application/pdf",
+            original_name=f"{name}.pdf",
+            current_name=f"{name}.pdf",
+            source=source,
+            source_path=str(datei),
+            drive_file_id=drive_id,
+            status=status,
+            first_seen_at=timezone.now(),
+        )
+        return datei
+
+    abgelegt = _kopie("p1", "paperless", "filed", "d-p1")
+    dublette = _kopie("p2", "paperless", "duplicate", "d-p2")
+    pruefung = _kopie("p3", "paperless", "review", None)
+    upload = _kopie("u1", "upload", "filed", "d-u1")
+    call_command("transit_bereinigen")
+    out = capsys.readouterr().out
+    assert "Vorschau: 3 Transit-Kopien" in out and all(
+        p.exists() for p in (abgelegt, dublette, pruefung, upload)
+    )
+    call_command("transit_bereinigen", echt=True)
+    out = capsys.readouterr().out
+    assert "Gelöscht: 3 Transit-Kopien" in out and "leere Eingangsordner entfernt: 3" in out
+    assert not abgelegt.exists() and not dublette.exists() and not upload.exists() and pruefung.exists()
+    assert not abgelegt.parent.exists() and pruefung.parent.exists()
+    assert AuditEvent.objects.filter(action="processing.transit_cleanup").count() == 1

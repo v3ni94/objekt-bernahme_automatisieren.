@@ -469,6 +469,14 @@ PY
       docker compose exec -T web python manage.py jobs_bereinigen
     fi
     ;;
+  transit-bereinigen)
+    # Transit-Kopien (Uploads, Paperless-Downloads) bereits in Drive abgelegter Dokumente loeschen; "echt" loescht, sonst Vorschau
+    if [ "${ARG:-}" = "echt" ]; then
+      docker compose exec -T web python manage.py transit_bereinigen --echt
+    else
+      docker compose exec -T web python manage.py transit_bereinigen
+    fi
+    ;;
   redis-status)
     # Redis-Speicher und Warteschlangen (Broker und Cache teilen sich eine Instanz); Passwort nur ueber Umgebungsvariable
     docker compose exec -T redis sh -c '
@@ -530,5 +538,5 @@ PY
     done
     echo "wirksam mit der Aktion deploy; Sicherung .env.bak"
     ;;
-  *) echo "Nur check, pull, befund, env-init, ps, logs, smoke, cert-retry, db-status, db-reset, first-run, deploy, rollback, create-admin, oauth-check, deploy-tests, doc-status, config-set, altbestand-import, altbestand-objekte, altbestand-aufarbeiten, verarbeitung-alle, paperless-feld-alle, redis-status, env-set, jobs-bereinigen, disk-status oder reconcile-all erlaubt"; exit 2 ;;
+  *) echo "Nur check, pull, befund, env-init, ps, logs, smoke, cert-retry, db-status, db-reset, first-run, deploy, rollback, create-admin, oauth-check, deploy-tests, doc-status, config-set, altbestand-import, altbestand-objekte, altbestand-aufarbeiten, verarbeitung-alle, paperless-feld-alle, redis-status, env-set, jobs-bereinigen, disk-status, transit-bereinigen oder reconcile-all erlaubt"; exit 2 ;;
 esac
