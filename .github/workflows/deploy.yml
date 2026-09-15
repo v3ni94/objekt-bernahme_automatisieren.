@@ -16,7 +16,7 @@ on:
         required: true
         default: "check"
         type: choice
-        options: ["check", "pull", "befund", "env-init", "ps", "logs", "smoke", "cert-retry", "db-status", "db-reset", "first-run", "deploy", "rollback", "create-admin", "oauth-check", "deploy-tests", "doc-status", "config-set", "altbestand-import", "altbestand-objekte", "altbestand-aufarbeiten", "verarbeitung-alle", "paperless-feld-alle", "reconcile-all", "redis-status", "env-set", "jobs-bereinigen", "disk-status", "transit-bereinigen", "worker-drosseln", "work-bereinigen", "last-status"]
+        options: ["check", "pull", "befund", "env-init", "ps", "logs", "smoke", "cert-retry", "db-status", "db-reset", "first-run", "deploy", "rollback", "create-admin", "oauth-check", "deploy-tests", "doc-status", "config-set", "altbestand-import", "altbestand-objekte", "altbestand-aufarbeiten", "verarbeitung-alle", "paperless-feld-alle", "reconcile-all", "redis-status", "env-set", "jobs-bereinigen", "disk-status", "transit-bereinigen", "worker-drosseln", "work-bereinigen", "last-status", "worker-stop", "worker-start"]
       argument:
         description: "Nur fuer create-admin (E-Mail), logs (Dienstname, leer = alle Anwendungsdienste), config-set (schluessel=wert) sowie altbestand-objekte, altbestand-aufarbeiten, verarbeitung-alle und paperless-feld-alle (echt = ausfuehren, sonst Vorschau) sowie env-set (SCHLUESSEL=wert, mehrere mit + getrennt), jobs-bereinigen (echt) und reconcile-all (ohne-ordner)"
         required: false

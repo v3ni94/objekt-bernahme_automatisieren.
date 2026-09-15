@@ -511,6 +511,20 @@ PY
     echo "$(date -Is) worker-drosseln Kerne $KERNE Anteil $ANTEIL (Quote $Q_OCR, Pool vorher ${AKTUELL:-unbekannt})" >> "$LOG"
     echo "Hinweis: dauerhaft ueber env-set OCR_PROCESSES=$KERNE+WORKER_CPUS=$Q_OCR+WORKER_IO_CPUS=$Q_NEBEN+WORKER_NLP_CPUS=$Q_NEBEN (wirksam mit deploy)"
     ;;
+  worker-stop)
+    # Verarbeitung sofort anhalten (15.09.2026, Server ueberlastet): OCR-, Klassifikations- und Ablage-Worker sowie Beat
+    # stoppen; web, db, redis laufen weiter. Warteschlangen und Jobs bleiben erhalten (acks_late), laufende Jobs
+    # werden nach dem Neustart wiederholt. Wiederanlauf mit worker-start.
+    docker compose stop -t 20 worker worker-nlp worker-io beat
+    docker compose ps --format "table {{.Service}}\t{{.State}}\t{{.Status}}"
+    echo "$(date -Is) worker-stop" >> "$LOG"
+    ;;
+  worker-start)
+    # Verarbeitung nach worker-stop wieder anlaufen lassen (dieselben Container, CPU-Grenzen aus worker-drosseln bleiben)
+    docker compose start worker-io worker-nlp worker beat
+    docker compose ps --format "table {{.Service}}\t{{.State}}\t{{.Status}}"
+    echo "$(date -Is) worker-start" >> "$LOG"
+    ;;
   last-status)
     # Momentaufnahme der Serverlast (nur lesend): Load, CPU je Container, gesetzte CPU-Grenzen, Top-Prozesse
     uptime
@@ -626,5 +640,5 @@ PY
     done
     echo "wirksam mit der Aktion deploy; Sicherung .env.bak"
     ;;
-  *) echo "Nur check, pull, befund, env-init, ps, logs, smoke, cert-retry, db-status, db-reset, first-run, deploy, rollback, create-admin, oauth-check, deploy-tests, doc-status, config-set, altbestand-import, altbestand-objekte, altbestand-aufarbeiten, verarbeitung-alle, paperless-feld-alle, redis-status, env-set, jobs-bereinigen, disk-status, transit-bereinigen, worker-drosseln, work-bereinigen, last-status oder reconcile-all erlaubt"; exit 2 ;;
+  *) echo "Nur check, pull, befund, env-init, ps, logs, smoke, cert-retry, db-status, db-reset, first-run, deploy, rollback, create-admin, oauth-check, deploy-tests, doc-status, config-set, altbestand-import, altbestand-objekte, altbestand-aufarbeiten, verarbeitung-alle, paperless-feld-alle, redis-status, env-set, jobs-bereinigen, disk-status, transit-bereinigen, worker-drosseln, work-bereinigen, last-status, worker-stop, worker-start oder reconcile-all erlaubt"; exit 2 ;;
 esac
