@@ -478,32 +478,38 @@ PY
     fi
     ;;
   worker-drosseln)
-    # CPU-Last des laufenden OCR-Workers ohne Neustart senken; Argument Zielanzahl OCR-Prozesse (1 bis 8).
-    # Zuerst die harte CPU-Grenze der Container (docker update, cgroup, wirkt sofort und braucht keine Antwort des
-    # Workers), danach die Poolgroesse ueber Celery pool_shrink/pool_grow (best effort, der ueberlastete Worker
-    # antwortet nicht immer rechtzeitig). Dauerhaft ueber env-set OCR_PROCESSES und WORKER_CPUS (naechstes deploy).
-    case "${ARG:-}" in ''|*[!0-9]*) echo "Argument Zielanzahl (1 bis 8) fehlt"; exit 2;; esac
-    [ "$ARG" -ge 1 ] && [ "$ARG" -le 8 ] || { echo "Zielanzahl ausserhalb 1 bis 8"; exit 2; }
-    W_ID="$(docker compose ps -q worker)"; IO_ID="$(docker compose ps -q worker-io)"
+    # CPU-Last der laufenden Worker ohne Neustart senken. Argument: Kerne fuer den OCR-Worker, optional mit Anteil in
+    # Prozent, z. B. "2" oder "2+50" (2 Kerne, je hoechstens 50 Prozent = Quote 1,0). Ablage- und Klassifikations-
+    # Worker erhalten 1 Kern mal Anteil. Zuerst die harten Grenzen (docker update: --cpus als Zeitquote, cgroup,
+    # sofort wirksam), dazu niedrige Prioritaet (--cpu-shares 128, andere Anwendungen gewinnen bei Konkurrenz),
+    # danach die Poolgroesse ueber Celery pool_shrink/pool_grow (best effort). Dauerhaft ueber env-set
+    # OCR_PROCESSES, WORKER_CPUS, WORKER_IO_CPUS, WORKER_NLP_CPUS (naechstes deploy).
+    KERNE="${ARG%%+*}"; ANTEIL=100; case "$ARG" in *+*) ANTEIL="${ARG#*+}";; esac
+    case "$KERNE" in ''|*[!0-9]*) echo "Argument Kerne (1 bis 8), optional +Anteil in Prozent, fehlt"; exit 2;; esac
+    case "$ANTEIL" in ''|*[!0-9]*) echo "Anteil muss eine Zahl 10 bis 100 sein"; exit 2;; esac
+    [ "$KERNE" -ge 1 ] && [ "$KERNE" -le 8 ] || { echo "Kerne ausserhalb 1 bis 8"; exit 2; }
+    [ "$ANTEIL" -ge 10 ] && [ "$ANTEIL" -le 100 ] || { echo "Anteil ausserhalb 10 bis 100"; exit 2; }
+    Q_OCR="$(awk -v k="$KERNE" -v a="$ANTEIL" 'BEGIN{printf "%.2f", k*a/100}')"
+    Q_NEBEN="$(awk -v a="$ANTEIL" 'BEGIN{printf "%.2f", a/100}')"
+    W_ID="$(docker compose ps -q worker)"; IO_ID="$(docker compose ps -q worker-io)"; NLP_ID="$(docker compose ps -q worker-nlp)"
     [ -n "$W_ID" ] || { echo "Worker-Container nicht gefunden"; exit 1; }
-    docker update --cpus "$ARG" "$W_ID" >/dev/null && echo "CPU-Grenze worker: $ARG Kerne (sofort wirksam)"
-    [ -n "$IO_ID" ] && docker update --cpus 1.0 "$IO_ID" >/dev/null && echo "CPU-Grenze worker-io: 1.0 Kerne"
-    NLP_ID="$(docker compose ps -q worker-nlp)"
-    [ -n "$NLP_ID" ] && docker update --cpus 1.0 "$NLP_ID" >/dev/null && echo "CPU-Grenze worker-nlp: 1.0 Kerne"
+    docker update --cpus "$Q_OCR" --cpu-shares 128 "$W_ID" >/dev/null && echo "worker: Quote $Q_OCR Kerne ($KERNE Kerne zu $ANTEIL Prozent), Prioritaet niedrig"
+    [ -n "$IO_ID" ] && docker update --cpus "$Q_NEBEN" --cpu-shares 128 "$IO_ID" >/dev/null && echo "worker-io: Quote $Q_NEBEN Kerne, Prioritaet niedrig"
+    [ -n "$NLP_ID" ] && docker update --cpus "$Q_NEBEN" --cpu-shares 128 "$NLP_ID" >/dev/null && echo "worker-nlp: Quote $Q_NEBEN Kerne, Prioritaet niedrig"
     NAME="$(docker compose exec -T worker celery -A objektakte inspect ping -t 30 2>/dev/null | grep -oE 'worker-ocr@[^ :>]+' | head -1)"
     if [ -z "$NAME" ]; then
-      echo "OCR-Worker antwortet nicht auf ping; Poolgroesse bleibt, die CPU-Grenze gilt trotzdem"
+      echo "OCR-Worker antwortet nicht auf ping; Poolgroesse bleibt, die Grenzen gelten trotzdem"
     else
       AKTUELL="$(docker compose exec -T worker celery -A objektakte inspect stats -j -d "$NAME" -t 30 2>/dev/null | python3 -c 'import sys,json; d=json.load(sys.stdin); print(list(d.values())[0]["pool"]["max-concurrency"])' 2>/dev/null)"
-      case "$AKTUELL" in ''|*[!0-9]*) echo "Poolgroesse nicht lesbar; CPU-Grenze gilt trotzdem";;
-        *) echo "OCR-Prozesse aktuell $AKTUELL, Ziel $ARG ($NAME)"
-           if [ "$ARG" -lt "$AKTUELL" ]; then docker compose exec -T worker celery -A objektakte control pool_shrink "$((AKTUELL - ARG))" -d "$NAME" -t 30 || true
-           elif [ "$ARG" -gt "$AKTUELL" ]; then docker compose exec -T worker celery -A objektakte control pool_grow "$((ARG - AKTUELL))" -d "$NAME" -t 30 || true
+      case "$AKTUELL" in ''|*[!0-9]*) echo "Poolgroesse nicht lesbar; Grenzen gelten trotzdem";;
+        *) echo "OCR-Prozesse aktuell $AKTUELL, Ziel $KERNE ($NAME)"
+           if [ "$KERNE" -lt "$AKTUELL" ]; then docker compose exec -T worker celery -A objektakte control pool_shrink "$((AKTUELL - KERNE))" -d "$NAME" -t 30 || true
+           elif [ "$KERNE" -gt "$AKTUELL" ]; then docker compose exec -T worker celery -A objektakte control pool_grow "$((KERNE - AKTUELL))" -d "$NAME" -t 30 || true
            else echo "Poolgroesse unveraendert"; fi;;
       esac
     fi
-    echo "$(date -Is) worker-drosseln Ziel $ARG (Pool vorher ${AKTUELL:-unbekannt})" >> "$LOG"
-    echo "Hinweis: dauerhaft ueber env-set OCR_PROCESSES=$ARG und WORKER_CPUS=$ARG (wirksam mit deploy)"
+    echo "$(date -Is) worker-drosseln Kerne $KERNE Anteil $ANTEIL (Quote $Q_OCR, Pool vorher ${AKTUELL:-unbekannt})" >> "$LOG"
+    echo "Hinweis: dauerhaft ueber env-set OCR_PROCESSES=$KERNE+WORKER_CPUS=$Q_OCR+WORKER_IO_CPUS=$Q_NEBEN+WORKER_NLP_CPUS=$Q_NEBEN (wirksam mit deploy)"
     ;;
   last-status)
     # Momentaufnahme der Serverlast (nur lesend): Load, CPU je Container, gesetzte CPU-Grenzen, Top-Prozesse
