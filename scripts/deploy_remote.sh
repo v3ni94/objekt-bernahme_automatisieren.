@@ -503,6 +503,18 @@ PY
     echo "$(date -Is) worker-drosseln Ziel $ARG (Pool vorher ${AKTUELL:-unbekannt})" >> "$LOG"
     echo "Hinweis: dauerhaft ueber env-set OCR_PROCESSES=$ARG und WORKER_CPUS=$ARG (wirksam mit deploy)"
     ;;
+  last-status)
+    # Momentaufnahme der Serverlast (nur lesend): Load, CPU je Container, gesetzte CPU-Grenzen, Top-Prozesse
+    uptime
+    echo "--- CPU und Speicher je Container (docker stats, eine Messung) ---"
+    docker stats --no-stream --format "table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}" 2>/dev/null | sort -k2 -rh | head -20
+    echo "--- gesetzte CPU-Grenzen (NanoCpus / 1e9) ---"
+    for svc in worker worker-io worker-nlp web db; do
+      ID="$(docker compose ps -q "$svc" 2>/dev/null)"; [ -n "$ID" ] && echo "$svc: $(docker inspect --format '{{.HostConfig.NanoCpus}}' "$ID" | awk '{printf "%.1f Kerne", $1/1e9}')"
+    done
+    echo "--- Top-Prozesse nach CPU (Host) ---"
+    ps -eo pcpu,pmem,comm --sort=-pcpu 2>/dev/null | head -12
+    ;;
   work-bereinigen)
     # Arbeitsverzeichnisse unter work/ in einem Durchgang raeumen (15.09.2026, Platte voll): alles aelter als eine
     # Stunde, dessen Dokument nicht mehr hashed ist und keinen offenen Job hat; ein DB-Abgleich statt zwei Abfragen je
@@ -606,5 +618,5 @@ PY
     done
     echo "wirksam mit der Aktion deploy; Sicherung .env.bak"
     ;;
-  *) echo "Nur check, pull, befund, env-init, ps, logs, smoke, cert-retry, db-status, db-reset, first-run, deploy, rollback, create-admin, oauth-check, deploy-tests, doc-status, config-set, altbestand-import, altbestand-objekte, altbestand-aufarbeiten, verarbeitung-alle, paperless-feld-alle, redis-status, env-set, jobs-bereinigen, disk-status, transit-bereinigen, worker-drosseln, work-bereinigen oder reconcile-all erlaubt"; exit 2 ;;
+  *) echo "Nur check, pull, befund, env-init, ps, logs, smoke, cert-retry, db-status, db-reset, first-run, deploy, rollback, create-admin, oauth-check, deploy-tests, doc-status, config-set, altbestand-import, altbestand-objekte, altbestand-aufarbeiten, verarbeitung-alle, paperless-feld-alle, redis-status, env-set, jobs-bereinigen, disk-status, transit-bereinigen, worker-drosseln, work-bereinigen, last-status oder reconcile-all erlaubt"; exit 2 ;;
 esac
