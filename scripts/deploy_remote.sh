@@ -477,6 +477,26 @@ PY
       docker compose exec -T web python manage.py transit_bereinigen
     fi
     ;;
+  worker-drosseln)
+    # OCR-Prozesse des laufenden Workers ohne Neustart aendern (Celery pool_shrink/pool_grow); Argument Zielanzahl.
+    # Wirkt sofort auf die CPU-Last; dauerhaft ueber env-set OCR_PROCESSES (naechstes deploy). Nur lesend ausser Poolgroesse.
+    case "${ARG:-}" in ''|*[!0-9]*) echo "Argument Zielanzahl (1 bis 8) fehlt"; exit 2;; esac
+    [ "$ARG" -ge 1 ] && [ "$ARG" -le 8 ] || { echo "Zielanzahl ausserhalb 1 bis 8"; exit 2; }
+    NAME="$(docker compose exec -T worker celery -A objektakte inspect ping -t 20 2>/dev/null | grep -oE 'worker-ocr@[^ :>]+' | head -1)"
+    [ -n "$NAME" ] || { echo "OCR-Worker antwortet nicht auf ping"; exit 1; }
+    AKTUELL="$(docker compose exec -T worker celery -A objektakte inspect stats -j -d "$NAME" -t 20 2>/dev/null | python3 -c 'import sys,json; d=json.load(sys.stdin); print(list(d.values())[0]["pool"]["max-concurrency"])')"
+    case "$AKTUELL" in ''|*[!0-9]*) echo "Poolgroesse nicht lesbar"; exit 1;; esac
+    echo "OCR-Prozesse aktuell $AKTUELL, Ziel $ARG ($NAME)"
+    if [ "$ARG" -lt "$AKTUELL" ]; then
+      docker compose exec -T worker celery -A objektakte control pool_shrink "$((AKTUELL - ARG))" -d "$NAME" -t 20
+    elif [ "$ARG" -gt "$AKTUELL" ]; then
+      docker compose exec -T worker celery -A objektakte control pool_grow "$((ARG - AKTUELL))" -d "$NAME" -t 20
+    else
+      echo "unveraendert"
+    fi
+    echo "$(date -Is) worker-drosseln $AKTUELL -> $ARG" >> "$LOG"
+    echo "Hinweis: dauerhaft ueber env-set OCR_PROCESSES=$ARG (wirksam mit deploy)"
+    ;;
   redis-status)
     # Redis-Speicher und Warteschlangen (Broker und Cache teilen sich eine Instanz); Passwort nur ueber Umgebungsvariable
     docker compose exec -T redis sh -c '
@@ -538,5 +558,5 @@ PY
     done
     echo "wirksam mit der Aktion deploy; Sicherung .env.bak"
     ;;
-  *) echo "Nur check, pull, befund, env-init, ps, logs, smoke, cert-retry, db-status, db-reset, first-run, deploy, rollback, create-admin, oauth-check, deploy-tests, doc-status, config-set, altbestand-import, altbestand-objekte, altbestand-aufarbeiten, verarbeitung-alle, paperless-feld-alle, redis-status, env-set, jobs-bereinigen, disk-status, transit-bereinigen oder reconcile-all erlaubt"; exit 2 ;;
+  *) echo "Nur check, pull, befund, env-init, ps, logs, smoke, cert-retry, db-status, db-reset, first-run, deploy, rollback, create-admin, oauth-check, deploy-tests, doc-status, config-set, altbestand-import, altbestand-objekte, altbestand-aufarbeiten, verarbeitung-alle, paperless-feld-alle, redis-status, env-set, jobs-bereinigen, disk-status, transit-bereinigen, worker-drosseln oder reconcile-all erlaubt"; exit 2 ;;
 esac
