@@ -151,7 +151,12 @@ def hash_document(job: ProcessingJob) -> dict:
         doc.status = "review"
         doc.save(update_fields=["status", "updated_at"])
         return {"kind": "google_doc"}
-    storage.ensure_disk_reserve()
+    try:
+        storage.ensure_disk_reserve()
+    except storage.DiskFull as exc:
+        # Platte an der Reserve (15.09.2026): Download pausiert und wird spaeter wiederholt, statt das Dokument als
+        # Fehler zu markieren; der Sweeper raeumt inzwischen Arbeitsverzeichnisse (processing.work_orphan_hours)
+        raise DeferJob(f"Plattenreserve erreicht, Download wartet: {exc}", seconds=1800) from exc
     tmp = storage.work_tmp_dir()
     try:
         path = _download(doc, tmp)
@@ -862,6 +867,16 @@ def decide_task(job: ProcessingJob) -> dict:
     return result
 
 
+def _remove_transit_copy(doc: Document) -> bool:
+    """Transit-Kopie (Upload oder Paperless-Download unter transit/) nach der Ablage in Drive loeschen
+    (docs/architektur.md 3.4: Loeschung nach erfolgreicher Ablage). Bis 15.09.2026 nur fuer Uploads; die Downloads
+    der Paperless-Uebernahme blieben liegen und fuellten die Platte. Bestandsdateien aus Drive haben keine Kopie."""
+    if not doc.source_path or doc.source not in ("upload", "paperless"):
+        return False
+    Path(doc.source_path).unlink(missing_ok=True)
+    return True
+
+
 @job_task(JobType.FILE_TO_DRIVE)
 def file_to_drive(job: ProcessingJob) -> dict:
     """Letzter Schritt (docs/architektur.md 6.1 Nr. 10): Bestandsdatei per Elternwechsel verschieben, Upload in den
@@ -974,8 +989,7 @@ def file_to_drive(job: ProcessingJob) -> dict:
                 )
                 action = "uploaded"
             doc.drive_file_id = node.id
-            if doc.source_path and doc.source == "upload":
-                Path(doc.source_path).unlink(missing_ok=True)
+            _remove_transit_copy(doc)
         # Elternordner zuruecklesen
         check = drive.get(doc.drive_file_id)
         if check is None or check.parent_id != target.drive_file_id:

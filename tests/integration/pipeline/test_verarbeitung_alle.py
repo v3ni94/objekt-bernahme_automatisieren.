@@ -538,3 +538,47 @@ def test_dispatch_run_legt_keinen_startjob_fuer_dokumente_in_der_kette_an(
     assert wieder.status == JobStatus.SKIPPED and block.pk in set(
         ProcessingJob.objects.filter(object=a, status=JobStatus.PENDING).values_list("pk", flat=True)
     )
+
+
+def test_plattenreserve_pausiert_download_und_transit_kopie_wird_nach_ablage_geloescht(
+    drei_objekte, admin_user, monkeypatch, tmp_path
+):
+    """15.09.2026: Erreicht die Platte die Reserve, wartet der Hash-Job (DeferJob) statt als Fehler zu enden; die
+    Transit-Kopie eines Uploads oder einer Paperless-Uebernahme wird nach der Ablage in Drive geloescht,
+    Bestandsdateien aus Drive haben keine Kopie."""
+    from apps.pipeline import storage as storage_mod
+    from apps.pipeline import tasks as tasks_mod
+
+    a, _, _ = drei_objekte
+    monkeypatch.setattr(jobs_mod, "send", lambda job, countdown=None: None)
+    quelle = tmp_path / "eingang.pdf"
+    quelle.write_bytes(b"%PDF-1.4 test")
+    doc = Document.objects.create(
+        object=a,
+        size_bytes=13,
+        mime_type="application/pdf",
+        original_name="eingang.pdf",
+        current_name="eingang.pdf",
+        source="paperless",
+        source_path=str(quelle),
+        status="registered",
+        first_seen_at=timezone.now(),
+    )
+    job, _ = enqueue(
+        JobType.HASH, a, key=idempotency_key(JobType.HASH, a.pk, f"upload-{doc.pk}"), document=doc, run=None
+    )
+
+    def _voll(path=None):
+        raise storage_mod.DiskFull("Nur 17,0 GB frei, Reserve 18 GB")
+
+    monkeypatch.setattr(storage_mod, "ensure_disk_reserve", _voll)
+    ergebnis = tasks_mod.hash_document(job.pk)
+    job.refresh_from_db()
+    doc.refresh_from_db()
+    assert ergebnis["job_id"] == job.pk and "Plattenreserve" in ergebnis["deferred"]
+    assert job.status == JobStatus.PENDING and job.next_attempt_at is not None and doc.status == "registered"
+    assert quelle.exists()
+    # Transit-Kopie nach der Ablage
+    assert tasks_mod._remove_transit_copy(doc) is True and not quelle.exists()
+    bestand = Document.objects.get(object=a, original_name="a1.pdf")
+    assert tasks_mod._remove_transit_copy(bestand) is False

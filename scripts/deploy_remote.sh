@@ -484,6 +484,23 @@ PY
       redis-cli --bigkeys 2>/dev/null | grep -E "^(Biggest|\[|[0-9]+ [a-z]+ with)" | head -20
     '
     ;;
+  disk-status)
+    # Plattenbelegung der Datenverzeichnisse (nur lesend, keine Dateinamen): df, du je Unterverzeichnis,
+    # Anzahl und Alter der Arbeitsverzeichnisse unter work/, Transit-Kopien, Vorschaubilder
+    df -h /srv 2>/dev/null || df -h /
+    echo "--- /srv/objektakte je Verzeichnis ---"
+    du -sh /srv/objektakte/* 2>/dev/null | sort -rh
+    echo "--- work/: Verzeichnisse, aeltestes, juengstes ---"
+    W=/srv/objektakte/work
+    echo "Anzahl: $(find "$W" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l), davon tmp-: $(find "$W" -mindepth 1 -maxdepth 1 -type d -name 'tmp-*' 2>/dev/null | wc -l)"
+    echo "aelter als 48 h: $(find "$W" -mindepth 1 -maxdepth 1 -type d -mmin +2880 2>/dev/null | wc -l), aelter als 6 h: $(find "$W" -mindepth 1 -maxdepth 1 -type d -mmin +360 2>/dev/null | wc -l)"
+    echo "--- transit/: Dateien und Groesse ---"
+    echo "Dateien: $(find /srv/objektakte/transit -type f 2>/dev/null | wc -l), Groesse: $(du -sh /srv/objektakte/transit 2>/dev/null | cut -f1)"
+    echo "--- previews/: Dokumente und Bilder ---"
+    echo "Dokumente: $(find /srv/objektakte/previews -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l), Bilder: $(find /srv/objektakte/previews -type f -name '*.jpg' 2>/dev/null | wc -l)"
+    echo "--- Docker: Images, Container, Volumes, Build-Cache ---"
+    docker system df 2>/dev/null || true
+    ;;
   env-set)
     # Betriebswerte in .env setzen; mehrere Paare mit + getrennt (OCR_PROCESSES=6+IO_CONCURRENCY=12). Nur freigegebene
     # Schluessel (Ressourcen, Parallelitaet), Wert aus Ziffern, Buchstaben, Punkt, Unterstrich und Bindestrich.
@@ -510,5 +527,5 @@ PY
     done
     echo "wirksam mit der Aktion deploy; Sicherung .env.bak"
     ;;
-  *) echo "Nur check, pull, befund, env-init, ps, logs, smoke, cert-retry, db-status, db-reset, first-run, deploy, rollback, create-admin, oauth-check, deploy-tests, doc-status, config-set, altbestand-import, altbestand-objekte, altbestand-aufarbeiten, verarbeitung-alle, paperless-feld-alle, redis-status, env-set, jobs-bereinigen oder reconcile-all erlaubt"; exit 2 ;;
+  *) echo "Nur check, pull, befund, env-init, ps, logs, smoke, cert-retry, db-status, db-reset, first-run, deploy, rollback, create-admin, oauth-check, deploy-tests, doc-status, config-set, altbestand-import, altbestand-objekte, altbestand-aufarbeiten, verarbeitung-alle, paperless-feld-alle, redis-status, env-set, jobs-bereinigen, disk-status oder reconcile-all erlaubt"; exit 2 ;;
 esac
