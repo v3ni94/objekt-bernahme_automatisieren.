@@ -494,8 +494,11 @@ PY
     else
       echo "unveraendert"
     fi
+    # harte CPU-Grenze des laufenden Containers sofort anpassen (cgroup, ohne Neustart); der Ablage-Worker auf 1 CPU
+    docker update --cpus "$ARG" "$(docker compose ps -q worker)" >/dev/null && echo "CPU-Grenze worker: $ARG"
+    docker update --cpus 1.0 "$(docker compose ps -q worker-io)" >/dev/null && echo "CPU-Grenze worker-io: 1.0"
     echo "$(date -Is) worker-drosseln $AKTUELL -> $ARG" >> "$LOG"
-    echo "Hinweis: dauerhaft ueber env-set OCR_PROCESSES=$ARG (wirksam mit deploy)"
+    echo "Hinweis: dauerhaft ueber env-set OCR_PROCESSES=$ARG und WORKER_CPUS=$ARG (wirksam mit deploy)"
     ;;
   work-bereinigen)
     # Arbeitsverzeichnisse unter work/ in einem Durchgang raeumen (15.09.2026, Platte voll): alles aelter als eine
