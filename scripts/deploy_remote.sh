@@ -543,9 +543,16 @@ PY
       ID="$(docker compose ps -q "$svc" 2>/dev/null)"; [ -n "$ID" ] && echo "$svc: $(docker inspect --format '{{.HostConfig.NanoCpus}}' "$ID" | awk '{printf "%.1f Kerne", $1/1e9}')"
     done
     echo "--- Top-Prozesse nach CPU (Host, Lebenszeit-Mittel laut ps) ---"
-    ps -eo pcpu,pmem,comm --sort=-pcpu 2>/dev/null | head -12
+    ps -eo pcpu,pmem,comm --sort=-pcpu 2>/dev/null | awk '$3!="ps" && $3!="head" && $3!="top" && $3!="awk" {if (++c<=12) print}'
     echo "--- Top-Prozesse nach CPU (Host, aktuell ueber 3 s laut top) ---"
-    top -b -n 2 -d 3 -o %CPU 2>/dev/null | awk '/^top -/{n++} n==2' | head -20
+    # Begrenzung in awk statt head: head schliesst die Pipe vorzeitig, awk erhaelt SIGPIPE (Exit 141 bei pipefail)
+    top -b -n 2 -d 3 -o %CPU 2>/dev/null | awk '/^top -/{n++} n==2{c++} n==2 && c<=20'
+    echo "--- Zombie-Prozesse je Elternprozess (Top 5, mit Container) ---"
+    ps -eo ppid,stat,comm 2>/dev/null | awk '$2 ~ /^Z/ {z[$1]++} END {for (p in z) print z[p], p}' | sort -rn | awk 'NR<=5' | while read -r n p; do
+      cid="$(grep -oE 'docker-[0-9a-f]{64}' "/proc/$p/cgroup" 2>/dev/null | head -1 | cut -c8-19)"
+      name="$(docker ps --format '{{.ID}} {{.Names}}' 2>/dev/null | awk -v c="$cid" '$1==c{print $2}')"
+      echo "$n Zombies unter PID $p ($(ps -o comm= -p "$p" 2>/dev/null)) Container: ${name:-keiner}"
+    done
     ;;
   work-bereinigen)
     # Arbeitsverzeichnisse unter work/ in einem Durchgang raeumen (15.09.2026, Platte voll): alles aelter als eine
