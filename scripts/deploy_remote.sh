@@ -488,6 +488,8 @@ PY
     [ -n "$W_ID" ] || { echo "Worker-Container nicht gefunden"; exit 1; }
     docker update --cpus "$ARG" "$W_ID" >/dev/null && echo "CPU-Grenze worker: $ARG Kerne (sofort wirksam)"
     [ -n "$IO_ID" ] && docker update --cpus 1.0 "$IO_ID" >/dev/null && echo "CPU-Grenze worker-io: 1.0 Kerne"
+    NLP_ID="$(docker compose ps -q worker-nlp)"
+    [ -n "$NLP_ID" ] && docker update --cpus 1.0 "$NLP_ID" >/dev/null && echo "CPU-Grenze worker-nlp: 1.0 Kerne"
     NAME="$(docker compose exec -T worker celery -A objektakte inspect ping -t 30 2>/dev/null | grep -oE 'worker-ocr@[^ :>]+' | head -1)"
     if [ -z "$NAME" ]; then
       echo "OCR-Worker antwortet nicht auf ping; Poolgroesse bleibt, die CPU-Grenze gilt trotzdem"
