@@ -526,16 +526,26 @@ PY
     echo "$(date -Is) worker-start" >> "$LOG"
     ;;
   last-status)
-    # Momentaufnahme der Serverlast (nur lesend): Load, CPU je Container, gesetzte CPU-Grenzen, Top-Prozesse
+    # Momentaufnahme der Serverlast (nur lesend): Load, CPU je Container, gesetzte CPU-Grenzen, Top-Prozesse.
+    # Zusaetzlich (15.09.2026): Kernzahl, CPU-Verteilung ueber 6 s inkl. Anteil des Hypervisors (st) und
+    # CPU-Druck (PSI), weil ps nur Lebenszeit-Mittelwerte je Prozess zeigt und Load allein Verdraengung durch
+    # den Wirt nicht sichtbar macht.
     uptime
+    echo "Kerne sichtbar: $(nproc)"
+    echo "--- CPU-Verteilung (vmstat, 3 Messungen je 2 s: us sy id wa st) ---"
+    vmstat 2 3 2>/dev/null | tail -n 4
+    echo "--- CPU-Druck (PSI, Anteil der Zeit mit wartenden Prozessen) ---"
+    cat /proc/pressure/cpu 2>/dev/null || echo "nicht verfuegbar"
     echo "--- CPU und Speicher je Container (docker stats, eine Messung) ---"
     docker stats --no-stream --format "table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}" 2>/dev/null | sort -k2 -rh | head -20
     echo "--- gesetzte CPU-Grenzen (NanoCpus / 1e9) ---"
     for svc in worker worker-io worker-nlp web db; do
       ID="$(docker compose ps -q "$svc" 2>/dev/null)"; [ -n "$ID" ] && echo "$svc: $(docker inspect --format '{{.HostConfig.NanoCpus}}' "$ID" | awk '{printf "%.1f Kerne", $1/1e9}')"
     done
-    echo "--- Top-Prozesse nach CPU (Host) ---"
+    echo "--- Top-Prozesse nach CPU (Host, Lebenszeit-Mittel laut ps) ---"
     ps -eo pcpu,pmem,comm --sort=-pcpu 2>/dev/null | head -12
+    echo "--- Top-Prozesse nach CPU (Host, aktuell ueber 3 s laut top) ---"
+    top -b -n 2 -d 3 -o %CPU 2>/dev/null | awk '/^top -/{n++} n==2' | head -20
     ;;
   work-bereinigen)
     # Arbeitsverzeichnisse unter work/ in einem Durchgang raeumen (15.09.2026, Platte voll): alles aelter als eine
