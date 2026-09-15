@@ -485,21 +485,24 @@ PY
     '
     ;;
   disk-status)
-    # Plattenbelegung der Datenverzeichnisse (nur lesend, keine Dateinamen): df, du je Unterverzeichnis,
-    # Anzahl und Alter der Arbeitsverzeichnisse unter work/, Transit-Kopien, Vorschaubilder
-    df -h /srv 2>/dev/null || df -h /
-    echo "--- /srv/objektakte je Verzeichnis ---"
-    du -sh /srv/objektakte/* 2>/dev/null | sort -rh
-    echo "--- work/: Verzeichnisse, aeltestes, juengstes ---"
-    W=/srv/objektakte/work
-    echo "Anzahl: $(find "$W" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l), davon tmp-: $(find "$W" -mindepth 1 -maxdepth 1 -type d -name 'tmp-*' 2>/dev/null | wc -l)"
-    echo "aelter als 48 h: $(find "$W" -mindepth 1 -maxdepth 1 -type d -mmin +2880 2>/dev/null | wc -l), aelter als 6 h: $(find "$W" -mindepth 1 -maxdepth 1 -type d -mmin +360 2>/dev/null | wc -l)"
-    echo "--- transit/: Dateien und Groesse ---"
-    echo "Dateien: $(find /srv/objektakte/transit -type f 2>/dev/null | wc -l), Groesse: $(du -sh /srv/objektakte/transit 2>/dev/null | cut -f1)"
-    echo "--- previews/: Dokumente und Bilder ---"
-    echo "Dokumente: $(find /srv/objektakte/previews -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l), Bilder: $(find /srv/objektakte/previews -type f -name '*.jpg' 2>/dev/null | wc -l)"
-    echo "--- Docker: Images, Container, Volumes, Build-Cache ---"
+    # Plattenbelegung der Datenverzeichnisse (nur lesend, keine Dateinamen). Die Datenverzeichnisse gehoeren dem
+    # Container-Nutzer (uid 10001) und sind fuer den Deploy-Nutzer nicht lesbar, daher misst der Worker-Container
+    # (mountet work, ocr-cache, transit) und der Web-Container (previews); df und docker system df vom Host.
+    df -h /srv 2>/dev/null || df -h / || true
+    echo "--- Datenverzeichnisse (aus dem Worker-Container) ---"
+    docker compose exec -T worker sh -c '
+      for d in work ocr-cache transit previews; do [ -d /data/$d ] && du -sh /data/$d 2>/dev/null; done
+      W=/data/work
+      echo "work/: Verzeichnisse $(find $W -mindepth 1 -maxdepth 1 -type d | wc -l), davon tmp- $(find $W -mindepth 1 -maxdepth 1 -type d -name "tmp-*" | wc -l), aelter als 48 h $(find $W -mindepth 1 -maxdepth 1 -type d -mmin +2880 | wc -l), aelter als 6 h $(find $W -mindepth 1 -maxdepth 1 -type d -mmin +360 | wc -l)"
+      echo "transit/: Dateien $(find /data/transit -type f | wc -l)"
+      echo "ocr-cache/: Verzeichnisse $(find /data/ocr-cache -mindepth 1 -maxdepth 1 -type d | wc -l)"
+    ' 2>/dev/null || echo "Worker-Container nicht erreichbar"
+    echo "--- Vorschaubilder (aus dem Web-Container) ---"
+    docker compose exec -T web sh -c 'du -sh /data/previews 2>/dev/null; echo "previews/: Dokumente $(find /data/previews -mindepth 1 -maxdepth 1 -type d | wc -l), Bilder $(find /data/previews -type f -name "*.jpg" | wc -l)"' 2>/dev/null || echo "Web-Container nicht erreichbar"
+    echo "--- Docker: Images, Container, Volumes, Build-Cache (ganzer Host) ---"
     docker system df 2>/dev/null || true
+    echo "--- Docker-Volumes nach Groesse (ganzer Host, nur Namen) ---"
+    docker system df -v 2>/dev/null | awk "/^VOLUME NAME/{f=1;next} f&&NF==0{f=0} f{print \$1, \$NF}" | sort -k2 -rh | head -12 || true
     ;;
   env-set)
     # Betriebswerte in .env setzen; mehrere Paare mit + getrennt (OCR_PROCESSES=6+IO_CONCURRENCY=12). Nur freigegebene
