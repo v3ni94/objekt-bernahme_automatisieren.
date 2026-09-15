@@ -497,6 +497,48 @@ PY
     echo "$(date -Is) worker-drosseln $AKTUELL -> $ARG" >> "$LOG"
     echo "Hinweis: dauerhaft ueber env-set OCR_PROCESSES=$ARG (wirksam mit deploy)"
     ;;
+  work-bereinigen)
+    # Arbeitsverzeichnisse unter work/ in einem Durchgang raeumen (15.09.2026, Platte voll): alles aelter als eine
+    # Stunde, dessen Dokument nicht mehr hashed ist und keinen offenen Job hat; ein DB-Abgleich statt zwei Abfragen je
+    # Verzeichnis wie im Minuten-Sweep. Laeuft im Worker-Container (work/ beschreibbar). "echt" loescht, sonst Vorschau.
+    WB=0; [ "${ARG:-}" = "echt" ] && WB=1
+    docker compose exec -T -e WB_ECHT="$WB" worker python manage.py shell <<'PY'
+import os, shutil, time
+from apps.documents.models import Document
+from apps.pipeline import storage
+from apps.pipeline.models import JobStatus, ProcessingJob
+echt = os.environ.get("WB_ECHT") == "1"
+root = storage.data_dir() / "work"
+behalten = set(Document.objects.filter(status="hashed").exclude(sha256__isnull=True).values_list("sha256", flat=True))
+behalten |= set(
+    ProcessingJob.objects.filter(status__in=[JobStatus.PENDING, JobStatus.RUNNING], document__sha256__isnull=False)
+    .values_list("document__sha256", flat=True).distinct()
+)
+frei_vorher = shutil.disk_usage(root).free / 1024**3
+cutoff = time.time() - 3600
+loeschbar = jung = benoetigt = geloescht = 0
+for p in root.iterdir():
+    if not p.is_dir():
+        continue
+    try:
+        mtime = p.stat().st_mtime
+    except OSError:
+        continue
+    if mtime > cutoff:
+        jung += 1
+        continue
+    if not p.name.startswith("tmp-") and p.name in behalten:
+        benoetigt += 1
+        continue
+    loeschbar += 1
+    if echt:
+        shutil.rmtree(p, ignore_errors=True)
+        geloescht += 1
+frei_nachher = shutil.disk_usage(root).free / 1024**3
+print(f"work/: loeschbar {loeschbar}, juenger als 1 h {jung}, noch benoetigt (hashed oder offener Job) {benoetigt}, behalten-Menge {len(behalten)}")
+print(f"{'geloescht' if echt else 'Vorschau, nichts geloescht'}: {geloescht}; frei vorher {frei_vorher:.1f} GB, nachher {frei_nachher:.1f} GB")
+PY
+    ;;
   redis-status)
     # Redis-Speicher und Warteschlangen (Broker und Cache teilen sich eine Instanz); Passwort nur ueber Umgebungsvariable
     docker compose exec -T redis sh -c '
@@ -558,5 +600,5 @@ PY
     done
     echo "wirksam mit der Aktion deploy; Sicherung .env.bak"
     ;;
-  *) echo "Nur check, pull, befund, env-init, ps, logs, smoke, cert-retry, db-status, db-reset, first-run, deploy, rollback, create-admin, oauth-check, deploy-tests, doc-status, config-set, altbestand-import, altbestand-objekte, altbestand-aufarbeiten, verarbeitung-alle, paperless-feld-alle, redis-status, env-set, jobs-bereinigen, disk-status, transit-bereinigen, worker-drosseln oder reconcile-all erlaubt"; exit 2 ;;
+  *) echo "Nur check, pull, befund, env-init, ps, logs, smoke, cert-retry, db-status, db-reset, first-run, deploy, rollback, create-admin, oauth-check, deploy-tests, doc-status, config-set, altbestand-import, altbestand-objekte, altbestand-aufarbeiten, verarbeitung-alle, paperless-feld-alle, redis-status, env-set, jobs-bereinigen, disk-status, transit-bereinigen, worker-drosseln, work-bereinigen oder reconcile-all erlaubt"; exit 2 ;;
 esac
