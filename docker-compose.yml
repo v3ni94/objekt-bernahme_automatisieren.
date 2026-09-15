@@ -392,6 +392,10 @@ services:
   db:
     image: mariadb:${MARIADB_TAG}
     restart: unless-stopped
+    # Kindprozesse abgebrochener Healthchecks (healthcheck.sh laeuft bei CPU-Knappheit in den 5-s-Timeout) werden an
+    # PID 1 gehaengt; mariadbd holt sie nicht ab (15.09.2026: 332 Zombies). docker-init als PID 1 raeumt sie auf.
+    # Greift beim naechsten "docker compose up -d" (Neuerstellung des Containers, kurze Unterbrechung der Datenbank).
+    init: true
     security_opt:
       - no-new-privileges:true
     environment:
