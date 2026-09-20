@@ -311,11 +311,12 @@ if not (key and cfg.model):
     print("PROBE openai uebersprungen: Schluessel oder Modell fehlt.")
     raise SystemExit(0)
 from openai import OpenAI
-base_url = cfg.endpoint or os.environ.get("OPENAI_BASE_URL") or None
+from apps.ai.providers.openai_provider import resolve_base_url
+base_url = resolve_base_url(cfg.endpoint)
 client = OpenAI(api_key=key, base_url=base_url, timeout=20, max_retries=0)
 try:
     m = client.models.retrieve(cfg.model)
-    print(f"PROBE Schluessel und Modell: {m.id} ist ueber {base_url or 'api.openai.com'} abrufbar.")
+    print(f"PROBE Schluessel und Modell: {m.id} ist ueber {base_url} abrufbar.")
 except Exception as exc:
     print(f"PROBE Schluessel/Modell FEHLGESCHLAGEN: {type(exc).__name__}: {str(exc)[:240]}")
     raise SystemExit(0)

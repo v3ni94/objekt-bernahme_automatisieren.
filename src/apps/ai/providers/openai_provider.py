@@ -28,6 +28,19 @@ def supports_temperature(model: str | None) -> bool:
     return not name.startswith(REASONING_MODEL_PREFIXES)
 
 
+DEFAULT_BASE_URL = "https://api.openai.com/v1"
+
+
+def resolve_base_url(endpoint: str | None) -> str:
+    """Endpunkt aus Konfiguration, sonst OPENAI_BASE_URL, sonst Standard des Anbieters.
+
+    Der Standard wird ausdruecklich uebergeben: Das SDK liest bei base_url=None selbst die Umgebungsvariable und
+    wertet eine leere Zeichenkette (wie sie docker compose bei OPENAI_BASE_URL="" setzt) als gesetzte, leere URL.
+    Die Folge waere ein APIConnectionError ohne erkennbare Ursache.
+    """
+    return (endpoint or "").strip() or os.environ.get("OPENAI_BASE_URL", "").strip() or DEFAULT_BASE_URL
+
+
 class OpenAIProvider(BaseProvider):
     name = "openai"
 
@@ -37,8 +50,9 @@ class OpenAIProvider(BaseProvider):
         key = api_key_for("openai")
         if not key:
             raise ProviderError("OPENAI_API_KEY fehlt", retryable=False)
-        base_url = cfg.endpoint or os.environ.get("OPENAI_BASE_URL") or None
-        return OpenAI(api_key=key, base_url=base_url, timeout=cfg.timeout_s, max_retries=0)
+        return OpenAI(
+            api_key=key, base_url=resolve_base_url(cfg.endpoint), timeout=cfg.timeout_s, max_retries=0
+        )
 
     def send(self, system: str, user: str, cfg: ProviderConfig) -> RawResponse:
         import openai

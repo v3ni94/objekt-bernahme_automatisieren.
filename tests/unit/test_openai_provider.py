@@ -107,3 +107,13 @@ def test_fehlender_schluessel_ist_nicht_wiederholbar(monkeypatch):
         OpenAIProvider().send("s", "u", ProviderConfig(name="openai", enabled=True, model="gpt-4.1-mini"))
     assert exc.value.retryable is False
     assert openai_provider.REASONING_MODEL_PREFIXES[0] == "gpt-5"
+
+
+def test_leere_umgebungsvariable_ergibt_standardendpunkt(monkeypatch):
+    # docker compose setzt OPENAI_BASE_URL="" ; das SDK wuerde die leere URL uebernehmen und mit Connection error scheitern
+    monkeypatch.setenv("OPENAI_BASE_URL", "")
+    OpenAIProvider()._client(ProviderConfig(name="openai", enabled=True, model="gpt-4.1-mini"))
+    assert FakeOpenAI.instances[-1].kwargs["base_url"] == "https://api.openai.com/v1"
+    monkeypatch.delenv("OPENAI_BASE_URL")
+    OpenAIProvider()._client(ProviderConfig(name="openai", enabled=True, model="gpt-4.1-mini", endpoint="  "))
+    assert FakeOpenAI.instances[-1].kwargs["base_url"] == "https://api.openai.com/v1"
