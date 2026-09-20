@@ -63,7 +63,10 @@ fi
 # 4. Dump vor Migration (Pflicht), bei leerer Datenbank uebersprungen
 TABLES=$(docker compose exec -T db sh -c 'mariadb -uroot -p"$(cat /run/secrets/db_root_password)" -N -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = \"$MARIADB_DATABASE\""' | tr -d '[:space:]')
 if [ "${TABLES:-0}" -gt 0 ]; then
-  docker compose exec -T backup /usr/local/bin/backup.sh || { echo "Dump fehlgeschlagen, Abbruch"; exit 1; }
+  # db-only: nur der Datenbankdump; das Packen der Fachverzeichnisse (Transit 8,8 GB gepackt) kostete rund
+  # 20 Minuten je Deploy und wurde am 21.09.2026 fuer einen Abbruch gehalten. Die volle Sicherung bleibt Sache
+  # des Cron (BACKUP_CRON).
+  docker compose exec -T backup /usr/local/bin/backup.sh db-only || { echo "Dump fehlgeschlagen, Abbruch"; exit 1; }
 else
   echo "Leere Datenbank, kein Dump vor der ersten Migration"
 fi

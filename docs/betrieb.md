@@ -1182,7 +1182,7 @@ fi
 # 4. Dump vor Migration (Pflicht), bei leerer Datenbank uebersprungen
 TABLES=$(docker compose exec -T db sh -c 'mariadb -uroot -p"$(cat /run/secrets/db_root_password)" -N -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = \"$MARIADB_DATABASE\""' | tr -d '[:space:]')
 if [ "${TABLES:-0}" -gt 0 ]; then
-  docker compose exec -T backup /usr/local/bin/backup.sh || { echo "Dump fehlgeschlagen, Abbruch"; exit 1; }
+  docker compose exec -T backup /usr/local/bin/backup.sh db-only || { echo "Dump fehlgeschlagen, Abbruch"; exit 1; }
 else
   echo "Leere Datenbank, kein Dump vor der ersten Migration"
 fi
@@ -1362,7 +1362,7 @@ Eigenschaften: `.part`-Dateien mit atomarem Umbenennen (ein unvollständiges Arc
 
 ### 5.3 Manueller Lauf
 
-`docker compose exec -T backup /usr/local/bin/backup.sh`. Das Deployment-Skript ruft genau dies vor jeder Migration auf. Ein Admin kann den Lauf nicht aus der Oberfläche starten; die Statusseite zeigt stattdessen diesen Befehl an (Festlegung für M1; ein Auftrag über Redis an den Backup-Container ist als spätere Erweiterung möglich).
+`docker compose exec -T backup /usr/local/bin/backup.sh`. Das Deployment-Skript ruft vor jeder Migration `backup.sh db-only` auf (seit 21.09.2026 nur der Datenbankdump, ohne status.json und ohne Aufräumen; das Packen der Fachverzeichnisse kostete mit dem Transit-Volume rund 20 Minuten je Deploy und wurde für einen Abbruch gehalten). Ein Admin kann den Lauf nicht aus der Oberfläche starten; die Statusseite zeigt stattdessen diesen Befehl an (Festlegung für M1; ein Auftrag über Redis an den Backup-Container ist als spätere Erweiterung möglich).
 
 ### 5.4 Wiederherstellung auf leerer Instanz (Schritt für Schritt)
 
