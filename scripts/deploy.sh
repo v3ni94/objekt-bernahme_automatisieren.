@@ -60,7 +60,9 @@ if $FIRST_RUN; then
   wait_healthy 180 db redis
 fi
 
-# 4. Dump vor Migration (Pflicht), bei leerer Datenbank uebersprungen
+# 4. Dump vor Migration (Pflicht), bei leerer Datenbank uebersprungen. Der Sicherungscontainer kommt zuerst auf das
+# neue Image, damit der Dump mit dem aktuellen backup.sh laeuft (Modus db-only gibt es erst seit 21.09.2026).
+docker compose up -d --no-deps backup
 TABLES=$(docker compose exec -T db sh -c 'mariadb -uroot -p"$(cat /run/secrets/db_root_password)" -N -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = \"$MARIADB_DATABASE\""' | tr -d '[:space:]')
 if [ "${TABLES:-0}" -gt 0 ]; then
   # db-only: nur der Datenbankdump; das Packen der Fachverzeichnisse (Transit 8,8 GB gepackt) kostete rund
