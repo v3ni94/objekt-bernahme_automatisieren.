@@ -199,13 +199,29 @@ def models_q_next_attempt(now):
 
 
 REDISPATCH_HOURS = 48
+# Ein zurueckgestellter Job (DeferJob, Nachricht mit Countdown) gilt als verloren, wenn sein Termin so lange
+# verstrichen ist und seitdem kein erneuter Versand erfolgte. Befund 20.09.2026: 124 Ablagen mit Termin 10:45 Uhr
+# standen bis nach Mitternacht, weil drei Neustarte ihre Countdown-Nachrichten verworfen hatten und das
+# 48-Stunden-Fenster sie als „unterwegs“ zaehlte.
+DEFERRED_LOST_HOURS = 2
 
 
 def models_q_not_in_flight(now, hours: int = REDISPATCH_HOURS):
-    """Jobs ohne Nachricht unterwegs: nie versandt oder Versand aelter als `hours` Stunden (Warteschlange geleert)."""
-    from django.db.models import Q
+    """Jobs ohne Nachricht unterwegs: nie versandt, Versand aelter als `hours` Stunden (Warteschlange geleert) oder
+    zurueckgestellt mit einem seit DEFERRED_LOST_HOURS verstrichenen Termin, ohne dass nach dem Termin erneut
+    versandt wurde (dispatched_at liegt vor next_attempt_at). Ein Doppelversand ist unschaedlich: reserve nimmt
+    einen Job nur einmal."""
+    from django.db.models import F, Q
 
-    return Q(dispatched_at__isnull=True) | Q(dispatched_at__lt=now - timedelta(hours=hours))
+    return (
+        Q(dispatched_at__isnull=True)
+        | Q(dispatched_at__lt=now - timedelta(hours=hours))
+        | Q(
+            next_attempt_at__isnull=False,
+            next_attempt_at__lt=now - timedelta(hours=DEFERRED_LOST_HOURS),
+            dispatched_at__lt=F("next_attempt_at"),
+        )
+    )
 
 
 def redispatch_lost_jobs(limit: int = 500, hours: int = REDISPATCH_HOURS) -> int:

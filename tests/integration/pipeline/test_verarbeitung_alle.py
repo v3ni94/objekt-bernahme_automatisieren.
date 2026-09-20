@@ -73,6 +73,57 @@ def test_sweep_versendet_wartende_jobs_beendeter_laeufe(drei_objekte, admin_user
     assert verwaist.dispatched_at is None
 
 
+def test_sweep_versendet_zurueckgestellte_jobs_mit_verstrichenem_termin(
+    drei_objekte, admin_user, monkeypatch
+):
+    """Zurueckgestellte Jobs (DeferJob) tragen einen Termin; ist er seit DEFERRED_LOST_HOURS verstrichen und der
+    letzte Versand liegt vor dem Termin, ist die Countdown-Nachricht verloren (Neustart). Der Sweep sendet nach,
+    ohne das 48-Stunden-Fenster abzuwarten; ein junger Termin bleibt unangetastet (Befund 20.09.2026)."""
+    from apps.pipeline.jobs import DEFERRED_LOST_HOURS
+
+    a, _, _ = drei_objekte
+    start_runs_for_all(user=admin_user)
+    lauf_a = ProcessingRun.objects.get(object=a)
+    now = timezone.now()
+    ProcessingJob.objects.filter(status=JobStatus.PENDING).update(dispatched_at=now)
+    gesendet: list[int] = []
+
+    def _send(job, countdown=None):
+        gesendet.append(job.pk)
+        ProcessingJob.objects.filter(pk=job.pk).update(dispatched_at=timezone.now())
+
+    monkeypatch.setattr(jobs_mod, "send", _send)
+    alt_dok = _dok(a, "alt.pdf", "classified")
+    alt, _ = enqueue(
+        JobType.FILE_TO_DRIVE,
+        a,
+        key=idempotency_key(JobType.FILE_TO_DRIVE, a.pk, alt_dok.drive_file_id, ""),
+        document=alt_dok,
+        run=lauf_a,
+        dispatch=False,
+    )
+    termin_alt = now - timedelta(hours=DEFERRED_LOST_HOURS, minutes=5)
+    ProcessingJob.objects.filter(pk=alt.pk).update(
+        next_attempt_at=termin_alt, dispatched_at=termin_alt - timedelta(seconds=20)
+    )
+    jung_dok = _dok(a, "jung.pdf", "classified")
+    jung, _ = enqueue(
+        JobType.FILE_TO_DRIVE,
+        a,
+        key=idempotency_key(JobType.FILE_TO_DRIVE, a.pk, jung_dok.drive_file_id, ""),
+        document=jung_dok,
+        run=lauf_a,
+        dispatch=False,
+    )
+    termin_jung = now - timedelta(minutes=10)
+    ProcessingJob.objects.filter(pk=jung.pk).update(
+        next_attempt_at=termin_jung, dispatched_at=termin_jung - timedelta(seconds=20)
+    )
+    assert redispatch_lost_jobs() == 1 and gesendet == [alt.pk]
+    # nach dem Nachversand liegt dispatched_at hinter dem Termin: kein zweiter Versand
+    assert redispatch_lost_jobs() == 0
+
+
 def _dok(obj, name, status):
     return Document.objects.create(
         object=obj,
