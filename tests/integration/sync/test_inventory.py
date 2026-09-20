@@ -310,31 +310,41 @@ def test_paperless_umfang_liest_nur_dokumente_mit_objektfeld(
     pid_b = paperless.add_document("Rechnung 624", pdf_bytes(["B 624"]), custom_fields={fid: "624"})
     pid_c = paperless.add_document("Ohne Feld", pdf_bytes(["C"]))
     pid_d = paperless.add_document("Unbekannt 999", pdf_bytes(["D 999"]), custom_fields={fid: "999"})
+    # Feldwerte aus Speicherpfaden oder Handeingaben beginnen mit der Nummer; 6230 ist ein anderes Objekt
+    pid_a4 = paperless.add_document(
+        "Schreiben 623 Pfadwert",
+        pdf_bytes(["A4 623"]),
+        custom_fields={fid: "623 Musterstraße 1, Musterstadt"},
+    )
+    pid_e = paperless.add_document("Nummer 6230", pdf_bytes(["E 6230"]), custom_fields={fid: "6230"})
     paperless.reset_calls()
 
     run = inventory.start(
         "paperless", dry_run=True, scope={"object_numbers": ["623", "999"]}, user=admin_user
     )
     ergebnisse = _bis_ende(run)
-    # 623: drei Dokumente bei Seitengroesse zwei, also zwei Seiten; 999: eine Seite
-    assert [e["continue"] for e in ergebnisse] == [True, True, False]
-    assert [e["scope_value"] for e in ergebnisse] == ["623", "623", "999"]
-    assert ergebnisse[-1]["count"] == 4
-    assert run.status == InventoryStatus.DONE and run.counters["seen"] == 4
+    # 623: Vorwaertsvergleich liefert fuenf Treffer (vier passende, 6230 wird verworfen), Seitengroesse zwei,
+    # also drei Seiten; 999: eine Seite
+    assert [e["continue"] for e in ergebnisse] == [True, True, True, False]
+    assert [e["scope_value"] for e in ergebnisse] == ["623", "623", "623", "999"]
+    assert ergebnisse[-1]["count"] == 6
+    assert run.status == InventoryStatus.DONE and run.counters["seen"] == 5
+    assert run.counters["scope_prefix_skipped"] == 1
     assert run.counters["complete"] is True
     assert run.page_state["scope_values"] == ["623", "999"] and run.page_state["scope_index"] == 2
 
     items = _items(run)
-    assert set(items) == {str(pid_a), str(pid_a2), str(pid_a3), str(pid_d)}
-    assert str(pid_b) not in items and str(pid_c) not in items
-    assert all(items[str(p)].disposition == Disposition.IMPORT_NEW for p in (pid_a, pid_a2, pid_a3))
+    assert set(items) == {str(pid_a), str(pid_a2), str(pid_a3), str(pid_a4), str(pid_d)}
+    assert str(pid_b) not in items and str(pid_c) not in items and str(pid_e) not in items
+    assert all(items[str(p)].disposition == Disposition.IMPORT_NEW for p in (pid_a, pid_a2, pid_a3, pid_a4))
     fremd = items[str(pid_d)]
     assert fremd.disposition == Disposition.OUT_OF_SCOPE and fremd.details["object_field"] == "999"
     assert "kein aktives Objekt" in fremd.details["reason"]
-    filter_aufrufe = [c[2]["custom_field"] for c in paperless.calls if c[0] == "iter_pages"]
-    assert filter_aufrufe == [("MHV Objekt", "623"), ("MHV Objekt", "623"), ("MHV Objekt", "999")]
-    assert [c[2]["start_page"] for c in paperless.calls if c[0] == "iter_pages"] == [1, 2, 1]
-    assert sorted(_metadaten_aufrufe(paperless)) == sorted([pid_a, pid_a2, pid_a3, pid_d])
+    seiten = [c[2] for c in paperless.calls if c[0] == "iter_pages"]
+    assert [c["custom_field"] for c in seiten] == [("MHV Objekt", "623")] * 3 + [("MHV Objekt", "999")]
+    assert all(c["custom_field_op"] == "istartswith" for c in seiten)
+    assert [c["start_page"] for c in seiten] == [1, 2, 3, 1]
+    assert sorted(_metadaten_aufrufe(paperless)) == sorted([pid_a, pid_a2, pid_a3, pid_a4, pid_d])
     assert not SyncOperation.objects.exists() and not Document.objects.filter(source="paperless").exists()
 
 

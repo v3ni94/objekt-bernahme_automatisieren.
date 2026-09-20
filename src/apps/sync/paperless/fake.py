@@ -244,6 +244,7 @@ class FakePaperless:
         ids: Iterable[int] | None,
         ordering: str,
         custom_field: tuple[str, str] | None = None,
+        custom_field_op: str = "exact",
         storage_path: int | None = None,
     ) -> list[dict]:
         docs = list(self.documents.values())
@@ -259,11 +260,18 @@ class FakePaperless:
                 None,
             )
             field_id = field["id"] if field else None
+            wanted = str(value).casefold()
+            ops = {
+                "exact": lambda v: v == wanted,
+                "istartswith": lambda v: v.startswith(wanted),
+                "icontains": lambda v: wanted in v,
+            }
+            matches = ops[custom_field_op]  # unbekannter Operator: KeyError wie ein 400 des Servers
             docs = [
                 d
                 for d in docs
                 if any(
-                    int(cf["field"]) == field_id and str(cf.get("value")) == str(value)
+                    int(cf["field"]) == field_id and matches(str(cf.get("value")).casefold())
                     for cf in d["custom_fields"]
                 )
             ]
@@ -288,6 +296,7 @@ class FakePaperless:
         page_size: int | None = None,
         start_page: int = 1,
         custom_field: tuple[str, str] | None = None,
+        custom_field_op: str = "exact",
         storage_path: int | None = None,
     ) -> Iterator[Page]:
         self._record(
@@ -299,6 +308,7 @@ class FakePaperless:
             page_size=page_size,
             start_page=start_page,
             custom_field=None if custom_field is None else tuple(custom_field),
+            custom_field_op=custom_field_op,
             storage_path=storage_path,
         )
         ids_list = None if ids is None else [int(i) for i in ids]
@@ -308,6 +318,7 @@ class FakePaperless:
             ids=ids_list,
             ordering=ordering,
             custom_field=custom_field,
+            custom_field_op=custom_field_op,
             storage_path=storage_path,
         )
         size = int(page_size or self.page_size)

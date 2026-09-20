@@ -14,7 +14,7 @@ from apps.documents.models import Document
 from apps.drive.adapter import FOLDER_MIME, DriveError
 from apps.objects.models import ManagedObject
 from apps.sync import config, inbox, services
-from apps.sync.flows.paperless_pull import CURSOR_MODIFIED, pending_pull
+from apps.sync.flows.paperless_pull import CURSOR_MODIFIED, _object_number_from_field, pending_pull
 from apps.sync.models import (
     Disposition,
     ExternalLink,
@@ -246,6 +246,15 @@ def _fetch_page(client, *, run_id: int, page_no: int, page_size: int, counters: 
         return None
 
 
+def _scope_number_matches(number: str | None, value: str) -> bool:
+    """Erster Zahlenblock des Feldwertes gegen die Objektnummer des Umfangs, fuehrende Nullen gleichgestellt."""
+    if number is None:
+        return False
+    if number.isdigit() and str(value).isdigit():
+        return int(number) == int(value)
+    return number == str(value)
+
+
 def _paperless_step(run: InventoryRun) -> dict:
     client = services.get_client()
     if client is None:
@@ -278,6 +287,10 @@ def _paperless_step(run: InventoryRun) -> dict:
         return {"continue": False}
     value = values[index]
     field_name = config.field_names().object
+    # Vorwaertsvergleich statt exakter Gleichheit: das Feld traegt neben der reinen Nummer auch Werte wie
+    # „133 Musterstraße 1“ (Speicherpfade, Handeingaben). Paperless 3.1.3 vergleicht exact buchstabengenau, dadurch
+    # sah der Lauf fuer Nummer 133 nur 486 von 4.155 Dokumenten (Befund 20.09.2026). Der erste Zahlenblock des
+    # Wertes muss der Nummer entsprechen, sonst gehoert das Dokument nicht zum Umfang (etwa 1330 bei 133).
     page = _fetch_page(
         client,
         run_id=run.pk,
@@ -285,9 +298,16 @@ def _paperless_step(run: InventoryRun) -> dict:
         page_size=page_size,
         counters=counters,
         custom_field=(field_name, value),
+        custom_field_op="istartswith",
     )
     results = list(page.results) if page is not None else []
-    for remote in results:
+    meta = services.connection_meta() if results else {}
+    matching = [r for r in results if _scope_number_matches(_object_number_from_field(r, meta), value)]
+    if len(matching) < len(results):
+        counters["scope_prefix_skipped"] = (
+            counters.get("scope_prefix_skipped", 0) + len(results) - len(matching)
+        )
+    for remote in matching:
         counters["seen"] = counters.get("seen", 0) + 1
         _classify_paperless(run, client, remote)
     counters["steps"] = counters.get("steps", 0) + 1

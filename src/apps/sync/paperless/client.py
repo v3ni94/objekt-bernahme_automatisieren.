@@ -64,9 +64,11 @@ class ServerInfo:
         return bool(self.features.get(feature, False))
 
 
-def custom_field_query(field_name: str, value: str) -> str:
-    """Filterausdruck fuer den exakten Wert eines benutzerdefinierten Feldes (Parameter custom_field_query)."""
-    return json.dumps([field_name, "exact", str(value)])
+def custom_field_query(field_name: str, value: str, op: str = "exact") -> str:
+    """Filterausdruck fuer ein benutzerdefiniertes Feld (Parameter custom_field_query): exact, istartswith,
+    icontains. Paperless 3.1.3 vergleicht exact buchstabengenau; Werte wie „133 Musterstraße 1“ findet nur
+    istartswith (Befund 20.09.2026)."""
+    return json.dumps([field_name, op, str(value)])
 
 
 @dataclass(frozen=True)
@@ -497,6 +499,7 @@ class PaperlessClient:
         ordering: str,
         fields: Iterable[str] | None,
         custom_field: tuple[str, str] | None = None,
+        custom_field_op: str = "exact",
         storage_path: int | None = None,
     ) -> dict:
         return {
@@ -504,7 +507,9 @@ class PaperlessClient:
             "added__gt": _iso(added_after),
             "ordering": ordering,
             "fields": ",".join(fields) if fields else None,
-            "custom_field_query": custom_field_query(*custom_field) if custom_field else None,
+            "custom_field_query": custom_field_query(*custom_field, op=custom_field_op)
+            if custom_field
+            else None,
             "storage_path__id": int(storage_path) if storage_path is not None else None,
         }
 
@@ -519,6 +524,7 @@ class PaperlessClient:
         page_size: int | None = None,
         start_page: int = 1,
         custom_field: tuple[str, str] | None = None,
+        custom_field_op: str = "exact",
         storage_path: int | None = None,
     ) -> Iterator[Page]:
         """Seitenweise Dokumentliste mit Seitennummer, damit ein Inventar nach Abbruch fortgesetzt werden kann.
@@ -530,6 +536,7 @@ class PaperlessClient:
             ordering=ordering,
             fields=fields,
             custom_field=custom_field,
+            custom_field_op=custom_field_op,
             storage_path=storage_path,
         )
         size = int(page_size or self.page_size)
