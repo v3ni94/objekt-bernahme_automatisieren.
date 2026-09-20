@@ -1,9 +1,11 @@
 """ai_reclassify: Nachklassifikationslauf (E 4.2, F17). Dokumente in 06/01_Unklar mit offenem Fall und Grund KI nicht
-verfuegbar oder Kostenlimit gehen erneut durch classify (und damit Stufe 3), solange kein Mensch sie bearbeitet hat."""
+verfuegbar, Kostenlimit, Stufe 3 nicht freigegeben oder Stufe 3 nie aufgerufen (kein Anbieter freigegeben, daher
+stage3_status leer, 20.09.2026) gehen erneut durch classify (und damit Stufe 3), solange kein Mensch sie bearbeitet hat."""
 
 from __future__ import annotations
 
 from django.core.management.base import BaseCommand
+from django.db.models import Q
 
 from apps.config import store
 from apps.documents.models import Document
@@ -12,7 +14,7 @@ from apps.review.models import CaseStatus, ReviewCase
 
 
 class Command(BaseCommand):
-    help = "Dokumente in 06/01_Unklar mit Grund KI nicht verfügbar oder Kostenlimit erneut klassifizieren"
+    help = "Dokumente in 06/01_Unklar mit Grund KI nicht verfügbar, Kostenlimit oder ohne Stufe-3-Aufruf erneut klassifizieren"
 
     def add_arguments(self, parser):
         parser.add_argument("--object", help="Objektnummer, sonst alle")
@@ -23,12 +25,20 @@ class Command(BaseCommand):
         if not store.get("ai.reclassify_enabled", False) and not options["force"]:
             self.stdout.write("ai.reclassify_enabled ist falsch; --force erzwingt den Lauf")
             return
-        cases = ReviewCase.objects.filter(
-            status=CaseStatus.OPEN,
-            case_subtype="below_threshold",
-            context__stage3_status__in=["provider_error", "budget_blocked", "disabled"],
-            document__isnull=False,
-        ).select_related("document", "object")
+        # stage3_status leer: classify hat die Stufe 3 gar nicht angestossen, weil kein Anbieter freigegeben war
+        # (stage3_enabled false); diese Faelle sind der Bestand vor der Freischaltung des ersten Anbieters
+        ohne_stufe3 = (
+            Q(context__stage3_status__in=["provider_error", "budget_blocked", "disabled"])
+            | Q(context__stage3_status=None)
+            | Q(context__stage3_status__isnull=True)
+        )
+        cases = (
+            ReviewCase.objects.filter(
+                status=CaseStatus.OPEN, case_subtype="below_threshold", document__isnull=False
+            )
+            .filter(ohne_stufe3)
+            .select_related("document", "object")
+        )
         if options["object"]:
             cases = cases.filter(object__object_number=options["object"])
         count = 0

@@ -73,7 +73,13 @@ ensure_network() {
   fi
 }
 case "$BRANCH" in *[!A-Za-z0-9._/-]*|*..*|"") case "$ACTION" in rollback|check) ;; *) echo "Branch fehlt oder unzulaessig"; exit 2 ;; esac ;; esac
-case "${ARG:-}" in *[!A-Za-z0-9@._+=-]*) echo "Argument unzulaessig"; exit 2 ;; esac
+# config-set traegt JSON-Werte (Objekte, Listen, Zeichenketten) ohne Leerzeichen; der Wert geht nur als Umgebungsvariable
+# an Python und wird nie von der Shell ausgewertet. Alle anderen Aktionen behalten den engen Zeichenvorrat.
+if [ "$ACTION" = "config-set" ]; then
+  case "${ARG:-}" in *[!A-Za-z0-9@._+=:,/{}\[\]\"-]*) echo "Argument unzulaessig (config-set: JSON ohne Leerzeichen; erlaubt sind Buchstaben, Ziffern, doppelte Anfuehrungszeichen und @._+=:,/{}[]-)"; exit 2 ;; esac
+else
+  case "${ARG:-}" in *[!A-Za-z0-9@._+=-]*) echo "Argument unzulaessig"; exit 2 ;; esac
+fi
 echo "$(date -Is) $ACTION ${BRANCH:-} ${ARG:-} von ${SSH_CLIENT:-unbekannt}" >> "$LOG"
 case "$ACTION" in
   deploy)    ensure_github_hostkey; ensure_network; exec scripts/deploy.sh "$BRANCH" ;;

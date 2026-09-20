@@ -135,6 +135,32 @@ def test_ausfall_beider_anbieter_unklar_mit_fall(welt, fake_oauth, run_all, admi
     assert doc.final_decided_by == "stage3" and doc.category_id == "05"
 
 
+def test_nachklassifikation_holt_faelle_ohne_stufe3_aufruf_nach(
+    welt, fake_oauth, run_all, admin_user, fake_router
+):
+    """Bestand vor der Freischaltung (20.09.2026): kein Anbieter freigegeben, classify ruft die Stufe 3 gar nicht auf,
+    der Fall traegt stage3_status None. Nach der Freischaltung muss ai_reclassify genau diese Faelle erneut einreihen."""
+    obj = welt["objects"]["623"]
+    doc = make_document(obj, UNKLAR)
+    start_run(obj)
+    run_all(obj)
+    doc.refresh_from_db()
+    assert doc.category_id == "06" and doc.subfolder.code == "01" and doc.status == "review"
+    assert not ProcessingJob.objects.filter(document=doc, job_type=JobType.CLASSIFY_AI).exists()
+    case = ReviewCase.objects.get(document=doc)
+    assert case.case_subtype == "below_threshold" and case.context.get("stage3_status") is None
+    assert AiCall.objects.filter(document=doc).count() == 0
+    enable_ai(admin_user)
+    fake_router(answer=_answer("05", "08", "schriftverkehr", 0.95))
+    call_command("ai_reclassify", object="623", force=True)
+    case.refresh_from_db()
+    assert case.status == "dismissed" and case.resolution["decision"] == "reclassify"
+    run_all(obj)
+    doc.refresh_from_db()
+    assert doc.final_decided_by == "stage3" and doc.category_id == "05"
+    assert AiCall.objects.filter(document=doc, status="ok").count() == 1
+
+
 def test_uebereinstimmung_hebt_konfidenz_und_sperren(welt, fake_oauth, run_all, admin_user, fake_router):
     enable_ai(admin_user)
     r = fake_router(answer=_answer("05", "09", "mahnung", 0.8, year=2025))
