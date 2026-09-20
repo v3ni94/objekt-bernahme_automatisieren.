@@ -44,7 +44,7 @@ Kontakt und Zeitfenster für Deployments: Frage F27 (docs/umsetzungsplan.md).
 
 ## Synchronisation Paperless-ngx und Google Drive
 
-Stand: 12.09.2026. Einrichtung, Ablauf und Wiederanlauf in docs/betrieb/paperless-sync.md (Abschnitte 5, 10 und 12). Erkennung auf `/verwaltung/sync/` (Recht `sync.manage`, Fehlerwarteschlange und Verbindungsbefund) und im Dokumenteneingang `/eingang/?art=fehler` (Recht `inbox.work`). Operationen sind idempotent über ihren Schlüssel; „erneut“ setzt den Versuchszähler zurück, „verwerfen“ beendet die Operation sichtbar.
+Stand: 12.09.2026. Einrichtung, Ablauf und Wiederanlauf in docs/betrieb/paperless-sync.md (Abschnitte 5, 10 und 12). Befund von der Kommandozeile ohne Personendaten: `d sync-status <branch>` (Schalter, letzter Verbindungstest, Cursor, je Dokumentquelle wie viele Dokumente in Drive, in Paperless oder in beiden auffindbar sind, Operationen je Art und Status mit maskierten Fehlertexten); mit Argument `live` wird die Paperless-Verbindung tatsächlich geprüft (nur lesend). Für den lokalen Klassifikator (Stufe 2): `d classifier-status <branch> [list|train|train+force]` zeigt Kaltstartstatus und Beispiele je Klasse; `train` läuft nur ohne laufenden Objektlauf und über der Schwelle `classification.stage2_min_samples_per_class`, `train+force` erzwingt beides (seit 20.09.2026). Erkennung auf `/verwaltung/sync/` (Recht `sync.manage`, Fehlerwarteschlange und Verbindungsbefund) und im Dokumenteneingang `/eingang/?art=fehler` (Recht `inbox.work`). Operationen sind idempotent über ihren Schlüssel; „erneut“ setzt den Versuchszähler zurück, „verwerfen“ beendet die Operation sichtbar.
 
 | Fall | Erkennung | Sofortmaßnahme | Nacharbeit |
 |---|---|---|---|

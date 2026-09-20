@@ -36,6 +36,8 @@
 #   altbestand-aufarbeiten <branch> [echt] Alle Altbestand-Ordner mit Objekt aufarbeiten (echt = Celery-Aufgabe, sonst Vorschau)
 #   verarbeitung-alle <branch> [echt] Verarbeitungslaeufe fuer alle Objekte mit offener Arbeit (echt = einreihen)
 #   review-status <branch> [<objekt>]   Offene Pruefcenter-Faelle je Art und Unterart, Vorschlaege, KI-Nachklassifizierbarkeit (keine Personendaten)
+#   sync-status <branch> [live]          Verbindung Drive, Anwendung, Paperless: Schalter, Verbindungstest, Cursor, Auffindbarkeit je Quelle, Operationen (lesend; live = echter Verbindungstest)
+#   classifier-status <branch> [list|train|train+force]  Stufe 2: Kaltstartstatus, Modelle, Training (train+force auch waehrend laufender Verarbeitung)
 #   jobs-bereinigen <branch> [echt] Ueberzaehlige wartende Wiederholungsjobs (#n) bereinigen (echt = ausfuehren, sonst Vorschau)
 #   redis-status <branch>     Redis: Speicher, Schluesselzahl, Warteschlangenlaengen, groesste Schluessel (nur lesend)
 #   env-set <branch> <SCHLUESSEL=wert[+SCHLUESSEL=wert]>  Freigegebene Betriebswerte in .env setzen (Ressourcen, Parallelitaet);
@@ -381,6 +383,113 @@ PY
     echo "ai_reclassify ${args[*]} (Vorschau: $([ -z "$echt" ] && echo ja || echo nein))"
     docker compose exec -T web python manage.py ai_reclassify "${args[@]}"
     echo "$(date -Is) ai-reclassify ${ARG:-alle}" >> "$LOG"
+    ;;
+  classifier-status)
+    # Lokaler Klassifikator (Stufe 2, B-27): ohne Argument Status der Kaltstartphase (aktives Modell, gewichtete Beispiele je
+    # Klasse, Schwelle stage2_min_samples_per_class); "list" zeigt alle Modelle; "train" trainiert, wenn die Schwelle erreicht
+    # ist und kein Lauf laeuft; "train+force" erzwingt das Training (auch unter der Schwelle und waehrend laufender
+    # Verarbeitung). Laeuft im worker-nlp, weil dort das Modell geladen und der naechtliche Nachtrainingstask ausgefuehrt wird.
+    case "${ARG:-status}" in
+      status|list) docker compose exec -T worker-nlp python manage.py classifier "${ARG:-status}" ;;
+      train)       docker compose exec -T worker-nlp python manage.py classifier train ;;
+      train+force) docker compose exec -T worker-nlp python manage.py classifier train --force ;;
+      *) echo "Argument unzulaessig (status, list, train, train+force)"; exit 2 ;;
+    esac
+    ;;
+  sync-status)
+    # Verbindung Drive, Anwendung, Paperless lesend pruefen: Schalter (paperless.enabled, Modus, Pilotumfang, Webhook,
+    # Drive-Aenderungsabgleich), letzter Verbindungstest, Abfragecursor, je Dokumentquelle und Status wie viele Dokumente in
+    # Drive, in Paperless oder in beiden auffindbar sind, Verknuepfungen, Operationen je Art und Status mit maskierten
+    # Fehlertexten, Bestandslaeufe. Mit Argument "live" wird die Paperless-Verbindung tatsaechlich getestet (nur lesend,
+    # legt nichts an). Keine Personendaten, kein Token in der Ausgabe.
+    docker compose exec -T -e SYNC_LIVE="${ARG:-}" web python manage.py shell <<'PY'
+import os, re
+from collections import Counter
+from django.db.models import Count, Exists, OuterRef, Q
+from apps.config import store
+from apps.sync import config, operations, services
+from apps.sync.models import ExternalLink, InventoryRun, LinkRole, OperationStatus, SyncOperation, SyncSystem
+from apps.sync.paperless import setup as paperless_setup
+from apps.documents.models import Document
+from apps.objects.models import ManagedObject
+
+def mask(text):
+    """Dateinamen und lange Kennungen aus Fehlertexten entfernen (keine Personendaten in der Ausgabe)."""
+    text = re.sub(r"\S+\.(pdf|PDF|docx?|xlsx?|jpe?g|png|tiff?|msg|eml|zip)\b", "[DATEI]", text or "")
+    return re.sub(r"\b[0-9A-Za-z_-]{25,}\b", "[ID]", text)[:160]
+
+live = os.environ.get("SYNC_LIVE") == "live"
+base = config.base_url() or ""
+host = re.sub(r"^https?://", "", base).split("/")[0] if base else "(nicht gesetzt)"
+print("=== Schalter ===")
+print(f"paperless.enabled={config.enabled()} | konfiguriert (Adresse und Token)={config.configured()} | Modus={config.mode()} | Adresse={host}")
+print(f"Pilotobjekte={sorted(config.pilot_object_numbers()) or 'keine'} | Webhook aktiv={config.webhook_enabled()} Webhook-Token={'vorhanden' if config.webhook_token() else 'FEHLT'}")
+print(f"Neue Paperless-Dokumente uebernehmen={config.import_new_documents()} nur mit Objekt={config.import_only_with_object()} | Abfrage alle {store.get('paperless.poll_interval_minutes')} min")
+print(f"Drive-Aenderungsabgleich (sync.drive_changes_enabled)={config.drive_changes_enabled()} alle {store.get('sync.drive_changes_interval_minutes')} min")
+print("Bewertung: Schreiben nach Paperless " + ("fuer alle Objekte erlaubt" if config.active() and config.mode() == "full" else ("nur fuer Pilotobjekte und Eingang erlaubt" if config.active() and config.mode() == "pilot" else "NICHT erlaubt (Hauptschalter, Konfiguration oder Modus readonly)")))
+
+print("=== Verbindung Paperless ===")
+state = paperless_setup.check(create=False) if live else paperless_setup.state_from_cursor()
+if state is None:
+    print("kein Verbindungstest hinterlegt (Seite /verwaltung/sync/ Verbindung pruefen oder Aktion mit Argument live)")
+else:
+    print(f"{'LIVE' if live else 'letzter Test'} {state.checked_at or ''}: ok={state.ok} {state.message} | Server {state.server_version} API {state.api_version} | fehlt: {state.missing or 'nichts'}")
+    print("Funktionen:", ", ".join(f"{k}={v}" for k, v in sorted((state.features or {}).items())) or "unbekannt")
+def cur(system, name):
+    row = services.get_cursor(system, name)
+    return f"{row.value or '-'} {row.meta or ''} (Stand {row.updated_at:%d.%m. %H:%M})" if row else "nie"
+print("Paperless letzte Abfrage:", cur(SyncSystem.PAPERLESS, "last_poll"))
+print("Paperless Aenderungscursor:", cur(SyncSystem.PAPERLESS, "modified_cursor"))
+print("Drive letzte Aenderungsabfrage:", cur(SyncSystem.DRIVE, "last_changes_poll"))
+print("Drive Seitencursor:", "gesetzt" if services.get_cursor(SyncSystem.DRIVE, "page_token") else "nie")
+
+print("=== Dokumente: wo auffindbar (ohne geloeschte) ===")
+pl_exists = ExternalLink.objects.filter(document=OuterRef("pk"), system=SyncSystem.PAPERLESS, role=LinkRole.ORIGINAL)
+docs = Document.objects.filter(deleted_at__isnull=True).annotate(has_pl=Exists(pl_exists))
+rows = docs.values("source", "status").annotate(
+    n=Count("id"),
+    drive=Count("id", filter=Q(drive_file_id__isnull=False)),
+    paperless=Count("id", filter=Q(has_pl=True)),
+    beide=Count("id", filter=Q(drive_file_id__isnull=False, has_pl=True)),
+).order_by("source", "status")
+tot = Counter()
+print("Quelle/Status: gesamt | in Drive | in Paperless verknuepft | in beiden")
+for r in rows:
+    print(f"  {r['source']}/{r['status']}: {r['n']} | {r['drive']} | {r['paperless']} | {r['beide']}")
+    for k in ("n", "drive", "paperless", "beide"):
+        tot[k] += r[k]
+print(f"Summe: {tot['n']} | Drive {tot['drive']} | Paperless {tot['paperless']} | beide {tot['beide']} | weder noch {tot['n'] - tot['drive'] - tot['paperless'] + tot['beide']}")
+filed = docs.filter(status="filed")
+print(f"Abgelegt (filed) ohne Paperless-Verknuepfung: {filed.filter(has_pl=False).count()} von {filed.count()} | Paperless-Dokumente ohne Drive-Datei: {docs.filter(source='paperless', drive_file_id__isnull=True).exclude(status__in=['duplicate','error']).count()}")
+ohne_link_meta = filed.filter(has_pl=True).exclude(sync_links__system=SyncSystem.PAPERLESS, sync_links__synced_fields__isnull=False).count()
+print(f"Abgelegt mit Paperless-Verknuepfung, aber Drive-Link/Objekt noch nicht nach Paperless geschrieben (synced_fields leer): {ohne_link_meta}")
+
+print("=== Verknuepfungen (sync_links) je System und Zustand ===")
+for r in ExternalLink.objects.values("system", "role", "state").annotate(n=Count("id")).order_by("system", "role", "state"):
+    print(f"  {r['system']}/{r['role']}/{r['state']}: {r['n']}")
+
+print("=== Operationen je Art und Status ===")
+for r in SyncOperation.objects.values("kind", "status").annotate(n=Count("id")).order_by("kind", "status"):
+    print(f"  {r['kind']}/{r['status']}: {r['n']}")
+s = operations.summary()
+print(f"Warteschlange (pending+running): {s.get('queue')} | aelteste wartende: {s.get('oldest_pending') or s.get('oldest') or '-'}")
+print("Blockiert, Gruende (Top 8):")
+for reason, n in Counter(mask(x) for x in SyncOperation.objects.filter(status=OperationStatus.BLOCKED).values_list("blocked_reason", flat=True)).most_common(8):
+    print(f"  {n}x {reason or '(ohne Grund)'}")
+print("Fehlgeschlagen, letzte Fehler (Top 8, Dateinamen maskiert):")
+for err, n in Counter(mask(x) for x in SyncOperation.objects.filter(status=OperationStatus.FAILED).values_list("last_error", flat=True)).most_common(8):
+    print(f"  {n}x {err or '(ohne Text)'}")
+
+print("=== Bestandslaeufe (letzte 5) ===")
+for run in InventoryRun.objects.order_by("-created_at")[:5]:
+    print(f"  {run.pk} {run.kind} dry_run={run.dry_run} {run.status} {run.counters or {}} {('Fehler: ' + mask(run.error_message)) if run.error_message else ''}")
+inbox_obj = ManagedObject.objects.filter(is_system_inbox=True).first()
+if inbox_obj:
+    ic = {r['status']: r['n'] for r in docs.filter(object=inbox_obj).values('status').annotate(n=Count('id'))}
+    print(f"Eingangsobjekt {inbox_obj.object_number}: {ic or 'keine Dokumente'}")
+else:
+    print("Eingangsobjekt: nicht angelegt")
+PY
     ;;
   review-status)
     # Pruefcenter-Bestand: offene Faelle je Art/Unterart, wie viele einen maschinellen Vorschlag tragen, wie viele die
@@ -815,5 +924,5 @@ PY
     done
     echo "wirksam mit der Aktion deploy; Sicherung .env.bak"
     ;;
-  *) echo "Nur check, pull, befund, env-init, ps, logs, smoke, cert-retry, db-status, db-reset, first-run, deploy, rollback, create-admin, oauth-check, deploy-tests, doc-status, config-set, altbestand-import, altbestand-objekte, altbestand-aufarbeiten, verarbeitung-alle, paperless-feld-alle, redis-status, env-set, jobs-bereinigen, disk-status, transit-bereinigen, worker-drosseln, work-bereinigen, last-status, worker-stop, worker-start, ai-check, ai-reclassify, review-status oder reconcile-all erlaubt"; exit 2 ;;
+  *) echo "Nur check, pull, befund, env-init, ps, logs, smoke, cert-retry, db-status, db-reset, first-run, deploy, rollback, create-admin, oauth-check, deploy-tests, doc-status, config-set, altbestand-import, altbestand-objekte, altbestand-aufarbeiten, verarbeitung-alle, paperless-feld-alle, redis-status, env-set, jobs-bereinigen, disk-status, transit-bereinigen, worker-drosseln, work-bereinigen, last-status, worker-stop, worker-start, ai-check, ai-reclassify, review-status, sync-status, classifier-status oder reconcile-all erlaubt"; exit 2 ;;
 esac
