@@ -404,14 +404,26 @@ PY
     # Neustarts oder Updates war (Traefik antwortet "404 page not found", Befund 20.09.2026). Kein direkter Versand:
     # der Beat (sync.dispatch_due) verteilt mit hoechstens 200 gleichzeitig unterwegs, damit Redis nicht volllaeuft
     # (Befund 14.09.2026). Argument "bestand+<id>" setzt einen fehlgeschlagenen oder pausierten Bestandslauf fort.
-    # Ohne Argument nur Vorschau; "echt" fuehrt aus.
+    # Ohne Argument nur Vorschau; "echt" fuehrt aus. "push400" zeigt fehlgeschlagene Uebertragungen nach Paperless
+    # mit HTTP 400, "push400+echt" reiht sie einmal erneut ein (nach dem Deploy vom 20.09.2026 nennt der Fehlertext
+    # dann den Grund des Servers, etwa den nicht unterstuetzten Dateityp).
     docker compose exec -T -e SYNC_ARG="${ARG:-}" web python manage.py shell <<'PY'
 import os
 from collections import Counter
 from django.db.models import Q
 from django.utils import timezone
-from apps.sync.models import InventoryRun, InventoryStatus, OperationStatus, SyncOperation
+from apps.sync.models import InventoryRun, InventoryStatus, OperationKind, OperationStatus, SyncOperation
 arg = os.environ.get("SYNC_ARG", "")
+if arg.startswith("push400"):
+    qs = SyncOperation.objects.filter(kind=OperationKind.PAPERLESS_PUSH, status=OperationStatus.FAILED, last_error__icontains="HTTP 400")
+    print("fehlgeschlagene Uebertragungen nach Paperless mit HTTP 400:", qs.count(),
+          dict(Counter(qs.values_list("document__mime_type", flat=True))))
+    if arg != "push400+echt":
+        print("Vorschau; mit push400+echt werden sie einmal erneut eingereiht"); raise SystemExit(0)
+    n = qs.update(status=OperationStatus.PENDING, attempt_count=0, next_attempt_at=timezone.now(), blocked_reason=None,
+                  locked_by=None, locked_at=None, dispatched_at=None)
+    print(f"{n} Operationen erneut eingereiht; Ergebnis in sync-status (Fehlgeschlagene Uebertragungen nach Dateityp)")
+    raise SystemExit(0)
 if arg.startswith("bestand+"):
     from apps.sync import inventory
     run = InventoryRun.objects.get(pk=int(arg.split("+", 1)[1]))

@@ -222,6 +222,40 @@ def test_google_dokument_erhaelt_exportfassung(objekt, paperless, drive, ops):
     assert not any(c[0] in ("upload", "update_content", "delete", "trash") for c in drive.ops)
 
 
+def test_leere_datei_wird_nicht_uebertragen(objekt, paperless, ops):
+    """Paperless lehnt leere Dateien mit HTTP 400 ab; statt fuenf vergeblicher Versuche wird die Operation
+    uebersprungen (Befund 20.09.2026)."""
+    from django.utils import timezone
+
+    from apps.sync.models import SyncSystem
+    from apps.sync.operations import enqueue, op_key
+
+    doc = Document.objects.create(
+        object=objekt,
+        size_bytes=0,
+        mime_type="application/pdf",
+        original_name="leer.pdf",
+        current_name="leer.pdf",
+        source="drive_existing",
+        drive_file_id="drive-leer-1",
+        status="classified",
+        sha256=hashlib.sha256(b"").hexdigest(),
+        first_seen_at=timezone.now(),
+    )
+    enqueue(
+        OperationKind.PAPERLESS_PUSH,
+        system=SyncSystem.PAPERLESS,
+        key=op_key(OperationKind.PAPERLESS_PUSH, doc.uuid, doc.sha256),
+        document=doc,
+        source_system=SyncSystem.APP,
+        source_revision=doc.sha256,
+    )
+    ops()
+    push = _push_ops(doc).get()
+    assert push.status == OperationStatus.SKIPPED and "0 Byte" in push.result["skipped"]
+    assert "post_document" not in paperless.call_names()
+
+
 def test_verlorene_aufgabe_wird_nach_zwei_stunden_erneut_uebertragen(objekt, paperless, run_all, ops):
     """Paperless verwirft die Aufgabenliste bei Neustart oder Update: statt endlos alle 30 Sekunden zu warten, sucht die
     Anwendung nach zwei Stunden die Kopie per UUID und uebertraegt sonst erneut (Befund 20.09.2026)."""

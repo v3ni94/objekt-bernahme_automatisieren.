@@ -209,11 +209,14 @@ def models_q_not_in_flight(now, hours: int = REDISPATCH_HOURS):
 
 
 def redispatch_lost_jobs(limit: int = 500, hours: int = REDISPATCH_HOURS) -> int:
-    """Wartende, faellige Jobs laufender Laeufe erneut versenden, wenn keine Nachricht unterwegs ist: nie versandt
-    (etwa waehrend eines laufenden Laufs von der Altbestand-Aufarbeitung angelegt) oder seit `hours` Stunden nicht
-    angekommen (Redis geleert). Hoechstens `limit` je Aufruf (Beat-Sweep jede Minute), damit eine tiefe, aber
-    intakte Warteschlange nicht durch Doppelte waechst. Doppelte sind unschaedlich: reserve nimmt einen Job nur
-    einmal."""
+    """Wartende, faellige Jobs erneut versenden, wenn keine Nachricht unterwegs ist: nie versandt (etwa waehrend
+    eines laufenden Laufs von der Altbestand-Aufarbeitung angelegt) oder seit `hours` Stunden nicht angekommen
+    (Redis geleert). Erfasst werden Jobs laufender Laeufe und Jobs beendeter Laeufe (done, failed): seit dem
+    14.09.2026 endet ein Lauf bei offener Ablage, die Ablagejobs gehoeren dann zu einem beendeten Lauf und gingen
+    bei Neustarts ohne Nachversand verloren (Befund 20.09.2026: 124 Ablagen standen stundenlang auf „wartet“, der
+    Sweep fand 0). Jobs wartender oder abgebrochener Laeufe bleiben liegen. Hoechstens `limit` je Aufruf
+    (Beat-Sweep jede Minute), damit eine tiefe, aber intakte Warteschlange nicht durch Doppelte waechst. Doppelte
+    sind unschaedlich: reserve nimmt einen Job nur einmal."""
     from apps.pipeline.models import ProcessingRun, RunStatus
 
     now = timezone.now()
@@ -224,7 +227,9 @@ def redispatch_lost_jobs(limit: int = 500, hours: int = REDISPATCH_HOURS) -> int
             object_id=run.object_id, status=JobStatus.PENDING, run__isnull=True
         ).update(run=run)
     jobs = (
-        ProcessingJob.objects.filter(status=JobStatus.PENDING, run__status=RunStatus.RUNNING)
+        ProcessingJob.objects.filter(
+            status=JobStatus.PENDING, run__status__in=[RunStatus.RUNNING, RunStatus.DONE, RunStatus.FAILED]
+        )
         .filter(models_q_next_attempt(now))
         .filter(models_q_not_in_flight(now, hours))
         .order_by("id")[:limit]

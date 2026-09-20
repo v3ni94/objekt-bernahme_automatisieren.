@@ -1894,6 +1894,7 @@ Celery-Queues aus den Settings: `ai`, `classify`, `io`, `lists`, `ocr`
 | processing.start | Verarbeitungslauf angefordert |
 | processing.start_all | Verarbeitungsläufe für alle Objekte mit offener Arbeit eingereiht |
 | processing.jobs_dedupe | Überzählige wartende Wiederholungsjobs bereinigt |
+| processing.transit_cleanup | Transit-Kopien abgelegter Dokumente gelöscht |
 | processing.sweep | Sweeper manuell ausgeführt |
 | document.view | Dokument aus Eigentümerakte angesehen (nur bei security.log_document_views) |
 | document.download | Dokument aus Eigentümerakte heruntergeladen (nur bei security.log_document_views) |

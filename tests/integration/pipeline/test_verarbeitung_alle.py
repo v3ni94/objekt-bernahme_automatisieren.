@@ -37,6 +37,42 @@ from apps.review.models import CaseStatus, CaseType, ReviewCase
 pytestmark = pytest.mark.django_db
 
 
+def test_sweep_versendet_wartende_jobs_beendeter_laeufe(drei_objekte, admin_user, monkeypatch):
+    """Seit 14.09.2026 endet ein Lauf bei offener Ablage; deren Jobs gehoeren dann zu einem beendeten Lauf. Geht
+    ihre Nachricht bei einem Neustart verloren, sendet der Sweep sie trotzdem nach (Befund 20.09.2026: 124 Ablagen
+    standen stundenlang auf „wartet“, der Sweep fand 0). Jobs abgebrochener Laeufe bleiben liegen."""
+    a, _, c = drei_objekte
+    start_runs_for_all(user=admin_user)
+    lauf_a = ProcessingRun.objects.get(object=a)
+    lauf_c = ProcessingRun.objects.get(object=c)
+    ProcessingJob.objects.filter(status=JobStatus.PENDING).update(dispatched_at=timezone.now())
+    gesendet: list[int] = []
+
+    def _send(job, countdown=None):
+        gesendet.append(job.pk)
+        ProcessingJob.objects.filter(pk=job.pk).update(dispatched_at=timezone.now())
+
+    monkeypatch.setattr(jobs_mod, "send", _send)
+    ablage_dok = _dok(a, "ablage.pdf", "classified")
+    ablage, _ = enqueue(
+        JobType.FILE_TO_DRIVE,
+        a,
+        key=idempotency_key(JobType.FILE_TO_DRIVE, a.pk, ablage_dok.drive_file_id, ""),
+        document=ablage_dok,
+        run=lauf_a,
+        dispatch=False,
+    )
+    verwaist, _ = enqueue(
+        JobType.HASH, c, key=idempotency_key(JobType.HASH, c.pk, "abgebrochen"), run=lauf_c, dispatch=False
+    )
+    ProcessingRun.objects.filter(pk=lauf_a.pk).update(status=RunStatus.DONE, finished_at=timezone.now())
+    ProcessingRun.objects.filter(pk=lauf_c.pk).update(status=RunStatus.ABORTED, finished_at=timezone.now())
+    assert redispatch_lost_jobs() == 1 and gesendet == [ablage.pk]
+    assert redispatch_lost_jobs() == 0
+    verwaist.refresh_from_db()
+    assert verwaist.dispatched_at is None
+
+
 def _dok(obj, name, status):
     return Document.objects.create(
         object=obj,

@@ -173,7 +173,18 @@ def _http_error(response: requests.Response, method: str, path: str) -> Paperles
             payload = None
     detail = ""
     if isinstance(payload, dict):
-        detail = str(payload.get("detail") or payload.get("error") or "")[:300]
+        detail = str(payload.get("detail") or payload.get("error") or "")
+        if not detail:
+            # Validierungsfehler des Django REST Framework kommen je Feld als Liste, etwa
+            # {"document": ["File type text/plain not supported"]}; ohne diesen Text war ein HTTP 400 bei
+            # post_document nicht deutbar (Befund 20.09.2026, 18 Uebertragungen).
+            parts = []
+            for key, value in list(payload.items())[:3]:
+                if isinstance(value, list):
+                    value = "; ".join(str(v) for v in value[:2])
+                parts.append(f"{key}: {value}")
+            detail = ", ".join(parts)
+        detail = detail[:300]
     elif isinstance(payload, str):
         detail = payload[:300]
     message = f"Paperless {method} {path}: HTTP {status}" + (f" ({detail})" if detail else "")

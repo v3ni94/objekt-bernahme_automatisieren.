@@ -132,7 +132,8 @@ def test_filter_pagination_und_modified_fortschreibung():
     assert [pg.number for pg in pages] == [1, 2, 3] and all(isinstance(pg, Page) for pg in pages)
     assert pages[0].count == 5 and pages[0].has_next and not pages[2].has_next and len(pages[2].results) == 1
     assert [pg.number for pg in p.iter_pages(start_page=3)] == [3]
-    assert list(p.iter_pages(start_page=9)) == []
+    with pytest.raises(PaperlessNotFound, match="Invalid page"):  # wie Paperless: Seite jenseits des Endes
+        list(p.iter_pages(start_page=9))
     nur_felder = next(iter(p.list_documents(fields=["id", "title"])))
     assert set(nur_felder) == {"id", "title"}
     zeit = datetime(2030, 1, 1, tzinfo=UTC)

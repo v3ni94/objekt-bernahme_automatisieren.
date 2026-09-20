@@ -134,6 +134,9 @@ def push(op) -> dict:
             source_system=SyncSystem.DRIVE,
         )
         raise Skip("Google-Dokument: Exportfassung statt Original")
+    if not doc.size_bytes:
+        # Paperless lehnt leere Dateien mit HTTP 400 ab; fuenf Versuche je Datei waren vergeblich (Befund 20.09.2026)
+        raise Skip("Leere Datei (0 Byte): nichts zu übertragen")
     if suffix not in PAPERLESS_SUFFIXES or (doc.size_bytes or 0) > config.max_upload_bytes():
         reason = "Dateityp nicht übertragbar" if suffix not in PAPERLESS_SUFFIXES else "Datei zu groß"
         enqueue(
