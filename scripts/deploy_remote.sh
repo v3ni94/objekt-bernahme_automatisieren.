@@ -444,7 +444,7 @@ from collections import Counter
 from django.db.models import Count, Exists, OuterRef, Q
 from apps.config import store
 from apps.sync import config, operations, services
-from apps.sync.models import ExternalLink, InventoryRun, LinkRole, OperationStatus, SyncOperation, SyncSystem
+from apps.sync.models import ExternalLink, InventoryRun, LinkRole, OperationKind, OperationStatus, SyncOperation, SyncSystem
 from apps.sync.paperless import setup as paperless_setup
 from apps.documents.models import Document
 from apps.objects.models import ManagedObject
@@ -515,6 +515,15 @@ for reason, n in Counter(mask(x) for x in SyncOperation.objects.filter(status=Op
 print("Fehlgeschlagen, letzte Fehler (Top 8, Dateinamen maskiert):")
 for err, n in Counter(mask(x) for x in SyncOperation.objects.filter(status=OperationStatus.FAILED).values_list("last_error", flat=True)).most_common(8):
     print(f"  {n}x {err or '(ohne Text)'}")
+fehl_push = SyncOperation.objects.filter(kind=OperationKind.PAPERLESS_PUSH, status=OperationStatus.FAILED)
+if fehl_push.exists():
+    print("Fehlgeschlagene Uebertragungen nach Paperless nach Dateityp:")
+    for r in fehl_push.values("document__mime_type").annotate(n=Count("id")).order_by("-n")[:8]:
+        print(f"  {r['n']}x {r['document__mime_type'] or '(ohne)'}")
+    for op in fehl_push.select_related("document").order_by("-updated_at")[:5]:
+        d = op.document
+        groesse = f"{d.size_bytes} Byte" if d else "-"
+        print(f"  Operation {op.pk}: {d.mime_type if d else '-'}, {groesse}, Versuche {op.attempt_count}: {mask(op.last_error or '')[:200]}")
 
 print("=== Bestandslaeufe (letzte 5) ===")
 for run in InventoryRun.objects.order_by("-created_at")[:5]:
@@ -610,6 +619,19 @@ for j in ProcessingJob.objects.filter(status="failed").order_by("-id")[:5]:
     print(f"  Fehler {j.job_type} Job {j.pk}: {(j.last_error or '')[:160]}")
 for j in ProcessingJob.objects.filter(status="pending", last_error__startswith="wartet").order_by("-id")[:3]:
     print(f"  wartet {j.job_type} Job {j.pk}: {(j.last_error or '')[:120]}")
+# Objektsperren der Ablage: wer haelt sie, und lebt der Halter noch? (Befund 20.09.2026: 124 wartende Ablagen)
+from django.core.cache import cache
+sperren = []
+for oid in ProcessingJob.objects.filter(status="pending", job_type="file_to_drive").values_list("object_id", flat=True).distinct():
+    halter = cache.get(f"drive:write:{oid}")
+    if halter is None:
+        continue
+    j = ProcessingJob.objects.filter(pk=halter).first() if str(halter).isdigit() else None
+    info = f"Job {j.pk} {j.job_type} {j.status}, zuletzt {j.updated_at:%d.%m. %H:%M:%S}" if j else f"Halter {halter!r}"
+    sperren.append(f"  Sperre Objekt {oid}: {info}")
+print("Drive-Schreibsperren bei wartenden Ablagen:", len(sperren) or "keine")
+for zeile in sperren[:10]:
+    print(zeile)
 laeufe = ProcessingRun.objects.values("status").annotate(c=Count("id"))
 print("Laeufe:", ", ".join(f"{r['status']}={r['c']}" for r in laeufe) or "keine")
 for run in ProcessingRun.objects.filter(status="running").select_related("object").order_by("id"):

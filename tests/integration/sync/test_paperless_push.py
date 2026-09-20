@@ -242,7 +242,9 @@ def test_verlorene_aufgabe_wird_nach_zwei_stunden_erneut_uebertragen(objekt, pap
     ops()
     awaiting.refresh_from_db()
     assert awaiting.status == OperationStatus.SKIPPED
-    retry = SyncOperation.objects.get(kind=OperationKind.PAPERLESS_PUSH, document=doc, payload__reason="task_lost")
+    retry = SyncOperation.objects.get(
+        kind=OperationKind.PAPERLESS_PUSH, document=doc, payload__reason="task_lost"
+    )
     assert "erneut" in retry.op_key
     ops()  # zweiter Upload (je nach Reihenfolge bereits im vorigen Durchlauf erledigt)
     assert [c[0] for c in paperless.calls].count("post_document") == 2

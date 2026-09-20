@@ -26,6 +26,7 @@ from apps.sync.models import (
     SyncSystem,
 )
 from apps.sync.operations import enqueue, op_key
+from apps.sync.paperless.errors import PaperlessNotFound
 
 logger = logging.getLogger(__name__)
 
@@ -208,6 +209,43 @@ def paperless_scope_values(numbers) -> list[str]:
     return values
 
 
+def _fetch_page(client, *, run_id: int, page_no: int, page_size: int, counters: dict, **filters):
+    """Eine Seite der Dokumentliste. Paperless (Django REST Framework) beantwortet eine Seitennummer jenseits des
+    Endes mit HTTP 404 „Invalid page.“. Das passiert, wenn die Liste zwischen zwei Schritten kuerzer geworden ist
+    (Dokumente geloescht oder umgefiltert): dann ist die Liste zu Ende, kein Fehler; Dokumente, die dadurch die Seite
+    gewechselt haben, erfasst der naechste Lauf. Kuendigt Seite 1 die Seite dagegen noch an, war sie nur nicht
+    abrufbar (etwa waehrend eines Paperless-Updates), und der Lauf faellt fortsetzbar auf failed statt vorzeitig als
+    abgeschlossen zu gelten (Bestandslauf 2, 20.09.2026)."""
+
+    def _one(number: int):
+        return next(
+            iter(client.iter_pages(ordering="id", page_size=page_size, start_page=number, **filters)), None
+        )
+
+    try:
+        return _one(page_no)
+    except PaperlessNotFound as exc:
+        if page_no <= 1 or "Invalid page" not in str(exc):
+            raise
+        first = _one(1)
+        count = int(first.count) if first is not None else 0
+        pages = max(1, -(-count // page_size))
+        if page_no <= pages:
+            raise InventoryError(
+                f"Seite {page_no} von {pages} nicht abrufbar ({exc}); Fortsetzung mit sync-retry bestand+<lauf>"
+            ) from exc
+        logger.warning(
+            "Bestandslauf %s: Liste endete vor Seite %s (jetzt %s Seiten, %s Eintraege)",
+            run_id,
+            page_no,
+            pages,
+            count,
+        )
+        counters["ended_early_page"] = page_no
+        counters["count_at_end"] = count
+        return None
+
+
 def _paperless_step(run: InventoryRun) -> dict:
     client = services.get_client()
     if client is None:
@@ -218,8 +256,9 @@ def _paperless_step(run: InventoryRun) -> dict:
     counters = dict(run.counters or {})
     numbers = (run.scope or {}).get("object_numbers") or []
     if not numbers:
-        page = next(iter(client.iter_pages(ordering="id", page_size=page_size, start_page=page_no)), None)
+        page = _fetch_page(client, run_id=run.pk, page_no=page_no, page_size=page_size, counters=counters)
         if page is None:
+            InventoryRun.objects.filter(pk=run.pk).update(counters=counters)
             return {"continue": False}
         for remote in page.results:
             counters["seen"] = counters.get("seen", 0) + 1
@@ -239,13 +278,13 @@ def _paperless_step(run: InventoryRun) -> dict:
         return {"continue": False}
     value = values[index]
     field_name = config.field_names().object
-    page = next(
-        iter(
-            client.iter_pages(
-                ordering="id", page_size=page_size, start_page=page_no, custom_field=(field_name, value)
-            )
-        ),
-        None,
+    page = _fetch_page(
+        client,
+        run_id=run.pk,
+        page_no=page_no,
+        page_size=page_size,
+        counters=counters,
+        custom_field=(field_name, value),
     )
     results = list(page.results) if page is not None else []
     for remote in results:

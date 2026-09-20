@@ -319,7 +319,10 @@ class FakePaperless:
             chunk = docs[start : start + size]
             has_next = start + size < total
             if not chunk and number > 1:
-                return
+                # wie Paperless (Django REST Framework): Seitennummer jenseits des Endes ist ein 404
+                raise PaperlessNotFound(
+                    "Paperless GET /api/documents/: HTTP 404 (Invalid page.)", status_code=404
+                )
             yield Page(
                 number=number,
                 count=total,

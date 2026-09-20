@@ -153,7 +153,9 @@ def test_kostenlimit_ohne_preis_blockiert_vor_dem_ersten_aufruf(objekt):
     assert result.status == "budget_blocked" and result.provider == "openai"
     assert p.sent == []
     call = AiCall.objects.get(status="budget_blocked")
-    assert "fehlt in ai.price_list" in (call.error_message or "") and "openai-testmodell" in (call.error_message or "")
+    assert "fehlt in ai.price_list" in (call.error_message or "") and "openai-testmodell" in (
+        call.error_message or ""
+    )
 
 
 def test_preis_null_gilt_als_fehlender_preis(objekt):

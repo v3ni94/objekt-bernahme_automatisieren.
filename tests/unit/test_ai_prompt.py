@@ -30,7 +30,15 @@ def test_konstante_teile_stehen_vorn_und_praefix_ist_fuer_alle_dokumente_gleich(
     _, user_a = build_messages(_request("A.pdf", "Hausgeldabrechnung 2025 WE01"))
     _, user_b = build_messages(_request("B.pdf", "Protokoll der Eigentümerversammlung"))
     keys = list(json.loads(user_a).keys())
-    assert keys == ["taxonomie", "schema", "verwaltungsart", "einheitenmuster", "hinweise", "dateiname", "textauszug"]
+    assert keys == [
+        "taxonomie",
+        "schema",
+        "verwaltungsart",
+        "einheitenmuster",
+        "hinweise",
+        "dateiname",
+        "textauszug",
+    ]
     # gemeinsamer Praefix reicht bis hinter die Hinweise, erst der Dateiname unterscheidet sich
     cut = user_a.index('"dateiname"')
     assert user_a[:cut] == user_b[:cut]

@@ -877,6 +877,10 @@ def _remove_transit_copy(doc: Document) -> bool:
     return True
 
 
+LOCK_WAIT_ATTEMPTS = 15  # bis 3 s im Prozess auf die Objektsperre warten, dann zurueckstellen
+LOCK_WAIT_SLEEP = 0.2
+
+
 @job_task(JobType.FILE_TO_DRIVE)
 def file_to_drive(job: ProcessingJob) -> dict:
     """Letzter Schritt (docs/architektur.md 6.1 Nr. 10): Bestandsdatei per Elternwechsel verschieben, Upload in den
@@ -907,7 +911,14 @@ def file_to_drive(job: ProcessingJob) -> dict:
         # Datenverlust). Mit RetryableError stuende es nach drei Versuchen faelschlich auf error.
         raise DeferJob("Keine Google-Verbindung für die Ablage")
     lock_key = f"drive:write:{job.object_id}"
-    if not cache.add(lock_key, job.pk, timeout=600):
+    for _ in range(LOCK_WAIT_ATTEMPTS):
+        if cache.add(lock_key, job.pk, timeout=600):
+            break
+        # Die Sperre ist meist nur Millisekunden belegt (Ordner bekannt) bis wenige Sekunden (Drive-Zugriff).
+        # Kurz im Prozess warten statt sofort zurueckzustellen: am 20.09.2026 kreisten 124 Ablagen im
+        # 20-Sekunden-Takt um eine Sperre, die dazwischen frei war.
+        time.sleep(LOCK_WAIT_SLEEP)
+    else:
         # Ein anderes Dokument desselben Objekts wird gerade abgelegt. Das ist Reihenfolge, kein Fehler: kurz
         # warten, ohne einen Versuch zu verbrauchen. Mit RetryableError standen bei acht gleichzeitigen Uploads
         # fuenf Dokumente nach drei schnellen Fehlversuchen auf error (Befund 11.09.2026).

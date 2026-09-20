@@ -18,13 +18,20 @@ def test_harter_regeltreffer_wird_trainingsbeispiel(objekt, stammdaten, pdf_fact
         "V",
         1,
         1,
-        extra=["Protokoll der Eigentümerversammlung vom 20.05.2026", "Wirtschaftsjahr 2026", "TOP 7 bauliche Veränderung"],
+        extra=[
+            "Protokoll der Eigentümerversammlung vom 20.05.2026",
+            "Wirtschaftsjahr 2026",
+            "TOP 7 bauliche Veränderung",
+        ],
     )
     pdf = pdf_factory("protokoll.pdf", [text])
     doc, _ = ingest.ingest_upload(objekt, filename="protokoll.pdf", data=pdf.read_bytes())
     run_all(objekt)
     doc.refresh_from_db()
-    assert doc.category_id == "02" and doc.final_decided_by == "stage1", (doc.category_id, doc.final_decided_by)
+    assert doc.category_id == "02" and doc.final_decided_by == "stage1", (
+        doc.category_id,
+        doc.final_decided_by,
+    )
     assert doc.status == "filed", doc.status  # ohne Pruefbedarf abgelegt, sonst wuerde nicht gelernt
     samples = list(TrainingSample.objects.filter(document=doc))
     assert len(samples) == 1

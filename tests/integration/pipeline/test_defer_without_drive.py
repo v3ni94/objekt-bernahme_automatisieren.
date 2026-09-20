@@ -37,9 +37,17 @@ def test_ablage_wartet_ohne_verbindung_und_holt_nach(objekt, stammdaten, pdf_fac
     assert doc.status in ("filed", "review")
 
 
-def test_belegte_schreibsperre_ist_wartegrund_kein_fehlversuch(objekt, stammdaten, pdf_factory, run_all):
-    """Zwei Dokumente desselben Objekts legen gleichzeitig ab: das zweite wartet, statt einen Versuch zu verbrauchen."""
+def test_belegte_schreibsperre_ist_wartegrund_kein_fehlversuch(
+    objekt, stammdaten, pdf_factory, run_all, monkeypatch
+):
+    """Zwei Dokumente desselben Objekts legen gleichzeitig ab: das zweite wartet kurz im Prozess und stellt dann
+    zurueck, statt einen Versuch zu verbrauchen."""
     from django.core.cache import cache
+
+    from apps.pipeline import tasks as pipeline_tasks
+
+    monkeypatch.setattr(pipeline_tasks, "LOCK_WAIT_ATTEMPTS", 2)
+    monkeypatch.setattr(pipeline_tasks, "LOCK_WAIT_SLEEP", 0.01)
 
     pdf = pdf_factory("s.pdf", [page_lines("S", 1, 1)])
     doc, run = ingest.ingest_upload(objekt, filename="s.pdf", data=pdf.read_bytes())

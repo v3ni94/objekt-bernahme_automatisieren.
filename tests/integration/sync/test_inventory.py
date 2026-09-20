@@ -37,7 +37,7 @@ from apps.sync.models import (
     SyncSystem,
 )
 from apps.sync.operations import op_key
-from apps.sync.paperless.errors import PaperlessError, PaperlessUnavailable
+from apps.sync.paperless.errors import PaperlessError, PaperlessNotFound, PaperlessUnavailable
 
 pytestmark = pytest.mark.django_db
 
@@ -545,6 +545,50 @@ def test_fehler_der_seite_setzt_lauf_auf_fehlgeschlagen_und_ist_fortsetzbar(obje
     assert run.status == InventoryStatus.DONE and run.counters["complete"] is True
     assert _items(run)[str(pid)].disposition == Disposition.IMPORT_NEW
     assert AuditEvent.objects.filter(action="sync.inventory_done", entity_id=run.pk).count() == 2
+
+
+def test_kuerzer_gewordene_liste_beendet_den_lauf_statt_zu_scheitern(drei_dokumente, paperless, admin_user):
+    """Paperless meldet eine Seite jenseits des Endes mit HTTP 404 „Invalid page.“. Verschwinden Dokumente zwischen
+    zwei Schritten aus der Liste, ist das das Ende der Liste, kein Fehler (Bestandslauf 2, 20.09.2026)."""
+    d = drei_dokumente
+    run = inventory.start("paperless", dry_run=True, user=admin_user)
+    assert inventory.step(run.pk)["continue"] is True  # Seite 1 mit zwei Eintraegen, Seite 2 angekuendigt
+    paperless.documents.pop(d.pid_b)
+    paperless.documents.pop(d.pid_c)
+    ergebnis = inventory.step(run.pk)
+    assert ergebnis["continue"] is False and "error" not in ergebnis
+    run.refresh_from_db()
+    assert run.status == InventoryStatus.DONE and run.error_message is None
+    assert (
+        run.counters["seen"] == 2
+        and run.counters["ended_early_page"] == 2
+        and run.counters["count_at_end"] == 1
+    )
+    assert _seitenaufrufe(paperless) == [(2, 1), (2, 2), (2, 1)]  # Seite 2 abgelehnt, Seite 1 zur Kontrolle
+
+
+def test_nicht_abrufbare_seite_setzt_lauf_fortsetzbar_auf_fehlgeschlagen(
+    drei_dokumente, paperless, admin_user
+):
+    """404 „Invalid page.“, obwohl Seite 1 die Seite noch ankuendigt (etwa waehrend eines Paperless-Updates): der
+    Lauf faellt auf failed und laesst sich fortsetzen, statt vorzeitig als abgeschlossen zu gelten."""
+    run = inventory.start("paperless", dry_run=True, user=admin_user)
+    assert inventory.step(run.pk)["continue"] is True
+    paperless.inject(
+        "iter_pages",
+        PaperlessNotFound("Paperless GET /api/documents/: HTTP 404 (Invalid page.)", status_code=404),
+    )
+    ergebnis = inventory.step(run.pk)
+    assert ergebnis["continue"] is False and "Seite 2 von 2 nicht abrufbar" in ergebnis["error"]
+    run.refresh_from_db()
+    assert run.status == InventoryStatus.FAILED and run.error_message.startswith(
+        "InventoryError: Seite 2 von 2"
+    )
+    inventory.resume(run, user=admin_user)
+    ergebnisse = _bis_ende(run)
+    assert [e["continue"] for e in ergebnisse] == [False]
+    assert run.status == InventoryStatus.DONE and run.counters["seen"] == 3
+    assert "ended_early_page" not in run.counters
 
 
 def test_mehrere_lokale_treffer_ergeben_dublette(objekt, anderes_objekt, paperless, admin_user):
