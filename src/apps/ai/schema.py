@@ -5,6 +5,7 @@ Validierung mit pydantic; das JSON-Schema wird beim Anbieter fuer strukturierte 
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass, field
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
@@ -101,6 +102,26 @@ class LeaseBlock(BaseModel):
         )
 
 
+_CODE_PREFIX = re.compile(r"^\s*([0-9A-Za-z_.-]+)")
+
+
+def coerce_code(value, allowed) -> str | None:
+    """Liefert den Code, wenn die Antwort den Code allein oder mit Name traegt ("04", "04 Hausgeld", "04 (Hausgeld)").
+
+    Modelle kopieren gelegentlich die Zeile aus der Taxonomie statt nur des Codes. Der fuehrende Token wird gegen die
+    erlaubten Codes geprueft; alles andere bleibt eine Schemaverletzung.
+    """
+    if value is None:
+        return None
+    text = str(value).strip()
+    if text in allowed:
+        return text
+    m = _CODE_PREFIX.match(text)
+    if m and m.group(1) in allowed:
+        return m.group(1)
+    return None
+
+
 class ClassificationResult(BaseModel):
     """Antwort der Stufe 3, strikt (additionalProperties false), Codes nach B-12."""
 
@@ -116,12 +137,13 @@ class ClassificationResult(BaseModel):
     reasoning: str = Field(max_length=400)
     lease: LeaseBlock | None = None
 
-    @field_validator("category")
+    @field_validator("category", mode="before")
     @classmethod
-    def _category_code(cls, v: str) -> str:
-        if v not in CATEGORY_CODES:
+    def _category_code(cls, v):
+        code = coerce_code(v, CATEGORY_CODES)
+        if code is None:
             raise ValueError("category muss ein Code 01 bis 06 sein")
-        return v
+        return code
 
 
 def response_json_schema() -> dict:
@@ -210,16 +232,22 @@ def parse_result(raw: str | dict, taxonomy: Taxonomy | None = None) -> Classific
             f"Antwort verletzt das Schema: {exc.errors()[:3]}", json.dumps(data)[:2000]
         ) from exc
     if taxonomy is not None:
-        if result.subfolder and result.subfolder not in taxonomy.subfolder_codes(result.category):
-            raise SchemaViolation(
-                f"Unterordner {result.subfolder} nicht in der Taxonomie für {result.category}",
-                json.dumps(data),
-            )
-        if result.document_type and result.document_type not in taxonomy.document_type_codes(result.category):
-            raise SchemaViolation(
-                f"Unterart {result.document_type} nicht in der Taxonomie für {result.category}",
-                json.dumps(data),
-            )
+        if result.subfolder:
+            code = coerce_code(result.subfolder, taxonomy.subfolder_codes(result.category))
+            if code is None:
+                raise SchemaViolation(
+                    f"Unterordner {result.subfolder} nicht in der Taxonomie für {result.category}",
+                    json.dumps(data),
+                )
+            result = result.model_copy(update={"subfolder": code})
+        if result.document_type:
+            code = coerce_code(result.document_type, taxonomy.document_type_codes(result.category))
+            if code is None:
+                raise SchemaViolation(
+                    f"Unterart {result.document_type} nicht in der Taxonomie für {result.category}",
+                    json.dumps(data),
+                )
+            result = result.model_copy(update={"document_type": code})
     return result
 
 
