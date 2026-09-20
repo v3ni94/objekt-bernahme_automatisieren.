@@ -284,7 +284,7 @@ from apps.ai.provider import PriceList, ProviderConfig, api_key_for
 order = store.get("ai.provider_order", []) or []
 print("Reihenfolge (ai.provider_order):", order)
 pl = PriceList.from_settings()
-print(f"Preisliste: Version {pl.version}, Modelle: {', '.join(sorted(pl.prices)) or 'keine (Kosten wuerden mit 0 EUR protokolliert)'}")
+print(f"Preisliste: Version {pl.version}, Modelle: {', '.join(sorted(pl.prices)) or 'keine (mit Kostenlimit werden Aufrufe blockiert, ohne Kostenlimit mit 0 EUR gebucht)'}")
 print("Schwellen: Aufruf unter", store.get("classification.threshold_stage3_call"), "| Ueberschreiben ab", store.get("classification.threshold_stage3_override"), "| Ablage ab", store.get("classification.threshold_auto_file"))
 print("Nachklassifikation (ai.reclassify_enabled):", store.get("ai.reclassify_enabled"), "| Mietvertragsdaten (ai.extract_lease_facts):", store.get("ai.extract_lease_facts"))
 from datetime import timedelta
@@ -303,7 +303,10 @@ for name in ("openai", "anthropic"):
     print(f"{name}: freigegeben={cfg.enabled} Modell={cfg.model or '(leer)'} Endpunkt={endpoint} Region={cfg.region or '(leer)'} "
           f"Timeout={cfg.timeout_s:g}s Versuche={cfg.max_attempts} Kostenlimit je Objekt={limit} EUR Schluessel={schl}")
     if cfg.enabled and cfg.model and cfg.model not in pl.prices:
-        print(f"  Hinweis: Modell {cfg.model} steht nicht in ai.price_list; Kosten wuerden mit 0 EUR protokolliert.")
+        if cfg.cost_limit_eur_per_object is not None:
+            print(f"  WARNUNG: Modell {cfg.model} steht nicht in ai.price_list; der Router blockiert Aufrufe (budget_blocked), bis der Preis eingetragen ist.")
+        else:
+            print(f"  WARNUNG: Modell {cfg.model} steht nicht in ai.price_list und kein Kostenlimit gesetzt; Aufrufe laufen ohne Kostenbremse und werden mit 0 EUR gebucht.")
     if cfg.enabled and not key:
         print(f"  Hinweis: {name} ist freigegeben, aber ohne Schluessel; Aufrufe enden mit provider_error.")
 cfg = ProviderConfig.from_settings("openai")

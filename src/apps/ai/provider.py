@@ -82,6 +82,9 @@ class PriceList:
             )
         return cls(version=str(raw.get("version") or "unbekannt"), prices=prices)
 
+    def has_price(self, model: str | None) -> bool:
+        return bool(model) and model in self.prices
+
     def cost(self, model: str | None, tokens_in: int, tokens_out: int) -> Decimal:
         inp, out = self.prices.get(model or "", (Decimal(0), Decimal(0)))
         return (Decimal(tokens_in) / 1000 * inp + Decimal(tokens_out) / 1000 * out).quantize(

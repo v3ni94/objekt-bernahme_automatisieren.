@@ -136,6 +136,39 @@ def test_kostenlimit_stoppt_aufrufe(objekt):
     assert len(p.sent) == 1  # kein zweiter Aufruf beim Anbieter
 
 
+def test_kostenlimit_ohne_preis_blockiert_vor_dem_ersten_aufruf(objekt):
+    """Fail-closed: Ohne Preis fuer das Modell wuerde jeder Aufruf mit 0 EUR gebucht und das Limit nie greifen."""
+    p = FakeClassificationProvider("openai", script=["ok"])
+    f = FakeClassificationProvider("anthropic", script=[])
+    r = Router(
+        {"openai": p, "anthropic": f},
+        configs={
+            "openai": cfg("openai", cost_limit_eur_per_object=Decimal("5")),
+            "anthropic": cfg("anthropic", enabled=False),
+        },
+        price_list=PriceList("leer", {}),
+        order=["openai", "anthropic"],
+    )
+    result = r.classify(request(), obj=objekt)
+    assert result.status == "budget_blocked" and result.provider == "openai"
+    assert p.sent == []
+    call = AiCall.objects.get(status="budget_blocked")
+    assert "fehlt in ai.price_list" in (call.error_message or "") and "openai-testmodell" in (call.error_message or "")
+
+
+def test_ohne_kostenlimit_laeuft_der_aufruf_auch_ohne_preis(objekt):
+    p = FakeClassificationProvider("openai", script=["ok"])
+    f = FakeClassificationProvider("anthropic", script=[])
+    r = Router(
+        {"openai": p, "anthropic": f},
+        configs={"openai": cfg("openai"), "anthropic": cfg("anthropic", enabled=False)},
+        price_list=PriceList("leer", {}),
+        order=["openai", "anthropic"],
+    )
+    assert r.classify(request(), obj=objekt).status == "ok"
+    assert len(p.sent) == 1
+
+
 def test_maskierungssperre_vor_dem_senden(objekt):
     r, p, f = make_router(["ok"])
     req = ClassificationRequest(

@@ -45,6 +45,8 @@ Die Anwendung rechnet in EUR je 1.000 Token. Die Preisseite des Anbieters nennt 
 d config-set $B 'ai.price_list={"version":"2026-09-20","models":{"MODELLNAME":{"input_per_1k":0.0000,"output_per_1k":0.0000}}}'
 ```
 
+Ohne Preis für das konfigurierte Modell greift das Kostenlimit je Objekt nicht, weil jeder Aufruf mit 0 EUR gebucht würde. Der Router arbeitet deshalb fail-closed: Ist ein Kostenlimit gesetzt und das Modell fehlt in `ai.price_list`, wird nicht aufgerufen und der Fall als `budget_blocked` mit Hinweis protokolliert (sichtbar in `ai-check` unter „Aufrufe der letzten 24 Stunden“). Ohne Kostenlimit laufen Aufrufe auch ohne Preis, dann mit 0 EUR gebucht; das ist nur für Tests gedacht. Der Nutzerteil des Prompts beginnt seit Version 2026-09-20.2 mit den für alle Dokumente identischen Teilen (Taxonomie, Schema), damit der automatische Prompt-Cache des Anbieters den Präfix wiederverwendet; die Ersparnis richtet sich nach der Preisspalte für zwischengespeicherte Eingabetoken, die Anwendung bucht weiterhin den vollen Eingabepreis (konservativ).
+
 ### 3 Anbieter konfigurieren und freigeben
 
 Modellwahl: Das Modell muss strukturierte JSON-Ausgaben (Structured Outputs) unterstützen. Für Reasoning-Modelle (gpt-5, o-Reihe) setzt die Anwendung seit dem 20.09.2026 keinen `temperature`-Parameter mehr, weil diese Modelle ihn ablehnen. Für die Klassifikation reicht ein kleines, günstiges Modell; Modellnamen und Preise aus der Anbieterdokumentation übernehmen.

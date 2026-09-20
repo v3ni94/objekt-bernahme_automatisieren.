@@ -1,6 +1,7 @@
 """Router der Stufe 3 (E 4.2, docs/architektur.md 6.7): Primaer bis max_attempts (zweiter Versuch nur bei Timeout, 5xx,
 429 oder Schemaverletzung mit Reparaturhinweis), dann Fallback mit identischem Request; Circuit Breaker je Provider im
-Cache; Gesamtbudget je Dokument; Kostenlimit je Provider und Objekt gegen SUM(cost_eur); Protokoll je Versuch in
+Cache; Gesamtbudget je Dokument; Kostenlimit je Provider und Objekt gegen SUM(cost_eur), fail-closed: ohne Preis fuer
+das Modell in ai.price_list wird bei gesetztem Limit nicht aufgerufen (budget_blocked); Protokoll je Versuch in
 ai_calls ohne Prompttext (B-07); maskierter Prompt nur bei ai.store_masked_prompts."""
 
 from __future__ import annotations
@@ -125,7 +126,16 @@ class Router:
                 logger.warning("Stufe 3: %s", last_message)
                 continue
             limit = cfg.cost_limit_eur_per_object
-            if limit is not None and object_cost(name, obj.pk) >= limit:
+            block_message = None
+            if limit is not None and not self.price_list.has_price(cfg.model):
+                # Ohne Preis fuer das Modell wuerde jeder Aufruf mit 0 EUR gebucht und das Limit nie greifen.
+                block_message = (
+                    f"Kostenlimit {limit} EUR je Objekt nicht pruefbar: Modell {cfg.model or '(leer)'} "
+                    f"fehlt in ai.price_list (Version {self.price_list.version})"
+                )
+            elif limit is not None and object_cost(name, obj.pk) >= limit:
+                block_message = f"Kostenlimit {limit} EUR je Objekt erreicht"
+            if block_message:
                 call = self._log(
                     name,
                     cfg,
@@ -136,7 +146,7 @@ class Router:
                     page_from,
                     page_to,
                     status=AiCallStatus.BUDGET_BLOCKED,
-                    message=f"Kostenlimit {limit} EUR je Objekt erreicht",
+                    message=block_message,
                     fallback_of=previous,
                     fallback_used=index > 0,
                     masked=masked_entities_count,

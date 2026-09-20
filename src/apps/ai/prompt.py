@@ -1,5 +1,9 @@
 """Systemprompt der Stufe 3 (E 4.3): Deutsch, versioniert, Taxonomie mit Codes, Entscheidungsregel in der Reihenfolge
-aus CR 6, Anweisung, unklar und nicht objektbezogen ausdruecklich zu waehlen statt zu raten, Ausgabe nur im Schema."""
+aus CR 6, Anweisung, unklar und nicht objektbezogen ausdruecklich zu waehlen statt zu raten, Ausgabe nur im Schema.
+
+Reihenfolge im Nutzerteil (seit 2026-09-20.2): erst die fuer alle Dokumente identischen Teile (Taxonomie, Schema), dann
+die je Objekt gleichen (Verwaltungsart, Einheitenmuster, Hinweise), zuletzt Dateiname und Textauszug. Anbieter mit
+automatischem Prompt-Cache verguenstigen den unveraenderten Praefix; die Reihenfolge aendert nichts am Inhalt."""
 
 from __future__ import annotations
 
@@ -8,7 +12,7 @@ import json
 
 from apps.ai.schema import ClassificationRequest, response_json_schema
 
-PROMPT_VERSION = "2026-09-20.1"
+PROMPT_VERSION = "2026-09-20.2"
 
 SYSTEM_PROMPT = """Du ordnest Dokumente einer Hausverwaltung in die Ablagestruktur eines Objekts ein. Du erhältst einen maskierten Textauszug (Bankdaten und Ausweisnummern sind durch Platzhalter ersetzt), den Dateinamen ohne Personennamen, die Verwaltungsart und die Taxonomie mit Codes.
 
@@ -28,9 +32,15 @@ Verwende ausschließlich die Codes der übergebenen Taxonomie. Trage in category
 
 def build_messages(req: ClassificationRequest, *, repair_hint: str | None = None) -> tuple[str, str]:
     """Rueckgabe (system, user); der Nutzerteil traegt Taxonomie und Auszug als JSON."""
-    payload = req.prompt_payload()
-    payload["taxonomie"] = req.taxonomy.as_prompt_text()
-    payload["schema"] = response_json_schema()
+    variable = req.prompt_payload()
+    payload = {
+        "taxonomie": req.taxonomy.as_prompt_text(),
+        "schema": response_json_schema(),
+        "verwaltungsart": variable.pop("verwaltungsart"),
+        "einheitenmuster": variable.pop("einheitenmuster"),
+        "hinweise": variable.pop("hinweise"),
+    }
+    payload.update(variable)  # dateiname, textauszug
     user = json.dumps(payload, ensure_ascii=False, indent=1)
     if repair_hint:
         user += f"\n\nHinweis zur Korrektur der vorherigen Antwort: {repair_hint}"
