@@ -35,6 +35,7 @@
 #   paperless-feld-alle <branch> [echt] Feld MHV Objekt fuer alle zugeordneten Speicherpfade setzen und Bestandslauf starten
 #   altbestand-aufarbeiten <branch> [echt] Alle Altbestand-Ordner mit Objekt aufarbeiten (echt = Celery-Aufgabe, sonst Vorschau)
 #   verarbeitung-alle <branch> [echt] Verarbeitungslaeufe fuer alle Objekte mit offener Arbeit (echt = einreihen)
+#   review-status <branch> [<objekt>]   Offene Pruefcenter-Faelle je Art und Unterart, Vorschlaege, KI-Nachklassifizierbarkeit (keine Personendaten)
 #   jobs-bereinigen <branch> [echt] Ueberzaehlige wartende Wiederholungsjobs (#n) bereinigen (echt = ausfuehren, sonst Vorschau)
 #   redis-status <branch>     Redis: Speicher, Schluesselzahl, Warteschlangenlaengen, groesste Schluessel (nur lesend)
 #   env-set <branch> <SCHLUESSEL=wert[+SCHLUESSEL=wert]>  Freigegebene Betriebswerte in .env setzen (Ressourcen, Parallelitaet);
@@ -377,6 +378,41 @@ PY
     echo "ai_reclassify ${args[*]} (Vorschau: $([ -z "$echt" ] && echo ja || echo nein))"
     docker compose exec -T web python manage.py ai_reclassify "${args[@]}"
     echo "$(date -Is) ai-reclassify ${ARG:-alle}" >> "$LOG"
+    ;;
+  review-status)
+    # Pruefcenter-Bestand: offene Faelle je Art/Unterart, wie viele einen maschinellen Vorschlag tragen, wie viele die
+    # KI nachklassifizieren kann (below_threshold mit Dokument im Status review), Stufe-3-Status; optional je Objekt.
+    docker compose exec -T -e OBJ="${ARG:-}" web python manage.py shell <<'PY'
+import os
+from collections import Counter
+from django.db.models import Count, Q
+from apps.review.models import ReviewCase, CaseStatus
+offen = ReviewCase.objects.filter(status__in=[CaseStatus.OPEN, CaseStatus.IN_PROGRESS])
+if os.environ.get("OBJ"):
+    offen = offen.filter(object__object_number=os.environ["OBJ"])
+gesamt = offen.count()
+print(f"Offene Faelle: {gesamt}")
+rows = (offen.values("case_type", "case_subtype")
+        .annotate(n=Count("id"), mit_vorschlag=Count("id", filter=Q(proposed_action__isnull=False)),
+                  mit_dokument=Count("id", filter=Q(document__isnull=False)))
+        .order_by("-n"))
+print("Art/Unterart: Anzahl | mit Vorschlag | mit Dokument")
+for r in rows:
+    print(f"  {r['case_type']}/{r['case_subtype'] or '-'}: {r['n']} | {r['mit_vorschlag']} | {r['mit_dokument']}")
+bt = offen.filter(case_subtype="below_threshold", document__isnull=False)
+ki = bt.filter(document__status="review").exclude(document__review_cases__status=CaseStatus.RESOLVED).distinct().count()
+print(f"KI-nachklassifizierbar (below_threshold, Dokument im Status review, kein erledigter Fall): {ki} von {bt.count()}")
+st = Counter()
+for ctx in bt.values_list("context", flat=True):
+    st[(ctx or {}).get("stage3_status") or "nie aufgerufen"] += 1
+print("Stufe-3-Status der below_threshold-Faelle: " + ", ".join(f"{k}={v}" for k, v in st.most_common()))
+akt = Counter()
+for pa in offen.filter(proposed_action__isnull=False).values_list("proposed_action", flat=True):
+    akt[(pa or {}).get("action") or "?"] += 1
+print("Vorgeschlagene Aktionen: " + (", ".join(f"{k}={v}" for k, v in akt.most_common()) or "keine"))
+je_obj = offen.values("object__object_number").annotate(n=Count("id")).order_by("-n")[:15]
+print("Objekte mit den meisten offenen Faellen: " + ", ".join(f"{r['object__object_number']}={r['n']}" for r in je_obj))
+PY
     ;;
   deploy-tests)
     # Deployment-Tests T2, T3, T11 und T14 (docs/betrieb/deployment-test.md), nur lesend
@@ -776,5 +812,5 @@ PY
     done
     echo "wirksam mit der Aktion deploy; Sicherung .env.bak"
     ;;
-  *) echo "Nur check, pull, befund, env-init, ps, logs, smoke, cert-retry, db-status, db-reset, first-run, deploy, rollback, create-admin, oauth-check, deploy-tests, doc-status, config-set, altbestand-import, altbestand-objekte, altbestand-aufarbeiten, verarbeitung-alle, paperless-feld-alle, redis-status, env-set, jobs-bereinigen, disk-status, transit-bereinigen, worker-drosseln, work-bereinigen, last-status, worker-stop, worker-start, ai-check, ai-reclassify oder reconcile-all erlaubt"; exit 2 ;;
+  *) echo "Nur check, pull, befund, env-init, ps, logs, smoke, cert-retry, db-status, db-reset, first-run, deploy, rollback, create-admin, oauth-check, deploy-tests, doc-status, config-set, altbestand-import, altbestand-objekte, altbestand-aufarbeiten, verarbeitung-alle, paperless-feld-alle, redis-status, env-set, jobs-bereinigen, disk-status, transit-bereinigen, worker-drosseln, work-bereinigen, last-status, worker-stop, worker-start, ai-check, ai-reclassify, review-status oder reconcile-all erlaubt"; exit 2 ;;
 esac
