@@ -20,6 +20,11 @@
 #   db-reset <branch>         Datenverzeichnis der Datenbank leeren und neu initialisieren; bricht ab,
 #                             sobald ein Schema vorhanden ist (Schutz gegen Datenverlust)
 #   oauth-check <branch>      Google-Verbindung: Konfiguration ohne Geheimnisse und Probe der Client-Zugangsdaten
+#   ai-check <branch> [probe] KI-Anbieter (Stufe 3): Konfiguration ohne Geheimnisse, Schluessel vorhanden, Preisliste,
+#                             Modell beim Anbieter abrufbar; mit probe eine echte Klassifikation eines synthetischen
+#                             Textes (kostet wenige Token, wird nicht in ai_calls protokolliert)
+#   ai-reclassify <branch> [<objekt>][+echt]  Unklar-Faelle mit Grund Stufe 3 nicht freigegeben, KI nicht verfuegbar oder
+#                             Kostenlimit erneut klassifizieren (ohne echt nur Vorschau; ohne Objekt alle Objekte)
 #   deploy-tests <branch>     Deployment-Tests T2, T3, T11, T14 (nur lesend)
 #   doc-status <branch> [nr]  Dokumente je Objekt und Status, offene und fehlgeschlagene Jobs (nur lesend);
 #                             mit Objektnummer je Dokument Stufen, Entitaetenzaehler und Faelle, ohne Namen
@@ -258,6 +263,109 @@ except urllib.error.HTTPError as e:
 except Exception as exc:
     print("PROBE nicht moeglich:", exc)
 PY
+    ;;
+  ai-check)
+    # KI-Anbieter (Stufe 3) pruefen, ohne Geheimnisse auszugeben: Konfiguration je Anbieter, Schluessel vorhanden,
+    # Preisliste, Modell beim Anbieter abrufbar (kein Token verbraucht). Mit Argument "probe" eine echte Klassifikation
+    # eines synthetischen Textes ohne Personenbezug ueber die Provider-Klasse (Maskierungspruefung, Schema), Kosten nach
+    # Preisliste; der Aufruf wird nicht in ai_calls protokolliert. Laeuft im worker-io, weil dort die Stufe 3 arbeitet.
+    docker compose exec -T -e AI_PROBE="${ARG:-}" worker-io python manage.py shell <<'PY'
+import os, time
+from decimal import Decimal
+from apps.config import store
+from apps.ai.provider import PriceList, ProviderConfig, api_key_for
+order = store.get("ai.provider_order", []) or []
+print("Reihenfolge (ai.provider_order):", order)
+pl = PriceList.from_settings()
+print(f"Preisliste: Version {pl.version}, Modelle: {', '.join(sorted(pl.prices)) or 'keine (Kosten wuerden mit 0 EUR protokolliert)'}")
+print("Schwellen: Aufruf unter", store.get("classification.threshold_stage3_call"), "| Ueberschreiben ab", store.get("classification.threshold_stage3_override"), "| Ablage ab", store.get("classification.threshold_auto_file"))
+print("Nachklassifikation (ai.reclassify_enabled):", store.get("ai.reclassify_enabled"), "| Mietvertragsdaten (ai.extract_lease_facts):", store.get("ai.extract_lease_facts"))
+from datetime import timedelta
+from django.db.models import Count, Sum
+from django.utils import timezone
+from apps.ai.models import AiCall
+seit = timezone.now() - timedelta(hours=24)
+rows = AiCall.objects.filter(requested_at__gte=seit).values("provider", "status").annotate(n=Count("id"), eur=Sum("cost_eur")).order_by("provider", "status")
+print("Aufrufe der letzten 24 Stunden:", ", ".join(f"{r['provider']}/{r['status']}={r['n']} ({r['eur'] or 0} EUR)" for r in rows) or "keine")
+for name in ("openai", "anthropic"):
+    cfg = ProviderConfig.from_settings(name)
+    key = api_key_for(name)
+    endpoint = cfg.endpoint or os.environ.get(f"{name.upper()}_BASE_URL") or "(Standard des Anbieters)"
+    schl = f"vorhanden ({len(key)} Zeichen)" if key else "FEHLT (Secret-Datei leer oder nicht eingebunden)"
+    limit = cfg.cost_limit_eur_per_object if cfg.cost_limit_eur_per_object is not None else "keines"
+    print(f"{name}: freigegeben={cfg.enabled} Modell={cfg.model or '(leer)'} Endpunkt={endpoint} Region={cfg.region or '(leer)'} "
+          f"Timeout={cfg.timeout_s:g}s Versuche={cfg.max_attempts} Kostenlimit je Objekt={limit} EUR Schluessel={schl}")
+    if cfg.enabled and cfg.model and cfg.model not in pl.prices:
+        print(f"  Hinweis: Modell {cfg.model} steht nicht in ai.price_list; Kosten wuerden mit 0 EUR protokolliert.")
+    if cfg.enabled and not key:
+        print(f"  Hinweis: {name} ist freigegeben, aber ohne Schluessel; Aufrufe enden mit provider_error.")
+cfg = ProviderConfig.from_settings("openai")
+key = api_key_for("openai")
+if not (key and cfg.model):
+    print("PROBE openai uebersprungen: Schluessel oder Modell fehlt.")
+    raise SystemExit(0)
+from openai import OpenAI
+base_url = cfg.endpoint or os.environ.get("OPENAI_BASE_URL") or None
+client = OpenAI(api_key=key, base_url=base_url, timeout=20, max_retries=0)
+try:
+    m = client.models.retrieve(cfg.model)
+    print(f"PROBE Schluessel und Modell: {m.id} ist ueber {base_url or 'api.openai.com'} abrufbar.")
+except Exception as exc:
+    print(f"PROBE Schluessel/Modell FEHLGESCHLAGEN: {type(exc).__name__}: {str(exc)[:240]}")
+    raise SystemExit(0)
+if os.environ.get("AI_PROBE") != "probe":
+    print("Echte Klassifikationsprobe nur mit Argument probe (kostet wenige Token).")
+    raise SystemExit(0)
+from apps.ai.providers.openai_provider import OpenAIProvider
+from apps.ai.schema import ClassificationRequest, taxonomy_from_catalog
+req = ClassificationRequest(
+    excerpt_masked=("Hausgeldabrechnung 2025 fuer die Einheit WE01. Abrechnungszeitraum 01.01.2025 bis 31.12.2025. "
+                    "Gesamtkosten der Gemeinschaft, Verteilung nach Miteigentumsanteilen, Abrechnungsergebnis: Nachzahlung 184,20 EUR. "
+                    "Bitte ueberweisen Sie den Betrag bis zum 30.04.2026 auf das Konto der Gemeinschaft [IBAN]."),
+    filename_masked="Probe_Hausgeldabrechnung_2025_WE01.pdf",
+    management_type="weg",
+    taxonomy=taxonomy_from_catalog(),
+    unit_label_patterns=["WE"],
+    hints={"probe": True, "has_period_year": True, "has_unit": True},
+)
+started = time.monotonic()
+try:
+    out = OpenAIProvider().classify(req, cfg)
+except Exception as exc:
+    print(f"PROBE Klassifikation FEHLGESCHLAGEN: {type(exc).__name__}: {str(exc)[:240]}")
+    raise SystemExit(0)
+dauer = int((time.monotonic() - started) * 1000)
+raw = out.raw
+kosten = pl.cost(cfg.model, raw.tokens_in, raw.tokens_out) if raw else Decimal(0)
+if out.error:
+    print(f"PROBE Antwort verletzt das Schema: {out.error}; Token {raw.tokens_in if raw else '?'}/{raw.tokens_out if raw else '?'}, {dauer} ms")
+    raise SystemExit(0)
+r = out.result
+print(f"PROBE Klassifikation ok: Kategorie {r.category} Unterordner {getattr(r, 'subfolder', None)} Dokumentart {getattr(r, 'document_type', None)} "
+      f"Konfidenz {r.confidence} | Token ein {raw.tokens_in} aus {raw.tokens_out} | {dauer} ms | Kosten nach Preisliste {kosten} EUR")
+print("Erwartung: Kategorie 05 (Abrechnung) mit hoher Konfidenz; sonst Modell oder Prompt pruefen.")
+PY
+    ;;
+  ai-reclassify)
+    # Nachklassifikationslauf (ai_reclassify): Unklar-Faelle mit Grund Stufe 3 nicht freigegeben, KI nicht verfuegbar
+    # oder Kostenlimit erneut durch classify (und damit Stufe 3) schicken. Argument "<objekt>[+echt]" oder "echt";
+    # ohne echt nur Vorschau. --force, weil der manuelle Lauf unabhaengig von ai.reclassify_enabled erlaubt ist.
+    obj=""; echt=""
+    IFS='+' read -r -a teile <<<"${ARG:-}"
+    for t in "${teile[@]}"; do
+      case "$t" in
+        "") ;;
+        echt) echt="1" ;;
+        *[!0-9]*) echo "Argument unbekannt: $t (erlaubt: Objektnummer, echt, Objektnummer+echt)"; exit 2 ;;
+        *) obj="$t" ;;
+      esac
+    done
+    args=(--force)
+    [ -n "$obj" ] && args+=(--object "$obj")
+    [ -z "$echt" ] && args+=(--dry-run)
+    echo "ai_reclassify ${args[*]} (Vorschau: $([ -z "$echt" ] && echo ja || echo nein))"
+    docker compose exec -T web python manage.py ai_reclassify "${args[@]}"
+    echo "$(date -Is) ai-reclassify ${ARG:-alle}" >> "$LOG"
     ;;
   deploy-tests)
     # Deployment-Tests T2, T3, T11 und T14 (docs/betrieb/deployment-test.md), nur lesend
@@ -657,5 +765,5 @@ PY
     done
     echo "wirksam mit der Aktion deploy; Sicherung .env.bak"
     ;;
-  *) echo "Nur check, pull, befund, env-init, ps, logs, smoke, cert-retry, db-status, db-reset, first-run, deploy, rollback, create-admin, oauth-check, deploy-tests, doc-status, config-set, altbestand-import, altbestand-objekte, altbestand-aufarbeiten, verarbeitung-alle, paperless-feld-alle, redis-status, env-set, jobs-bereinigen, disk-status, transit-bereinigen, worker-drosseln, work-bereinigen, last-status, worker-stop, worker-start oder reconcile-all erlaubt"; exit 2 ;;
+  *) echo "Nur check, pull, befund, env-init, ps, logs, smoke, cert-retry, db-status, db-reset, first-run, deploy, rollback, create-admin, oauth-check, deploy-tests, doc-status, config-set, altbestand-import, altbestand-objekte, altbestand-aufarbeiten, verarbeitung-alle, paperless-feld-alle, redis-status, env-set, jobs-bereinigen, disk-status, transit-bereinigen, worker-drosseln, work-bereinigen, last-status, worker-stop, worker-start, ai-check, ai-reclassify oder reconcile-all erlaubt"; exit 2 ;;
 esac

@@ -1,5 +1,7 @@
-"""OpenAI-Anbindung (Stufe 3): strukturierte Ausgabe ueber das JSON-Schema, Basis-URL aus OPENAI_BASE_URL (EU-Endpunkt
-nach V-12), Schluessel aus dem Secret openai_api_key. Nur maskierte, gekuerzte Auszuege (B-11, Ue15)."""
+"""OpenAI-Anbindung (Stufe 3): strukturierte Ausgabe ueber das JSON-Schema, Basis-URL aus ai.providers.openai.endpoint
+oder OPENAI_BASE_URL (EU-Endpunkt nach V-12), Schluessel aus dem Secret openai_api_key. Nur maskierte, gekuerzte
+Auszuege (B-11, Ue15). Reasoning-Modelle (gpt-5, o-Reihe) lehnen den Parameter temperature ab; er wird nur fuer die
+uebrigen Modelle gesetzt (20.09.2026)."""
 
 from __future__ import annotations
 
@@ -15,6 +17,15 @@ from apps.ai.provider import (
     api_key_for,
 )
 from apps.ai.schema import response_json_schema
+
+# Modellfamilien ohne frei waehlbare temperature (nur Standardwert erlaubt); Vergleich auf den Namensanfang
+REASONING_MODEL_PREFIXES = ("gpt-5", "o1", "o3", "o4")
+
+
+def supports_temperature(model: str | None) -> bool:
+    """Fuer Reasoning-Modelle darf temperature nicht gesetzt werden, sonst antwortet die API mit 400."""
+    name = (model or "").strip().lower()
+    return not name.startswith(REASONING_MODEL_PREFIXES)
 
 
 class OpenAIProvider(BaseProvider):
@@ -33,20 +44,22 @@ class OpenAIProvider(BaseProvider):
         import openai
 
         client = self._client(cfg)
-        try:
-            response = client.chat.completions.create(
-                model=cfg.model or "",
-                messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
-                response_format={
-                    "type": "json_schema",
-                    "json_schema": {
-                        "name": "klassifikation",
-                        "strict": True,
-                        "schema": response_json_schema(),
-                    },
+        params: dict = {
+            "model": cfg.model or "",
+            "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
+            "response_format": {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": "klassifikation",
+                    "strict": True,
+                    "schema": response_json_schema(),
                 },
-                temperature=0,
-            )
+            },
+        }
+        if supports_temperature(cfg.model):
+            params["temperature"] = 0
+        try:
+            response = client.chat.completions.create(**params)
         except openai.APITimeoutError as exc:
             raise ProviderTimeout(str(exc)) from exc
         except openai.RateLimitError as exc:
