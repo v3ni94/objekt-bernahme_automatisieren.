@@ -124,9 +124,20 @@ def period_from_entities(entities: list[DocumentEntity]) -> PeriodRef:
         ref.date_from, ref.date_to = date(y, m, 1), last
         ref.source = "claim_period"
     if dates:
-        first_page = min(e.page_no for e in dates)
-        candidates = sorted(_parse_iso(e.value_normalized) for e in dates if e.page_no == first_page)
-        candidates = [c for c in candidates if c]
+        # Nur gueltige Daten sortieren: ein nicht lesbarer Normalwert (None) neben einem Datum liess sorted() mit
+        # TypeError abbrechen und den Klassifizierungsjob scheitern (15.09.2026, 39 Jobs). Fehlt die Seitenzahl,
+        # zaehlen alle Datumsangaben als erste Seite.
+        pages = [e.page_no for e in dates if e.page_no is not None]
+        first_page = min(pages) if pages else None
+        candidates = sorted(
+            c
+            for c in (
+                _parse_iso(e.value_normalized) for e in dates if first_page is None or e.page_no == first_page
+            )
+            if c is not None
+        )
+        if not candidates:
+            candidates = sorted(c for c in (_parse_iso(e.value_normalized) for e in dates) if c is not None)
         ref.document_date = candidates[0] if candidates else None
         if not ref.has_period and ref.document_date:
             ref.source = "document_date"
