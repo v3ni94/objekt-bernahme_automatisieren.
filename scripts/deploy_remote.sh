@@ -311,7 +311,11 @@ if not (key and cfg.model):
     print("PROBE openai uebersprungen: Schluessel oder Modell fehlt.")
     raise SystemExit(0)
 from openai import OpenAI
-from apps.ai.providers.openai_provider import resolve_base_url
+try:
+    from apps.ai.providers.openai_provider import resolve_base_url
+except ImportError:  # Image aelter als Commit 3b3faba: gleiche Regel inline, damit die Probe vor dem Deploy laeuft
+    def resolve_base_url(endpoint):
+        return (endpoint or "").strip() or os.environ.get("OPENAI_BASE_URL", "").strip() or "https://api.openai.com/v1"
 base_url = resolve_base_url(cfg.endpoint)
 client = OpenAI(api_key=key, base_url=base_url, timeout=20, max_retries=0)
 try:
