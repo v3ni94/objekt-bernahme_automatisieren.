@@ -220,3 +220,32 @@ def test_google_dokument_erhaelt_exportfassung(objekt, paperless, drive, ops):
     # Original in Drive unveraendert
     assert drive.get(file_id).mime_type == "application/vnd.google-apps.document"
     assert not any(c[0] in ("upload", "update_content", "delete", "trash") for c in drive.ops)
+
+
+def test_verlorene_aufgabe_wird_nach_zwei_stunden_erneut_uebertragen(objekt, paperless, run_all, ops):
+    """Paperless verwirft die Aufgabenliste bei Neustart oder Update: statt endlos alle 30 Sekunden zu warten, sucht die
+    Anwendung nach zwei Stunden die Kopie per UUID und uebertraegt sonst erneut (Befund 20.09.2026)."""
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    doc, _ = ingest.ingest_upload(objekt, filename="Verloren.pdf", data=pdf_bytes())
+    run_all(objekt)
+    ops()  # Upload, Aufgabe angelegt
+    awaiting = SyncOperation.objects.get(kind=OperationKind.PAPERLESS_AWAIT_TASK, document=doc)
+    task_id = awaiting.payload["task_id"]
+    paperless.forget_task(task_id)  # Neustart: Aufgabe weg, Dokument nie angelegt
+    ops()
+    awaiting.refresh_from_db()
+    assert awaiting.status == OperationStatus.PENDING  # noch jung: warten
+    SyncOperation.objects.filter(pk=awaiting.pk).update(created_at=timezone.now() - timedelta(hours=3))
+    ops()
+    awaiting.refresh_from_db()
+    assert awaiting.status == OperationStatus.SKIPPED
+    retry = SyncOperation.objects.get(kind=OperationKind.PAPERLESS_PUSH, document=doc, payload__reason="task_lost")
+    assert "erneut" in retry.op_key
+    ops()  # zweiter Upload (je nach Reihenfolge bereits im vorigen Durchlauf erledigt)
+    assert [c[0] for c in paperless.calls].count("post_document") == 2
+    paperless.process_tasks()
+    ops()
+    assert ExternalLink.objects.filter(document=doc, system="paperless", role=LinkRole.ORIGINAL).exists()

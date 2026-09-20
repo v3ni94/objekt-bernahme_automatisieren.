@@ -912,6 +912,11 @@ def file_to_drive(job: ProcessingJob) -> dict:
         # warten, ohne einen Versuch zu verbrauchen. Mit RetryableError standen bei acht gleichzeitigen Uploads
         # fuenf Dokumente nach drei schnellen Fehlversuchen auf error (Befund 11.09.2026).
         raise DeferJob("Drive-Schreibsperre des Objekts belegt", seconds=20)
+    # Die Sperre schuetzt nur das Anlegen und Nachlesen der Zielordner: zwei Ablagen desselben Objekts duerfen einen
+    # fehlenden Ordner nicht doppelt anlegen. Verschieben, Upload und Pruefung laufen danach ohne Sperre parallel;
+    # jede Datei ist ueber Hash, Kennzeichen und die Idempotenzpruefung im Zielordner eindeutig. Bis 20.09.2026 hielt
+    # die Sperre die ganze Ablage: je Objekt lief nur eine Datei, rund 1.000 Ablagen warteten und wurden alle 20 s
+    # neu eingereiht (Befund Objekt 503).
     try:
         try:
             if payload.get("category") == "05":
@@ -932,90 +937,90 @@ def file_to_drive(job: ProcessingJob) -> dict:
             # oder ist zu starten. Warten statt Fehlversuch, damit uebernommene Bestandsdateien nicht auf error
             # laufen, bevor die Struktur steht (Altbestand, 11.09.2026).
             raise DeferJob(f"Ablageziel noch nicht vorhanden: {exc}", seconds=120) from exc
-        if doc.source == "drive_existing" or (doc.drive_file_id and doc.source == "moved_in"):
-            node = drive.get(doc.drive_file_id)
-            if node is None:
-                raise SkipJob("drive_file_missing")
-            current_parent = node.parent_id
-            if current_parent != target.drive_file_id:
-                drive.move(doc.drive_file_id, current_parent, target.drive_file_id)
-                record(
-                    "drive.move",
-                    entity_type="document",
-                    entity_id=doc.pk,
-                    object_id=job.object_id,
-                    after={"from": current_parent, "to": target.drive_file_id, "name": doc.current_name},
-                )
-            action = "moved" if current_parent != target.drive_file_id else "already_there"
-        else:
-            # Dubletten tragen keinen eigenen Hash (Pruefabfrage sha256 eindeutig); Quelle ist die Datei des Originals
-            sha_for_file = doc.sha256 or (doc.duplicate_of.sha256 if doc.duplicate_of_id else None)
-            existing = next(
-                (
-                    c
-                    for c in drive.list_children(target.drive_file_id)
-                    if not c.is_folder
-                    and c.name == doc.current_name
-                    and (c.app_properties or {}).get("sha256") == sha_for_file
-                ),
-                None,
-            )
-            if existing is not None:
-                node = existing
-                action = "reused"
-            else:
-                original = (storage.original_path(sha_for_file) if sha_for_file else None) or (
-                    Path(doc.source_path) if doc.source_path and Path(doc.source_path).exists() else None
-                )
-                if original is None:
-                    raise RetryableError("Quelldatei für den Upload fehlt")
-                node = drive.upload(
-                    target.drive_file_id,
-                    original,
-                    doc.current_name,
-                    doc.mime_type,
-                    app_properties={
-                        "sha256": doc.sha256,
-                        "document_id": str(doc.pk),
-                        "object_id": str(job.object_id),
-                    },
-                )
-                record(
-                    "drive.upload",
-                    entity_type="document",
-                    entity_id=doc.pk,
-                    object_id=job.object_id,
-                    after={"drive_file_id": node.id, "to": target.drive_file_id, "name": doc.current_name},
-                )
-                action = "uploaded"
-            doc.drive_file_id = node.id
-            _remove_transit_copy(doc)
-        # Elternordner zuruecklesen
-        check = drive.get(doc.drive_file_id)
-        if check is None or check.parent_id != target.drive_file_id:
-            raise RetryableError("Elternordner nach der Ablage stimmt nicht mit dem Ziel überein")
-        doc.drive_node = target
-        doc.target_drive_node = target
-        doc.drive_moved_at = timezone.now()
-        doc.filed_at = timezone.now()
-        if doc.status == "classified":  # mit offenem Fall bleibt review, Dubletten behalten ihren Status
-            doc.status = "filed"
-        doc.save(
-            update_fields=[
-                "drive_file_id",
-                "drive_node",
-                "target_drive_node",
-                "drive_moved_at",
-                "filed_at",
-                "status",
-                "updated_at",
-            ]
-        )
-        DriveNodeRow.objects.filter(pk=target.pk).update(
-            last_verified_at=timezone.now(), status=NodeStatus.ACTIVE
-        )
     finally:
         cache.delete(lock_key)
+    if doc.source == "drive_existing" or (doc.drive_file_id and doc.source == "moved_in"):
+        node = drive.get(doc.drive_file_id)
+        if node is None:
+            raise SkipJob("drive_file_missing")
+        current_parent = node.parent_id
+        if current_parent != target.drive_file_id:
+            drive.move(doc.drive_file_id, current_parent, target.drive_file_id)
+            record(
+                "drive.move",
+                entity_type="document",
+                entity_id=doc.pk,
+                object_id=job.object_id,
+                after={"from": current_parent, "to": target.drive_file_id, "name": doc.current_name},
+            )
+        action = "moved" if current_parent != target.drive_file_id else "already_there"
+    else:
+        # Dubletten tragen keinen eigenen Hash (Pruefabfrage sha256 eindeutig); Quelle ist die Datei des Originals
+        sha_for_file = doc.sha256 or (doc.duplicate_of.sha256 if doc.duplicate_of_id else None)
+        existing = next(
+            (
+                c
+                for c in drive.list_children(target.drive_file_id)
+                if not c.is_folder
+                and c.name == doc.current_name
+                and (c.app_properties or {}).get("sha256") == sha_for_file
+            ),
+            None,
+        )
+        if existing is not None:
+            node = existing
+            action = "reused"
+        else:
+            original = (storage.original_path(sha_for_file) if sha_for_file else None) or (
+                Path(doc.source_path) if doc.source_path and Path(doc.source_path).exists() else None
+            )
+            if original is None:
+                raise RetryableError("Quelldatei für den Upload fehlt")
+            node = drive.upload(
+                target.drive_file_id,
+                original,
+                doc.current_name,
+                doc.mime_type,
+                app_properties={
+                    "sha256": doc.sha256,
+                    "document_id": str(doc.pk),
+                    "object_id": str(job.object_id),
+                },
+            )
+            record(
+                "drive.upload",
+                entity_type="document",
+                entity_id=doc.pk,
+                object_id=job.object_id,
+                after={"drive_file_id": node.id, "to": target.drive_file_id, "name": doc.current_name},
+            )
+            action = "uploaded"
+        doc.drive_file_id = node.id
+        _remove_transit_copy(doc)
+    # Elternordner zuruecklesen
+    check = drive.get(doc.drive_file_id)
+    if check is None or check.parent_id != target.drive_file_id:
+        raise RetryableError("Elternordner nach der Ablage stimmt nicht mit dem Ziel überein")
+    doc.drive_node = target
+    doc.target_drive_node = target
+    doc.drive_moved_at = timezone.now()
+    doc.filed_at = timezone.now()
+    if doc.status == "classified":  # mit offenem Fall bleibt review, Dubletten behalten ihren Status
+        doc.status = "filed"
+    doc.save(
+        update_fields=[
+            "drive_file_id",
+            "drive_node",
+            "target_drive_node",
+            "drive_moved_at",
+            "filed_at",
+            "status",
+            "updated_at",
+        ]
+    )
+    DriveNodeRow.objects.filter(pk=target.pk).update(
+        last_verified_at=timezone.now(), status=NodeStatus.ACTIVE
+    )
     _sync_hook("on_document_filed", doc)
     return {"action": action, "target": target.drive_file_id, "target_name": target.drive_name}
 

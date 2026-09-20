@@ -83,7 +83,11 @@ class PriceList:
         return cls(version=str(raw.get("version") or "unbekannt"), prices=prices)
 
     def has_price(self, model: str | None) -> bool:
-        return bool(model) and model in self.prices
+        """Preis bekannt und nicht null: ein Eintrag mit 0 EUR hebelt die Kostenbremse ebenso aus wie ein fehlender."""
+        if not model or model not in self.prices:
+            return False
+        inp, out = self.prices[model]
+        return inp > 0 or out > 0
 
     def cost(self, model: str | None, tokens_in: int, tokens_out: int) -> Decimal:
         inp, out = self.prices.get(model or "", (Decimal(0), Decimal(0)))

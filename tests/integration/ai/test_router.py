@@ -156,6 +156,23 @@ def test_kostenlimit_ohne_preis_blockiert_vor_dem_ersten_aufruf(objekt):
     assert "fehlt in ai.price_list" in (call.error_message or "") and "openai-testmodell" in (call.error_message or "")
 
 
+def test_preis_null_gilt_als_fehlender_preis(objekt):
+    """Ein Platzhalter mit 0 EUR wuerde jeden Aufruf mit 0 EUR buchen; der Router behandelt ihn wie einen fehlenden Preis."""
+    p = FakeClassificationProvider("openai", script=["ok"])
+    f = FakeClassificationProvider("anthropic", script=[])
+    r = Router(
+        {"openai": p, "anthropic": f},
+        configs={
+            "openai": cfg("openai", cost_limit_eur_per_object=Decimal("5")),
+            "anthropic": cfg("anthropic", enabled=False),
+        },
+        price_list=PriceList("platzhalter", {"openai-testmodell": (Decimal("0"), Decimal("0"))}),
+        order=["openai", "anthropic"],
+    )
+    assert r.classify(request(), obj=objekt).status == "budget_blocked" and p.sent == []
+    assert "0 EUR" in (AiCall.objects.get(status="budget_blocked").error_message or "")
+
+
 def test_ohne_kostenlimit_laeuft_der_aufruf_auch_ohne_preis(objekt):
     p = FakeClassificationProvider("openai", script=["ok"])
     f = FakeClassificationProvider("anthropic", script=[])

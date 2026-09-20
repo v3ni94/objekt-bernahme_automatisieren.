@@ -37,7 +37,8 @@
 #   verarbeitung-alle <branch> [echt] Verarbeitungslaeufe fuer alle Objekte mit offener Arbeit (echt = einreihen)
 #   review-status <branch> [<objekt>]   Offene Pruefcenter-Faelle je Art und Unterart, Vorschlaege, KI-Nachklassifizierbarkeit (keine Personendaten)
 #   sync-status <branch> [live]          Verbindung Drive, Anwendung, Paperless: Schalter, Verbindungstest, Cursor, Auffindbarkeit je Quelle, Operationen (lesend; live = echter Verbindungstest)
-#   classifier-status <branch> [list|train|train+force]  Stufe 2: Kaltstartstatus, Modelle, Training (train+force auch waehrend laufender Verarbeitung)
+#   classifier-status <branch> [list|train|train+force|deactivate]  Stufe 2: Kaltstartstatus, Modelle, Training (train+force auch waehrend laufender Verarbeitung), Modell abschalten
+#   sync-retry <branch> [echt|bestand+<id>]  Sync-Operationen mit Paperless-404 erneut einreihen (Vorschau ohne echt); Bestandslauf fortsetzen
 #   jobs-bereinigen <branch> [echt] Ueberzaehlige wartende Wiederholungsjobs (#n) bereinigen (echt = ausfuehren, sonst Vorschau)
 #   redis-status <branch>     Redis: Speicher, Schluesselzahl, Warteschlangenlaengen, groesste Schluessel (nur lesend)
 #   env-set <branch> <SCHLUESSEL=wert[+SCHLUESSEL=wert]>  Freigegebene Betriebswerte in .env setzen (Ressourcen, Parallelitaet);
@@ -304,11 +305,12 @@ for name in ("openai", "anthropic"):
     limit = cfg.cost_limit_eur_per_object if cfg.cost_limit_eur_per_object is not None else "keines"
     print(f"{name}: freigegeben={cfg.enabled} Modell={cfg.model or '(leer)'} Endpunkt={endpoint} Region={cfg.region or '(leer)'} "
           f"Timeout={cfg.timeout_s:g}s Versuche={cfg.max_attempts} Kostenlimit je Objekt={limit} EUR Schluessel={schl}")
-    if cfg.enabled and cfg.model and cfg.model not in pl.prices:
+    _pr = pl.prices.get(cfg.model or "")
+    if cfg.enabled and cfg.model and not (_pr and (_pr[0] > 0 or _pr[1] > 0)):
         if cfg.cost_limit_eur_per_object is not None:
-            print(f"  WARNUNG: Modell {cfg.model} steht nicht in ai.price_list; der Router blockiert Aufrufe (budget_blocked), bis der Preis eingetragen ist.")
+            print(f"  WARNUNG: Modell {cfg.model} steht nicht in ai.price_list oder mit 0 EUR; der Router blockiert Aufrufe (budget_blocked), bis ein Preis groesser 0 eingetragen ist.")
         else:
-            print(f"  WARNUNG: Modell {cfg.model} steht nicht in ai.price_list und kein Kostenlimit gesetzt; Aufrufe laufen ohne Kostenbremse und werden mit 0 EUR gebucht.")
+            print(f"  WARNUNG: Modell {cfg.model} steht nicht in ai.price_list oder mit 0 EUR und kein Kostenlimit gesetzt; Aufrufe laufen ohne Kostenbremse und werden mit 0 EUR gebucht.")
     if cfg.enabled and not key:
         print(f"  Hinweis: {name} ist freigegeben, aber ohne Schluessel; Aufrufe enden mit provider_error.")
 cfg = ProviderConfig.from_settings("openai")
@@ -393,8 +395,42 @@ PY
       status|list) docker compose exec -T worker-nlp python manage.py classifier "${ARG:-status}" ;;
       train)       docker compose exec -T worker-nlp python manage.py classifier train ;;
       train+force) docker compose exec -T worker-nlp python manage.py classifier train --force ;;
-      *) echo "Argument unzulaessig (status, list, train, train+force)"; exit 2 ;;
+      deactivate)  docker compose exec -T worker-nlp python manage.py shell -c "from apps.documents.models import ClassifierModel; n = ClassifierModel.objects.filter(is_active=True).update(is_active=False); print(f'{n} Modell(e) deaktiviert; Stufe 2 arbeitet wieder in der Kaltstartphase (kein Neustart noetig, das aktive Modell wird je Aufruf aus der Datenbank gelesen)')" ;;
+      *) echo "Argument unzulaessig (status, list, train, train+force, deactivate)"; exit 2 ;;
     esac
+    ;;
+  sync-retry)
+    # Blockierte oder fehlgeschlagene Sync-Operationen erneut einreihen, deren Grund ein Paperless-404 waehrend eines
+    # Neustarts oder Updates war (Traefik antwortet "404 page not found", Befund 20.09.2026). Kein direkter Versand:
+    # der Beat (sync.dispatch_due) verteilt mit hoechstens 200 gleichzeitig unterwegs, damit Redis nicht volllaeuft
+    # (Befund 14.09.2026). Argument "bestand+<id>" setzt einen fehlgeschlagenen oder pausierten Bestandslauf fort.
+    # Ohne Argument nur Vorschau; "echt" fuehrt aus.
+    docker compose exec -T -e SYNC_ARG="${ARG:-}" web python manage.py shell <<'PY'
+import os
+from collections import Counter
+from django.db.models import Q
+from django.utils import timezone
+from apps.sync.models import InventoryRun, InventoryStatus, OperationStatus, SyncOperation
+arg = os.environ.get("SYNC_ARG", "")
+if arg.startswith("bestand+"):
+    from apps.sync import inventory
+    run = InventoryRun.objects.get(pk=int(arg.split("+", 1)[1]))
+    print(f"Bestandslauf {run.pk} ({run.kind}) Status {run.status}, Zaehler {run.counters or {}}")
+    if run.status not in (InventoryStatus.FAILED, InventoryStatus.PAUSED):
+        print("nur fehlgeschlagene oder pausierte Laeufe lassen sich fortsetzen"); raise SystemExit(0)
+    inventory.resume(run)
+    run.refresh_from_db(); print("jetzt", run.status, "(Fortsetzung an der gespeicherten Seite, Schritt eingereiht)")
+    raise SystemExit(0)
+pattern = Q(blocked_reason__icontains="404 page not found") | Q(last_error__icontains="404 page not found")
+qs = SyncOperation.objects.filter(status__in=[OperationStatus.BLOCKED, OperationStatus.FAILED]).filter(pattern)
+je_art = Counter(qs.values_list("kind", flat=True))
+print("betroffen (Paperless-404):", dict(je_art) or "keine")
+if arg != "echt":
+    print("Vorschau; mit Argument echt werden sie erneut eingereiht"); raise SystemExit(0)
+n = qs.update(status=OperationStatus.PENDING, attempt_count=0, next_attempt_at=timezone.now(), blocked_reason=None,
+              locked_by=None, locked_at=None, dispatched_at=None)
+print(f"{n} Operationen erneut eingereiht; der Beat verteilt hoechstens 200 gleichzeitig, Fortschritt in sync-status")
+PY
     ;;
   sync-status)
     # Verbindung Drive, Anwendung, Paperless lesend pruefen: Schalter (paperless.enabled, Modus, Pilotumfang, Webhook,
@@ -924,5 +960,5 @@ PY
     done
     echo "wirksam mit der Aktion deploy; Sicherung .env.bak"
     ;;
-  *) echo "Nur check, pull, befund, env-init, ps, logs, smoke, cert-retry, db-status, db-reset, first-run, deploy, rollback, create-admin, oauth-check, deploy-tests, doc-status, config-set, altbestand-import, altbestand-objekte, altbestand-aufarbeiten, verarbeitung-alle, paperless-feld-alle, redis-status, env-set, jobs-bereinigen, disk-status, transit-bereinigen, worker-drosseln, work-bereinigen, last-status, worker-stop, worker-start, ai-check, ai-reclassify, review-status, sync-status, classifier-status oder reconcile-all erlaubt"; exit 2 ;;
+  *) echo "Nur check, pull, befund, env-init, ps, logs, smoke, cert-retry, db-status, db-reset, first-run, deploy, rollback, create-admin, oauth-check, deploy-tests, doc-status, config-set, altbestand-import, altbestand-objekte, altbestand-aufarbeiten, verarbeitung-alle, paperless-feld-alle, redis-status, env-set, jobs-bereinigen, disk-status, transit-bereinigen, worker-drosseln, work-bereinigen, last-status, worker-stop, worker-start, ai-check, ai-reclassify, review-status, sync-status, sync-retry, classifier-status oder reconcile-all erlaubt"; exit 2 ;;
 esac

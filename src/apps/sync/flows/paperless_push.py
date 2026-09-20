@@ -5,6 +5,7 @@ UUID bereits angekommen ist."""
 from __future__ import annotations
 
 import re
+from datetime import timedelta
 from pathlib import Path
 
 from django.utils import timezone
@@ -181,6 +182,30 @@ def push(op) -> dict:
     return {"task_id": str(task_id)}
 
 
+AWAIT_TASK_MAX_AGE = timedelta(hours=2)  # danach gilt eine unsichtbare Paperless-Aufgabe als verloren
+
+
+def _recover_lost_task(doc, client, op, task_id: str, role: str) -> dict:
+    """Die Aufgabe ist Stunden nach dem Upload nicht auffindbar: Paperless verwirft die Aufgabenliste bei Neustart oder
+    Update (Befund 20.09.2026, 9.460 Operationen warteten endlos alle 30 Sekunden). Original: Kopie per UUID suchen und
+    verknuepfen, sonst erneut uebertragen; andere Rollen bleiben sichtbar blockiert. Die Operation endet uebersprungen."""
+    if role != LinkRole.ORIGINAL:
+        raise Block(f"Aufgabe {task_id} in Paperless nicht mehr auffindbar (Rolle {role}); erneut anstossen")
+    remote = find_by_uuid(client, doc)
+    if remote is not None:
+        return _link_existing(doc, remote, client, "Aufgabe verloren, Kopie per UUID gefunden")
+    enqueue(
+        OperationKind.PAPERLESS_PUSH,
+        system=SyncSystem.PAPERLESS,
+        key=op_key(OperationKind.PAPERLESS_PUSH, doc.uuid, doc.sha256, "erneut", task_id),
+        document=doc,
+        source_system=SyncSystem.APP,
+        source_revision=doc.sha256,
+        payload={"reason": "task_lost", "task_id": task_id},
+    )
+    raise Skip("Aufgabe in Paperless nicht mehr auffindbar, erneute Uebertragung vorgemerkt")
+
+
 @handler(OperationKind.PAPERLESS_AWAIT_TASK)
 def await_task(op) -> dict:
     doc = op.document
@@ -196,6 +221,8 @@ def await_task(op) -> dict:
     except Exception as exc:
         raise_mapped(exc)
     if task is None:
+        if timezone.now() - op.created_at > AWAIT_TASK_MAX_AGE:
+            return _recover_lost_task(doc, client, op, str(task_id), role_wanted)
         raise Defer("Aufgabe in Paperless noch nicht sichtbar", 30)
     status = str(task.get("status") or "").upper()
     if status in ("PENDING", "STARTED", "RETRY"):

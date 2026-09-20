@@ -7,6 +7,7 @@ document_tenant_links und review_cases in einer Transaktion. Jede Ablage in 06_S
 
 from __future__ import annotations
 
+import logging
 import re
 from dataclasses import dataclass, field
 from datetime import date
@@ -28,6 +29,8 @@ from apps.objects.models import Unit
 from apps.parties import services as party_services
 from apps.parties.models import Owner, OwnerUnitAssignment
 from apps.review.models import CaseStatus, CaseType, ReviewCase
+
+logger = logging.getLogger(__name__)
 
 OWNERSHIP_TYPES = {
     "kaufvertrag",
@@ -994,6 +997,29 @@ def persist(
         doc.is_master_with_segments = bool(decision.segments)
         doc.status = "review" if decision.review_required else "classified"
         doc.save()
+        if (
+            s1.hard
+            and decision.decided_by == "stage1"
+            and not decision.review_required
+            and decision.category
+            and decision.category != "06"
+        ):
+            # E 3.4 Nr. 1: harte Regeltreffer ohne Pruefbedarf werden gewichtetes Trainingsbeispiel fuer Stufe 2.
+            # Bis 20.09.2026 war das nicht angebunden, deshalb blieb Stufe 2 trotz Tausender Ablagen in der
+            # Kaltstartphase und jede unsichere Entscheidung ging an Stufe 3.
+            try:
+                from apps.classification.stage2 import input_text
+                from apps.classification.training import add_rule_sample
+
+                add_rule_sample(
+                    doc,
+                    input_text(ctx),
+                    category=decision.category,
+                    subfolder=decision.subfolder,
+                    document_type=decision.document_type,
+                )
+            except Exception:  # Lernen darf die Entscheidung nie verhindern
+                logger.warning("Trainingsbeispiel nicht angelegt: Dokument %s", doc.pk, exc_info=True)
         # Verknuepfungen
         DocumentOwnerLink.objects.filter(document=doc, status="suggested").delete()
         DocumentTenantLink.objects.filter(document=doc, status="suggested").delete()

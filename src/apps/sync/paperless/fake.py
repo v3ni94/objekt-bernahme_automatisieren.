@@ -481,6 +481,13 @@ class FakePaperless:
         self._task_order.append(task_id)
         return task_id
 
+    def forget_task(self, task_id: str) -> None:
+        """Simuliert einen Neustart oder ein Update von Paperless: die Aufgabe verschwindet samt Ergebnis, ohne dass das
+        Dokument angelegt wurde (Befund 20.09.2026)."""
+        self.tasks.pop(task_id, None)
+        if task_id in self._task_order:
+            self._task_order.remove(task_id)
+
     def process_tasks(self, *, limit: int | None = None) -> list[dict]:
         """Fuehrt ausstehende Aufgaben aus; liefert die normalisierten Ergebnisse."""
         done: list[dict] = []

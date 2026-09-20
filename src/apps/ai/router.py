@@ -131,7 +131,7 @@ class Router:
                 # Ohne Preis fuer das Modell wuerde jeder Aufruf mit 0 EUR gebucht und das Limit nie greifen.
                 block_message = (
                     f"Kostenlimit {limit} EUR je Objekt nicht pruefbar: Modell {cfg.model or '(leer)'} "
-                    f"fehlt in ai.price_list (Version {self.price_list.version})"
+                    f"fehlt in ai.price_list oder steht auf 0 EUR (Version {self.price_list.version})"
                 )
             elif limit is not None and object_cost(name, obj.pk) >= limit:
                 block_message = f"Kostenlimit {limit} EUR je Objekt erreicht"
