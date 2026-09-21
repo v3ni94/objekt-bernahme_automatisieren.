@@ -13,7 +13,8 @@ from tests.integration.sync.conftest import pdf_bytes
 from apps.documents import ingest
 from apps.documents.models import Document
 from apps.sync import services
-from apps.sync.models import ExternalLink, LinkRole, SyncSystem
+from apps.sync.flows import assign
+from apps.sync.models import AssignmentExample, ExampleKind, ExternalLink, LinkRole, SyncSystem
 
 pytestmark = pytest.mark.django_db
 
@@ -74,6 +75,22 @@ def test_geleertes_feld_fuehrt_in_das_eingangsobjekt(
     # zweiter Lauf findet nichts mehr: die alten Zeilen sind moved_out, die neuen gehoeren anderen Objekten
     befund = _lauf(objekt.object_number).split("Vorschau")[0]
     assert "ok 1" in befund and "leer 1" not in befund and "anderes_objekt 1" not in befund
+    # Lernbeispiele: geleertes Feld = Ablehnung des alten Objekts, andere Nummer = Korrektur
+    assert AssignmentExample.objects.filter(
+        document=neu_a, kind=ExampleKind.REJECT, previous_object=objekt, proposed_object=objekt
+    ).exists()
+    assert AssignmentExample.objects.filter(
+        document=neu_c, kind=ExampleKind.CORRECT, previous_object=objekt, target_object=anderes_objekt
+    ).exists()
+    # Die Inhaltszuordnung im Eingang darf das verworfene Objekt wegen desselben Adresstreffers nicht sofort wieder
+    # automatisch waehlen: gleicher Text, ohne Ablehnung auto, mit Ablehnung nur Vorschlag
+    text = "Fahrtkostenabrechnung\nFahrtziel: Musterstraße 49, 12345 Musterstadt\nObjekt 623"
+    kontrolle, _ = assign.build_proposal(b, text=text)
+    assert kontrolle.decision == "auto" and kontrolle.chosen.object_id == objekt.pk
+    vorschlag, _ = assign.build_proposal(neu_a, text=text)
+    assert vorschlag.decision == "review" and vorschlag.chosen.object_id == objekt.pk
+    assert any("manuell verworfen" in r for r in vorschlag.reasons)
+    assert "automatische Zuordnung" not in vorschlag.reasons
 
 
 def test_unbekannte_nummer_wird_nur_gemeldet(objekt, eingang, paperless, run_all, ops):

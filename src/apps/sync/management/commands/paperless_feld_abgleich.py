@@ -4,7 +4,11 @@ geaendert wurde: Die 5-Minuten-Abfrage uebernimmt jedes Dokument mit gesetztem F
 in Paperless wirkt nicht auf die Anwendung zurueck (Pilot Objekt 82, 22.09.2026: Fahrtkostenabrechnungen mit der
 Objektadresse als Fahrtziel). Ohne --echt nur Vorschau. Mit --echt werden Dokumente mit leerem Feld in das
 Eingangsobjekt uebernommen (transfer_document, Drive-Datei folgt), Dokumente mit anderer aktiver Objektnummer in
-dieses Objekt; unbekannte Nummern und in Paperless nicht mehr vorhandene Dokumente werden nur gemeldet."""
+dieses Objekt; unbekannte Nummern und in Paperless nicht mehr vorhandene Dokumente werden nur gemeldet.
+
+Jede Uebernahme wird als Lernbeispiel festgehalten: das geleerte Feld als Ablehnung des alten Objekts (reject),
+die andere Nummer als Korrektur (correct). Die Ablehnung verhindert, dass die Inhaltszuordnung im Eingang dasselbe
+Objekt wegen desselben Adresstreffers sofort wieder automatisch waehlt; sie bleibt dort Vorschlag."""
 
 from __future__ import annotations
 
@@ -14,9 +18,10 @@ from apps.documents.models import Document
 from apps.documents.transfer import TransferError, transfer_document
 from apps.objects.models import ManagedObject
 from apps.sync import services
+from apps.sync.assignment import learning
 from apps.sync.flows.paperless_pull import _object_number_from_field
 from apps.sync.inbox import ensure_inbox_object
-from apps.sync.models import ExternalLink, LinkRole, SyncSystem
+from apps.sync.models import ExampleKind, ExternalLink, LinkRole, SyncSystem
 from apps.sync.paperless.errors import PaperlessError, PaperlessNotFound
 
 
@@ -125,6 +130,15 @@ class Command(BaseCommand):
             except TransferError as exc:
                 self.stdout.write(f"  nicht übernommen Dok {r['doc'].pk}: {exc}")
                 continue
+            merkmale = {"reason": "feldabgleich_paperless", "paperless_id": str(r["remote_id"])}
+            if r["befund"] == "leer":
+                learning.record_example(
+                    new, kind=ExampleKind.REJECT, previous_object=obj, proposed_object=obj, features=merkmale
+                )
+            else:
+                learning.record_example(
+                    new, kind=ExampleKind.CORRECT, previous_object=obj, target_object=ziel, features=merkmale
+                )
             moved += 1
             self.stdout.write(
                 f"  übernommen Dok {r['doc'].pk} -> Objekt {ziel.object_number} als Dok {new.pk}"

@@ -17,7 +17,13 @@ from apps.objects.models import ManagedObject
 from apps.review.models import CaseStatus, CaseType, ReviewCase
 from apps.sync import config, inbox, services
 from apps.sync.flows.common import open_case
-from apps.sync.models import OperationKind, OperationStatus, SyncOperation
+from apps.sync.models import (
+    AssignmentExample,
+    ExampleKind,
+    OperationKind,
+    OperationStatus,
+    SyncOperation,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -168,7 +174,25 @@ def build_proposal(doc, *, text: str | None = None):
     )
     auto_min, gap_min = config.assignment_thresholds()
     proposal = dec.decide(ranked, dec.Thresholds(auto_min=auto_min, gap_min=gap_min))
+    if proposal.decision == "auto" and proposal.chosen is not None:
+        if proposal.chosen.object_id in _rejected_object_ids(doc):
+            proposal.decision = "review"
+            proposal.reasons = [r for r in proposal.reasons if r != "automatische Zuordnung"] + [
+                f"Objekt {proposal.chosen.object_number} wurde für dieses Dokument bereits manuell verworfen; "
+                "keine erneute automatische Zuordnung"
+            ]
     return proposal, ranked
+
+
+def _rejected_object_ids(doc) -> set[int]:
+    """Objekte, die fuer dieses Dokument bereits manuell verworfen wurden (Ablehnung im Pruefcenter oder Herausnahme
+    ueber den Feldabgleich Paperless). Ein einziger Adresstreffer im Text (Objektadresse als Fahrtziel einer
+    Fahrtkostenabrechnung) wuerde sonst dasselbe Objekt sofort wieder automatisch waehlen."""
+    return set(
+        AssignmentExample.objects.filter(
+            document=doc, kind=ExampleKind.REJECT, proposed_object__isnull=False
+        ).values_list("proposed_object_id", flat=True)
+    )
 
 
 def run_for_document(doc, *, job=None) -> dict:
