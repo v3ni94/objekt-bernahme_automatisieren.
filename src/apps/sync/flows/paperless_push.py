@@ -172,6 +172,19 @@ def push(op) -> dict:
         if isinstance(exc, e.PaperlessUnavailable):
             # Ausgang unklar: beim naechsten Versuch zuerst per UUID suchen (oben), nie blind erneut hochladen
             raise Retry(f"Upload mit unklarem Ausgang: {exc}") from exc
+        if isinstance(exc, e.PaperlessError) and exc.status_code == 400 and "not supported" in str(exc):
+            # Der Server lehnt den Dateiinhalt endgueltig ab (etwa ein verschluesseltes Dokument, "File type
+            # application/encrypted not supported"); ein erneuter Versuch aendert daran nichts. Bisher liefen
+            # fuenf Versuche ins Leere, bevor die Operation als fehlgeschlagen sichtbar wurde (Befund 21.09.2026).
+            enqueue(
+                OperationKind.PAPERLESS_INDEX_STUB,
+                system=SyncSystem.PAPERLESS,
+                key=op_key(OperationKind.PAPERLESS_INDEX_STUB, doc.uuid, doc.sha256),
+                document=doc,
+                source_system=SyncSystem.APP,
+                payload={"reason": f"vom Server abgelehnt: {exc}"[:255]},
+            )
+            raise Skip(f"vom Server abgelehnt, Indexbeleg vorgemerkt: {exc}") from exc
         raise_mapped(exc)
     enqueue(
         OperationKind.PAPERLESS_AWAIT_TASK,

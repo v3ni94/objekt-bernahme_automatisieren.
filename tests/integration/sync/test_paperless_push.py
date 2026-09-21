@@ -17,7 +17,7 @@ from apps.documents import ingest
 from apps.documents.models import Document
 from apps.sync import config, hooks
 from apps.sync.models import ExternalLink, LinkRole, LinkState, OperationKind, OperationStatus, SyncOperation
-from apps.sync.paperless.errors import PaperlessUnavailable
+from apps.sync.paperless.errors import PaperlessError, PaperlessUnavailable
 
 pytestmark = pytest.mark.django_db
 
@@ -254,6 +254,33 @@ def test_leere_datei_wird_nicht_uebertragen(objekt, paperless, ops):
     push = _push_ops(doc).get()
     assert push.status == OperationStatus.SKIPPED and "0 Byte" in push.result["skipped"]
     assert "post_document" not in paperless.call_names()
+
+
+def test_vom_server_abgelehnter_dateiinhalt_wird_indexbeleg_statt_erneut_versucht(
+    objekt, paperless, run_all, ops
+):
+    """Paperless lehnt den Inhalt endgueltig ab (etwa ein verschluesseltes Dokument, "File type
+    application/encrypted not supported"); ein erneuter Versuch aendert daran nichts, die Operation wird
+    uebersprungen und ein Indexbeleg vorgemerkt statt fuenf Versuche zu verbrauchen (Befund 21.09.2026)."""
+    doc, _ = ingest.ingest_upload(objekt, filename="verschluesselt.pdf", data=pdf_bytes())
+    run_all(objekt)
+    paperless.inject(
+        "post_document",
+        PaperlessError(
+            "Paperless POST /api/documents/post_document/: HTTP 400 (document: File type "
+            "application/encrypted not supported)",
+            status_code=400,
+        ),
+    )
+    ops()
+    push = _push_ops(doc).get()
+    assert push.status == OperationStatus.SKIPPED and "vom Server abgelehnt" in push.result["skipped"]
+    stub = SyncOperation.objects.get(kind=OperationKind.PAPERLESS_INDEX_STUB, document=doc)
+    assert (
+        stub.payload["reason"].startswith("vom Server abgelehnt")
+        and "not supported" in stub.payload["reason"]
+    )
+    assert push.attempt_count == 1  # kein weiterer Versuch verbraucht
 
 
 def test_verlorene_aufgabe_wird_nach_zwei_stunden_erneut_uebertragen(objekt, paperless, run_all, ops):
