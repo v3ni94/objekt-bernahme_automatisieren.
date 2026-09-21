@@ -979,12 +979,12 @@
       "key": "processing.max_parallel_objects",
       "category": "processing",
       "value_type": "integer",
-      "description": "Gleichzeitig verarbeitete Objekte (Obergrenze 32 seit 20.09.2026 für Server ab 32 Kernen; OCR-Prozesse und Ablage-Threads passend dimensionieren, je Objekt ist die Ablage durch die Drive-Schreibsperre seriell)",
+      "description": "Gleichzeitig verarbeitete Objekte (Obergrenze 64 seit 21.09.2026 für den 64-Kern-Server; OCR-Prozesse und Ablage-Threads passend dimensionieren; die Drive-Schreibsperre eines Objekts umfasst seit 20.09.2026 nur noch die Ordnerauflösung, mehrere Dokumente desselben Objekts legen seither parallel ab)",
       "source": "ANNAHME A20, Frage F18",
       "schema": {
         "type": "integer",
         "minimum": 1,
-        "maximum": 32
+        "maximum": 64
       }
     },
     {

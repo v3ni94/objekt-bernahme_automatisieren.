@@ -176,7 +176,7 @@ Schlüssel: 149 in 20 Gruppen (seit 12.09.2026 zusätzlich `paperless.*` und `sy
 | Schlüssel | Typ | Seed | Bedeutung | Quelle | Wertebereich |
 |---|---|---|---|---|---|
 | `processing.heartbeat_seconds` | integer | `30` | Abstand der Heartbeats laufender Jobs in Sekunden (ANNAHME A-13) | A-13 | min 5 |
-| `processing.max_parallel_objects` | integer | `1` | Gleichzeitig verarbeitete Objekte (Obergrenze 32 seit 20.09.2026 für Server ab 32 Kernen; OCR-Prozesse und Ablage-Threads passend dimensionieren, je Objekt ist die Ablage durch die Drive-Schreibsperre seriell) | ANNAHME A20, Frage F18 | min 1, max 32 |
+| `processing.max_parallel_objects` | integer | `1` | Gleichzeitig verarbeitete Objekte (Obergrenze 64 seit 21.09.2026 für den 64-Kern-Server; OCR-Prozesse und Ablage-Threads passend dimensionieren; die Drive-Schreibsperre eines Objekts umfasst seit 20.09.2026 nur noch die Ordnerauflösung, mehrere Dokumente desselben Objekts legen seither parallel ab) | ANNAHME A20, Frage F18 | min 1, max 64 |
 | `processing.work_orphan_hours` | integer | `48` | Frist, nach der verwaiste Arbeitsverzeichnisse unter work/ ohne aktiven Job geräumt werden (E 10.4 Punkt 4); ANNAHME | E 10.4 | min 1 |
 
 ## OCR (`ocr.*`)
