@@ -33,6 +33,7 @@
 #   altbestand-import <branch>  Quellordner aus db/seeds/altbestand_ordner.txt in die Altbestand-Tabelle
 #   altbestand-objekte <branch> [echt]  Objekte fuer Altbestand-Quellen ohne Objekt anlegen (echt = anlegen, sonst Vorschau)
 #   paperless-feld-alle <branch> [echt] Feld MHV Objekt fuer alle zugeordneten Speicherpfade setzen und Bestandslauf starten
+#   paperless-feld-abgleich <branch> <objekt>[+echt]  Feld MHV Objekt je Dokument gegen die Zuordnung pruefen; echt uebernimmt Abweichungen (leer -> Eingang)
 #   altbestand-aufarbeiten <branch> [echt] Alle Altbestand-Ordner mit Objekt aufarbeiten (echt = Celery-Aufgabe, sonst Vorschau)
 #   verarbeitung-alle <branch> [echt] Verarbeitungslaeufe fuer alle Objekte mit offener Arbeit (echt = einreihen)
 #   review-status <branch> [<objekt>]   Offene Pruefcenter-Faelle je Art und Unterart, Vorschlaege, KI-Nachklassifizierbarkeit (keine Personendaten)
@@ -788,6 +789,26 @@ PY
       docker compose exec -T web python manage.py paperless_feld_setzen --echt
     else
       docker compose exec -T web python manage.py paperless_feld_setzen
+    fi
+    ;;
+  paperless-feld-abgleich)
+    # Feld MHV Objekt in Paperless gegen die Zuordnung eines Objekts pruefen: "<objekt>" Vorschau, "<objekt>+echt"
+    # uebernimmt Dokumente mit geleertem Feld in das Eingangsobjekt und mit anderer Nummer in dieses Objekt.
+    obj=""; echt=""
+    IFS='+' read -r -a teile <<<"${ARG:-}"
+    for t in "${teile[@]}"; do
+      case "$t" in
+        "") ;;
+        echt) echt="1" ;;
+        *[!0-9]*) echo "Argument unbekannt: $t (erlaubt: Objektnummer, Objektnummer+echt)"; exit 2 ;;
+        *) obj="$t" ;;
+      esac
+    done
+    [ -n "$obj" ] || { echo "Objektnummer fehlt"; exit 2; }
+    if [ -n "$echt" ]; then
+      docker compose exec -T web python manage.py paperless_feld_abgleich "$obj" --echt
+    else
+      docker compose exec -T web python manage.py paperless_feld_abgleich "$obj"
     fi
     ;;
   altbestand-objekte)
