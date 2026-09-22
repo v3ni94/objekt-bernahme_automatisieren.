@@ -868,12 +868,20 @@ PY
     docker compose exec -T web python manage.py paperless_zuordnung_pruefen "${args[@]}"
     ;;
   objekt-anschriften)
-    # Weitere Anschriften (Eckobjekte, mehrere Hausnummern) aus den Objektbezeichnungen ableiten; "echt" speichert
-    if [ "${ARG:-}" = "echt" ]; then
-      docker compose exec -T web python manage.py objekt_anschriften_ergaenzen --echt
-    else
-      docker compose exec -T web python manage.py objekt_anschriften_ergaenzen
-    fi
+    # Weitere Anschriften (Eckobjekte, mehrere Hausnummern) aus den Objektbezeichnungen ableiten; "echt" speichert.
+    # "korrigieren" leitet Hauptanschriften, die ein frueherer Lauf aus der Bezeichnung gesetzt hat, mit der
+    # aktuellen Erkennung neu ab (Vorschau), "korrigieren+echt" speichert die Korrekturen (22.09.2026).
+    args=()
+    IFS='+' read -r -a teile <<<"${ARG:-}"
+    for t in "${teile[@]}"; do
+      case "$t" in
+        "") ;;
+        echt) args+=(--echt) ;;
+        korrigieren) args+=(--korrigieren) ;;
+        *) echo "Argument unbekannt: $t (erlaubt: echt, korrigieren, korrigieren+echt)"; exit 2 ;;
+      esac
+    done
+    docker compose exec -T web python manage.py objekt_anschriften_ergaenzen "${args[@]}"
     ;;
   altbestand-objekte)
     # Objekte fuer alle Altbestand-Quellen ohne Objekt anlegen; Argument "echt" legt an, sonst nur Vorschau

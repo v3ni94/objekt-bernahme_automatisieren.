@@ -112,3 +112,131 @@ def test_nachpflege_aus_bezeichnung(seeded):
     out = StringIO()
     call_command("objekt_anschriften_ergaenzen", "--echt", stdout=out)
     assert "gespeichert 0" in out.getvalue()
+
+
+def test_korrigieren_leitet_nur_vom_kommando_gesetzte_hauptanschriften_neu_ab(clerk_user):
+    from apps.audit.services import record
+
+    reason = "Weitere Anschriften aus der Bezeichnung (objekt_anschriften_ergaenzen)"
+
+    def alt(nummer, name, street, house_number, city=None, additional=None):
+        # Stand nach dem Serverlauf 22.09.2026 mit der alten Erkennung, samt dessen Audit-Eintrag
+        obj = ManagedObject.objects.create(
+            object_number=nummer,
+            name=name,
+            street=street,
+            house_number=house_number,
+            city=city,
+            additional_addresses=additional or [],
+            management_type="weg",
+            is_test=True,
+        )
+        record(
+            "object.update",
+            entity_type="object",
+            entity_id=obj.pk,
+            object_id=obj.pk,
+            before={
+                "street": None,
+                "house_number": None,
+                "postal_code": None,
+                "city": None,
+                "additional_addresses": [],
+            },
+            after={
+                "street": obj.street,
+                "house_number": obj.house_number,
+                "postal_code": obj.postal_code,
+                "city": obj.city,
+                "additional_addresses": list(obj.additional_addresses),
+            },
+            reason=reason,
+        )
+        return obj
+
+    seesen = alt("424", "Seesen Jacobsonstraße 24", "Seesen Jacobsonstraße", "24")
+    juechen = alt(
+        "374",
+        "Jüchen, Wanloer Str. 28+30 & An der Sandkaule 5, 41363 Jüchen",
+        "Wanloer Str. 28+30 & An der Sandkaule",
+        "5",
+        city="Jüchen",
+    )
+    # nach dem Lauf von Hand berichtigt: Audit-Nachzustand und Objekt weichen ab, bleibt unangetastet
+    hand = alt("427", "Altena Am Stapel 10", "Altena Am Stapel", "10")
+    ManagedObject.objects.filter(pk=hand.pk).update(street="Am Stapel", city="Altena")
+    # Hauptanschrift stammt aus dem Register, das Kommando hat nur weitere Anschriften ergaenzt
+    register = ManagedObject.objects.create(
+        object_number="529",
+        name="Kaiserstraße 77 u. 79, Windmühlenstraße 31",
+        street="Kaiserstraße",
+        house_number="77",
+        additional_addresses=[
+            {"street": "Kaiserstraße", "house_number": "79"},
+            {"street": "Windmühlenstraße", "house_number": "31"},
+        ],
+        management_type="weg",
+        is_test=True,
+    )
+    record(
+        "object.update",
+        entity_type="object",
+        entity_id=register.pk,
+        object_id=register.pk,
+        before={"street": "Kaiserstraße", "house_number": "77", "additional_addresses": []},
+        after={"street": "Kaiserstraße", "house_number": "77", "additional_addresses": []},
+        reason=reason,
+    )
+    # korrekt gesetzt: nichts zu korrigieren
+    alt("600", "Fontanestr. 7", "Fontanestr.", "7")
+
+    out = StringIO()
+    call_command("objekt_anschriften_ergaenzen", "--korrigieren", stdout=out)
+    text = out.getvalue()
+    assert (
+        "Objekt 424 „Seesen Jacobsonstraße 24“: Korrektur Hauptanschrift: Seesen Jacobsonstraße 24 -> Jacobsonstraße 24, Seesen"
+        in text
+    )
+    assert (
+        "Objekt 374 „Jüchen, Wanloer Str. 28+30 & An der Sandkaule 5, 41363 Jüchen“: Korrektur Hauptanschrift: "
+        "Wanloer Str. 28+30 & An der Sandkaule 5, Jüchen -> Wanloer Str. 28, 41363 Jüchen | weitere: "
+        "Wanloer Str. 30, 41363 Jüchen; An der Sandkaule 5, 41363 Jüchen"
+    ) in text
+    assert (
+        "Objekt 427 „Altena Am Stapel 10“: Hinweis: Anschrift seit dem letzten Lauf von Hand geändert" in text
+    )
+    assert "Objekt 600" not in text and "Objekt 529" not in text
+    assert "korrigiert 2" in text and "Vorschau, nichts geändert" in text
+    seesen.refresh_from_db()
+    assert (seesen.street, seesen.city) == ("Seesen Jacobsonstraße", None)
+
+    out = StringIO()
+    call_command("objekt_anschriften_ergaenzen", "--korrigieren", "--echt", stdout=out)
+    assert "korrigiert 2, gespeichert 2" in out.getvalue()
+    seesen.refresh_from_db()
+    juechen.refresh_from_db()
+    hand.refresh_from_db()
+    register.refresh_from_db()
+    assert (seesen.street, seesen.house_number, seesen.city) == ("Jacobsonstraße", "24", "Seesen")
+    assert (juechen.street, juechen.house_number, juechen.postal_code, juechen.city) == (
+        "Wanloer Str.",
+        "28",
+        "41363",
+        "Jüchen",
+    )
+    assert [(a["street"], a["house_number"]) for a in juechen.additional_addresses] == [
+        ("Wanloer Str.", "30"),
+        ("An der Sandkaule", "5"),
+    ]
+    assert (hand.street, hand.city) == ("Am Stapel", "Altena")
+    assert register.street == "Kaiserstraße" and len(register.additional_addresses) == 2
+    korrektur = AuditEvent.objects.get(
+        entity_id=seesen.pk, reason__contains="--korrigieren", action="object.update"
+    )
+    assert korrektur.before_state["street"] == "Seesen Jacobsonstraße"
+    assert korrektur.after_state["street"] == "Jacobsonstraße"
+
+    # idempotent: die Korrektur ist der letzte Lauf, ein weiterer Lauf aendert nichts
+    out = StringIO()
+    call_command("objekt_anschriften_ergaenzen", "--korrigieren", "--echt", stdout=out)
+    assert "korrigiert 0, gespeichert 0" in out.getvalue()

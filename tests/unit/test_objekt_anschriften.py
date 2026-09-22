@@ -54,12 +54,82 @@ class Obj:
         ("Südwall 111-113, 41179 Mönchengladbach", [("Südwall", "111-113")], 0),
         ("Kaiserstraße 34", [("Kaiserstraße", "34")], 0),
         ("", [], 0),
+        # Schreibweisen aus dem Serverlauf 22.09.2026
+        (
+            "Jüchen, Wanloer Str. 28+30 & An der Sandkaule 5, 41363 Jüchen",
+            [("Wanloer Str.", "28"), ("Wanloer Str.", "30"), ("An der Sandkaule", "5")],
+            0,
+        ),
+        ("Bungstr. 5 u. Kreuzbuschstr. 5", [("Bungstr.", "5"), ("Kreuzbuschstr.", "5")], 0),
+        ("Wollmatinger Str. 18 u 20", [("Wollmatinger Str.", "18"), ("Wollmatinger Str.", "20")], 0),
+        (
+            "Richard-Wagner-Strasse 8_9, 16348 Wandlitz",
+            [("Richard-Wagner-Strasse", "8"), ("Richard-Wagner-Strasse", "9")],
+            0,
+        ),
+        ("R31 Rigaer Straße 31", [("Rigaer Straße", "31")], 0),
+        ("SEV Fontanestr. 7 Wandlitz", [("Fontanestr.", "7")], 0),
+        ("Königstuhlstraße 21, 21 a-c", [("Königstuhlstraße", "21")], 1),
+        ("Hofstraße 175 Mönchengladbach Grundbesitz Mönchengladbach GmbH", [], 1),
+        ("Am Panke Park 67-85 H5", [], 1),
+        ("Hauptstraße 9 A-C", [], 1),
+        ("Bedburg Dr. Harald Fett Bauernhof Projekt", [], 1),
     ],
 )
 def test_anschriften_aus_bezeichnung(name, erwartet, hinweise):
     found, notes = addresses_from_name(name)
     assert [(a["street"], a["house_number"]) for a in found] == erwartet
     assert len(notes) == hinweise
+
+
+@pytest.mark.parametrize(
+    "name, street, nr, plz, city",
+    [
+        # Ort vor der Strasse
+        ("Seesen Jacobsonstraße 24", "Jacobsonstraße", "24", "", "Seesen"),
+        ("Altena Am Stapel 10", "Am Stapel", "10", "", "Altena"),
+        ("Zeithain Teninger Str. 6-8", "Teninger Str.", "6-8", "", "Zeithain"),
+        ("Friedrichshafen Scheffelstr. 33", "Scheffelstr.", "33", "", "Friedrichshafen"),
+        ("Hannover Lange Straße 5", "Lange Straße", "5", "", "Hannover"),
+        # Ort hinter der Hausnummer, mit oder ohne PLZ, mit „in“
+        ("Am Bildchen 9 Erkelenz", "Am Bildchen", "9", "", "Erkelenz"),
+        ("Fahlenberg 23a Linnich", "Fahlenberg", "23a", "", "Linnich"),
+        ("Notweg 1-7 44229 dortmund", "Notweg", "1-7", "44229", "dortmund"),
+        ("Hinrichsring 15b 30177 Hannover", "Hinrichsring", "15b", "30177", "Hannover"),
+        ("Zeppelinstraße 18-20 in Remscheid", "Zeppelinstraße", "18-20", "", "Remscheid"),
+        ("WEG Burgstraße 58 Eschweiler", "Burgstraße", "58", "", "Eschweiler"),
+        ("Musterweg 5 Frankfurt am Main", "Musterweg", "5", "", "Frankfurt am Main"),
+        # Objektnummer vor dem Ort
+        ("082 Ratheim, Shalomweg 3", "Shalomweg", "3", "", "Ratheim"),
+        ("623 Düsseldorf,  Joachimstraße 49", "Joachimstraße", "49", "", "Düsseldorf"),
+        ("203 Hückelhoven, Weberstraße 2 - 6", "Weberstraße", "2-6", "", "Hückelhoven"),
+        # kein Ortspraefix: Adjektive, Wortanfaenge und Gattungsnamen bleiben Teil der Strasse
+        ("Aachener Straße 119 (GmbH)", "Aachener Straße", "119", "", ""),
+        ("Kleiner Seeweg 1-14", "Kleiner Seeweg", "1-14", "", ""),
+        ("Bayerische Straße 27", "Bayerische Straße", "27", "", ""),
+        ("Düsseldorfer Landstraße 5", "Düsseldorfer Landstraße", "5", "", ""),
+        ("Berliner Allee 3", "Berliner Allee", "3", "", ""),
+        ("Konstanzer Str. 16 A", "Konstanzer Str.", "16a", "", ""),
+        ("In Gerderhahn 105", "In Gerderhahn", "105", "", ""),
+    ],
+)
+def test_ort_vor_oder_hinter_der_strasse(name, street, nr, plz, city):
+    found, notes = addresses_from_name(name)
+    assert not notes and len(found) == 1
+    assert found[0] == {"street": street, "house_number": nr, "postal_code": plz, "city": city}
+
+
+def test_strasse_mit_ziffern_wird_nicht_geraten():
+    # ohne die Trennung an „&“ bliebe eine Strasse mit Ziffern uebrig; so etwas ist nie eine Hauptanschrift
+    found, notes = addresses_from_name("Wanloer Str. 28+30 & An der Sandkaule 5")
+    assert [(a["street"], a["house_number"]) for a in found] == [
+        ("Wanloer Str.", "28"),
+        ("Wanloer Str.", "30"),
+        ("An der Sandkaule", "5"),
+    ]
+    assert notes == []
+    found, notes = addresses_from_name("Straße des 17. Juni 5")
+    assert found == [] and notes == ["nicht erkannt: Straße des 17. Juni 5"]
 
 
 def test_ort_und_plz_gelten_fuer_alle_anschriften_der_bezeichnung():
