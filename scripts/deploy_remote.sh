@@ -754,6 +754,20 @@ key, _, raw = os.environ["CFG_ARG"].partition("=")
 try:
     value = json.loads(raw)
 except json.JSONDecodeError:
+    import re
+    # Woerter ausserhalb von Zeichenketten (z. B. EUR_EINGABE statt einer Zahl) sind stehen gebliebene Platzhalter
+    platzhalter = sorted({
+        w for w in re.findall(r"[A-Za-z_][A-Za-z0-9_]*", re.sub(r'"[^"]*"', '""', raw))
+        if w not in ("true", "false", "null")
+    })
+    if raw[:1] in "{[" and '"' in raw and platzhalter:
+        print(
+            f"config-set abgelehnt: {raw!r} ist kein gueltiges JSON, weil Platzhalter stehen geblieben sind: "
+            + ", ".join(platzhalter)
+            + ". Diese durch Zahlen ersetzen (Dezimalpunkt, ohne Anfuehrungszeichen), zum Beispiel "
+            + "\"input_per_1k\":0.0001"
+        )
+        raise SystemExit(2)
     if raw[:1] in "{[" or raw.count(":") and not raw.startswith('"'):
         # Typischer Fehler in der interaktiven Shell: Anfuehrungszeichen entfernt, Klammern expandiert
         print(
