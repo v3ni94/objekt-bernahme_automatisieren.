@@ -117,3 +117,22 @@ def test_leere_umgebungsvariable_ergibt_standardendpunkt(monkeypatch):
     monkeypatch.delenv("OPENAI_BASE_URL")
     OpenAIProvider()._client(ProviderConfig(name="openai", enabled=True, model="gpt-4.1-mini", endpoint="  "))
     assert FakeOpenAI.instances[-1].kwargs["base_url"] == "https://api.openai.com/v1"
+
+
+def test_schema_je_zweck_landet_im_response_format():
+    # Befund 22.09.2026: fuer die Objektzuordnung wurde das Klassifikationsschema erzwungen, jede Antwort verletzte
+    # danach das Zuordnungsschema (provider_error: Schemaverletzung im Sammellauf)
+    from apps.ai import assignment
+    from apps.ai.schema import response_json_schema
+
+    cfg = ProviderConfig(name="openai", enabled=True, model="gpt-4.1-mini")
+    OpenAIProvider().send("s", "u", cfg)
+    OpenAIProvider().send(
+        "s", "u", cfg, schema=assignment.response_json_schema(), schema_name="objektzuordnung"
+    )
+    standard, zuordnung = FakeOpenAI.calls
+    assert standard["response_format"]["json_schema"]["name"] == "klassifikation"
+    assert standard["response_format"]["json_schema"]["schema"] == response_json_schema()
+    assert zuordnung["response_format"]["json_schema"]["name"] == "objektzuordnung"
+    assert zuordnung["response_format"]["json_schema"]["schema"] == assignment.response_json_schema()
+    assert "is_object_document" in zuordnung["response_format"]["json_schema"]["schema"]["required"]

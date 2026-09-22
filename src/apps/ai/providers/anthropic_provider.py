@@ -30,7 +30,15 @@ class AnthropicProvider(BaseProvider):
         base_url = cfg.endpoint or os.environ.get("ANTHROPIC_BASE_URL") or None
         return Anthropic(api_key=key, base_url=base_url, timeout=cfg.timeout_s, max_retries=0)
 
-    def send(self, system: str, user: str, cfg: ProviderConfig) -> RawResponse:
+    def send(
+        self,
+        system: str,
+        user: str,
+        cfg: ProviderConfig,
+        *,
+        schema: dict | None = None,
+        schema_name: str = "klassifikation",
+    ) -> RawResponse:
         import anthropic
 
         client = self._client(cfg)
@@ -42,12 +50,12 @@ class AnthropicProvider(BaseProvider):
                 messages=[{"role": "user", "content": user}],
                 tools=[
                     {
-                        "name": "klassifikation",
-                        "description": "Klassifikationsergebnis im Schema",
-                        "input_schema": response_json_schema(),
+                        "name": schema_name,
+                        "description": "Ergebnis im Schema",
+                        "input_schema": schema or response_json_schema(),
                     }
                 ],
-                tool_choice={"type": "tool", "name": "klassifikation"},
+                tool_choice={"type": "tool", "name": schema_name},
                 temperature=0,
             )
         except anthropic.APITimeoutError as exc:

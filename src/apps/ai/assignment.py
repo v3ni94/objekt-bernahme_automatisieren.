@@ -104,6 +104,7 @@ class ObjectAssignmentRequest:
     candidates: list[dict]
     hints: dict = field(default_factory=dict)
     purpose: ClassVar[str] = "assign_object"
+    schema_name: ClassVar[str] = "objektzuordnung"
     repair_instruction: ClassVar[str] = (
         "Verwende für object_number ausschließlich eine Objektnummer aus der Kandidatenliste oder null und fülle "
         "alle Pflichtfelder."
@@ -112,6 +113,10 @@ class ObjectAssignmentRequest:
     @property
     def mask_check_text(self) -> str:
         return self.filename_masked
+
+    def response_schema(self) -> dict:
+        """JSON-Schema der Antwort fuer die strukturierte Ausgabe des Anbieters (nicht das Klassifikationsschema)."""
+        return response_json_schema()
 
     def build_messages(self, *, repair_hint: str | None = None) -> tuple[str, str]:
         payload = {

@@ -36,8 +36,18 @@ class FakeClassificationProvider(BaseProvider):
         self.tokens = tokens
         self.sent: list[dict] = []
 
-    def send(self, system: str, user: str, cfg: ProviderConfig) -> RawResponse:
-        self.sent.append({"system": system, "user": user, "model": cfg.model})
+    def send(
+        self,
+        system: str,
+        user: str,
+        cfg: ProviderConfig,
+        *,
+        schema: dict | None = None,
+        schema_name: str = "klassifikation",
+    ) -> RawResponse:
+        self.sent.append(
+            {"system": system, "user": user, "model": cfg.model, "schema": schema, "schema_name": schema_name}
+        )
         step = self.script.popleft() if self.script else "ok"
         if step == "timeout":
             raise ProviderTimeout()

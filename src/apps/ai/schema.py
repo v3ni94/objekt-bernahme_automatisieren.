@@ -74,6 +74,7 @@ class ClassificationRequest:
 
     # Gemeinsame Schnittstelle aller Requests an den Router (Zweck, Prompt, Antwortpruefung, Maskierungspruefung)
     purpose: ClassVar[str] = "classify"
+    schema_name: ClassVar[str] = "klassifikation"
     repair_instruction: ClassVar[str] = (
         "Verwende ausschließlich Codes aus der Taxonomie und alle Pflichtfelder."
     )
@@ -81,6 +82,10 @@ class ClassificationRequest:
     @property
     def mask_check_text(self) -> str:
         return self.filename_masked
+
+    def response_schema(self) -> dict:
+        """JSON-Schema der Antwort fuer die strukturierte Ausgabe des Anbieters."""
+        return response_json_schema()
 
     def build_messages(self, *, repair_hint: str | None = None) -> tuple[str, str]:
         from apps.ai.prompt import build_messages

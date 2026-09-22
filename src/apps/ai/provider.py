@@ -133,18 +133,37 @@ class BaseProvider:
 
     name = "base"
 
-    def send(self, system: str, user: str, cfg: ProviderConfig) -> RawResponse:  # pragma: no cover
+    def send(
+        self,
+        system: str,
+        user: str,
+        cfg: ProviderConfig,
+        *,
+        schema: dict | None = None,
+        schema_name: str = "klassifikation",
+    ) -> RawResponse:  # pragma: no cover
+        """schema: JSON-Schema der erwarteten Antwort fuer die strukturierte Ausgabe des Anbieters; None steht fuer
+        das Klassifikationsschema (Altverhalten)."""
         raise NotImplementedError
 
     def classify(self, req, cfg: ProviderConfig, *, repair_hint: str | None = None) -> ProviderOutcome:
-        """req: ClassificationRequest oder ObjectAssignmentRequest (gleiche Schnittstelle)."""
+        """req: ClassificationRequest oder ObjectAssignmentRequest (gleiche Schnittstelle). Das Antwortschema kommt
+        aus dem Request (response_schema, schema_name): Befund 22.09.2026, der Anbieter erzwang fuer jede Anfrage das
+        Klassifikationsschema, die Zuordnungsantwort scheiterte dadurch immer an der Schemapruefung."""
         from apps.ai.prompt import prompt_hash
 
         system, user = req.build_messages(repair_hint=repair_hint)
         if contains_sensitive(user) or contains_sensitive(req.mask_check_text):
             raise MaskCheckFailed("Sensible Muster im Request (IBAN, Kontonummer oder Ausweisnummer)")
         started = time.monotonic()
-        raw = self.send(system, user, cfg)
+        response_schema = getattr(req, "response_schema", None)
+        raw = self.send(
+            system,
+            user,
+            cfg,
+            schema=response_schema() if callable(response_schema) else None,
+            schema_name=getattr(req, "schema_name", "klassifikation"),
+        )
         latency = int((time.monotonic() - started) * 1000)
         try:
             result = req.parse(raw.text)

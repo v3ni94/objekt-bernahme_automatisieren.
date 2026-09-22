@@ -198,7 +198,7 @@ def test_bestandslauf_vorschau_und_echt(
     )
     assert "Vorschau" in text
     assert not AiCall.objects.exists()
-    ki(
+    anbieter = ki(
         {
             "is_object_document": True,
             "object_number": "623",
@@ -212,6 +212,8 @@ def test_bestandslauf_vorschau_und_echt(
     call_command("paperless_zuordnung_pruefen", "--echt", "--objekt", "623", stdout=out)
     text = out.getvalue()
     assert "aktion_bestaetigt 1" in text and "ki_ok 1" in text and "Vorschau" not in text
+    assert [s["schema_name"] for s in anbieter.sent] == ["objektzuordnung"]
+    assert "is_object_document" in anbieter.sent[0]["schema"]["required"]
     for d in (klar, zwei):
         d.refresh_from_db()
         assert d.assignment_checked_at is not None and d.object_id == objekt.pk

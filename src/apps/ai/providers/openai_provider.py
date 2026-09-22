@@ -1,4 +1,6 @@
-"""OpenAI-Anbindung (Stufe 3): strukturierte Ausgabe ueber das JSON-Schema, Basis-URL aus ai.providers.openai.endpoint
+"""OpenAI-Anbindung (Stufe 3): strukturierte Ausgabe ueber das JSON-Schema des jeweiligen Requests (Klassifikation
+oder Objektzuordnung; bis 22.09.2026 wurde fuer jede Anfrage das Klassifikationsschema erzwungen, die
+Zuordnungsantworten scheiterten deshalb an der Schemapruefung), Basis-URL aus ai.providers.openai.endpoint
 oder OPENAI_BASE_URL (EU-Endpunkt nach V-12), Schluessel aus dem Secret openai_api_key. Nur maskierte, gekuerzte
 Auszuege (B-11, Ue15). Reasoning-Modelle (gpt-5, o-Reihe) lehnen den Parameter temperature ab; er wird nur fuer die
 uebrigen Modelle gesetzt (20.09.2026)."""
@@ -54,7 +56,15 @@ class OpenAIProvider(BaseProvider):
             api_key=key, base_url=resolve_base_url(cfg.endpoint), timeout=cfg.timeout_s, max_retries=0
         )
 
-    def send(self, system: str, user: str, cfg: ProviderConfig) -> RawResponse:
+    def send(
+        self,
+        system: str,
+        user: str,
+        cfg: ProviderConfig,
+        *,
+        schema: dict | None = None,
+        schema_name: str = "klassifikation",
+    ) -> RawResponse:
         import openai
 
         client = self._client(cfg)
@@ -64,9 +74,9 @@ class OpenAIProvider(BaseProvider):
             "response_format": {
                 "type": "json_schema",
                 "json_schema": {
-                    "name": "klassifikation",
+                    "name": schema_name,
                     "strict": True,
-                    "schema": response_json_schema(),
+                    "schema": schema or response_json_schema(),
                 },
             },
         }
