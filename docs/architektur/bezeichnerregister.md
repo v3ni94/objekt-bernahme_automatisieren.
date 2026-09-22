@@ -111,7 +111,7 @@ Modell `ai.AiCall`. ai calls.
 | document_id | bigint | ja | → documents.id |
 | run_id | bigint | ja | → processing_runs.id |
 | job_id | bigint | ja | → processing_jobs.id |
-| purpose | varchar(24) | nein | classify, extract_entities, parse_list, other |
+| purpose | varchar(24) | nein | classify, extract_entities, parse_list, assign_object, other |
 | provider | varchar(24) | nein | openai, anthropic |
 | model | varchar(80) | nein |  |
 | endpoint | varchar(255) | ja |  |
@@ -1836,6 +1836,8 @@ Celery-Queues aus den Settings: `ai`, `classify`, `io`, `lists`, `ocr`
 | security.log_document_views | security | boolean | `true` |
 | security.mfa_required_roles | security | list | `["admin"]` |
 | security.store_full_iban | security | boolean | `false` |
+| sync.assignment_ai_enabled | sync | boolean | `true` |
+| sync.assignment_ai_min | sync | decimal | `0.85` |
 | sync.assignment_auto_min | sync | decimal | `0.85` |
 | sync.assignment_gap_min | sync | decimal | `0.25` |
 | sync.drive_changes_enabled | sync | boolean | `false` |

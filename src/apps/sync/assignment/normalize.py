@@ -32,6 +32,20 @@ HOUSE_NUMBER_PART = (
 
 # Rollenwoerter im Kontextfenster vor der Adresse (normalisierte Schreibweise)
 ROLE_WORDS: dict[str, tuple[str, ...]] = {
+    # Fahrtziel einer Reisekosten- oder Fahrtkostenabrechnung: die Objektanschrift kommt nur beilaeufig vor
+    # (Pilot Objekt 82, 22.09.2026); die Fundstelle zaehlt kaum und die KI prueft den Objektbezug
+    "travel": (
+        "fahrtziel",
+        "reiseziel",
+        "zielort",
+        "fahrtkosten",
+        "reisekosten",
+        "fahrtstrecke",
+        "dienstfahrt",
+        "dienstreise",
+        "fahrt nach",
+        "fahrt zu",
+    ),
     "object": (
         "leistungsort",
         "leistungsadresse",

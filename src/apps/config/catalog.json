@@ -1940,6 +1940,28 @@
       }
     },
     {
+      "key": "sync.assignment_ai_enabled",
+      "category": "sync",
+      "value_type": "boolean",
+      "description": "KI-Schiedsrichter der Objektzuordnung: greift, sobald die Zuordnung eines Eingangsdokuments nicht eindeutig ist und Kandidaten vorliegen; sicherer Kandidat wird übernommen, kein Objektdokument bleibt im Eingang mit Fall, sonst Prüffall mit KI-Einschätzung; wirkt nur mit freigegebenem Anbieter und Preisliste",
+      "source": "Entscheidung 22.09.2026",
+      "schema": {
+        "type": "boolean"
+      }
+    },
+    {
+      "key": "sync.assignment_ai_min",
+      "category": "sync",
+      "value_type": "decimal",
+      "description": "Mindestkonfidenz der KI für eine automatische Objektzuordnung; darunter bleibt ihr Kandidat Vorschlag im Prüffall",
+      "source": "Entscheidung 22.09.2026",
+      "schema": {
+        "type": "number",
+        "minimum": 0.5,
+        "maximum": 1
+      }
+    },
+    {
       "key": "sync.rule_min_confirmations",
       "category": "sync",
       "value_type": "integer",

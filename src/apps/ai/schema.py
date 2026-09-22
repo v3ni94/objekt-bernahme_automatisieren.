@@ -7,6 +7,7 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass, field
+from typing import ClassVar
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
@@ -70,6 +71,24 @@ class ClassificationRequest:
             "hinweise": self.hints,
             "textauszug": self.excerpt_masked,
         }
+
+    # Gemeinsame Schnittstelle aller Requests an den Router (Zweck, Prompt, Antwortpruefung, Maskierungspruefung)
+    purpose: ClassVar[str] = "classify"
+    repair_instruction: ClassVar[str] = (
+        "Verwende ausschließlich Codes aus der Taxonomie und alle Pflichtfelder."
+    )
+
+    @property
+    def mask_check_text(self) -> str:
+        return self.filename_masked
+
+    def build_messages(self, *, repair_hint: str | None = None) -> tuple[str, str]:
+        from apps.ai.prompt import build_messages
+
+        return build_messages(self, repair_hint=repair_hint)
+
+    def parse(self, raw: str | dict) -> ClassificationResult:
+        return parse_result(raw, self.taxonomy)
 
 
 class Period(BaseModel):
@@ -136,6 +155,19 @@ class ClassificationResult(BaseModel):
     confidence: float = Field(ge=0, le=1)
     reasoning: str = Field(max_length=400)
     lease: LeaseBlock | None = None
+
+    def summary(self) -> dict:
+        """Kurzfassung fuer das Protokoll ai_calls (keine Personendaten)."""
+        return {
+            "category": self.category,
+            "subfolder": self.subfolder,
+            "document_type": self.document_type,
+            "confidence": self.confidence,
+            "object_related": self.object_related,
+            "period_year": self.period.year,
+            "units": len(self.mentioned_units),
+            "parties": len(self.mentioned_parties),
+        }
 
     @field_validator("category", mode="before")
     @classmethod

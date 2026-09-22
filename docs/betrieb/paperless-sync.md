@@ -92,6 +92,8 @@ Alle fachlichen Werte liegen in `app_settings` (Verwaltung, Konfiguration; Recht
 | `sync.inbox_object_number` | 0 | Objektnummer des technischen Eingangsobjekts |
 | `sync.assignment_auto_min` | 0,85 | Mindestbewertung für eine automatische Objektzuordnung |
 | `sync.assignment_gap_min` | 0,25 | Mindestabstand zum zweitbesten Kandidaten |
+| `sync.assignment_ai_enabled` | true | KI-Schiedsrichter der Objektzuordnung: greift, sobald die Zuordnung nicht eindeutig ist und Kandidaten vorliegen (nur mit freigegebenem Anbieter und Preisliste) |
+| `sync.assignment_ai_min` | 0,85 | Mindestkonfidenz der KI für eine automatische Übernahme, darunter Vorschlag |
 | `sync.rule_min_confirmations` | 2 | Bestätigte Beispiele, ab denen eine Zuordnungsregel entsteht |
 | `sync.operation_max_attempts` | 5 | Höchstzahl der Versuche je Operation |
 | `sync.inventory_page_size` | 200 | Paketgröße des Bestandslaufs je Schritt |
@@ -114,6 +116,7 @@ Schaltfläche Eingang einrichten auf `/verwaltung/sync/` (erneute Anmeldung erfo
 - legt das technische Eingangsobjekt an (Nummer `sync.inbox_object_number`, Name `sync.inbox_folder_name`, Verwaltungsart rental, Status active, Kennzeichen `is_system_inbox`). Es erscheint in keiner Objektliste, bekommt keine Ordnerstruktur, keine Listen und keine Vollständigkeitsbewertung.
 - legt unter der bestätigten Drive-Wurzel den Ordner `sync.inbox_folder_name` an oder verwendet einen vorhandenen Ordner gleichen Namens; speichert die ID in `sync.inbox_folder_id` und am Eingangsobjekt. Ohne bestätigte Drive-Wurzel oder ohne Google-Verbindung bleibt es beim Objekt, die Seite meldet das.
 - Dokumente ohne Objektbezug (aus Paperless ohne Feld Objekt, aus dem Drive-Eingangsordner) laufen als Dokumente des Eingangsobjekts durch die Pipeline (Hash, Text, Klassifikation) und erhalten danach einen Zuordnungsvorschlag im Dokumenteneingang `/eingang/` (Schwellen `sync.assignment_auto_min`, `sync.assignment_gap_min`). Nach Zuordnung wandert das Dokument in das Zielobjekt, die Drive-Datei wird verschoben, nie kopiert.
+- KI-Schiedsrichter: Ist die Zuordnung nicht eindeutig (Prüffall oder kein Vorschlag mit Kandidaten), fragt die Anwendung sofort die KI (Zweck `assign_object`, docs/betrieb/ki-anbindung.md): sicherer Kandidat wird übernommen (Fall `ai_auto`), kein Objektdokument bleibt im Eingang (Fall `ai_not_object`), sonst Prüffall mit KI-Einschätzung. Ein für das Dokument manuell verworfenes Objekt wird weder vom Regelwerk noch von der KI automatisch gewählt.
 - Eckobjekte und mehrere Hausnummern: Ein Objekt kann weitere Anschriften desselben Gebäudes tragen (Objektformular, Feld „Weitere Anschriften“, eine je Zeile in der Form „Straße Hausnummer, PLZ Ort“; Feld `additional_addresses`). Alle Anschriften zeigen im Kandidatenindex auf dasselbe Objekt: Eine Rechnung mit „Kaiserstraße 77 / Windmühlenstraße 31“ ist ein Objektbezug, kein Widerspruch und kein zweites Objekt. Die Deploy-Aktion `objekt-anschriften` (Vorschau) beziehungsweise `objekt-anschriften echt` (Kommando `manage.py objekt_anschriften_ergaenzen [--echt]`) leitet die weiteren Anschriften aus den Objektbezeichnungen ab („Kaiserstraße 77 u. 79, Windmühlenstraße 31“ ergibt Kaiserstraße 79 und Windmühlenstraße 31), setzt fehlende Hauptanschriften aus der Bezeichnung und meldet nicht erkannte Bestandteile; vorhandene Werte werden nie überschrieben.
 
 ## 4 Webhook

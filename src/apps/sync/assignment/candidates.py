@@ -32,6 +32,7 @@ WEIGHTS: dict[str, float] = {
     "address_object": 0.88,
     "address_neutral": 0.80,
     "address_billing": 0.30,
+    "address_travel": 0.25,
     "address_owner": 0.15,
     "address_supplier": -0.20,
     "filename_address": 0.60,
@@ -264,6 +265,8 @@ def address_weight(hit: AddressHit) -> tuple[float, bool]:
         base = WEIGHTS["address_object"]
     elif role == "billing":
         base = WEIGHTS["address_billing"]
+    elif role == "travel":
+        base = WEIGHTS["address_travel"]
     elif role == "supplier":
         return WEIGHTS["address_supplier"], False
     elif role == "owner":

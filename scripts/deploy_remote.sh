@@ -297,8 +297,8 @@ from django.db.models import Count, Sum
 from django.utils import timezone
 from apps.ai.models import AiCall
 seit = timezone.now() - timedelta(hours=24)
-rows = AiCall.objects.filter(requested_at__gte=seit).values("provider", "status").annotate(n=Count("id"), eur=Sum("cost_eur")).order_by("provider", "status")
-print("Aufrufe der letzten 24 Stunden:", ", ".join(f"{r['provider']}/{r['status']}={r['n']} ({r['eur'] or 0} EUR)" for r in rows) or "keine")
+rows = AiCall.objects.filter(requested_at__gte=seit).values("provider", "purpose", "status").annotate(n=Count("id"), eur=Sum("cost_eur")).order_by("provider", "purpose", "status")
+print("Aufrufe der letzten 24 Stunden (Anbieter/Zweck/Status):", ", ".join(f"{r['provider']}/{r['purpose']}/{r['status']}={r['n']} ({r['eur'] or 0} EUR)" for r in rows) or "keine")
 for name in ("openai", "anthropic"):
     cfg = ProviderConfig.from_settings(name)
     key = api_key_for(name)

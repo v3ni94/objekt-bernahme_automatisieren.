@@ -8,8 +8,7 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Protocol
 
-from apps.ai.prompt import build_messages
-from apps.ai.schema import ClassificationRequest, ClassificationResult, SchemaViolation, parse_result
+from apps.ai.schema import ClassificationResult, SchemaViolation
 from apps.config import store
 from objektakte.masking import contains_sensitive
 
@@ -117,9 +116,12 @@ class ProviderOutcome:
 
 
 class ClassificationProvider(Protocol):
+    """Anbieter fuer jeden Request mit build_messages, parse, purpose und mask_check_text (Klassifikation,
+    Objektzuordnung)."""
+
     name: str
 
-    def classify(self, req: ClassificationRequest, cfg: ProviderConfig) -> ProviderOutcome: ...
+    def classify(self, req, cfg: ProviderConfig) -> ProviderOutcome: ...
 
     def estimate_cost_eur(
         self, tokens_in: int, tokens_out: int, price_list: PriceList, model: str | None
@@ -134,19 +136,18 @@ class BaseProvider:
     def send(self, system: str, user: str, cfg: ProviderConfig) -> RawResponse:  # pragma: no cover
         raise NotImplementedError
 
-    def classify(
-        self, req: ClassificationRequest, cfg: ProviderConfig, *, repair_hint: str | None = None
-    ) -> ProviderOutcome:
+    def classify(self, req, cfg: ProviderConfig, *, repair_hint: str | None = None) -> ProviderOutcome:
+        """req: ClassificationRequest oder ObjectAssignmentRequest (gleiche Schnittstelle)."""
         from apps.ai.prompt import prompt_hash
 
-        system, user = build_messages(req, repair_hint=repair_hint)
-        if contains_sensitive(user) or contains_sensitive(req.filename_masked):
+        system, user = req.build_messages(repair_hint=repair_hint)
+        if contains_sensitive(user) or contains_sensitive(req.mask_check_text):
             raise MaskCheckFailed("Sensible Muster im Request (IBAN, Kontonummer oder Ausweisnummer)")
         started = time.monotonic()
         raw = self.send(system, user, cfg)
         latency = int((time.monotonic() - started) * 1000)
         try:
-            result = parse_result(raw.text, req.taxonomy)
+            result = req.parse(raw.text)
         except SchemaViolation as exc:
             return ProviderOutcome(
                 None, raw, latency, prompt_hash(system, user), len(system) + len(user), error=exc

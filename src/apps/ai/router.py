@@ -27,7 +27,6 @@ from apps.ai.provider import (
     ProviderTimeout,
     RateLimited,
 )
-from apps.ai.schema import ClassificationRequest, ClassificationResult
 from apps.config import store
 
 logger = logging.getLogger(__name__)
@@ -37,7 +36,7 @@ BREAKER_OPEN_SECONDS = 300  # ANNAHME: fuenf Minuten, danach halboffen
 
 @dataclass
 class RouterResult:
-    result: ClassificationResult | None
+    result: object | None  # ClassificationResult oder ObjectAssignmentResult, je nach Zweck des Requests
     provider: str | None
     call: AiCall | None
     status: str  # ok | provider_error | budget_blocked | blocked_by_mask_check | disabled
@@ -93,7 +92,7 @@ class Router:
 
     def classify(
         self,
-        req: ClassificationRequest,
+        req,
         *,
         obj,
         document=None,
@@ -103,6 +102,9 @@ class Router:
         page_to=None,
         masked_entities_count: int = 0,
     ) -> RouterResult:
+        """req: ClassificationRequest (Zweck classify) oder ObjectAssignmentRequest (Zweck assign_object); der
+        Zweck steht am Request und wird je Aufruf in ai_calls protokolliert."""
+        self._purpose = getattr(req, "purpose", "classify")
         order = self.enabled_order()
         if not order:
             return RouterResult(
@@ -126,6 +128,8 @@ class Router:
                 logger.warning("Stufe 3: %s", last_message)
                 continue
             limit = cfg.cost_limit_eur_per_object
+            inbox = bool(getattr(obj, "is_system_inbox", False))
+            monthly = (store.get("ai.monthly_budget_eur", {}) or {}).get(name)
             block_message = None
             if limit is not None and not self.price_list.has_price(cfg.model):
                 # Ohne Preis fuer das Modell wuerde jeder Aufruf mit 0 EUR gebucht und das Limit nie greifen.
@@ -133,8 +137,14 @@ class Router:
                     f"Kostenlimit {limit} EUR je Objekt nicht pruefbar: Modell {cfg.model or '(leer)'} "
                     f"fehlt in ai.price_list oder steht auf 0 EUR (Version {self.price_list.version})"
                 )
-            elif limit is not None and object_cost(name, obj.pk) >= limit:
+            elif limit is not None and not inbox and object_cost(name, obj.pk) >= limit:
                 block_message = f"Kostenlimit {limit} EUR je Objekt erreicht"
+            elif (
+                inbox and monthly is not None and month_costs().get(name, Decimal(0)) >= Decimal(str(monthly))
+            ):
+                # Das Eingangsobjekt sammelt die Aufrufe des Schiedsrichters aller Dokumente; das Limit je Objekt
+                # waere dort eine versteckte Gesamtsperre, deshalb gilt der Monatsdeckel des Anbieters.
+                block_message = f"Monatsdeckel {monthly} EUR für {name} erreicht (ai.monthly_budget_eur)"
             if block_message:
                 call = self._log(
                     name,
@@ -298,7 +308,9 @@ class Router:
                     )
                     calls.append(call)
                     previous = call
-                    repair_hint = f"Die Antwort verletzte das Schema: {str(outcome.error)[:300]}. Verwende ausschließlich Codes aus der Taxonomie und alle Pflichtfelder."
+                    repair_hint = f"Die Antwort verletzte das Schema: {str(outcome.error)[:300]}. " + getattr(
+                        req, "repair_instruction", "Fülle alle Pflichtfelder nach dem Schema."
+                    )
                     last_message = f"{name}: Schemaverletzung"
                     continue
                 call = self._log(
@@ -365,16 +377,7 @@ class Router:
         summary = None
         if outcome is not None and outcome.result is not None:
             r = outcome.result
-            summary = {
-                "category": r.category,
-                "subfolder": r.subfolder,
-                "document_type": r.document_type,
-                "confidence": r.confidence,
-                "object_related": r.object_related,
-                "period_year": r.period.year,
-                "units": len(r.mentioned_units),
-                "parties": len(r.mentioned_parties),
-            }
+            summary = r.summary() if hasattr(r, "summary") else {"confidence": getattr(r, "confidence", None)}
         elif outcome is not None and outcome.error is not None:
             summary = {"error": str(outcome.error)[:300]}
         prompt_text = None
@@ -383,7 +386,7 @@ class Router:
             document=document,
             run=run,
             job=job,
-            purpose="classify",
+            purpose=getattr(self, "_purpose", "classify"),
             provider=name,
             model=cfg.model or "unbekannt",
             endpoint=cfg.endpoint,

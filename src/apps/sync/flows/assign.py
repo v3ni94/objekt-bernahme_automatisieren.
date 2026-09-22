@@ -195,60 +195,97 @@ def _rejected_object_ids(doc) -> set[int]:
     )
 
 
+def _assign_auto(
+    doc,
+    target: ManagedObject,
+    *,
+    proposal,
+    plain: list[dict],
+    mirrored,
+    subtype: str,
+    reason: str,
+    audit_action: str,
+    context_extra: dict | None = None,
+) -> Document:
+    """Uebernahme ohne Menschen (Regelwerk oder KI): Dokument in das Zielobjekt, erledigter Fall mit Belegen und
+    Grund, Audit. Automatische Zuordnungen sind keine Lernbeispiele."""
+    from apps.documents.transfer import transfer_document
+
+    new_doc = transfer_document(doc, target, reason=reason[:400])
+    _carry_over_operations(doc, new_doc)
+    score = next(
+        (c.score for c in proposal.ranked if c.object_id == target.pk),
+        proposal.chosen.score if proposal.chosen else 0.0,
+    )
+    ReviewCase.objects.create(
+        object=target,
+        case_type=CaseType.OBJECT_ASSIGNMENT,
+        case_subtype=subtype,
+        document=new_doc,
+        status=CaseStatus.RESOLVED,
+        batch_key=f"object_assignment:{subtype}:{new_doc.pk}",
+        priority=90,
+        candidates=plain,
+        context={
+            "reasons": proposal.reasons,
+            "score": score,
+            "from_document_id": doc.pk,
+            **(context_extra or {}),
+        },
+        resolution={
+            "action": "assign_object_auto" if subtype == "auto" else "assign_object_ai",
+            "object_id": target.pk,
+            "at": timezone.now().isoformat(),
+        },
+        resolved_at=timezone.now(),
+    )
+    top = next((c for c in plain if c.get("object_id") == target.pk), plain[0] if plain else {})
+    record(
+        audit_action,
+        entity_type="document",
+        entity_id=new_doc.pk,
+        object_id=target.pk,
+        after={
+            "from_document_id": doc.pk,
+            "score": score,
+            "reasons": proposal.reasons[:5],
+            "evidence": [e.get("text", "")[:80] for e in (top.get("evidence") or [])][:5],
+            **{
+                k: v for k, v in (context_extra or {}).get("ai", {}).items() if k in ("confidence", "call_id")
+            },
+        },
+    )
+    return new_doc
+
+
 def run_for_document(doc, *, job=None) -> dict:
+    """Ablauf: Datei spiegeln, Kandidaten bewerten. Eindeutig (auto) -> Uebernahme. Sonst greift der
+    KI-Schiedsrichter, sobald es Kandidaten gibt (Entscheidung 22.09.2026): sicherer Kandidat -> Uebernahme
+    (ai_auto), kein Objektdokument -> Fall ai_not_object im Eingang, sonst Pruefall mit KI-Einschaetzung. Ein fuer
+    dieses Dokument manuell verworfenes Objekt wird weder vom Regelwerk noch von der KI automatisch gewaehlt."""
     drive = services.get_drive()
     mirrored = mirror_to_inbox_folder(doc, drive) if drive is not None else None
-    proposal, ranked = build_proposal(doc)
+    text = document_text(doc)
+    proposal, ranked = build_proposal(doc, text=text)
     plain = [_to_plain(c) for c in ranked[:5]]
     try:
-        features = document_features(doc)
+        features = document_features(doc, text=text)
     except Exception:  # Merkmale dienen dem Lernen, nicht der Entscheidung
         logger.exception("Merkmalsextraktion fehlgeschlagen (Dokument %s)", doc.pk)
         features = {}
     if proposal.decision == "auto" and proposal.chosen is not None:
         target = ManagedObject.active.filter(pk=proposal.chosen.object_id).first()
         if target is not None:
-            from apps.documents.transfer import transfer_document
-
-            new_doc = transfer_document(
+            new_doc = _assign_auto(
                 doc,
                 target,
+                proposal=proposal,
+                plain=plain,
+                mirrored=mirrored,
+                subtype="auto",
                 reason=f"automatische Objektzuordnung ({proposal.chosen.score:.2f}): "
                 + "; ".join(proposal.reasons)[:200],
-            )
-            _carry_over_operations(doc, new_doc)
-            ReviewCase.objects.create(
-                object=target,
-                case_type=CaseType.OBJECT_ASSIGNMENT,
-                case_subtype="auto",
-                document=new_doc,
-                status=CaseStatus.RESOLVED,
-                batch_key=f"object_assignment:auto:{new_doc.pk}",
-                priority=90,
-                candidates=plain,
-                context={
-                    "reasons": proposal.reasons,
-                    "score": proposal.chosen.score,
-                    "from_document_id": doc.pk,
-                },
-                resolution={
-                    "action": "assign_object_auto",
-                    "object_id": target.pk,
-                    "at": timezone.now().isoformat(),
-                },
-                resolved_at=timezone.now(),
-            )
-            record(
-                "inbox.assign_auto",
-                entity_type="document",
-                entity_id=new_doc.pk,
-                object_id=target.pk,
-                after={
-                    "from_document_id": doc.pk,
-                    "score": proposal.chosen.score,
-                    "reasons": proposal.reasons[:5],
-                    "evidence": [e.get("text", "")[:80] for e in (plain[0].get("evidence") or [])][:5],
-                },
+                audit_action="inbox.assign_auto",
             )
             return {
                 "decision": "auto",
@@ -256,6 +293,75 @@ def run_for_document(doc, *, job=None) -> dict:
                 "document_id": new_doc.pk,
                 "mirrored": mirrored,
             }
+    ai = None
+    if ranked:
+        from apps.ai import assignment as arbiter
+
+        try:
+            ai = arbiter.arbitrate(doc, ranked, text=text, job=job)
+        except Exception:  # die KI darf die Zuordnung nie scheitern lassen; der Pruefall bleibt
+            logger.exception("KI-Schiedsrichter fehlgeschlagen (Dokument %s)", doc.pk)
+            ai = arbiter.ArbiterOutcome("provider_error", message="unerwarteter Fehler, siehe Log")
+    ai_context = {"ai": ai.to_context()} if ai is not None else {}
+    proposed_id = proposal.chosen.object_id if proposal.chosen else None
+    if ai is not None and ai.status == "ok":
+        from apps.ai import assignment as arbiter
+
+        if ai.is_object_document and ai.object_id and ai.confidence >= arbiter.min_confidence():
+            if ai.object_id in _rejected_object_ids(doc):
+                proposal.reasons.append(
+                    f"KI wählt Objekt {ai.object_number}, das für dieses Dokument bereits manuell verworfen "
+                    "wurde; nur Vorschlag"
+                )
+                proposed_id = ai.object_id
+            else:
+                target = ManagedObject.active.filter(pk=ai.object_id).first()
+                if target is not None:
+                    new_doc = _assign_auto(
+                        doc,
+                        target,
+                        proposal=proposal,
+                        plain=plain,
+                        mirrored=mirrored,
+                        subtype="ai_auto",
+                        reason=f"KI-Zuordnung ({ai.confidence:.2f}): {ai.reasoning or ''}",
+                        audit_action="inbox.assign_ai",
+                        context_extra=ai_context,
+                    )
+                    return {
+                        "decision": "ai_auto",
+                        "object_id": target.pk,
+                        "document_id": new_doc.pk,
+                        "mirrored": mirrored,
+                        "ai_call_id": ai.call_id,
+                    }
+        elif ai.is_object_document is False:
+            case = open_case(
+                doc.object,
+                case_type=CaseType.OBJECT_ASSIGNMENT,
+                subtype="ai_not_object",
+                key=f"object_assignment:{doc.pk}",
+                document=doc,
+                context={
+                    "reasons": proposal.reasons,
+                    "decision": proposal.decision,
+                    "mirrored": bool(mirrored),
+                    "features": features,
+                    **ai_context,
+                },
+                candidates=plain,
+                proposed_action=None,
+                priority=50,
+            )
+            return {
+                "decision": "ai_not_object",
+                "case_id": case.pk if case else None,
+                "candidates": len(ranked),
+                "mirrored": mirrored,
+                "ai_call_id": ai.call_id,
+            }
+        elif ai.object_id:
+            proposed_id = ai.object_id  # KI-Vorschlag unter der Mindestkonfidenz: als Vorschlag im Pruefall
     subtype = "proposal" if ranked else "no_candidate"
     case = open_case(
         doc.object,
@@ -268,11 +374,10 @@ def run_for_document(doc, *, job=None) -> dict:
             "decision": proposal.decision,
             "mirrored": bool(mirrored),
             "features": features,
+            **ai_context,
         },
         candidates=plain,
-        proposed_action={"action": "assign_object", "object_id": proposal.chosen.object_id}
-        if proposal.chosen
-        else None,
+        proposed_action={"action": "assign_object", "object_id": proposed_id} if proposed_id else None,
         priority=70,
     )
     return {
@@ -280,6 +385,7 @@ def run_for_document(doc, *, job=None) -> dict:
         "case_id": case.pk if case else None,
         "candidates": len(ranked),
         "mirrored": mirrored,
+        **({"ai_status": ai.status} if ai is not None else {}),
     }
 
 

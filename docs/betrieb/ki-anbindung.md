@@ -83,6 +83,26 @@ d ai-reclassify $B echt
 
 Der Nachklassifikationslauf nimmt nur offene Fälle `below_threshold` mit Grund Stufe 3 nicht freigegeben, KI nicht verfügbar oder Kostenlimit, die noch kein Mensch bearbeitet hat; Bestandsdateien in Drive werden weiterhin nie verschoben, sondern nur als Vorschlag gestellt.
 
+## KI-Schiedsrichter der Objektzuordnung (Zweck `assign_object`, seit 22.09.2026)
+
+Die KI greift immer, wenn die Anwendung ein Eingangsdokument nicht eindeutig einem Objekt zuordnen kann: Die lokale Bewertung (Anschriften, Objektnummern, Ordner, Regeln) ergibt keinen Automatismus (Prüffall oder kein Vorschlag), aber es gibt Kandidaten. Dann erhält der freigegebene Anbieter den maskierten Textauszug, den Dateinamen ohne Personennamen und die Kandidaten (Objektnummer, Verwaltungsart, alle Anschriften des Gebäudes einschließlich weiterer Anschriften von Eckobjekten, Bewertung, Belegarten). Keine Eigentümer- oder Mieternamen, keine Einheitenlisten.
+
+Die Antwort (Schema `apps.ai.assignment.response_json_schema`) enthält: `is_object_document` (ist es überhaupt ein Dokument eines verwalteten Objekts oder eine interne Unterlage, in der die Anschrift nur beiläufig vorkommt, etwa eine Fahrtkostenabrechnung mit der Anschrift als Fahrtziel), `object_number` (nur aus den Kandidaten oder null), `multiple_objects` (Sammelbeleg ohne Hauptbezug), `other_addresses_role` (Rolle weiterer Anschriften: same_object, billing_address, sender_address, neighbor, travel_destination, multiple_objects), `confidence`, `reasoning`.
+
+Wirkung im Eingang (`apps.sync.flows.assign.run_for_document`):
+
+| KI-Antwort | Ergebnis |
+|---|---|
+| Objektdokument, Kandidat mit Konfidenz mindestens `sync.assignment_ai_min` (0,85) | Übernahme in das Objekt wie beim Regelwerk (Fall `ai_auto` erledigt, Audit `inbox.assign_ai`, Grund „KI-Zuordnung“) |
+| Kandidat wurde für dieses Dokument bereits manuell verworfen (Lernbeispiel `reject`) | keine Übernahme, nur Vorschlag im Prüffall; der Mensch bleibt Herr der Entscheidung |
+| kein Objektdokument | Dokument bleibt im Eingang, offener Fall `ai_not_object` ohne Vorschlag |
+| Kandidat unter der Mindestkonfidenz, mehrere Objekte oder kein Kandidat | Prüffall wie bisher, der KI-Kandidat wird Vorschlag, die Einschätzung steht im Fall („KI-Einschätzung“ auf der Falldetailseite) |
+| KI nicht verfügbar (kein Anbieter, Preisliste 0, Monatsdeckel, Fehler) | Prüffall wie bisher mit dem Grund im Fall (`context.ai.status`) |
+
+Kosten und Schutz: Jeder Aufruf steht in `ai_calls` mit `purpose = assign_object`, Kosten nach `ai.price_list`, Circuit Breaker und Wiederholungen wie in Stufe 3. Die Aufrufe werden am Eingangsobjekt protokolliert; dort gilt statt des Kostenlimits je Objekt (`ai.providers.<p>.cost_limit_eur_per_object`, das für das Eingangsobjekt eine versteckte Gesamtsperre wäre) der Monatsdeckel des Anbieters `ai.monthly_budget_eur` (null = kein Deckel). Abschalten ohne Deploy: `sync.assignment_ai_enabled = false` (Deploy-Aktion `config-set`). Lokal senkt die Rolle „Fahrtziel“ (Wörter wie Fahrtziel, Reisekosten, Dienstfahrt vor der Anschrift) das Gewicht einer Anschrift, sodass solche Dokumente nicht mehr automatisch zugeordnet werden, sondern zur KI gehen.
+
+Deploy-Aktion `ai-check` zeigt Anbieter, Preisliste und Probe; die Aufrufe der letzten 24 Stunden sind dort nach Anbieter, Zweck (`classify`, `assign_object`) und Status mit Kosten aufgeführt.
+
 ## Kontrolle im Betrieb
 
 - `d ai-check $B`: Aufrufe der letzten 24 Stunden je Anbieter und Status mit Kosten nach Preisliste.

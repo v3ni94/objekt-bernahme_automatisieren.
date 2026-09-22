@@ -283,3 +283,22 @@ def test_evidence_serialisierung():
     )
     data = evidence_to_dicts([ev, {"kind": "x"}, "ignoriert"])
     assert data[0]["weight"] == 0.8 and data[0]["object_id"] == 1 and data[1] == {"kind": "x"}
+
+
+def test_fahrtziel_zaehlt_kaum_und_bleibt_pruefall(index):
+    """Objektanschrift als Fahrtziel einer Fahrtkostenabrechnung (Pilot 82): Rolle travel, kleines Gewicht,
+    kein Automatismus; der KI-Schiedsrichter prueft solche Faelle."""
+    ranked = score_candidates(
+        "Fahrtkostenabrechnung September 2026. Fahrtziel: Musterweg 1, 12345 Musterstadt. 24 km",
+        index=index,
+        own_addresses=OWN,
+    )
+    assert ranked and ranked[0].object_id == 1
+    treffer = [e for e in ranked[0].evidence if e.kind == "address"]
+    assert treffer and treffer[0].role == "travel" and treffer[0].details["role_word"] == "fahrtziel"
+    assert ranked[0].score < 0.85
+    assert decide(ranked, Thresholds()).decision == "review"
+    normal = score_candidates(
+        "Wartung Heizung im Objekt Musterweg 1, 12345 Musterstadt", index=index, own_addresses=OWN
+    )
+    assert decide(normal, Thresholds()).decision == "auto"

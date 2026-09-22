@@ -13,6 +13,7 @@ class AiPurpose(models.TextChoices):
     CLASSIFY = "classify", "Klassifikation"
     EXTRACT_ENTITIES = "extract_entities", "Entitäten"
     PARSE_LIST = "parse_list", "Liste einlesen"
+    ASSIGN_OBJECT = "assign_object", "Objektzuordnung"
     OTHER = "other", "sonstiges"
 
 

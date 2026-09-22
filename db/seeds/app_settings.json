@@ -618,6 +618,8 @@
   "sync.inbox_object_number": "0",
   "sync.assignment_auto_min": 0.85,
   "sync.assignment_gap_min": 0.25,
+  "sync.assignment_ai_enabled": true,
+  "sync.assignment_ai_min": 0.85,
   "sync.rule_min_confirmations": 2,
   "sync.operation_max_attempts": 5,
   "sync.inventory_page_size": 200
