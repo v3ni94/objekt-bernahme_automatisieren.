@@ -86,11 +86,12 @@ def image_to_pdf(image_path: Path, target: Path) -> Path:
                 buf = target.with_suffix(f".p{i}.png")
                 im.convert("RGB").save(buf)
                 pages.append(buf)
-            target.write_bytes(img2pdf.convert([str(p) for p in pages]))
+            target.write_bytes(img2pdf.convert([str(p) for p in pages], rotation=img2pdf.Rotation.ifvalid))
             for p in pages:
                 p.unlink(missing_ok=True)
             return target
-    target.write_bytes(img2pdf.convert(str(image_path)))
+    # rotation=ifvalid (23.09.2026): 24 Scans trugen EXIF-Drehung 0 und scheiterten mit ExifOrientationError
+    target.write_bytes(img2pdf.convert(str(image_path), rotation=img2pdf.Rotation.ifvalid))
     return target
 
 

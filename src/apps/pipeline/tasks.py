@@ -483,6 +483,53 @@ def ocr_chunk(job: ProcessingJob) -> dict:
 
 
 # ---------------------------------------------------------------- 5 merge_pages und render_previews
+
+# Seitentexte: eine dichte A4-Seite hat rund 5.000 Zeichen. 23.09.2026: 26 Dokumente in Objekt 503 hatten entartete
+# Textebenen mit bis zu 12,4 Mio. Zeichen je Seite; das Einfuegen scheiterte an max_allowed_packet (16 MB, Fehler 1153).
+MAX_PAGE_CHARS = 200_000
+BULK_BYTES = 4_000_000
+
+
+def _cap_page_text(text: str, *, doc_pk: int, page_no: int) -> str:
+    if len(text) <= MAX_PAGE_CHARS:
+        return text
+    logger.warning(
+        "Dokument %s Seite %s: Seitentext %s Zeichen, auf %s gekuerzt",
+        doc_pk,
+        page_no,
+        len(text),
+        MAX_PAGE_CHARS,
+    )
+    return text[:MAX_PAGE_CHARS]
+
+
+def _batches_by_bytes(rows, limit: int = BULK_BYTES):
+    """Zeilen so buendeln, dass ein Einfuegepaket unter limit Bytes bleibt (mindestens eine Zeile je Paket)."""
+    batch: list = []
+    size = 0
+    for row in rows:
+        n = len((row.text_content or "").encode("utf-8")) + 512
+        if batch and size + n > limit:
+            yield batch
+            batch, size = [], 0
+        batch.append(row)
+        size += n
+    if batch:
+        yield batch
+
+
+def _known_subfolder(category: str | None, code: str | None) -> str | None:
+    """Unterordnercode nur weitergeben, wenn er im Katalog der Kategorie existiert; sonst Hauptordner (23.09.2026)."""
+    if not category or not code:
+        return code
+    from apps.documents.models import DocumentSubfolder
+
+    if DocumentSubfolder.objects.filter(category_id=category, code=code).exists():
+        return code
+    logger.warning("Unterordner %s/%s nicht im Katalog, Ablage im Hauptordner", category, code)
+    return None
+
+
 @job_task(JobType.MERGE_PAGES)
 def merge_pages(job: ProcessingJob) -> dict:
     doc = job.document
@@ -501,6 +548,7 @@ def merge_pages(job: ProcessingJob) -> dict:
             missing.append(page_no)
             continue
         text, hits, meta = cached
+        text = _cap_page_text(text, doc_pk=doc.pk, page_no=page_no)
         source = meta.get("source") or "ocr"
         rows.append(
             DocumentPage(
@@ -524,7 +572,8 @@ def merge_pages(job: ProcessingJob) -> dict:
         if doc.status != "hashed":
             raise SkipJob("already_processed")
         DocumentPage.objects.filter(document=doc).delete()
-        DocumentPage.objects.bulk_create(rows, batch_size=500)
+        for batch in _batches_by_bytes(rows):
+            DocumentPage.objects.bulk_create(batch)
         doc.status = "ocr_done"
         doc.ocr_cache_key = doc.sha256
         doc.page_count = page_count
@@ -874,7 +923,7 @@ def decide_task(job: ProcessingJob) -> dict:
         run=job.run,
         payload={
             "category": decision.physical_category,
-            "subfolder": decision.physical_subfolder,
+            "subfolder": _known_subfolder(decision.physical_category, decision.physical_subfolder),
             "owner_file_id": next((link.owner_file_id for link in decision.links if link.primary), None)
             or decision.physical_owner_file_id,
             "link_subfolder": next((link.subfolder for link in decision.links if link.primary), None),

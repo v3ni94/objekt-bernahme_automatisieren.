@@ -410,6 +410,18 @@ def _segment_entities(ctx: DocContext, page_from: int, page_to: int, key: str) -
 
 
 # ---------------------------------------------------------------- Entscheidung
+
+
+def _misc_subfolder(s1: Stage1Result) -> str:
+    """Unterordner unter 06: nur aus Regeln, die selbst 06 setzen, und nur, wenn der Katalog ihn kennt, sonst 01.
+    23.09.2026: 47 Ablagen scheiterten mit DoesNotExist, weil die Abstufung nach 06 den Stufe-1-Unterordner der
+    Ursprungskategorie (08 bis 14) ungeprueft als physischen Unterordner uebernahm."""
+    sub = s1.subfolder if s1.category == "06" else None
+    if sub and not DocumentSubfolder.objects.filter(category_id="06", code=sub).exists():
+        sub = None
+    return sub or "01"
+
+
 def decide(
     ctx: DocContext,
     s1: Stage1Result,
@@ -562,7 +574,7 @@ def _decide_core(
         return base
     category = base.category
     if category == "06":
-        sub = s1.subfolder or "01"
+        sub = _misc_subfolder(s1)
         base.physical_category, base.physical_subfolder = "06", sub
         subtype = s1.subtype or ("foreign_object" if sub == "04" else "manual_check")
         proposal = None

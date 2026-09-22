@@ -1077,6 +1077,24 @@ PY
     echo "--- Docker-Volumes nach Groesse (ganzer Host, nur Namen) ---"
     docker system df -v 2>/dev/null | awk "/^VOLUME NAME/{f=1;next} f&&NF==0{f=0} f{print \$1, \$NF}" | sort -k2 -rh | head -12 || true
     ;;
+  fehler-wiederaufnehmen)
+    # Dokumente im Status Fehler gezielt wieder in die Kette nehmen, auch jenseits der drei automatischen
+    # Wiederaufnahmen (nach einer Fehlerkorrektur im Code). Argumente mit + getrennt: objekt=503,
+    # klasse=DoesNotExist,OperationalError (Fehlerklasse des letzten fehlgeschlagenen Jobs), echt. Ohne echt
+    # Vorschau. Danach die Verarbeitung starten: verarbeitung-alle echt.
+    args=()
+    IFS='+' read -r -a parts <<< "${ARG:-}"
+    for p in "${parts[@]}"; do
+      case "$p" in
+        echt) args+=(--echt) ;;
+        objekt=*) args+=(--objekt "${p#objekt=}") ;;
+        klasse=*) args+=(--fehlerklasse "${p#klasse=}") ;;
+        '') ;;
+        *) echo "Unbekanntes Argument: $p (erlaubt: objekt=NR, klasse=A,B, echt)"; exit 2 ;;
+      esac
+    done
+    docker compose exec -T web python manage.py fehler_wiederaufnehmen "${args[@]}"
+    ;;
   lauf-monitor)
     # Fortschritt der Verarbeitung live (nur lesend): alle N Sekunden (Argument, Standard 10, mindestens 5) eine Zeile
     # mit Laeufen nach Status, offenen Jobs nach Art, Fortschritt in Prozent, Durchsatz und Hochrechnung des Endes aus
@@ -1223,5 +1241,5 @@ PY
     done
     echo "wirksam mit der Aktion deploy; Sicherung .env.bak"
     ;;
-  *) echo "Nur check, pull, befund, env-init, ps, logs, smoke, cert-retry, db-status, db-reset, first-run, deploy, rollback, create-admin, oauth-check, deploy-tests, doc-status, config-set, altbestand-import, altbestand-objekte, altbestand-aufarbeiten, verarbeitung-alle, paperless-feld-alle, redis-status, env-set, jobs-bereinigen, disk-status, lauf-monitor, transit-bereinigen, worker-drosseln, work-bereinigen, last-status, worker-stop, worker-start, ai-check, ai-reclassify, review-status, sync-status, sync-retry, classifier-status, zuordnung-pruefen, objekt-anschriften, paperless-feld-abgleich, backup-voll oder reconcile-all erlaubt"; exit 2 ;;
+  *) echo "Nur check, pull, befund, env-init, ps, logs, smoke, cert-retry, db-status, db-reset, first-run, deploy, rollback, create-admin, oauth-check, deploy-tests, doc-status, config-set, altbestand-import, altbestand-objekte, altbestand-aufarbeiten, verarbeitung-alle, paperless-feld-alle, redis-status, env-set, jobs-bereinigen, disk-status, lauf-monitor, fehler-wiederaufnehmen, transit-bereinigen, worker-drosseln, work-bereinigen, last-status, worker-stop, worker-start, ai-check, ai-reclassify, review-status, sync-status, sync-retry, classifier-status, zuordnung-pruefen, objekt-anschriften, paperless-feld-abgleich, backup-voll oder reconcile-all erlaubt"; exit 2 ;;
 esac
