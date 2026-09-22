@@ -785,6 +785,20 @@ except (store.UnknownSetting, ValidationError, ValueError) as exc:
     print(f"config-set abgelehnt: {exc}")
     raise SystemExit(2)
 print(f"{key}: {before!r} -> {store.get(key)!r}")
+if key == "ai.price_list":
+    nullpreise = [
+        f"{m} ({feld})"
+        for m, p in ((store.get(key) or {}).get("models") or {}).items()
+        for feld in ("input_per_1k", "output_per_1k")
+        if not (p or {}).get(feld)
+    ]
+    if nullpreise:
+        print(
+            "WARNUNG: Preis 0 oder fehlend bei "
+            + ", ".join(nullpreise)
+            + ". Der Router blockiert Aufrufe dieses Modells weiterhin (budget_blocked), bis beide Preise "
+            "groesser 0 sind (EUR je 1.000 Token, Dezimalpunkt)."
+        )
 PY
     ;;
   altbestand-import)
