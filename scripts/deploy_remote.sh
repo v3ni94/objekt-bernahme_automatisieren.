@@ -35,6 +35,7 @@
 #   paperless-feld-alle <branch> [echt] Feld MHV Objekt fuer alle zugeordneten Speicherpfade setzen und Bestandslauf starten
 #   paperless-feld-abgleich <branch> <objekt>[+echt]  Feld MHV Objekt je Dokument gegen die Zuordnung pruefen; echt uebernimmt Abweichungen (leer -> Eingang)
 #   objekt-anschriften <branch> [echt]  Weitere Anschriften (Eckobjekte) aus den Objektbezeichnungen ableiten (echt = speichern, sonst Vorschau)
+#   zuordnung-pruefen <branch> [<objekt>][+echt][+details][+ohne-ki][+limit=N]  Gegenprobe der Objektzuordnung fuer Paperless-Feldimporte (Vorschau ohne KI; echt loest mit KI auf)
 #   altbestand-aufarbeiten <branch> [echt] Alle Altbestand-Ordner mit Objekt aufarbeiten (echt = Celery-Aufgabe, sonst Vorschau)
 #   verarbeitung-alle <branch> [echt] Verarbeitungslaeufe fuer alle Objekte mit offener Arbeit (echt = einreihen)
 #   review-status <branch> [<objekt>]   Offene Pruefcenter-Faelle je Art und Unterart, Vorschlaege, KI-Nachklassifizierbarkeit (keine Personendaten)
@@ -811,6 +812,24 @@ PY
     else
       docker compose exec -T web python manage.py paperless_feld_abgleich "$obj"
     fi
+    ;;
+  zuordnung-pruefen)
+    # Gegenprobe der Objektzuordnung: "<objekt>" beschraenkt, "echt" loest auf, "details" listet, "ohne-ki",
+    # "limit=N" begrenzt die Aufloesungen je Lauf; Vorschau ruft keine KI
+    args=()
+    IFS='+' read -r -a teile <<<"${ARG:-}"
+    for t in "${teile[@]}"; do
+      case "$t" in
+        "") ;;
+        echt) args+=(--echt) ;;
+        details) args+=(--details) ;;
+        ohne-ki) args+=(--ohne-ki) ;;
+        limit=*) n="${t#limit=}"; case "$n" in *[!0-9]*|"") echo "limit braucht eine Zahl"; exit 2 ;; esac; args+=(--limit "$n") ;;
+        *[!0-9]*) echo "Argument unbekannt: $t (erlaubt: Objektnummer, echt, details, ohne-ki, limit=N)"; exit 2 ;;
+        *) args+=(--objekt "$t") ;;
+      esac
+    done
+    docker compose exec -T web python manage.py paperless_zuordnung_pruefen "${args[@]}"
     ;;
   objekt-anschriften)
     # Weitere Anschriften (Eckobjekte, mehrere Hausnummern) aus den Objektbezeichnungen ableiten; "echt" speichert

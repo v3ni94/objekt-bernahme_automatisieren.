@@ -99,6 +99,8 @@ Wirkung im Eingang (`apps.sync.flows.assign.run_for_document`):
 | Kandidat unter der Mindestkonfidenz, mehrere Objekte oder kein Kandidat | Prüffall wie bisher, der KI-Kandidat wird Vorschlag, die Einschätzung steht im Fall („KI-Einschätzung“ auf der Falldetailseite) |
 | KI nicht verfügbar (kein Anbieter, Preisliste 0, Monatsdeckel, Fehler) | Prüffall wie bisher mit dem Grund im Fall (`context.ai.status`) |
 
+Derselbe Schiedsrichter prüft Feldimporte aus Paperless mit zweitem oder nur beiläufigem Objektbezug (Gegenprobe, docs/betrieb/paperless-sync.md Abschnitt 6); dort steht das Feldobjekt als erster Kandidat mit dem Beleg `paperless_field`.
+
 Kosten und Schutz: Jeder Aufruf steht in `ai_calls` mit `purpose = assign_object`, Kosten nach `ai.price_list`, Circuit Breaker und Wiederholungen wie in Stufe 3. Die Aufrufe werden am Eingangsobjekt protokolliert; dort gilt statt des Kostenlimits je Objekt (`ai.providers.<p>.cost_limit_eur_per_object`, das für das Eingangsobjekt eine versteckte Gesamtsperre wäre) der Monatsdeckel des Anbieters `ai.monthly_budget_eur` (null = kein Deckel). Abschalten ohne Deploy: `sync.assignment_ai_enabled = false` (Deploy-Aktion `config-set`). Lokal senkt die Rolle „Fahrtziel“ (Wörter wie Fahrtziel, Reisekosten, Dienstfahrt vor der Anschrift) das Gewicht einer Anschrift, sodass solche Dokumente nicht mehr automatisch zugeordnet werden, sondern zur KI gehen.
 
 Deploy-Aktion `ai-check` zeigt Anbieter, Preisliste und Probe; die Aufrufe der letzten 24 Stunden sind dort nach Anbieter, Zweck (`classify`, `assign_object`) und Status mit Kosten aufgeführt.

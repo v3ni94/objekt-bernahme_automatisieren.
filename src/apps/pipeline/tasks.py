@@ -814,6 +814,23 @@ def decide_task(job: ProcessingJob) -> dict:
             )
         return {"category": decision.category, "document_type": decision.document_type, "inbox": True}
     final = decide_mod.persist(doc, ctx, s1, s2, decision, run=job.run, dry_run=dry_run)
+    if not dry_run:
+        # Gegenprobe der Objektzuordnung fuer Feldimporte aus Paperless (Entscheidung 22.09.2026): zweiter oder nur
+        # beilaeufiger Objektbezug geht an den KI-Schiedsrichter; ein umgehaengtes Dokument wird hier nicht abgelegt
+        from apps.sync.flows import crosscheck
+
+        if crosscheck.applies(doc, live=True):
+            try:
+                gegenprobe = crosscheck.run(doc, job=job)
+            except Exception:  # die Gegenprobe darf die Entscheidung nicht scheitern lassen
+                logger.exception("Gegenprobe Feldimport fehlgeschlagen (Dokument %s)", doc.pk)
+                gegenprobe = None
+            if gegenprobe and gegenprobe.get("action") in ("umgehaengt", "eingang"):
+                return {
+                    "category": decision.category,
+                    "document_type": decision.document_type,
+                    "crosscheck": gegenprobe,
+                }
     result = {
         "category": decision.category,
         "subfolder": decision.subfolder,

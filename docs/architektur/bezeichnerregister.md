@@ -491,6 +491,7 @@ Modell `documents.Document`. documents.
 | page_count | integer UNSIGNED | ja |  |
 | origin_kind | varchar(16) | ja | digital, scan, mixed |
 | ocr_cache_key | varchar(160) | ja |  |
+| assignment_checked_at | datetime(6) | ja |  |
 | status | varchar(16) | nein | registered, hashed, ocr_done, classified, filed, review, duplicate, moved_out, error |
 | duplicate_of_document_id | bigint | ja | → documents.id |
 | category_code | varchar(2) | ja | → document_categories.code |

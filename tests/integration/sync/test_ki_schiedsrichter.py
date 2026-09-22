@@ -5,17 +5,11 @@ Eingangsdokuments nicht eindeutig ist. Sicherer Kandidat -> Uebernahme (ai_auto)
 
 from __future__ import annotations
 
-from decimal import Decimal
-
 import pytest
 from django.urls import reverse
 from tests.integration.sync.conftest import pdf_bytes
 
-from apps.ai import assignment as arbiter
-from apps.ai.fakes import FakeClassificationProvider
 from apps.ai.models import AiCall
-from apps.ai.provider import PriceList, ProviderConfig
-from apps.ai.router import Router
 from apps.audit.models import AuditEvent
 from apps.config import store
 from apps.documents import ingest
@@ -55,28 +49,6 @@ def _antwort(**over) -> dict:
     }
     base.update(over)
     return base
-
-
-@pytest.fixture
-def ki(monkeypatch):
-    """Fake-Anbieter als Router des Schiedsrichters; liefert den Provider zur Pruefung der gesendeten Requests."""
-
-    def setze(answer: dict, script: list[str] | None = None) -> FakeClassificationProvider:
-        p = FakeClassificationProvider("openai", answer=answer, script=script)
-        router = Router(
-            {"openai": p},
-            configs={
-                "openai": ProviderConfig(
-                    name="openai", enabled=True, model="openai-testmodell", timeout_s=5, max_attempts=2
-                )
-            },
-            price_list=PriceList("test-2026-09", {"openai-testmodell": (Decimal("0.001"), Decimal("0.004"))}),
-            order=["openai"],
-        )
-        monkeypatch.setattr(arbiter, "default_router", lambda: router)
-        return p
-
-    return setze
 
 
 def _job(eingang, doc) -> ProcessingJob:

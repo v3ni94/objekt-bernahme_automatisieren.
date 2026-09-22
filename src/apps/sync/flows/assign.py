@@ -184,6 +184,18 @@ def build_proposal(doc, *, text: str | None = None):
     return proposal, ranked
 
 
+def _open_assignment_case(doc) -> ReviewCase | None:
+    return (
+        ReviewCase.objects.filter(
+            document=doc,
+            case_type=CaseType.OBJECT_ASSIGNMENT,
+            status__in=[CaseStatus.OPEN, CaseStatus.IN_PROGRESS],
+        )
+        .order_by("-id")
+        .first()
+    )
+
+
 def _rejected_object_ids(doc) -> set[int]:
     """Objekte, die fuer dieses Dokument bereits manuell verworfen wurden (Ablehnung im Pruefcenter oder Herausnahme
     ueber den Feldabgleich Paperless). Ein einziger Adresstreffer im Text (Objektadresse als Fahrtziel einer
@@ -294,14 +306,20 @@ def run_for_document(doc, *, job=None) -> dict:
                 "mirrored": mirrored,
             }
     ai = None
+    existing_case = _open_assignment_case(doc)
     if ranked:
         from apps.ai import assignment as arbiter
 
-        try:
-            ai = arbiter.arbitrate(doc, ranked, text=text, job=job)
-        except Exception:  # die KI darf die Zuordnung nie scheitern lassen; der Pruefall bleibt
-            logger.exception("KI-Schiedsrichter fehlgeschlagen (Dokument %s)", doc.pk)
-            ai = arbiter.ArbiterOutcome("provider_error", message="unerwarteter Fehler, siehe Log")
+        vorhanden = ((existing_case.context or {}).get("ai") if existing_case else None) or {}
+        if vorhanden.get("status") == "ok":
+            # Einschaetzung aus der Gegenprobe des Feldimports: dasselbe Dokument wird nicht erneut angefragt
+            ai = arbiter.ArbiterOutcome.from_context(vorhanden)
+        else:
+            try:
+                ai = arbiter.arbitrate(doc, ranked, text=text, job=job)
+            except Exception:  # die KI darf die Zuordnung nie scheitern lassen; der Pruefall bleibt
+                logger.exception("KI-Schiedsrichter fehlgeschlagen (Dokument %s)", doc.pk)
+                ai = arbiter.ArbiterOutcome("provider_error", message="unerwarteter Fehler, siehe Log")
     ai_context = {"ai": ai.to_context()} if ai is not None else {}
     proposed_id = proposal.chosen.object_id if proposal.chosen else None
     if ai is not None and ai.status == "ok":
@@ -355,7 +373,7 @@ def run_for_document(doc, *, job=None) -> dict:
             )
             return {
                 "decision": "ai_not_object",
-                "case_id": case.pk if case else None,
+                "case_id": case.pk if case else (existing_case.pk if existing_case else None),
                 "candidates": len(ranked),
                 "mirrored": mirrored,
                 "ai_call_id": ai.call_id,

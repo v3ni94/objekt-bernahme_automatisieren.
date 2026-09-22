@@ -180,11 +180,29 @@ class ArbiterOutcome:
             parts.append(self.reasoning)
         return "; ".join(parts)
 
+    @classmethod
+    def from_context(cls, ctx: dict) -> ArbiterOutcome:
+        """Einschaetzung aus einem gespeicherten Fallkontext (kein zweiter Aufruf fuer dasselbe Dokument)."""
+        return cls(
+            str(ctx.get("status") or "provider_error"),
+            object_id=ctx.get("object_id"),
+            object_number=ctx.get("object_number"),
+            is_object_document=ctx.get("is_object_document"),
+            multiple_objects=bool(ctx.get("multiple_objects")),
+            other_addresses_role=ctx.get("other_addresses_role"),
+            confidence=float(ctx.get("confidence") or 0.0),
+            reasoning=ctx.get("reasoning"),
+            provider=ctx.get("provider"),
+            call_id=ctx.get("call_id"),
+            message=ctx.get("message"),
+        )
+
     def to_context(self) -> dict:
         return {
             "status": self.status,
             "provider": self.provider,
             "call_id": self.call_id,
+            "object_id": self.object_id,
             "object_number": self.object_number,
             "is_object_document": self.is_object_document,
             "multiple_objects": self.multiple_objects,
@@ -225,7 +243,7 @@ def candidate_payload(objects_by_id: dict, ranked, *, limit: int = MAX_CANDIDATE
                 "belege": [
                     f"{e.kind}" + (f" ({e.role})" if e.role else "") + f": {e.text[:80]}"
                     for e in c.evidence
-                    if e.kind in ("address", "object_number", "folder", "rule")
+                    if e.kind in ("address", "object_number", "folder", "rule", "paperless_field")
                 ][:6],
                 "widersprueche": list(c.contradictions)[:4],
             }

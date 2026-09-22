@@ -240,6 +240,11 @@ class Document(SoftDeleteModel):
     page_count = models.PositiveIntegerField(null=True, blank=True)
     origin_kind = models.CharField(max_length=16, choices=OriginKind.choices, null=True, blank=True)
     ocr_cache_key = models.CharField(max_length=160, null=True, blank=True)
+    assignment_checked_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Gegenprobe der Objektzuordnung (Feldimport aus Paperless) abgeschlossen am",
+    )
     status = models.CharField(
         max_length=16, choices=DocumentStatus.choices, default=DocumentStatus.REGISTERED
     )

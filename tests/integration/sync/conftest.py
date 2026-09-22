@@ -5,10 +5,15 @@ Zugangsdaten (Token sind erkennbare Testwerte)."""
 from __future__ import annotations
 
 import io
+from decimal import Decimal
 
 import pytest
 from django.conf import settings
 
+from apps.ai import assignment as arbiter
+from apps.ai.fakes import FakeClassificationProvider
+from apps.ai.provider import PriceList, ProviderConfig
+from apps.ai.router import Router
 from apps.config import store
 from apps.objects.models import ManagedObject
 from apps.sync import operations, services
@@ -156,3 +161,26 @@ def run_ops(*, include_deferred: bool = True) -> list[dict]:
 @pytest.fixture
 def ops():
     return run_ops
+
+
+@pytest.fixture
+def ki(monkeypatch):
+    """KI-Schiedsrichter mit Fake-Anbieter (assign_object): setze(antwort) haengt einen Router mit dieser Antwort ein
+    und liefert den Provider zur Pruefung der gesendeten Requests."""
+
+    def setze(answer: dict, script: list[str] | None = None) -> FakeClassificationProvider:
+        p = FakeClassificationProvider("openai", answer=answer, script=script)
+        router = Router(
+            {"openai": p},
+            configs={
+                "openai": ProviderConfig(
+                    name="openai", enabled=True, model="openai-testmodell", timeout_s=5, max_attempts=2
+                )
+            },
+            price_list=PriceList("test-2026-09", {"openai-testmodell": (Decimal("0.001"), Decimal("0.004"))}),
+            order=["openai"],
+        )
+        monkeypatch.setattr(arbiter, "default_router", lambda: router)
+        return p
+
+    return setze
