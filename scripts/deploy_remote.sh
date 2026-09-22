@@ -1077,6 +1077,126 @@ PY
     echo "--- Docker-Volumes nach Groesse (ganzer Host, nur Namen) ---"
     docker system df -v 2>/dev/null | awk "/^VOLUME NAME/{f=1;next} f&&NF==0{f=0} f{print \$1, \$NF}" | sort -k2 -rh | head -12 || true
     ;;
+  lauf-monitor)
+    # Fortschritt der Verarbeitung live (nur lesend): alle N Sekunden (Argument, Standard 10, mindestens 5) eine Zeile
+    # mit Laeufen nach Status, offenen Jobs nach Art, Fortschritt in Prozent, Durchsatz und Hochrechnung des Endes aus
+    # der Abnahme der offenen Jobs seit Monitorstart; einmal je Minute die Dokumente der betroffenen Objekte nach
+    # Status. Vorab die fehlgeschlagenen Jobs der Laeufe der letzten 24 h nach Art und Fehlerklasse (Meldungen ohne
+    # Dateinamen). Endet von selbst, wenn nichts mehr offen ist; Strg+C beendet nur den Monitor, nie die Verarbeitung.
+    SEK="${ARG:-10}"
+    case "$SEK" in ''|*[!0-9]*) echo "Intervall muss aus Ziffern bestehen (Sekunden)"; exit 2 ;; esac
+    docker compose exec -T -e MON_SEK="$SEK" web python manage.py shell <<'PY'
+import os, re, time
+from collections import Counter
+from datetime import timedelta
+from zoneinfo import ZoneInfo
+from django.db.models import Count
+from django.utils import timezone
+from apps.documents.models import Document
+from apps.pipeline.models import JobStatus, ProcessingJob, ProcessingRun, RunStatus
+
+TZ = ZoneInfo("Europe/Berlin")
+sek = max(5, int(os.environ.get("MON_SEK") or 10))
+max_ticks = int(os.environ.get("MON_TICKS") or 0)  # 0 = unbegrenzt (nur fuer Tests gesetzt)
+OFFEN = (JobStatus.PENDING, JobStatus.RUNNING)
+ERLEDIGT = (JobStatus.DONE, JobStatus.FAILED, JobStatus.SKIPPED)
+LAUF_TXT = {"pending": "wartet", "running": "laeuft", "done": "fertig", "failed": "fehlgeschlagen", "aborted": "abgebrochen"}
+DOK_TXT = {
+    "registered": "registriert", "hashed": "Hash bekannt", "ocr_done": "Text erkannt",
+    "classified": "klassifiziert (Ablage offen)", "filed": "abgelegt", "review": "in Pruefung",
+    "duplicate": "Dubletten", "moved_out": "umgehaengt", "error": "Fehler",
+}
+
+
+def mask(text):
+    text = re.sub(r"\S+\.(pdf|PDF|docx?|xlsx?|jpe?g|png|tiff?|msg|eml|zip)\b", "[DATEI]", text or "")
+    return re.sub(r"\b[0-9a-f]{20,}\b", "[ID]", text)[:70]
+
+
+def uhr(dt):
+    return dt.astimezone(TZ).strftime("%H:%M:%S")
+
+
+def tsd(n):
+    return f"{n:,}".replace(",", ".")
+
+
+seit = timezone.now() - timedelta(hours=24)
+runs = ProcessingRun.objects.filter(created_at__gte=seit, dry_run=False)
+run_ids = list(runs.values_list("id", flat=True))
+obj_ids = list(runs.values_list("object_id", flat=True).distinct())
+print(f"Laufmonitor, Intervall {sek} s, Laeufe der letzten 24 h: {len(run_ids)} in {len(obj_ids)} Objekten "
+      "(Strg+C beendet nur den Monitor, die Verarbeitung laeuft weiter)", flush=True)
+if not run_ids:
+    print("Keine Laeufe in den letzten 24 h, nichts zu beobachten.")
+    raise SystemExit
+jobs = ProcessingJob.objects.filter(run_id__in=run_ids)
+fails = Counter()
+for j in jobs.filter(status=JobStatus.FAILED).only("job_type", "error_class", "last_error").iterator():
+    letzte = (j.last_error or "").strip().splitlines()
+    fails[(j.job_type, j.error_class or "-", mask(letzte[-1] if letzte else ""))] += 1
+if fails:
+    print(f"--- fehlgeschlagene Jobs dieser Laeufe: {sum(fails.values())} (Art, Fehlerklasse, Meldung ohne Dateinamen) ---")
+    for (art, kl, msg), n in fails.most_common(8):
+        print(f"  {n:5d}  {art:18s} {kl:30s} {msg}")
+print("--- Verlauf (Zeit | Laeufe | Jobs | Fortschritt | Durchsatz | Hochrechnung) ---", flush=True)
+
+
+def dokumente():
+    c = Counter()
+    for r in Document.objects.filter(object_id__in=obj_ids, deleted_at__isnull=True).values("status").annotate(c=Count("id")):
+        c[r["status"]] = r["c"]
+    teile = [f"{DOK_TXT.get(k, k)} {tsd(v)}" for k, v in c.most_common()]
+    return "    Dokumente der Objekte: " + (", ".join(teile) or "keine")
+
+
+start = timezone.now()
+offen_start = None
+tick = 0
+try:
+    while True:
+        jetzt = timezone.now()
+        laeufe = Counter({r["status"]: r["c"] for r in runs.values("status").annotate(c=Count("id"))})
+        st = Counter({r["status"]: r["c"] for r in jobs.values("status").annotate(c=Count("id"))})
+        je_art = {r["job_type"]: r["c"] for r in jobs.filter(status__in=OFFEN).values("job_type").annotate(c=Count("id"))}
+        offen = sum(je_art.values())
+        erledigt = sum(st.get(s, 0) for s in ERLEDIGT)
+        gesamt = offen + erledigt
+        if offen_start is None:
+            offen_start = offen
+        minuten = (jetzt - start).total_seconds() / 60
+        fertig_seit_start = jobs.filter(status__in=ERLEDIGT, finished_at__gte=start).count()
+        durchsatz = fertig_seit_start / minuten if minuten >= 0.5 else None
+        abnahme = (offen_start - offen) / minuten if minuten >= 1 else None
+        if offen == 0:
+            prognose = "nichts mehr offen"
+        elif abnahme is None:
+            prognose = "Hochrechnung ab 1 min"
+        elif abnahme <= 0:
+            prognose = "keine Abnahme messbar (neue Jobs kommen nach)"
+        else:
+            ende = jetzt + timedelta(minutes=offen / abnahme)
+            prognose = f"fertig ca. {uhr(ende)} (Abnahme {abnahme:.1f} Jobs/min)"
+        lauf_txt = " ".join(f"{LAUF_TXT.get(k, k)} {v}" for k, v in sorted(laeufe.items()))
+        arten = ", ".join(f"{k} {tsd(v)}" for k, v in sorted(je_art.items(), key=lambda kv: -kv[1])[:4])
+        prozent = f"{100 * erledigt / gesamt:.1f} %".replace(".", ",") if gesamt else "-"
+        ds = f"{durchsatz:.1f} Jobs/min" if durchsatz is not None else "Durchsatz ab 30 s"
+        print(f"{uhr(jetzt)} | Laeufe: {lauf_txt} | Jobs offen {tsd(offen)}" + (f" ({arten})" if arten else "")
+              + f", erledigt {tsd(erledigt)}, davon fehlgeschlagen {tsd(st.get('failed', 0))} | {prozent} | {ds} | {prognose}",
+              flush=True)
+        if tick % 6 == 0:
+            print(dokumente(), flush=True)
+        tick += 1
+        if offen == 0 and not (laeufe.get("pending") or laeufe.get("running")):
+            print("Nichts mehr offen, Monitor beendet.", flush=True)
+            break
+        if max_ticks and tick >= max_ticks:
+            break
+        time.sleep(sek)
+except (KeyboardInterrupt, BrokenPipeError):
+    pass
+PY
+    ;;
   env-set)
     # Betriebswerte in .env setzen; mehrere Paare mit + getrennt (OCR_PROCESSES=6+IO_CONCURRENCY=12). Nur freigegebene
     # Schluessel (Ressourcen, Parallelitaet), Wert aus Ziffern, Buchstaben, Punkt, Unterstrich und Bindestrich.
@@ -1103,5 +1223,5 @@ PY
     done
     echo "wirksam mit der Aktion deploy; Sicherung .env.bak"
     ;;
-  *) echo "Nur check, pull, befund, env-init, ps, logs, smoke, cert-retry, db-status, db-reset, first-run, deploy, rollback, create-admin, oauth-check, deploy-tests, doc-status, config-set, altbestand-import, altbestand-objekte, altbestand-aufarbeiten, verarbeitung-alle, paperless-feld-alle, redis-status, env-set, jobs-bereinigen, disk-status, transit-bereinigen, worker-drosseln, work-bereinigen, last-status, worker-stop, worker-start, ai-check, ai-reclassify, review-status, sync-status, sync-retry, classifier-status, zuordnung-pruefen, objekt-anschriften, paperless-feld-abgleich, backup-voll oder reconcile-all erlaubt"; exit 2 ;;
+  *) echo "Nur check, pull, befund, env-init, ps, logs, smoke, cert-retry, db-status, db-reset, first-run, deploy, rollback, create-admin, oauth-check, deploy-tests, doc-status, config-set, altbestand-import, altbestand-objekte, altbestand-aufarbeiten, verarbeitung-alle, paperless-feld-alle, redis-status, env-set, jobs-bereinigen, disk-status, lauf-monitor, transit-bereinigen, worker-drosseln, work-bereinigen, last-status, worker-stop, worker-start, ai-check, ai-reclassify, review-status, sync-status, sync-retry, classifier-status, zuordnung-pruefen, objekt-anschriften, paperless-feld-abgleich, backup-voll oder reconcile-all erlaubt"; exit 2 ;;
 esac
