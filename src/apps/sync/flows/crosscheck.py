@@ -46,8 +46,9 @@ STRONG_ADDRESS_ROLES = ("object", "neutral")
 KINDS = ("eindeutig", "zweiter_bezug", "schwacher_bezug", "kein_bezug")
 AMBIGUOUS = ("zweiter_bezug", "schwacher_bezug")
 # KI-Status, die einen technischen Ausfall statt einer fachlichen Einschaetzung bedeuten; ein Sammellauf ueberspringt
-# das Dokument dann (bleibt ungeprueft, naechster Lauf), statt es ohne Urteil in den Eingang zu schieben
-AI_UNAVAILABLE = ("disabled", "provider_error", "budget_blocked", "blocked_by_mask_check", "error")
+# das Dokument dann (bleibt ungeprueft, naechster Lauf), statt es ohne Urteil in den Eingang zu schieben. Die
+# Maskierungssperre gehoert nicht dazu: sie bleibt bei jedem Lauf bestehen, das Dokument geht den Weg ohne KI.
+AI_UNAVAILABLE = ("disabled", "provider_error", "budget_blocked", "error")
 
 
 @dataclass
@@ -194,9 +195,40 @@ def _to_inbox(
     return new
 
 
+def existing_copy(doc, target):
+    """Dokument mit gleichem Inhalt (sha256) im Zielobjekt; die Datenbank erlaubt je Objekt nur eine Zeile je Hash
+    (uq_documents_object_hash), eine Uebernahme wuerde dort scheitern (Serverlauf 22.09.2026: 385 Fehler)."""
+    if not doc.sha256:
+        return None
+    return Document.objects.filter(object=target, sha256=doc.sha256).exclude(pk=doc.pk).order_by("id").first()
+
+
+def mark_duplicate(doc, original, *, reason: str) -> None:
+    """Quelldokument als Dublette des Originals im Zielobjekt fuehren: keine zweite Zeile, keine Ablage, Audit.
+    Das Original bleibt unberuehrt, Paperless behaelt seinen Stand."""
+    Document.objects.filter(pk=doc.pk).update(
+        status="duplicate", duplicate_of=original, updated_at=timezone.now()
+    )
+    doc.status = "duplicate"
+    doc.duplicate_of = original
+    record(
+        "sync.duplicate_in_target",
+        entity_type="document",
+        entity_id=doc.pk,
+        object_id=doc.object_id,
+        reason=reason[:400],
+        after={
+            "duplicate_of": original.pk,
+            "target_object": original.object_id,
+            "original_status": original.status,
+        },
+    )
+
+
 def resolve(doc, check: CrossCheck, *, job=None, use_ai: bool = True, skip_on_ai_error: bool = False) -> dict:
-    """Aufloesung eines nicht eindeutigen Falls. action: bestaetigt | umgehaengt | eingang | belassen; mit
-    skip_on_ai_error zusaetzlich uebersprungen (KI technisch nicht verfuegbar, Dokument bleibt ungeprueft)."""
+    """Aufloesung eines nicht eindeutigen Falls. action: bestaetigt | umgehaengt | duplikat (Inhalt liegt im
+    Zielobjekt schon vor) | eingang | belassen; mit skip_on_ai_error zusaetzlich uebersprungen (KI technisch nicht
+    verfuegbar, Dokument bleibt ungeprueft)."""
     from apps.ai import assignment as arbiter
     from apps.sync.assignment import decide as dec
 
@@ -231,6 +263,27 @@ def resolve(doc, check: CrossCheck, *, job=None, use_ai: bool = True, skip_on_ai
             return {**result, "action": "bestaetigt"}
         target = ManagedObject.active.filter(pk=ai.object_id, is_system_inbox=False).first()
         if target is not None:
+            original = existing_copy(doc, target)
+            if original is not None:
+                # Der Inhalt liegt im Zielobjekt schon vor: Dublette statt zweiter Zeile (sonst IntegrityError)
+                mark_duplicate(
+                    doc,
+                    original,
+                    reason=f"KI-Gegenprobe Feldimport ({ai.confidence:.2f}): Inhalt bereits im Objekt {target.object_number}",
+                )
+                mark(
+                    doc,
+                    check,
+                    "duplikat",
+                    ai_ctx,
+                    {"target": target.object_number, "duplicate_of": original.pk},
+                )
+                return {
+                    **result,
+                    "action": "duplikat",
+                    "target": target.object_number,
+                    "duplicate_of": original.pk,
+                }
             proposal = dec.Proposal("review", None, candidates, [grund])
             new = assign._assign_auto(
                 doc,

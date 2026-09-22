@@ -3,7 +3,7 @@ uebernommenen Dokumente (apps.sync.flows.crosscheck). Ohne --echt Vorschau je Ob
 (anderes Objekt im Text), schwacher Bezug (Feldobjekt nur beilaeufig, etwa Fahrtziel), kein Bezug, ohne Text;
 dazu, wie viele nicht eindeutige Faelle die lokale Regel trotzdem eindeutig entscheiden wuerde. Kein KI-Aufruf.
 Mit --echt: eindeutige und bezugslose Dokumente werden als geprueft markiert, nicht eindeutige mit der KI
-aufgeloest (bestaetigt, umgehaengt, Eingang, belassen); --ohne-ki loest ohne KI auf (lokal eindeutig -> belassen,
+aufgeloest (bestaetigt, umgehaengt, duplikat, Eingang, belassen); --ohne-ki loest ohne KI auf (lokal eindeutig -> belassen,
 sonst Eingang), --limit begrenzt die Aufloesungen je Lauf (Kosten, Laufzeit), --objekt beschraenkt auf ein Objekt,
 --details listet die nicht eindeutigen Dokumente. Bereits geprüfte Dokumente (assignment_checked_at) werden
 uebersprungen; der Lauf ist wiederholbar.
@@ -65,6 +65,8 @@ class Command(BaseCommand):
         aufgeloest = 0
         ki_fehler_folge = 0
         abbruch = None
+        fehler_arten: Counter = Counter()
+        fehler_beispiele: list[str] = []
         limit = int(options["limit"] or 0)
         for doc in qs.iterator(chunk_size=200):
             zaehler = je_objekt.setdefault(doc.object.object_number, Counter())
@@ -85,9 +87,17 @@ class Command(BaseCommand):
                     try:
                         ergebnis = crosscheck.resolve(doc, check, use_ai=use_ai, skip_on_ai_error=True)
                     except Exception as exc:
-                        # Fehler eines Dokuments beendet den Lauf nicht; das Dokument bleibt ungeprueft
+                        # Fehler eines Dokuments beendet den Lauf nicht; das Dokument bleibt ungeprueft. Art und
+                        # Beispiele stehen in der Zusammenfassung, weil Einzelzeilen im Sammellauf wegscrollen
+                        # (Serverlauf 22.09.2026: 385 Fehler ohne auswertbare Meldung).
                         zaehler["fehler"] += 1
-                        self.stderr.write(f"  Fehler Dok {doc.pk}: {exc.__class__.__name__}: {exc}")
+                        art = exc.__class__.__name__
+                        fehler_arten[art] += 1
+                        if len(fehler_beispiele) < 5:
+                            fehler_beispiele.append(
+                                f"Dok {doc.pk} ({doc.object.object_number}): {art}: {str(exc)[:200]}"
+                            )
+                        self.stderr.write(f"  Fehler Dok {doc.pk}: {art}: {str(exc)[:300]}")
                         continue
                     aufgeloest += 1
                     zaehler["aktion_" + ergebnis["action"]] += 1
@@ -118,6 +128,12 @@ class Command(BaseCommand):
         self.stdout.write(
             "Gesamt: " + (", ".join(f"{k} {v}" for k, v in sorted(gesamt.items())) or "keine Dokumente")
         )
+        if fehler_arten:
+            self.stdout.write(
+                "Fehler nach Art: " + ", ".join(f"{k} {v}" for k, v in fehler_arten.most_common())
+            )
+            for zeile in fehler_beispiele:
+                self.stdout.write("  " + zeile)
         if not echt:
             self.stdout.write(
                 "Vorschau, nichts geändert, kein KI-Aufruf. Mit --echt: eindeutig und kein_bezug markieren, "

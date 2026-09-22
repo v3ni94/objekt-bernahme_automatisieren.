@@ -267,3 +267,54 @@ def test_bestandslauf_ueberspringt_bei_ki_ausfall_und_haelt_an(
     assert "aktion_bestaetigt 1" in out.getvalue()
     zwei.refresh_from_db()
     assert zwei.assignment_checked_at is not None and zwei.object_id == objekt.pk
+
+
+def test_inhalt_liegt_im_zielobjekt_schon_vor_dann_dublette_statt_uebernahme(
+    objekt, anderes_objekt, eingang, paperless, run_all, ops, ki, monkeypatch
+):
+    # Serverlauf 22.09.2026: 385 Fehler im Sammellauf, weil das Zielobjekt denselben Inhalt (sha256) schon fuehrte
+    # und die zweite Zeile an uq_documents_object_hash scheiterte. Jetzt: Quelle wird Dublette des Originals.
+    monkeypatch.setattr(crosscheck, "LIVE_SINCE", datetime(2099, 1, 1, tzinfo=UTC))
+    quelle = _import(paperless, ops, objekt, ZWEI, "Energieausweis zwei Gebaeude")
+    run_all(objekt)
+    quelle.refresh_from_db()
+    assert quelle.sha256 and quelle.assignment_checked_at is None and quelle.status != "moved_out"
+    # Paperless weist identische Inhalte ab, die Kopie im Zielobjekt kam auf anderem Weg dorthin
+    original = Document.objects.create(
+        object=anderes_objekt,
+        sha256=quelle.sha256,
+        size_bytes=quelle.size_bytes,
+        mime_type=quelle.mime_type,
+        original_name="Energieausweis Kopie.pdf",
+        current_name="Energieausweis Kopie.pdf",
+        source="upload",
+        status="ocr_done",
+        first_seen_at=quelle.first_seen_at,
+    )
+    ki(
+        {
+            "is_object_document": True,
+            "object_number": "624",
+            "multiple_objects": False,
+            "other_addresses_role": "neighbor",
+            "confidence": 0.93,
+            "reasoning": "Der Energieausweis betrifft das zweite Gebäude.",
+        }
+    )
+    out = StringIO()
+    call_command("paperless_zuordnung_pruefen", "--echt", "--objekt", "623", "--details", stdout=out)
+    text = out.getvalue()
+    assert "aktion_duplikat 1" in text and "ki_ok 1" in text and "fehler" not in text
+    quelle.refresh_from_db()
+    assert quelle.status == "duplicate" and quelle.duplicate_of_id == original.pk
+    assert quelle.assignment_checked_at is not None
+    assert Document.objects.filter(object=anderes_objekt, sha256=original.sha256).count() == 1
+    ereignis = _gegenprobe(quelle)
+    assert ereignis.after_state["action"] == "duplikat" and ereignis.after_state["target"] == "624"
+    assert ereignis.after_state["duplicate_of"] == original.pk
+    assert AuditEvent.objects.filter(action="sync.duplicate_in_target", entity_id=quelle.pk).exists()
+    assert not Document.objects.filter(object=eingang).exists()
+    # der Sammellauf hat nichts mehr zu tun
+    out = StringIO()
+    call_command("paperless_zuordnung_pruefen", "--echt", "--objekt", "623", stdout=out)
+    assert "Gesamt: keine Dokumente" in out.getvalue()
