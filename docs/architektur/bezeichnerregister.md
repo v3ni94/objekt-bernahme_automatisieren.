@@ -832,6 +832,7 @@ Modell `objects.ManagedObject`. managed objects.
 | house_number | varchar(20) | ja |  |
 | postal_code | varchar(10) | ja |  |
 | city | varchar(80) | ja |  |
+| additional_addresses | json | nein |  |
 | management_type | varchar(16) | nein | weg, rental, weg_with_se |
 | status | varchar(16) | nein | new, takeover, active, archived |
 | takeover_from | date | ja |  |
