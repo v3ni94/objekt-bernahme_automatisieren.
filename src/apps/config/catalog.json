@@ -857,7 +857,7 @@
       "key": "ai.monthly_budget_eur",
       "category": "ai",
       "value_type": "object",
-      "description": "Optionaler Monatsdeckel je Provider, nur Alarmschwelle",
+      "description": "Monatsdeckel je Provider in EUR: Alarm ab 80 Prozent, harte Sperre aller KI-Aufrufe (Klassifikation und Objektzuordnung) bei Erreichen der protokollierten Monatskosten; null = kein Deckel",
       "source": "Vorschlag G, Frage F17",
       "schema": {
         "type": "object",

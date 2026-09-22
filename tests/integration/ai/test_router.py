@@ -319,3 +319,22 @@ def test_taxonomie_und_router_ohne_freigabe(objekt):
         {"05/05": (TaxonomyEntry("einzelabrechnung", "Einzelabrechnung"),)},
     )
     assert small.document_type_codes("05") == {"einzelabrechnung"}
+
+
+def test_monatsdeckel_sperrt_alle_aufrufe(objekt, admin_user):
+    """ai.monthly_budget_eur ist eine harte Sperre je Anbieter fuer jeden Zweck und jedes Objekt (22.09.2026),
+    nicht nur eine Alarmschwelle; null hebt den Deckel auf."""
+    from apps.config import store
+
+    store.set("ai.monthly_budget_eur", {"openai": 0, "anthropic": None}, user=admin_user, reason="Test")
+    r, p, f = make_router([], [])
+    result = r.classify(request(), obj=objekt)
+    # fail-closed wie beim Objektlimit: der Block beendet den Aufruf, kein Ausweichen auf den Fallback
+    assert result.status == "budget_blocked" and result.provider == "openai"
+    gesperrt = AiCall.objects.get(provider="openai")
+    assert gesperrt.status == "budget_blocked" and "Monatsdeckel 0 EUR" in gesperrt.error_message
+    assert p.sent == [] and f.sent == []
+    store.set("ai.monthly_budget_eur", {"openai": 5, "anthropic": None}, user=admin_user, reason="Test")
+    r, p, f = make_router([], [])
+    result = r.classify(request(), obj=objekt)
+    assert result.status == "ok" and result.provider == "openai" and not result.fallback_used

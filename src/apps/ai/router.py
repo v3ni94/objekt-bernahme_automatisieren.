@@ -139,11 +139,10 @@ class Router:
                 )
             elif limit is not None and not inbox and object_cost(name, obj.pk) >= limit:
                 block_message = f"Kostenlimit {limit} EUR je Objekt erreicht"
-            elif (
-                inbox and monthly is not None and month_costs().get(name, Decimal(0)) >= Decimal(str(monthly))
-            ):
-                # Das Eingangsobjekt sammelt die Aufrufe des Schiedsrichters aller Dokumente; das Limit je Objekt
-                # waere dort eine versteckte Gesamtsperre, deshalb gilt der Monatsdeckel des Anbieters.
+            elif monthly is not None and month_costs().get(name, Decimal(0)) >= Decimal(str(monthly)):
+                # Monatsdeckel des Anbieters (Entscheidung 22.09.2026): harte Sperre fuer alle Zwecke und Objekte,
+                # sobald die protokollierten Kosten des Monats den Deckel erreichen; Alarm ab 80 Prozent. Das
+                # Limit je Objekt gilt nur fuer echte Objekte, am Eingangsobjekt waere es eine versteckte Gesamtsperre.
                 block_message = f"Monatsdeckel {monthly} EUR für {name} erreicht (ai.monthly_budget_eur)"
             if block_message:
                 call = self._log(

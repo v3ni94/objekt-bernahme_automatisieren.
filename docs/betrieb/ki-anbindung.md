@@ -12,7 +12,7 @@ Ist der Anbieter freigegeben, wirkt das sofort auf alle laufenden Verarbeitungsl
 
 1. Auftragsverarbeitungsvertrag mit OpenAI für die API-Nutzung abschließen (Data Processing Addendum in der OpenAI-Plattform), Kopie in die Verfahrensdokumentation (V-10).
 2. Datenresidenz festlegen (V-12): Ein API-Projekt mit Region Europa anlegen; die Anfragen laufen dann über den EU-Endpunkt `https://eu.api.openai.com/v1`. Ohne EU-Projekt bleibt der Endpunkt leer und die Verarbeitung erfolgt am Standardstandort des Anbieters; das ist für die datenschutzrechtliche Bewertung relevant. Die Aussagen des Anbieters zu Trainingsausschluss und Aufbewahrung der API-Eingaben schriftlich sichern.
-3. Kostenrahmen festlegen: Listenpreis des Modells (Preisseite des Anbieters), Kostenlimit je Objekt, optional Monatsdeckel als Alarm (`ai.monthly_budget_eur`).
+3. Kostenrahmen festlegen: Listenpreis des Modells (Preisseite des Anbieters), Kostenlimit je Objekt, Monatsdeckel je Anbieter in EUR (`ai.monthly_budget_eur`, zum Beispiel `{"openai":1500}`): Alarm ab 80 Prozent, harte Sperre aller KI-Aufrufe bei Erreichen; die Anwendung bewertet gecachte Eingabetoken zum vollen Preis, die interne Summe liegt also über der Anbieterrechnung, nie darunter.
 
 ## Schrittfolge auf dem Server (als root)
 
@@ -101,7 +101,7 @@ Wirkung im Eingang (`apps.sync.flows.assign.run_for_document`):
 
 Derselbe Schiedsrichter prüft Feldimporte aus Paperless mit zweitem oder nur beiläufigem Objektbezug (Gegenprobe, docs/betrieb/paperless-sync.md Abschnitt 6); dort steht das Feldobjekt als erster Kandidat mit dem Beleg `paperless_field`.
 
-Kosten und Schutz: Jeder Aufruf steht in `ai_calls` mit `purpose = assign_object`, Kosten nach `ai.price_list`, Circuit Breaker und Wiederholungen wie in Stufe 3. Die Aufrufe werden am Eingangsobjekt protokolliert; dort gilt statt des Kostenlimits je Objekt (`ai.providers.<p>.cost_limit_eur_per_object`, das für das Eingangsobjekt eine versteckte Gesamtsperre wäre) der Monatsdeckel des Anbieters `ai.monthly_budget_eur` (null = kein Deckel). Abschalten ohne Deploy: `sync.assignment_ai_enabled = false` (Deploy-Aktion `config-set`). Lokal senkt die Rolle „Fahrtziel“ (Wörter wie Fahrtziel, Reisekosten, Dienstfahrt vor der Anschrift) das Gewicht einer Anschrift, sodass solche Dokumente nicht mehr automatisch zugeordnet werden, sondern zur KI gehen.
+Kosten und Schutz: Jeder Aufruf steht in `ai_calls` mit `purpose = assign_object`, Kosten nach `ai.price_list`, Circuit Breaker und Wiederholungen wie in Stufe 3. Die Aufrufe werden am Eingangsobjekt protokolliert; das Kostenlimit je Objekt (`ai.providers.<p>.cost_limit_eur_per_object`) gilt dort nicht, weil es für das Eingangsobjekt eine versteckte Gesamtsperre wäre. Der Monatsdeckel des Anbieters `ai.monthly_budget_eur` sperrt bei Erreichen alle KI-Aufrufe, Klassifikation wie Objektzuordnung (null = kein Deckel). Abschalten ohne Deploy: `sync.assignment_ai_enabled = false` (Deploy-Aktion `config-set`). Lokal senkt die Rolle „Fahrtziel“ (Wörter wie Fahrtziel, Reisekosten, Dienstfahrt vor der Anschrift) das Gewicht einer Anschrift, sodass solche Dokumente nicht mehr automatisch zugeordnet werden, sondern zur KI gehen.
 
 Deploy-Aktion `ai-check` zeigt Anbieter, Preisliste und Probe; die Aufrufe der letzten 24 Stunden sind dort nach Anbieter, Zweck (`classify`, `assign_object`) und Status mit Kosten aufgeführt.
 

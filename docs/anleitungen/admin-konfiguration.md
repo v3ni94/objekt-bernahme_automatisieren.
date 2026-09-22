@@ -104,7 +104,7 @@ Schlüssel: 149 in 20 Gruppen (seit 12.09.2026 zusätzlich `paperless.*` und `sy
 |---|---|---|---|---|---|
 | `ai.chars_per_token` | decimal | `3.5` | Näherung Zeichen je Token für die Kürzung | ANNAHME A17 | min 1, max 10 |
 | `ai.max_input_tokens` | integer | `3000` | Höchstzahl Eingabetoken | ANNAHME A17 | min 200 |
-| `ai.monthly_budget_eur` | object | `{"openai": null, "anthropic": null}` | Optionaler Monatsdeckel je Provider, nur Alarmschwelle | Vorschlag G, Frage F17 | object |
+| `ai.monthly_budget_eur` | object | `{"openai": null, "anthropic": null}` | Monatsdeckel je Provider in EUR: Alarm ab 80 Prozent, harte Sperre aller KI-Aufrufe (Klassifikation und Objektzuordnung) bei Erreichen der protokollierten Monatskosten; null = kein Deckel | Vorschlag G, Frage F17; Entscheidung 22.09.2026 | object |
 | `ai.price_list` | object | `{"version": "nicht-festgelegt", "models": {}}` | Versionierte Preisliste je Modell in EUR je 1.000 Token (input_per_1k, output_per_1k), vom Auftraggeber freigegeben; Grundlage von ai_calls.cost_eur | E 4.2, B-07 | object |
 | `ai.provider_order` | list | `["openai", "anthropic"]` | Reihenfolge Primär und Fallback | Frage F17 | array |
 | `ai.providers` | object | `{"openai": {"enabled": false, "model": null, "endpoint": null, "region": null...` | Je Provider: enabled, model, endpoint, region, timeout_s, max_attempts, cost_limit_eur_per_object; enabled erst nach AVV-Freigabe | CR 0.1, ANNAHME A17, Frage F17 | object |
