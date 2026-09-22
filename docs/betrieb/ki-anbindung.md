@@ -24,6 +24,13 @@ B=claude/eigentuemer-sonstiges-umstellung-faduqc
 d() { sudo -u deploy env SSH_ORIGINAL_COMMAND="$*" /opt/objektakte/scripts/deploy_remote.sh; }
 ```
 
+JSON-Werte für `config-set` (Preisliste, Monatsdeckel, Anbieter) immer in einfache Anführungszeichen setzen, sonst entfernt die Shell die doppelten Anführungszeichen und expandiert `{a,b}` zu mehreren Wörtern; die Ablehnung lautet dann „ist nicht vom Typ object“:
+
+```bash
+d config-set $B 'ai.monthly_budget_eur={"openai":1500}'
+d config-set $B 'ai.price_list={"version":"2026-09","models":{"gpt-4.1-mini":{"input_per_1k":0.0001,"output_per_1k":0.0004}}}'   # Zahlen sind Platzhalter, Preise von der Preisseite in EUR je 1.000 Token
+```
+
 ### 1 API-Schlüssel als Secret hinterlegen (V-13)
 
 Den Schlüssel in der OpenAI-Plattform im EU-Projekt erzeugen und direkt auf dem Server eintragen, nie per E-Mail oder Chat übertragen. Die Datei wird in Ort und Stelle beschrieben (`printf`, kein Editor), damit die in die Container eingebundene Datei denselben Inhalt zeigt; die Anwendung liest das Secret bei jedem Aufruf neu, ein Neustart ist nicht nötig.

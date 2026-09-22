@@ -29,7 +29,7 @@
 #   doc-status <branch> [nr]  Dokumente je Objekt und Status, offene und fehlgeschlagene Jobs (nur lesend);
 #                             mit Objektnummer je Dokument Stufen, Entitaetenzaehler und Faelle, ohne Namen
 #   reconcile-all <branch> [ohne-ordner]  Ordnerabgleich aller aktiven Objekte (legt fehlende Struktur an); ohne-ordner = nur Objekte ohne Objektordner
-#   config-set <branch> <schluessel=wert>  Konfigurationswert setzen (Wert als JSON: true, 5, "text"); Audit
+#   config-set <branch> <schluessel=wert>  Konfigurationswert setzen (Wert als JSON: true, 5, "text", {"a":1}); in der interaktiven Shell das Argument in einfache Anfuehrungszeichen setzen; Audit
 #   altbestand-import <branch>  Quellordner aus db/seeds/altbestand_ordner.txt in die Altbestand-Tabelle
 #   altbestand-objekte <branch> [echt]  Objekte fuer Altbestand-Quellen ohne Objekt anlegen (echt = anlegen, sonst Vorschau)
 #   paperless-feld-alle <branch> [echt] Feld MHV Objekt fuer alle zugeordneten Speicherpfade setzen und Bestandslauf starten
@@ -754,6 +754,14 @@ key, _, raw = os.environ["CFG_ARG"].partition("=")
 try:
     value = json.loads(raw)
 except json.JSONDecodeError:
+    if raw[:1] in "{[" or raw.count(":") and not raw.startswith('"'):
+        # Typischer Fehler in der interaktiven Shell: Anfuehrungszeichen entfernt, Klammern expandiert
+        print(
+            f"config-set abgelehnt: {raw!r} ist kein gueltiges JSON. Vermutlich hat die Shell die "
+            "Anfuehrungszeichen entfernt oder die Klammern expandiert; das ganze Argument in einfache "
+            "Anfuehrungszeichen setzen, zum Beispiel: d config-set $B 'ai.monthly_budget_eur={\"openai\":1500}'"
+        )
+        raise SystemExit(2)
     value = raw
 from django.core.exceptions import ValidationError
 try:
