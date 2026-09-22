@@ -38,7 +38,7 @@
 #   zuordnung-pruefen <branch> [<objekt>][+echt][+details][+ohne-ki][+limit=N]  Gegenprobe der Objektzuordnung fuer Paperless-Feldimporte (Vorschau ohne KI; echt loest mit KI auf; laeuft im worker-io)
 #   backup-voll <branch>      Volle Sicherung sofort (Datenbank und Fachverzeichnisse, rund 20 Minuten, nur in tmux); schreibt status.json
 #   altbestand-aufarbeiten <branch> [echt] Alle Altbestand-Ordner mit Objekt aufarbeiten (echt = Celery-Aufgabe, sonst Vorschau)
-#   verarbeitung-alle <branch> [echt] Verarbeitungslaeufe fuer alle Objekte mit offener Arbeit (echt = einreihen)
+#   verarbeitung-alle <branch> [echt][+ohne=133,216]  Verarbeitungslaeufe fuer alle Objekte mit offener Arbeit (echt = einreihen, sonst Vorschau; ohne = Objekte ausnehmen)
 #   review-status <branch> [<objekt>]   Offene Pruefcenter-Faelle je Art und Unterart, Vorschlaege, KI-Nachklassifizierbarkeit (keine Personendaten)
 #   sync-status <branch> [live]          Verbindung Drive, Anwendung, Paperless: Schalter, Verbindungstest, Cursor, Auffindbarkeit je Quelle, Operationen (lesend; live = echter Verbindungstest)
 #   classifier-status <branch> [list|train|train+force|deactivate]  Stufe 2: Kaltstartstatus, Modelle, Training (train+force auch waehrend laufender Verarbeitung), Modell abschalten
@@ -86,7 +86,7 @@ case "$BRANCH" in *[!A-Za-z0-9._/-]*|*..*|"") case "$ACTION" in rollback|check) 
 if [ "$ACTION" = "config-set" ]; then
   case "${ARG:-}" in *[!A-Za-z0-9@._+=:,/{}\[\]\"-]*) echo "Argument unzulaessig (config-set: JSON ohne Leerzeichen; erlaubt sind Buchstaben, Ziffern, doppelte Anfuehrungszeichen und @._+=:,/{}[]-)"; exit 2 ;; esac
 else
-  case "${ARG:-}" in *[!A-Za-z0-9@._+=-]*) echo "Argument unzulaessig"; exit 2 ;; esac
+  case "${ARG:-}" in *[!A-Za-z0-9@._+=,-]*) echo "Argument unzulaessig"; exit 2 ;; esac
 fi
 echo "$(date -Is) $ACTION ${BRANCH:-} ${ARG:-} von ${SSH_CLIENT:-unbekannt}" >> "$LOG"
 case "$ACTION" in
@@ -815,12 +815,19 @@ PY
     fi
     ;;
   verarbeitung-alle)
-    # Verarbeitungslaeufe fuer alle Objekte mit offener Arbeit; Argument "echt" reiht ein, sonst Vorschau
-    if [ "${ARG:-}" = "echt" ]; then
-      docker compose exec -T web python manage.py verarbeitung_alle_starten --echt
-    else
-      docker compose exec -T web python manage.py verarbeitung_alle_starten
-    fi
+    # Verarbeitungslaeufe fuer alle Objekte mit offener Arbeit; "echt" reiht ein, sonst Vorschau; "ohne=133,216"
+    # nimmt Objekte aus (23.09.2026: Sammelpfade aus Paperless erst nach Sichtung); Argumente mit "+" verbinden
+    args=()
+    IFS='+' read -r -a teile <<<"${ARG:-}"
+    for t in "${teile[@]}"; do
+      case "$t" in
+        "") ;;
+        echt) args+=(--echt) ;;
+        ohne=*) n="${t#ohne=}"; case "$n" in *[!0-9,]*|"") echo "ohne braucht Objektnummern, durch Komma getrennt"; exit 2 ;; esac; args+=(--ohne "$n") ;;
+        *) echo "Argument unbekannt: $t (erlaubt: echt, ohne=133,216)"; exit 2 ;;
+      esac
+    done
+    docker compose exec -T web python manage.py verarbeitung_alle_starten "${args[@]}"
     ;;
   paperless-feld-alle)
     # Feld MHV Objekt fuer alle zugeordneten Paperless-Speicherpfade; Argument "echt" setzt und startet den Bestandslauf

@@ -8,6 +8,7 @@ from datetime import timedelta
 
 import pytest
 from django.core.management import call_command
+from django.core.management.base import CommandError
 from django.urls import reverse
 from django.utils import timezone
 
@@ -168,6 +169,19 @@ def test_sammelstart_reiht_nur_objekte_mit_offener_arbeit_ein(drei_objekte, admi
     # zweiter Sammelstart: beide Objekte haben wartende oder laufende Laeufe, nichts Neues
     wieder = start_runs_for_all(user=admin_user)
     assert wieder["runs"] == [] and ProcessingRun.objects.count() == 2
+
+
+def test_sammelstart_nimmt_objekte_aus(drei_objekte, admin_user, capsys):
+    # 23.09.2026: Sammelpfade aus Paperless (133, 216) sollen erst nach Sichtung laufen
+    a, b, c = drei_objekte
+    call_command("verarbeitung_alle_starten", "--ohne", "701,999")
+    out = capsys.readouterr().out
+    assert "Ausgenommen: 701" in out and "Vorschau: 1 Objekte mit offener Arbeit: 703" in out
+    result = start_runs_for_all(user=admin_user, exclude=["701"])
+    assert result["started"] == ["703"] and result["excluded"] == ["701"]
+    assert [r.object_id for r in ProcessingRun.objects.all()] == [c.pk]
+    with pytest.raises(CommandError):
+        call_command("verarbeitung_alle_starten", "--ohne", "701,abc")
 
 
 def test_sammelstart_ueber_die_objektliste(drei_objekte, client_as, admin_user, clerk_user):

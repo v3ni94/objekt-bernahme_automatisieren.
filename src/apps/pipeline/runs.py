@@ -364,18 +364,24 @@ def request_schedule() -> list[int] | None:
     return None
 
 
-def start_runs_for_all(*, user=None, run_type: str = RunType.INCREMENTAL, dry_run: bool = False) -> dict:
+def start_runs_for_all(
+    *, user=None, run_type: str = RunType.INCREMENTAL, dry_run: bool = False, exclude=()
+) -> dict:
     """„Verarbeitung für alle Objekte starten“: je Objekt mit offener Arbeit ein Nachlauf (wartende Laeufe werden
     nach processing.max_parallel_objects nacheinander gestartet). Objekte mit bereits wartendem oder laufendem
-    Lauf und Objekte ohne offene Dokumente werden ausgelassen. Der Start selbst laeuft im Hintergrund
+    Lauf und Objekte ohne offene Dokumente werden ausgelassen; exclude nimmt weitere Objektnummern aus (23.09.2026:
+    Sammelpfade 133 und 216 aus Paperless erst nach Sichtung). Der Start selbst laeuft im Hintergrund
     (request_schedule). Protokoll processing.start_all."""
     from apps.audit.services import record
 
-    candidates = objects_with_open_work()
+    ausgenommen = {int(str(n).strip()) for n in exclude if str(n).strip().isdigit()}
+    alle = objects_with_open_work()
+    candidates = [o for o in alle if int(o.object_number) not in ausgenommen]
     summary = {
         "run_type": run_type,
         "dry_run": dry_run,
         "objects": [o.object_number for o in candidates],
+        "excluded": [o.object_number for o in alle if int(o.object_number) in ausgenommen],
         "started": [],
         "runs": [],
         "folders_requested": [],
