@@ -47,6 +47,8 @@ class FakeClassificationProvider(BaseProvider):
             raise RateLimited()
         if step == "4xx":
             raise ProviderError("Unauthorized", http_status=401, retryable=False)
+        if step == "raise":
+            raise RuntimeError("Testfehler: Bibliothek des Anbieters fehlt")
         if step == "schema_error":
             return RawResponse(
                 '{"category": "05_Eigentümerakte", "confidence": 0.9}', *self.tokens, model=cfg.model

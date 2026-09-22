@@ -34,8 +34,9 @@
 #   altbestand-objekte <branch> [echt]  Objekte fuer Altbestand-Quellen ohne Objekt anlegen (echt = anlegen, sonst Vorschau)
 #   paperless-feld-alle <branch> [echt] Feld MHV Objekt fuer alle zugeordneten Speicherpfade setzen und Bestandslauf starten
 #   paperless-feld-abgleich <branch> <objekt>[+echt]  Feld MHV Objekt je Dokument gegen die Zuordnung pruefen; echt uebernimmt Abweichungen (leer -> Eingang)
-#   objekt-anschriften <branch> [echt]  Weitere Anschriften (Eckobjekte) aus den Objektbezeichnungen ableiten (echt = speichern, sonst Vorschau)
-#   zuordnung-pruefen <branch> [<objekt>][+echt][+details][+ohne-ki][+limit=N]  Gegenprobe der Objektzuordnung fuer Paperless-Feldimporte (Vorschau ohne KI; echt loest mit KI auf)
+#   objekt-anschriften <branch> [echt|korrigieren|korrigieren+echt]  Weitere Anschriften (Eckobjekte) aus den Objektbezeichnungen ableiten (echt = speichern, sonst Vorschau; korrigieren = vom Kommando gesetzte Hauptanschriften neu ableiten)
+#   zuordnung-pruefen <branch> [<objekt>][+echt][+details][+ohne-ki][+limit=N]  Gegenprobe der Objektzuordnung fuer Paperless-Feldimporte (Vorschau ohne KI; echt loest mit KI auf; laeuft im worker-io)
+#   backup-voll <branch>      Volle Sicherung sofort (Datenbank und Fachverzeichnisse, rund 20 Minuten, nur in tmux); schreibt status.json
 #   altbestand-aufarbeiten <branch> [echt] Alle Altbestand-Ordner mit Objekt aufarbeiten (echt = Celery-Aufgabe, sonst Vorschau)
 #   verarbeitung-alle <branch> [echt] Verarbeitungslaeufe fuer alle Objekte mit offener Arbeit (echt = einreihen)
 #   review-status <branch> [<objekt>]   Offene Pruefcenter-Faelle je Art und Unterart, Vorschlaege, KI-Nachklassifizierbarkeit (keine Personendaten)
@@ -865,7 +866,15 @@ PY
         *) args+=(--objekt "$t") ;;
       esac
     done
-    docker compose exec -T web python manage.py paperless_zuordnung_pruefen "${args[@]}"
+    # Laeuft im worker-io: nur das Worker-Image enthaelt die Anbieterbibliothek der Stufe 3 (Befund 22.09.2026:
+    # im Web-Container brach der Lauf mit fehlendem Modul ab); das Kommando haelt nach drei KI-Fehlversuchen an.
+    docker compose exec -T worker-io python manage.py paperless_zuordnung_pruefen "${args[@]}"
+    ;;
+  backup-voll)
+    # Volle Sicherung sofort im Backup-Container (Datenbank und Fachverzeichnisse, zuletzt 1.315 s); schreibt
+    # status.json und macht den Healthcheck wieder gruen. Nur in tmux starten. Hintergrund 22.09.2026: der Cron-Lauf
+    # blieb seit dem 10.09. aus, weil die Zeile in /etc/cron.d ohne Benutzerfeld geschrieben wurde.
+    docker compose exec -T backup /usr/local/bin/backup.sh
     ;;
   objekt-anschriften)
     # Weitere Anschriften (Eckobjekte, mehrere Hausnummern) aus den Objektbezeichnungen ableiten; "echt" speichert.
@@ -1087,5 +1096,5 @@ PY
     done
     echo "wirksam mit der Aktion deploy; Sicherung .env.bak"
     ;;
-  *) echo "Nur check, pull, befund, env-init, ps, logs, smoke, cert-retry, db-status, db-reset, first-run, deploy, rollback, create-admin, oauth-check, deploy-tests, doc-status, config-set, altbestand-import, altbestand-objekte, altbestand-aufarbeiten, verarbeitung-alle, paperless-feld-alle, redis-status, env-set, jobs-bereinigen, disk-status, transit-bereinigen, worker-drosseln, work-bereinigen, last-status, worker-stop, worker-start, ai-check, ai-reclassify, review-status, sync-status, sync-retry, classifier-status oder reconcile-all erlaubt"; exit 2 ;;
+  *) echo "Nur check, pull, befund, env-init, ps, logs, smoke, cert-retry, db-status, db-reset, first-run, deploy, rollback, create-admin, oauth-check, deploy-tests, doc-status, config-set, altbestand-import, altbestand-objekte, altbestand-aufarbeiten, verarbeitung-alle, paperless-feld-alle, redis-status, env-set, jobs-bereinigen, disk-status, transit-bereinigen, worker-drosseln, work-bereinigen, last-status, worker-stop, worker-start, ai-check, ai-reclassify, review-status, sync-status, sync-retry, classifier-status, zuordnung-pruefen, objekt-anschriften, paperless-feld-abgleich, backup-voll oder reconcile-all erlaubt"; exit 2 ;;
 esac

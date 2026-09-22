@@ -26,8 +26,12 @@ done
 if ! sh -c '. /etc/backup.env' >/dev/null 2>&1; then
   echo "backup: /etc/backup.env ist nicht einlesbar"; cat /etc/backup.env; exit 1
 fi
-echo "$BACKUP_CRON . /etc/backup.env && /usr/local/bin/backup.sh >> /proc/1/fd/1 2>&1" > /etc/cron.d/objektakte-backup
+# Dateien unter /etc/cron.d sind Systemcrontabs: zwischen Zeitplan und Befehl steht der Benutzer. Ohne dieses Feld
+# las cron „.“ als Benutzernamen und verwarf die Zeile, die naechtliche Sicherung lief seit dem 10.09.2026 nie
+# (Befund 22.09.2026: status.json nur von Handlaeufen, Healthcheck rot).
+echo "$BACKUP_CRON root . /etc/backup.env && /usr/local/bin/backup.sh >> /proc/1/fd/1 2>&1" > /etc/cron.d/objektakte-backup
 echo "" >> /etc/cron.d/objektakte-backup
 chmod 0644 /etc/cron.d/objektakte-backup
 echo "backup: Zeitplan '$BACKUP_CRON', Aufbewahrung ${BACKUP_RETENTION_DAYS:-?} Tage, Offsite ${OFFSITE_ENABLED:-false}"
+echo "backup: Crontab $(head -n 1 /etc/cron.d/objektakte-backup | cut -d' ' -f1-6) ..."
 exec cron -f

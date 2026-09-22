@@ -10,6 +10,7 @@ from io import StringIO
 
 import pytest
 from django.core.management import call_command
+from django.core.management.base import CommandError
 from tests.integration.sync.conftest import pdf_bytes
 
 from apps.ai.models import AiCall
@@ -19,6 +20,7 @@ from apps.pipeline.models import JobType, ProcessingJob
 from apps.review.models import CaseStatus, CaseType, ReviewCase
 from apps.sync import services
 from apps.sync.flows import crosscheck, paperless_pull
+from apps.sync.management.commands import paperless_zuordnung_pruefen as pruefen_cmd
 from apps.sync.models import ExternalLink, LinkRole, SyncSystem
 
 pytestmark = pytest.mark.django_db
@@ -219,3 +221,47 @@ def test_bestandslauf_vorschau_und_echt(
     out = StringIO()
     call_command("paperless_zuordnung_pruefen", "--echt", stdout=out)
     assert "Gesamt: keine Dokumente" in out.getvalue()
+
+
+def test_bestandslauf_ueberspringt_bei_ki_ausfall_und_haelt_an(
+    objekt, anderes_objekt, eingang, paperless, run_all, ops, ki, monkeypatch
+):
+    # Serverlauf 22.09.2026: der Anbieter warf eine Ausnahme (Bibliothek fehlte im Container). Ein technischer
+    # KI-Ausfall darf kein Dokument ohne Urteil in den Eingang schieben; das Dokument bleibt ungeprueft, der Lauf
+    # haelt nach MAX_KI_FEHLER_FOLGE Fehlversuchen in Folge mit Fehlercode an.
+    monkeypatch.setattr(crosscheck, "LIVE_SINCE", datetime(2099, 1, 1, tzinfo=UTC))
+    # Reihenfolge nach Dokument-ID: das eindeutige Dokument kommt vor dem Abbruch dran
+    klar = _import(paperless, ops, objekt, NUR_623, "Energieausweis 623")
+    zwei = _import(paperless, ops, objekt, ZWEI, "Energieausweis zwei Gebaeude")
+    run_all(objekt)
+    ki({}, script=["raise", "raise", "raise"])
+    monkeypatch.setattr(pruefen_cmd, "MAX_KI_FEHLER_FOLGE", 1)
+    out = StringIO()
+    with pytest.raises(CommandError) as exc:
+        call_command("paperless_zuordnung_pruefen", "--echt", stdout=out)
+    assert "KI nicht verfügbar (provider_error" in str(exc.value) and "--ohne-ki" in str(exc.value)
+    text = out.getvalue()
+    assert "aktion_uebersprungen 1" in text and "ki_provider_error 1" in text
+    zwei.refresh_from_db()
+    klar.refresh_from_db()
+    assert zwei.assignment_checked_at is None and zwei.object_id == objekt.pk and zwei.status != "moved_out"
+    assert not Document.objects.filter(object=eingang).exists()
+    assert not ReviewCase.objects.filter(case_type=CaseType.OBJECT_ASSIGNMENT).exists()
+    assert AiCall.objects.filter(status="error").count() == 1
+    # das eindeutige Dokument vor dem Abbruch ist markiert; ein Lauf mit funktionierender KI holt den Rest nach
+    assert klar.assignment_checked_at is not None
+    ki(
+        {
+            "is_object_document": True,
+            "object_number": "623",
+            "multiple_objects": False,
+            "other_addresses_role": "neighbor",
+            "confidence": 0.95,
+            "reasoning": "Das Dokument betrifft das Feldobjekt.",
+        }
+    )
+    out = StringIO()
+    call_command("paperless_zuordnung_pruefen", "--echt", stdout=out)
+    assert "aktion_bestaetigt 1" in out.getvalue()
+    zwei.refresh_from_db()
+    assert zwei.assignment_checked_at is not None and zwei.object_id == objekt.pk

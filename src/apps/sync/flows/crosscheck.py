@@ -45,6 +45,9 @@ STRONG_KINDS = ("object_number", "filename_number", "folder", "rule")
 STRONG_ADDRESS_ROLES = ("object", "neutral")
 KINDS = ("eindeutig", "zweiter_bezug", "schwacher_bezug", "kein_bezug")
 AMBIGUOUS = ("zweiter_bezug", "schwacher_bezug")
+# KI-Status, die einen technischen Ausfall statt einer fachlichen Einschaetzung bedeuten; ein Sammellauf ueberspringt
+# das Dokument dann (bleibt ungeprueft, naechster Lauf), statt es ohne Urteil in den Eingang zu schieben
+AI_UNAVAILABLE = ("disabled", "provider_error", "budget_blocked", "blocked_by_mask_check", "error")
 
 
 @dataclass
@@ -191,8 +194,9 @@ def _to_inbox(
     return new
 
 
-def resolve(doc, check: CrossCheck, *, job=None, use_ai: bool = True) -> dict:
-    """Aufloesung eines nicht eindeutigen Falls. action: bestaetigt | umgehaengt | eingang | belassen."""
+def resolve(doc, check: CrossCheck, *, job=None, use_ai: bool = True, skip_on_ai_error: bool = False) -> dict:
+    """Aufloesung eines nicht eindeutigen Falls. action: bestaetigt | umgehaengt | eingang | belassen; mit
+    skip_on_ai_error zusaetzlich uebersprungen (KI technisch nicht verfuegbar, Dokument bleibt ungeprueft)."""
     from apps.ai import assignment as arbiter
     from apps.sync.assignment import decide as dec
 
@@ -210,6 +214,8 @@ def resolve(doc, check: CrossCheck, *, job=None, use_ai: bool = True) -> dict:
         "ai_status": ai.status,
         "local_unique": check.local_unique,
     }
+    if use_ai and skip_on_ai_error and ai.status in AI_UNAVAILABLE:
+        return {**result, "action": "uebersprungen", "message": ai.message or ai.status}
     grund = f"Gegenprobe Feldimport ({check.kind}): " + (
         ", ".join(f"Objekt {n}" for n in check.other_numbers[:3])
         or "nur beiläufiger Bezug auf das Feldobjekt"

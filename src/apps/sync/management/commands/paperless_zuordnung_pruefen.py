@@ -6,7 +6,12 @@ Mit --echt: eindeutige und bezugslose Dokumente werden als geprueft markiert, ni
 aufgeloest (bestaetigt, umgehaengt, Eingang, belassen); --ohne-ki loest ohne KI auf (lokal eindeutig -> belassen,
 sonst Eingang), --limit begrenzt die Aufloesungen je Lauf (Kosten, Laufzeit), --objekt beschraenkt auf ein Objekt,
 --details listet die nicht eindeutigen Dokumente. Bereits geprüfte Dokumente (assignment_checked_at) werden
-uebersprungen; der Lauf ist wiederholbar."""
+uebersprungen; der Lauf ist wiederholbar.
+
+KI-Ausfall (22.09.2026, Serverlauf brach mit fehlender Anbieterbibliothek im Web-Container ab): Ist die KI technisch
+nicht verfuegbar (Anbieterfehler, Kostenlimit, abgeschaltet), wird das Dokument uebersprungen und bleibt ungeprueft,
+statt ohne Urteil in den Eingang zu wandern; nach MAX_KI_FEHLER_FOLGE Fehlversuchen in Folge haelt der Lauf mit
+Fehlercode an. Eine unerwartete Ausnahme je Dokument zaehlt als Fehler, der Lauf geht weiter."""
 
 from __future__ import annotations
 
@@ -16,6 +21,8 @@ from django.core.management.base import BaseCommand, CommandError
 
 from apps.documents.models import Document, DocumentPage, DocumentSource
 from apps.sync.flows import crosscheck
+
+MAX_KI_FEHLER_FOLGE = 3
 
 
 class Command(BaseCommand):
@@ -36,6 +43,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         echt = bool(options["echt"])
+        use_ai = not options["ohne_ki"]
         qs = (
             Document.objects.filter(
                 source=DocumentSource.PAPERLESS,
@@ -55,6 +63,8 @@ class Command(BaseCommand):
         gesamt: Counter = Counter()
         je_objekt: dict[str, Counter] = {}
         aufgeloest = 0
+        ki_fehler_folge = 0
+        abbruch = None
         limit = int(options["limit"] or 0)
         for doc in qs.iterator(chunk_size=200):
             zaehler = je_objekt.setdefault(doc.object.object_number, Counter())
@@ -72,13 +82,31 @@ class Command(BaseCommand):
                     lokal = "lokal eindeutig" if check.local_unique else "lokal offen"
                     self.stdout.write(f"  {check.kind:15} Dok {doc.pk}: {name} | andere: {andere} | {lokal}")
                 if echt and (limit == 0 or aufgeloest < limit):
-                    ergebnis = crosscheck.resolve(doc, check, use_ai=not options["ohne_ki"])
+                    try:
+                        ergebnis = crosscheck.resolve(doc, check, use_ai=use_ai, skip_on_ai_error=True)
+                    except Exception as exc:
+                        # Fehler eines Dokuments beendet den Lauf nicht; das Dokument bleibt ungeprueft
+                        zaehler["fehler"] += 1
+                        self.stderr.write(f"  Fehler Dok {doc.pk}: {exc.__class__.__name__}: {exc}")
+                        continue
                     aufgeloest += 1
                     zaehler["aktion_" + ergebnis["action"]] += 1
                     zaehler["ki_" + ergebnis["ai_status"]] += 1
                     if options["details"]:
                         ziel = f" -> Objekt {ergebnis['target']}" if ergebnis.get("target") else ""
                         self.stdout.write(f"    {ergebnis['action']}{ziel} (KI {ergebnis['ai_status']})")
+                    if ergebnis["action"] == "uebersprungen":
+                        ki_fehler_folge += 1
+                        if ki_fehler_folge >= MAX_KI_FEHLER_FOLGE:
+                            abbruch = (
+                                f"KI nicht verfügbar ({ergebnis['ai_status']}: {ergebnis.get('message') or ''}); "
+                                f"Lauf nach {ki_fehler_folge} Fehlversuchen in Folge angehalten. Übersprungene "
+                                "Dokumente bleiben ungeprüft und laufen beim nächsten Start erneut. Ohne KI: "
+                                "--ohne-ki (lokal eindeutig -> belassen, sonst Eingang)."
+                            )
+                            break
+                    else:
+                        ki_fehler_folge = 0
             elif echt:
                 aktion = "ok" if check.kind == "eindeutig" else "kein_bezug"
                 crosscheck.mark(doc, check, aktion)
@@ -95,6 +123,8 @@ class Command(BaseCommand):
                 "Vorschau, nichts geändert, kein KI-Aufruf. Mit --echt: eindeutig und kein_bezug markieren, "
                 "zweiter_bezug und schwacher_bezug mit der KI auflösen (bestaetigt, umgehaengt, eingang, belassen)."
             )
+        elif abbruch:
+            raise CommandError(abbruch)
         elif limit and aufgeloest >= limit:
             self.stdout.write(
                 f"Grenze erreicht: {aufgeloest} Auflösungen in diesem Lauf; erneut starten für die übrigen."

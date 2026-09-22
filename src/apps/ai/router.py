@@ -283,6 +283,32 @@ class Router:
                     if not exc.retryable:
                         break
                     continue
+                except Exception as exc:
+                    # Fail closed (22.09.2026): ein unerwarteter Fehler im Anbieter (fehlende Bibliothek im Container,
+                    # Programmierfehler) darf weder die Pipeline noch einen Sammellauf abbrechen. Er wird als Fehler
+                    # protokolliert, der Anbieter fuer diesen Aufruf nicht erneut versucht, der naechste Anbieter kommt dran.
+                    logger.exception("Stufe 3: unerwarteter Fehler bei %s", name)
+                    call = self._log(
+                        name,
+                        cfg,
+                        obj,
+                        document,
+                        run,
+                        job,
+                        page_from,
+                        page_to,
+                        status=AiCallStatus.ERROR,
+                        message=f"{exc.__class__.__name__}: {exc}"[:1000],
+                        fallback_of=previous,
+                        fallback_used=index > 0,
+                        masked=masked_entities_count,
+                        attempt=attempt,
+                    )
+                    calls.append(call)
+                    previous = call
+                    breaker.record_failure()
+                    last_message = f"{name}: {exc.__class__.__name__}: {exc}"
+                    break
                 tokens_in = outcome.raw.tokens_in if outcome.raw else 0
                 tokens_out = outcome.raw.tokens_out if outcome.raw else 0
                 cost = provider.estimate_cost_eur(tokens_in, tokens_out, self.price_list, cfg.model)

@@ -126,6 +126,24 @@ def test_ausfall_beider_anbieter(objekt):
     }
 
 
+def test_unerwarteter_fehler_faellt_geschlossen_aus(objekt):
+    # Befund 22.09.2026: fehlende Anbieterbibliothek im Container warf ModuleNotFoundError bis in das Kommando.
+    # Der Router protokolliert den Fehler, versucht den Anbieter nicht erneut und nimmt den naechsten.
+    router, primary, fallback = make_router(["raise"], ["ok"])
+    result = router.classify(request(), obj=objekt)
+    assert result.status == "ok" and result.provider == "anthropic" and result.fallback_used
+    assert len(primary.sent) == 1
+    fehler = AiCall.objects.get(status="error")
+    assert fehler.provider == "openai" and "RuntimeError" in (fehler.error_message or "")
+    # beide Anbieter mit unerwartetem Fehler: kein Ergebnis, keine Ausnahme nach aussen, je Anbieter ein Versuch
+    router, primary, fallback = make_router(["raise"], ["raise"])
+    result = router.classify(request(), obj=objekt)
+    assert result.result is None and result.status == "provider_error"
+    assert "RuntimeError" in (result.message or "")
+    assert len(primary.sent) == 1 and len(fallback.sent) == 1
+    assert AiCall.objects.filter(status="error").count() == 3
+
+
 def test_kostenlimit_stoppt_aufrufe(objekt):
     r, p, f = make_router(["ok"], cost_limit_eur_per_object=Decimal("0.001"))
     first = r.classify(request(), obj=objekt)
