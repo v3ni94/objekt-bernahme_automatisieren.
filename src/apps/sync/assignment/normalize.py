@@ -332,24 +332,47 @@ def split_pages(text: str | Sequence[str] | None) -> list[str]:
 
 
 def build_entries(objects: Iterable, *, own_addresses: Iterable = ()) -> list[AddressEntry]:
-    """Adresseintraege aus Objekten (Attribute street, house_number, postal_code, city, pk) und eigenen
-    Anschriften (Zeichenkette "Strasse 1, 12345 Ort" oder Tupel (strasse, nummer, plz, ort))."""
+    """Adresseintraege aus Objekten (Attribute street, house_number, postal_code, city, pk, optional
+    additional_addresses als Liste von dicts) und eigenen Anschriften (Zeichenkette "Strasse 1, 12345 Ort" oder
+    Tupel (strasse, nummer, plz, ort))."""
     entries: list[AddressEntry] = []
     for obj in objects:
+        object_id = getattr(obj, "pk", None) or getattr(obj, "id", None)
+        label = str(getattr(obj, "object_number", "") or "")
+        base_plz = (getattr(obj, "postal_code", None) or "").strip()
+        base_city = normalize_city(getattr(obj, "city", None))
         street = normalize_street(getattr(obj, "street", None))
-        if not street:
-            continue
-        entries.append(
-            AddressEntry(
-                key=street,
-                street=street,
-                house=parse_house_number(getattr(obj, "house_number", None)),
-                postal_code=(getattr(obj, "postal_code", None) or "").strip(),
-                city=normalize_city(getattr(obj, "city", None)),
-                object_id=getattr(obj, "pk", None) or getattr(obj, "id", None),
-                label=str(getattr(obj, "object_number", "") or ""),
+        if street:
+            entries.append(
+                AddressEntry(
+                    key=street,
+                    street=street,
+                    house=parse_house_number(getattr(obj, "house_number", None)),
+                    postal_code=base_plz,
+                    city=base_city,
+                    object_id=object_id,
+                    label=label,
+                )
             )
-        )
+        # Weitere Anschriften desselben Gebaeudes (Eckobjekt, weitere Hausnummern) zeigen auf dasselbe Objekt:
+        # zwei Strassen einer Rechnung sind dann ein Objektbezug, kein Widerspruch.
+        for extra in getattr(obj, "additional_addresses", None) or ():
+            if not isinstance(extra, dict):
+                continue
+            extra_street = normalize_street(extra.get("street"))
+            if not extra_street:
+                continue
+            entries.append(
+                AddressEntry(
+                    key=extra_street,
+                    street=extra_street,
+                    house=parse_house_number(extra.get("house_number")),
+                    postal_code=(extra.get("postal_code") or base_plz or "").strip(),
+                    city=normalize_city(extra.get("city")) or base_city,
+                    object_id=object_id,
+                    label=label,
+                )
+            )
     for own in own_addresses:
         entry = parse_own_address(own)
         if entry is not None:

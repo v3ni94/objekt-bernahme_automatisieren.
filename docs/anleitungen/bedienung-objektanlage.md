@@ -34,6 +34,7 @@ Voraussetzung: Objektnummer und Stammdaten aus dem Übernahmevertrag beziehungsw
 
 1. Objekte, „Objekt anlegen“.
 2. Felder ausfüllen: Objektnummer, Bezeichnung, Straße, Hausnummer, PLZ, Ort, Verwaltungsart (WEG, Mietverwaltung, WEG mit Sondereigentumsverwaltung), Status.
+   Bei Eckobjekten oder Gebäuden mit mehreren Hausnummern zusätzlich „Weitere Anschriften desselben Gebäudes“ ausfüllen, eine je Zeile in der Form „Straße Hausnummer, PLZ Ort“ (PLZ und Ort dürfen fehlen). Dokumente mit einer dieser Anschriften gelten dann als Dokumente dieses Objekts; zwei Anschriften desselben Objekts in einem Dokument sind kein zweiter Objektbezug.
 3. Übernahmedaten: Übernahmezeitraum von, Übernahmezeitraum bis (Stichtag), Wirtschaftsjahr beginnt im Monat (1 = Kalenderjahr). Ohne „von“ gilt die Vorgabe aus der Konfiguration (drei abgeschlossene Wirtschaftsjahre plus laufendes Jahr, ANNAHME H09).
 4. Prüfgrundlagen für die Vollständigkeit: Sollzahl Einheiten, SEPA-Lastschrift genutzt, Sonderumlagen im Übernahmezeitraum.
 5. Vorverwaltung mit Anschrift, Ansprechpartner und Zeichen; diese Angaben stehen später im Anschriftfeld der Nachforderung.

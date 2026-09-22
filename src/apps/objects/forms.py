@@ -7,11 +7,31 @@ from django.core.exceptions import ValidationError
 
 from apps.config import store
 from apps.drive.object_numbers import normalize_object_number
+from apps.objects.addresses import format_address_lines, parse_address_lines
 from apps.objects.models import ManagedObject, Unit
 from apps.objects.units import parse_unit_label
 
 
 class ObjectForm(forms.ModelForm):
+    additional_addresses_text = forms.CharField(
+        label="Weitere Anschriften desselben Gebäudes (Eckobjekt, weitere Hausnummern), eine je Zeile",
+        required=False,
+        widget=forms.Textarea(attrs={"rows": 3, "placeholder": "Beispielweg 7, 12345 Beispielstadt"}),
+        help_text=(
+            "Form „Straße Hausnummer, PLZ Ort“; PLZ und Ort dürfen fehlen. Dokumente mit einer dieser Anschriften "
+            "gelten als Dokumente dieses Objekts, zwei Anschriften desselben Objekts sind kein zweiter Objektbezug."
+        ),
+    )
+    field_order = [
+        "object_number",
+        "name",
+        "street",
+        "house_number",
+        "postal_code",
+        "city",
+        "additional_addresses_text",
+    ]
+
     class Meta:
         model = ManagedObject
         fields = [
@@ -69,6 +89,31 @@ class ObjectForm(forms.ModelForm):
             "takeover_to": forms.DateInput(attrs={"type": "date"}),
             "notes": forms.Textarea(attrs={"rows": 3}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance.pk and "additional_addresses_text" not in self.initial:
+            self.initial["additional_addresses_text"] = format_address_lines(
+                self.instance.additional_addresses
+            )
+
+    def clean_additional_addresses_text(self) -> str:
+        text = self.cleaned_data.get("additional_addresses_text") or ""
+        items, bad = parse_address_lines(text)
+        if bad:
+            raise ValidationError(
+                "Nicht als Anschrift erkannt (Form „Straße Hausnummer, PLZ Ort“): " + "; ".join(bad[:5])
+            )
+        self._additional_addresses = items
+        return text
+
+    def save(self, commit=True):
+        obj = super().save(commit=False)
+        obj.additional_addresses = getattr(self, "_additional_addresses", obj.additional_addresses or [])
+        if commit:
+            obj.save()
+            self.save_m2m()
+        return obj
 
     def clean_object_number(self) -> str:
         raw = (self.cleaned_data.get("object_number") or "").strip()

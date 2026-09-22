@@ -60,6 +60,11 @@ class ManagedObject(SoftDeleteModel):
     house_number = models.CharField(max_length=20, null=True, blank=True)
     postal_code = models.CharField(max_length=10, null=True, blank=True)
     city = models.CharField(max_length=80, null=True, blank=True)
+    additional_addresses = models.JSONField(
+        blank=True,
+        default=list,
+        help_text="weitere Anschriften desselben Gebäudes (Eckobjekt, weitere Hausnummern): Liste aus street, house_number, postal_code, city",
+    )
     management_type = models.CharField(max_length=16, choices=ManagementType.choices)
     status = models.CharField(max_length=16, choices=ObjectStatus.choices, default=ObjectStatus.NEW)
     takeover_from = models.DateField(null=True, blank=True)
@@ -141,6 +146,12 @@ class ManagedObject(SoftDeleteModel):
             " ".join(p for p in [self.postal_code, self.city] if p),
         ]
         return ", ".join(p for p in parts if p)
+
+    @property
+    def additional_addresses_display(self) -> str:
+        from apps.objects.addresses import format_address_lines
+
+        return "; ".join(format_address_lines(self.additional_addresses).splitlines())
 
 
 class Unit(SoftDeleteModel):

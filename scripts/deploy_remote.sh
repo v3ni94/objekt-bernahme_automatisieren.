@@ -34,6 +34,7 @@
 #   altbestand-objekte <branch> [echt]  Objekte fuer Altbestand-Quellen ohne Objekt anlegen (echt = anlegen, sonst Vorschau)
 #   paperless-feld-alle <branch> [echt] Feld MHV Objekt fuer alle zugeordneten Speicherpfade setzen und Bestandslauf starten
 #   paperless-feld-abgleich <branch> <objekt>[+echt]  Feld MHV Objekt je Dokument gegen die Zuordnung pruefen; echt uebernimmt Abweichungen (leer -> Eingang)
+#   objekt-anschriften <branch> [echt]  Weitere Anschriften (Eckobjekte) aus den Objektbezeichnungen ableiten (echt = speichern, sonst Vorschau)
 #   altbestand-aufarbeiten <branch> [echt] Alle Altbestand-Ordner mit Objekt aufarbeiten (echt = Celery-Aufgabe, sonst Vorschau)
 #   verarbeitung-alle <branch> [echt] Verarbeitungslaeufe fuer alle Objekte mit offener Arbeit (echt = einreihen)
 #   review-status <branch> [<objekt>]   Offene Pruefcenter-Faelle je Art und Unterart, Vorschlaege, KI-Nachklassifizierbarkeit (keine Personendaten)
@@ -809,6 +810,14 @@ PY
       docker compose exec -T web python manage.py paperless_feld_abgleich "$obj" --echt
     else
       docker compose exec -T web python manage.py paperless_feld_abgleich "$obj"
+    fi
+    ;;
+  objekt-anschriften)
+    # Weitere Anschriften (Eckobjekte, mehrere Hausnummern) aus den Objektbezeichnungen ableiten; "echt" speichert
+    if [ "${ARG:-}" = "echt" ]; then
+      docker compose exec -T web python manage.py objekt_anschriften_ergaenzen --echt
+    else
+      docker compose exec -T web python manage.py objekt_anschriften_ergaenzen
     fi
     ;;
   altbestand-objekte)

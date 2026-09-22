@@ -118,6 +118,7 @@ Löschung bestätigen löscht nichts: weder das Dokument der Anwendung noch die 
 
 - Ein Dokument steht seit Stunden in Verarbeitung ohne Kennzeichen Text: Die Pipeline wartet (Verarbeitungslauf, Google-Verbindung oder Texterkennung). Status in der Dokumentansicht (Jobs) prüfen; Störungen behebt der Admin (docs/betrieb/runbook.md).
 - Kein Kandidat, obwohl die Anschrift im Text steht: Die Anschrift muss der Objektanschrift entsprechen (Straße und Hausnummer; 12a und 12b sind verschieden). Prüfen, ob das Objekt Straße, Hausnummer, Postleitzahl und Ort trägt; sonst Stammdaten ergänzen oder das Objekt von Hand wählen.
+- Eckobjekt oder mehrere Hausnummern: Steht im Dokument die zweite Straße oder eine andere Hausnummer desselben Gebäudes, muss das Objekt diese Anschrift unter „Weitere Anschriften desselben Gebäudes“ tragen; sonst erscheint kein Kandidat oder das Dokument wirkt wie ein Dokument mit zwei Objektbezügen.
 - Zwei Objekte mit derselben Anschrift: Hinweis „gleiche Anschrift“; Verwaltungsart aus dem Inhalt bestimmen (WEG-Begriffe gegen Mietbegriffe) und von Hand zuordnen.
 - Vorschlag aus Paperless (from_paperless) stimmt: Zuordnen bestätigt ihn. Die Bestätigung ist erforderlich, weil das Feld in Paperless von Hand gesetzt wurde.
 - Nach dem Zuordnen liegt die Datei noch im Eingangsordner in Drive: Die Verschiebung läuft als Ablagejob im Zielobjekt; bei Google-Störung wartet der Job und läuft danach weiter.

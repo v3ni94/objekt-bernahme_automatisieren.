@@ -2,7 +2,7 @@
 {% block content %}<h1>Objekt {{ object.object_number }} {{ object.name|default:"" }}{% if object.is_test %} <span class="ampel grau">Test</span>{% endif %}</h1>
 <div class="raster">
 <div class="karte"><h2>Stammdaten</h2>
-<table><tr><td>Adresse</td><td>{{ object.address|default:"keine Angabe" }}</td></tr><tr><td>Verwaltungsart</td><td>{{ object.get_management_type_display }}</td></tr><tr><td>Status</td><td>{{ object.get_status_display }}</td></tr>
+<table><tr><td>Adresse</td><td>{{ object.address|default:"keine Angabe" }}</td></tr>{% if object.additional_addresses %}<tr><td>Weitere Anschriften</td><td>{{ object.additional_addresses_display }}</td></tr>{% endif %}<tr><td>Verwaltungsart</td><td>{{ object.get_management_type_display }}</td></tr><tr><td>Status</td><td>{{ object.get_status_display }}</td></tr>
 <tr><td>Übernahmezeitraum</td><td>{% if object.takeover_from %}{{ object.takeover_from|date:"d.m.Y" }}{% endif %}{% if object.takeover_to %} bis {{ object.takeover_to|date:"d.m.Y" }}{% endif %}</td></tr>
 <tr><td>Wirtschaftsjahr ab Monat</td><td>{{ object.fiscal_year_start_month|default:"keine Angabe" }}</td></tr><tr><td>Sollzahl Einheiten</td><td>{{ object.expected_unit_count|default:"keine Angabe" }}</td></tr>
 <tr><td>Vorverwaltung</td><td>{{ object.previous_manager_name|default:"keine Angabe" }}{% if object.previous_manager_city %}, {{ object.previous_manager_postal_code|default:"" }} {{ object.previous_manager_city }}{% endif %}</td></tr>
