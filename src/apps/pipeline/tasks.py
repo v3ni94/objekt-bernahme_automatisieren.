@@ -97,6 +97,10 @@ def discover(job: ProcessingJob) -> dict:
             misc_code="02",
             context={"size_bytes": doc.size_bytes, "limit": limit, "name": doc.current_name},
         )
+        # In die Pruefung statt "registered" zu bleiben: sonst legte jeder Lauf erneut einen discover-Job an, der
+        # denselben Fall meldete (23.09.2026: 18 ZIP-Archive ueber 500 MB, je Lauf ein Durchgang seit dem 13.09.)
+        doc.status = "review"
+        doc.save(update_fields=["status", "updated_at"])
         return {"skipped": "file_too_large"}
     key = idempotency_key(JobType.HASH, job.object_id, doc.drive_file_id or f"upload-{doc.pk}")
     enqueue(
@@ -435,6 +439,20 @@ def _maybe_import_candidate(job: ProcessingJob, doc: Document, path: Path) -> bo
 
 
 # ---------------------------------------------------------------- 4 ocr_chunk
+def _all_pages_cached(sha256: str) -> bool:
+    """Alle Seitentexte der Seitenanalyse liegen im Cache (Textebene, Office oder OCR); ohne Analyse False."""
+    analysis_file = storage.analysis_path(sha256)
+    if not analysis_file.exists():
+        return False
+    try:
+        page_count = int(json.loads(analysis_file.read_text(encoding="utf-8")).get("page_count") or 0)
+    except (ValueError, OSError):
+        return False
+    return page_count > 0 and all(
+        storage.page_text_path(sha256, p).exists() for p in range(1, page_count + 1)
+    )
+
+
 @job_task(JobType.OCR_CHUNK)
 def ocr_chunk(job: ProcessingJob) -> dict:
     doc = job.document
@@ -462,16 +480,19 @@ def ocr_chunk(job: ProcessingJob) -> dict:
             heartbeat=lambda n: heartbeat(job, n),
         )
         result_pages = len(res.pages)
-    # Letzter fertiger Block loest merge_pages aus (unter Zeilensperre auf dem Dokument, E 10.2)
+    # Letzter fertiger Block loest merge_pages aus (unter Zeilensperre auf dem Dokument, E 10.2). Massgeblich ist,
+    # dass kein Block mehr offen ist und alle Seitentexte vorliegen. Bis 23.09.2026 galt ein frueher fehlgeschlagener
+    # Block (Zeitueberschreitung, OSError) als offen: nach der Wiederaufnahme liefen die neuen Bloecke durch, das
+    # Zusammenfuehren wurde aber nie eingereiht, 37 Dokumente blieben ohne Job auf hashed.
     with transaction.atomic():
         Document.objects.select_for_update().get(pk=doc.pk)
         open_chunks = (
             ProcessingJob.objects.filter(document=doc, job_type=JobType.OCR_CHUNK)
             .exclude(pk=job.pk)
-            .exclude(status__in=[JobStatus.DONE, JobStatus.SKIPPED])
+            .exclude(status__in=TERMINAL_STATUSES)
             .exists()
         )
-        if not open_chunks:
+        if not open_chunks and _all_pages_cached(doc.sha256):
             enqueue(
                 JobType.MERGE_PAGES,
                 job.object,
