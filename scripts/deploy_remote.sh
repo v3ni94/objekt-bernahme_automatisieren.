@@ -371,19 +371,23 @@ PY
     ;;
   ai-reclassify)
     # Nachklassifikationslauf (ai_reclassify): Unklar-Faelle mit Grund Stufe 3 nicht freigegeben, KI nicht verfuegbar
-    # oder Kostenlimit erneut durch classify (und damit Stufe 3) schicken. Argument "<objekt>[+echt]" oder "echt";
-    # ohne echt nur Vorschau. --force, weil der manuelle Lauf unabhaengig von ai.reclassify_enabled erlaubt ist.
-    obj=""; echt=""
+    # oder Kostenlimit erneut durch classify (und damit Stufe 3) schicken. Argumente mit + getrennt: Objektnummer,
+    # echt, ohne=133,216 (Objekte ausnehmen), limit=200 (hoechstens so viele Dokumente, fuer Piloten), details (eine
+    # Zeile je Dokument statt nur je Objekt). Ohne echt nur Vorschau. --force, weil der manuelle Lauf unabhaengig von
+    # ai.reclassify_enabled erlaubt ist.
+    obj=""; echt=""; args=(--force)
     IFS='+' read -r -a teile <<<"${ARG:-}"
     for t in "${teile[@]}"; do
       case "$t" in
         "") ;;
         echt) echt="1" ;;
-        *[!0-9]*) echo "Argument unbekannt: $t (erlaubt: Objektnummer, echt, Objektnummer+echt)"; exit 2 ;;
+        details) args+=(--details) ;;
+        ohne=*) args+=(--ohne "${t#ohne=}") ;;
+        limit=*) args+=(--limit "${t#limit=}") ;;
+        *[!0-9]*) echo "Argument unbekannt: $t (erlaubt: Objektnummer, echt, ohne=NR,NR, limit=N, details)"; exit 2 ;;
         *) obj="$t" ;;
       esac
     done
-    args=(--force)
     [ -n "$obj" ] && args+=(--object "$obj")
     [ -z "$echt" ] && args+=(--dry-run)
     echo "ai_reclassify ${args[*]} (Vorschau: $([ -z "$echt" ] && echo ja || echo nein))"

@@ -207,3 +207,48 @@ def test_statusseite_zeigt_stufe3(welt, fake_oauth, client_as, admin_user):
     html = resp.content.decode()
     assert "Stufe 3 (externe KI)" in html and "deaktiviert (F17, AVV)" in html
     assert json.dumps(resp.context["processing"]["ai"]["order"]) == '["openai", "anthropic"]'
+
+
+H624 = "Objekt 624\n"
+UNKLAR624 = {"filename": "Schreiben_unklar_624.pdf", "pages": [H624 + UNKLAR["pages"][0].split("\n", 1)[1]]}
+
+
+def test_nachklassifikation_ausnahmen_begrenzung_zusammenfassung(
+    welt, fake_oauth, run_all, admin_user, fake_router
+):
+    """23.09.2026: Sammelpfade (133, 216) ausnehmen, Piloten begrenzen, je Objekt zusammenfassen statt 12.500 Zeilen."""
+    from io import StringIO
+
+    a, b = welt["objects"]["623"], welt["objects"]["624"]
+    doc_a = make_document(a, UNKLAR)
+    doc_b = make_document(b, UNKLAR624)
+    for obj in (a, b):
+        start_run(obj)
+        run_all(obj)
+    for doc in (doc_a, doc_b):
+        doc.refresh_from_db()
+        assert doc.status == "review" and doc.category_id == "06"
+    enable_ai(admin_user)
+    fake_router(answer=_answer("05", "08", "schriftverkehr", 0.95))
+
+    out = StringIO()
+    call_command("ai_reclassify", force=True, dry_run=True, stdout=out)
+    text = out.getvalue()
+    assert "Objekt 623: 1" in text and "Objekt 624: 1" in text and "2 Dokumente gefunden" in text
+    assert "würde neu klassifizieren" not in text  # Einzelzeilen nur mit --details
+
+    out = StringIO()
+    call_command("ai_reclassify", force=True, dry_run=True, details=True, limit=1, stdout=out)
+    text = out.getvalue()
+    assert text.count("würde neu klassifizieren") == 1 and "Begrenzung 1 erreicht" in text
+
+    out = StringIO()
+    call_command("ai_reclassify", force=True, ohne="624", stdout=out)
+    text = out.getvalue()
+    assert "Objekt 623: 1" in text and "Objekt 624" not in text and "Ausgenommen: 624" in text
+    assert "1 Dokumente erneut eingereiht" in text
+    assert ReviewCase.objects.get(document=doc_a).status == "dismissed"
+    assert ReviewCase.objects.get(document=doc_b).status == "open"
+
+    with pytest.raises(Exception, match="Ziffern"):
+        call_command("ai_reclassify", force=True, dry_run=True, ohne="624,abc")
