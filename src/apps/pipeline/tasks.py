@@ -947,6 +947,20 @@ LOCK_WAIT_ATTEMPTS = 15  # bis 3 s im Prozess auf die Objektsperre warten, dann 
 LOCK_WAIT_SLEEP = 0.2
 
 
+def _prior_drive_file(doc: Document, drive):
+    """Drive-Datei eines bereits abgelegten Dokuments (Upload oder Paperless), sofern sie noch existiert und nicht im
+    Papierkorb liegt. Bei einer erneuten Ablage (Nachklassifikation aus 06/01, geaenderte Entscheidung) wird diese
+    Datei per Elternwechsel verschoben statt erneut hochgeladen. Bis 23.09.2026 lud die Ablage eine Zweitkopie hoch,
+    die Altkopie blieb im alten Ordner, und ohne Original im Arbeitsverzeichnis scheiterte sie mit
+    „Quelldatei fuer den Upload fehlt“ (165 Dokumente im Nachklassifikationslauf)."""
+    if not doc.drive_file_id or doc.source in ("drive_existing", "moved_in"):
+        return None
+    node = drive.get(doc.drive_file_id)
+    if node is None or node.trashed:
+        return None
+    return node
+
+
 @job_task(JobType.FILE_TO_DRIVE)
 def file_to_drive(job: ProcessingJob) -> dict:
     """Letzter Schritt (docs/architektur.md 6.1 Nr. 10): Bestandsdatei per Elternwechsel verschieben, Upload in den
@@ -1016,8 +1030,13 @@ def file_to_drive(job: ProcessingJob) -> dict:
             raise DeferJob(f"Ablageziel noch nicht vorhanden: {exc}", seconds=120) from exc
     finally:
         cache.delete(lock_key)
-    if doc.source == "drive_existing" or (doc.drive_file_id and doc.source == "moved_in"):
-        node = drive.get(doc.drive_file_id)
+    prior = _prior_drive_file(doc, drive)
+    if (
+        doc.source == "drive_existing"
+        or (doc.drive_file_id and doc.source == "moved_in")
+        or prior is not None
+    ):
+        node = prior if prior is not None else drive.get(doc.drive_file_id)
         if node is None:
             raise SkipJob("drive_file_missing")
         current_parent = node.parent_id
@@ -1031,6 +1050,8 @@ def file_to_drive(job: ProcessingJob) -> dict:
                 after={"from": current_parent, "to": target.drive_file_id, "name": doc.current_name},
             )
         action = "moved" if current_parent != target.drive_file_id else "already_there"
+        if prior is not None:
+            _remove_transit_copy(doc)
     else:
         # Dubletten tragen keinen eigenen Hash (Pruefabfrage sha256 eindeutig); Quelle ist die Datei des Originals
         sha_for_file = doc.sha256 or (doc.duplicate_of.sha256 if doc.duplicate_of_id else None)

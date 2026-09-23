@@ -927,6 +927,24 @@ PY
       docker compose exec -T web python manage.py transit_bereinigen
     fi
     ;;
+  drive-dubletten)
+    # Altkopien in Drive in den Papierkorb legen, die bei einer erneuten Ablage desselben Dokuments entstanden sind
+    # (Nachklassifikation bis 23.09.2026: Zweitkopie hochgeladen, Altkopie blieb in 06/01). Quelle: Protokoll
+    # drive.upload; jede Altkopie wird vor dem Papierkorb in Drive nachgelesen und ueber document_id oder sha256
+    # bestaetigt. Nie endgueltig loeschen. Argumente mit + getrennt: echt, objekt=NR, limit=N. Ohne echt Vorschau.
+    args=()
+    IFS='+' read -r -a parts <<< "${ARG:-}"
+    for p in "${parts[@]}"; do
+      case "$p" in
+        echt) args+=(--echt) ;;
+        objekt=*) args+=(--objekt "${p#objekt=}") ;;
+        limit=*) args+=(--limit "${p#limit=}") ;;
+        '') ;;
+        *) echo "Unbekanntes Argument: $p (erlaubt: echt, objekt=NR, limit=N)"; exit 2 ;;
+      esac
+    done
+    docker compose exec -T web python manage.py drive_dubletten_bereinigen "${args[@]}"
+    ;;
   worker-drosseln)
     # CPU-Last der laufenden Worker ohne Neustart senken. Argument: Kerne fuer den OCR-Worker, optional mit Anteil in
     # Prozent, z. B. "2" oder "2+50" (2 Kerne, je hoechstens 50 Prozent = Quote 1,0). Ablage- und Klassifikations-
@@ -1245,5 +1263,5 @@ PY
     done
     echo "wirksam mit der Aktion deploy; Sicherung .env.bak"
     ;;
-  *) echo "Nur check, pull, befund, env-init, ps, logs, smoke, cert-retry, db-status, db-reset, first-run, deploy, rollback, create-admin, oauth-check, deploy-tests, doc-status, config-set, altbestand-import, altbestand-objekte, altbestand-aufarbeiten, verarbeitung-alle, paperless-feld-alle, redis-status, env-set, jobs-bereinigen, disk-status, lauf-monitor, fehler-wiederaufnehmen, transit-bereinigen, worker-drosseln, work-bereinigen, last-status, worker-stop, worker-start, ai-check, ai-reclassify, review-status, sync-status, sync-retry, classifier-status, zuordnung-pruefen, objekt-anschriften, paperless-feld-abgleich, backup-voll oder reconcile-all erlaubt"; exit 2 ;;
+  *) echo "Nur check, pull, befund, env-init, ps, logs, smoke, cert-retry, db-status, db-reset, first-run, deploy, rollback, create-admin, oauth-check, deploy-tests, doc-status, config-set, altbestand-import, altbestand-objekte, altbestand-aufarbeiten, verarbeitung-alle, paperless-feld-alle, redis-status, env-set, jobs-bereinigen, disk-status, lauf-monitor, fehler-wiederaufnehmen, transit-bereinigen, drive-dubletten, worker-drosseln, work-bereinigen, last-status, worker-stop, worker-start, ai-check, ai-reclassify, review-status, sync-status, sync-retry, classifier-status, zuordnung-pruefen, objekt-anschriften, paperless-feld-abgleich, backup-voll oder reconcile-all erlaubt"; exit 2 ;;
 esac
