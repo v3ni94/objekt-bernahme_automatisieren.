@@ -358,6 +358,64 @@
   }
  },
  {
+  "id": "R-03-GESAMTABR-002",
+  "name": "Jahresabrechnung oder Hausgeldabrechnung (weich)",
+  "version": 2,
+  "priority": 175,
+  "scope": {},
+  "when": {
+   "any_of": {
+    "head_regex": [
+     "(?im)^\\s*(gesamt|jahres|hausgeld)-?abrechnung\\b"
+    ],
+    "text_regex": [
+     "(?i)(jahres|hausgeld)-?abrechnung.{0,160}(alle einheiten|gesamtkosten|verteilungsschl(ue|ü)ssel|miteigentumsanteile|gesamt(ausgaben|einnahmen))"
+    ],
+    "filename_regex": [
+     "(?i)(gesamt|jahres|hausgeld)-?abrechnung"
+    ]
+   },
+   "not_text_regex": [
+    "(?i)protokoll der",
+    "(?i)einwendung",
+    "(?i)widerspruch",
+    "(?i)\\beinzelabrechnung\\b",
+    "(?i)betriebskostenabrechnung",
+    "(?i)nebenkostenabrechnung",
+    "(?i)heizkostenabrechnung",
+    "(?i)abrechnungsergebnis",
+    "(?i)\\bihr(e|en)? (anteil|nachzahlung|guthaben)\\b",
+    "(?i)\\beinladung\\b",
+    "(?i)tagesordnung",
+    "(?i)umlaufbeschl",
+    "(?i)beschlussgegenstand"
+   ]
+  },
+  "then": {
+   "category": "03",
+   "confidence": 0.85,
+   "hard": false,
+   "document_type": "gesamtjahresabrechnung",
+   "scope": "accounting",
+   "metadata": {
+    "period_year": "{period_year}"
+   }
+  },
+  "examples": {
+   "positive": [
+    "Jahresabrechnung 2024\nWohnungseigentümergemeinschaft Musterweg 5\nGesamtkosten 45.000,00 EUR",
+    "Hausgeldabrechnung 2025 für alle Einheiten der Gemeinschaft, Verteilungsschlüssel Miteigentumsanteile"
+   ],
+   "negative": [
+    "Einzelabrechnung 2024 für die Einheit WE 3, Abrechnungsergebnis Nachzahlung 120,00 EUR",
+    "Protokoll der Eigentümerversammlung: Die Jahresabrechnung 2024 wird genehmigt",
+    "Betriebskostenabrechnung 2024 für Ihre Wohnung",
+    "Hausgeldabrechnung 2024 für die Einheit WE 3, Abrechnungsergebnis Nachzahlung 120,00 EUR",
+    "Einladung zur ordentlichen Eigentümerversammlung 2025\nTagesordnung\nTOP 2\nJahresabrechnung 2024 mit Beschlussfassung"
+   ]
+  }
+ },
+ {
   "id": "R-03-GESAMTWP-001",
   "name": "Gesamtwirtschaftsplan",
   "version": 1,
@@ -437,8 +495,8 @@
  },
  {
   "id": "R-03-BELEG-001",
-  "name": "Beleg oder Rechnung mit Vertragspartner",
-  "version": 1,
+  "name": "Beleg oder Rechnung (Gemeinschaft oder Objekt)",
+  "version": 2,
   "priority": 120,
   "scope": {},
   "when": {
@@ -450,28 +508,104 @@
     ]
    },
    "entity_required": [
-    "contract_partner"
+    "amount"
    ],
    "not_entity": [
     "foreign_object_marker"
    ],
    "not_text_regex": [
-    "(?i)abrechnung"
+    "(?i)abrechnung",
+    "(?i)mietvertrag",
+    "(?i)\\bmahnung\\b",
+    "(?i)wirtschaftsplan"
    ]
   },
   "then": {
    "category": "03",
-   "confidence": 0.85,
+   "confidence": 0.8,
    "hard": false,
    "document_type": "beleg",
    "scope": "accounting"
   },
   "examples": {
    "positive": [
-    "Rechnung Nr. 4711 des Hausmeisterdienstes"
+    "Rechnung Nr. 4711 des Hausmeisterdienstes, Rechnungsbetrag 250,00 EUR",
+    "Beleg zur Reinigung des Treppenhauses, Betrag 120,00 EUR, zahlbar bis 30.09.2026"
    ],
    "negative": [
-    "Einzelabrechnung 2025"
+    "Einzelabrechnung 2025",
+    "Mahnung zur Rechnung Nr. 4711, Mahngebühr 5,00 EUR",
+    "Mietvertrag, die Rechnung der Kaution erfolgt gesondert"
+   ]
+  }
+ },
+ {
+  "id": "R-05-BELEG-001",
+  "name": "Rechnung oder Beleg für eine Einheit (Sondereigentum, Mietverwaltung)",
+  "version": 2,
+  "priority": 130,
+  "scope": {
+   "management_types": [
+    "rental",
+    "weg_with_se"
+   ]
+  },
+  "when": {
+   "any_of": {
+    "text_regex": [
+     "(?i)rechnungs-?(nr|nummer)",
+     "(?i)\\brechnung\\b",
+     "(?i)\\bbeleg\\b"
+    ]
+   },
+   "text_regex": [
+    "(?i)(reparatur|instandsetzung|instandhaltung|austausch|erneuerung|sanierung|montage|einbau|wartung|sondereigentum).{0,80}(wohnung|einheit|\\bwe\\b|sondereigentum)",
+    "(?i)(wohnung|einheit|\\bwe\\b).{0,80}(reparatur|instandsetzung|instandhaltung|austausch|erneuerung|sanierung|montage|einbau|wartung)"
+   ],
+   "entity_required": [
+    "unit",
+    "amount"
+   ],
+   "not_entity": [
+    "foreign_object_marker"
+   ],
+   "not_text_regex": [
+    "(?i)abrechnung",
+    "(?i)mietvertrag",
+    "(?i)\\bmahnung\\b",
+    "(?i)wirtschaftsplan",
+    "(?i)eigent(ue|ü)mergemeinschaft",
+    "(?i)\\bWEG\\b",
+    "(?i)gemeinschaftseigentum",
+    "(?i)treppenhaus",
+    "(?i)hausflur",
+    "(?i)allgemeinstrom",
+    "(?i)hausmeister",
+    "(?i)winterdienst",
+    "(?i)gartenpflege",
+    "(?i)aufzug",
+    "(?i)fassade",
+    "(?i)heizungsanlage"
+   ]
+  },
+  "then": {
+   "category": "05",
+   "confidence": 0.8,
+   "hard": false,
+   "subfolder": "11",
+   "document_type": "beleg_einheit",
+   "scope": "owner"
+  },
+  "examples": {
+   "positive": [
+    "Rechnung Nr. 176: Reparatur der WC-Spülung in der Wohnung 1.96, Rechnungsbetrag 107,10 EUR",
+    "Beleg über den Austausch der Wohnungstür WE 12, Betrag 890,00 EUR"
+   ],
+   "negative": [
+    "Betriebskostenabrechnung 2024 für die Wohnung 1.96",
+    "Mietvertrag für die Wohnung 2.05, Kaltmiete 650,00 EUR",
+    "Rechnung Nr. 4711 Hausmeisterdienst, Treppenhausreinigung, Schlüsselnachbestellung für WE 12, Rechnungsbetrag 250,00 EUR",
+    "Rechnung an die Wohnungseigentümergemeinschaft Musterweg 5: Wartung der Heizungsanlage, Betrag 480,00 EUR"
    ]
   }
  },

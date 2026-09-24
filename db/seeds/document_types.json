@@ -733,6 +733,22 @@
     ]
   },
   {
+    "code": "beleg_einheit",
+    "category_code": "05",
+    "subfolder_code": "11",
+    "name": "Beleg zur Einheit",
+    "requires_period": false,
+    "requires_owner": true,
+    "requires_tenant": false,
+    "keywords": [
+      "Rechnung",
+      "Beleg",
+      "Reparatur",
+      "Instandsetzung",
+      "Sondereigentum"
+    ]
+  },
+  {
     "code": "verwaltervertrag",
     "category_code": "01",
     "subfolder_code": null,

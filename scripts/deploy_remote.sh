@@ -373,8 +373,10 @@ PY
     # Nachklassifikationslauf (ai_reclassify): Unklar-Faelle mit Grund Stufe 3 nicht freigegeben, KI nicht verfuegbar
     # oder Kostenlimit erneut durch classify (und damit Stufe 3) schicken. Argumente mit + getrennt: Objektnummer,
     # echt, ohne=133,216 (Objekte ausnehmen), limit=200 (hoechstens so viele Dokumente, fuer Piloten), details (eine
-    # Zeile je Dokument statt nur je Objekt). Ohne echt nur Vorschau. --force, weil der manuelle Lauf unabhaengig von
-    # ai.reclassify_enabled erlaubt ist.
+    # Zeile je Dokument statt nur je Objekt), unterfall=manual_check (KI-Einstufung Sonstiges statt unter Schwelle,
+    # auch unterfall=below_threshold,manual_check), alle (auch Faelle mit fruehem Stufe-3-Ergebnis, nach Aenderung
+    # von Auftrag oder Regeln; fuer manual_check noetig). Ohne echt nur Vorschau. --force, weil der manuelle Lauf
+    # unabhaengig von ai.reclassify_enabled erlaubt ist.
     obj=""; echt=""; args=(--force)
     IFS='+' read -r -a teile <<<"${ARG:-}"
     for t in "${teile[@]}"; do
@@ -382,9 +384,11 @@ PY
         "") ;;
         echt) echt="1" ;;
         details) args+=(--details) ;;
+        alle) args+=(--alle) ;;
         ohne=*) args+=(--ohne "${t#ohne=}") ;;
         limit=*) args+=(--limit "${t#limit=}") ;;
-        *[!0-9]*) echo "Argument unbekannt: $t (erlaubt: Objektnummer, echt, ohne=NR,NR, limit=N, details)"; exit 2 ;;
+        unterfall=*) args+=(--unterfall "${t#unterfall=}") ;;
+        *[!0-9]*) echo "Argument unbekannt: $t (erlaubt: Objektnummer, echt, ohne=NR,NR, limit=N, unterfall=A,B, alle, details)"; exit 2 ;;
         *) obj="$t" ;;
       esac
     done
@@ -392,7 +396,7 @@ PY
     [ -z "$echt" ] && args+=(--dry-run)
     echo "ai_reclassify ${args[*]} (Vorschau: $([ -z "$echt" ] && echo ja || echo nein))"
     docker compose exec -T web python manage.py ai_reclassify "${args[@]}"
-    echo "$(date -Is) ai-reclassify ${ARG:-alle}" >> "$LOG"
+    echo "$(date -Is) ai-reclassify ${ARG:-ohne-argument}" >> "$LOG"
     ;;
   classifier-status)
     # Lokaler Klassifikator (Stufe 2, B-27): ohne Argument Status der Kaltstartphase (aktives Modell, gewichtete Beispiele je

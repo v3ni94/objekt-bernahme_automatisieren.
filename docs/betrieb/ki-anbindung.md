@@ -88,7 +88,16 @@ Die Vorschau nennt die Anzahl der Dokumente, die erneut klassifiziert würden. N
 d ai-reclassify $B echt
 ```
 
-Der Nachklassifikationslauf nimmt nur offene Fälle `below_threshold` mit Grund Stufe 3 nicht freigegeben, KI nicht verfügbar oder Kostenlimit, die noch kein Mensch bearbeitet hat; Bestandsdateien in Drive werden weiterhin nie verschoben, sondern nur als Vorschlag gestellt.
+Der Standardlauf nimmt nur offene Fälle `below_threshold` ohne Stufe-3-Ergebnis (Stufe 3 nicht freigegeben, KI nicht verfügbar, Kostenlimit oder nie aufgerufen), die noch kein Mensch bearbeitet hat. Bestandsdateien in Drive werden bei einer sicheren Entscheidung für 01 bis 03 und für 05 mit bekanntem Eigentümer verschoben; unterhalb der Schwelle bleibt es beim Vorschlag im Prüfcenter.
+
+Nach einer Änderung von Auftrag oder Regeln (24.09.2026: Objektangaben im Auftrag, Regeln für Abrechnungen und Belege) den Sonstiges-Bestand erneut durch die Stufe 3 schicken, also auch die Fälle, in denen die KI selbst „kein Objektbezug“ oder unklar geantwortet hat (`manual_check`, nur zusammen mit `alle`):
+
+```bash
+d ai-reclassify $B ohne=133,216+unterfall=below_threshold,manual_check+alle
+d ai-reclassify $B ohne=133,216+unterfall=below_threshold,manual_check+alle+echt
+```
+
+`alle` hebt für `below_threshold` die Beschränkung auf Fälle ohne Stufe-3-Ergebnis auf; jeder Aufruf kostet erneut (Preis je Dokument aus `d ai-check $B`). Diese Aktion läuft nur über den serverseitigen Wrapper `d`, nicht über den GitHub-Workflow.
 
 ## KI-Schiedsrichter der Objektzuordnung (Zweck `assign_object`, seit 22.09.2026)
 

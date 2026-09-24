@@ -9,6 +9,7 @@ import json
 
 import pytest
 from django.core.management import call_command
+from django.core.management.base import CommandError
 from django.urls import reverse
 from tests.integration.classification.conftest import make_document
 
@@ -19,6 +20,7 @@ from apps.ai.provider import PriceList, ProviderConfig
 from apps.ai.router import Router
 from apps.config import store
 from apps.documents.models import DocumentClassification
+from apps.objects.models import ManagedObject
 from apps.pipeline.models import JobType, ProcessingJob
 from apps.pipeline.runs import start_run
 from apps.review.models import ReviewCase
@@ -252,3 +254,110 @@ def test_nachklassifikation_ausnahmen_begrenzung_zusammenfassung(
 
     with pytest.raises(Exception, match="Ziffern"):
         call_command("ai_reclassify", force=True, dry_run=True, ohne="624,abc")
+
+
+def test_kein_objektbezug_ohne_anschrift_wird_verworfen(welt, fake_oauth, run_all, admin_user, fake_router):
+    """24.09.2026: 4.303 Dokumente lagen als „kein Objektbezug“ in 06, obwohl der Auftrag keine Objektanschrift
+    enthielt (963 davon in Objekten ohne erfasste Strasse). Der Auftrag traegt jetzt die Objektangaben; ohne bekannte
+    Anschrift wird object_related false verworfen und die Kategorie der Antwort uebernommen."""
+    enable_ai(admin_user)
+    r = fake_router(answer=_answer("02", None, "gebaeudeversicherung", 0.95, object_related=False))
+    obj = welt["objects"]["624"]
+    ManagedObject.objects.filter(pk=obj.pk).update(street="", house_number="")
+    obj.refresh_from_db()
+    doc = make_document(obj, UNKLAR624)
+    start_run(obj)
+    run_all(obj)
+    doc.refresh_from_db()
+    auftrag = r.providers["openai"].sent[0]["user"]
+    assert '"anschrift_bekannt": false' in auftrag and '"objektnummer": "624"' in auftrag
+    assert doc.final_decided_by == "stage3" and doc.category_id == "02" and doc.status == "filed"
+    s3 = DocumentClassification.objects.get(document=doc, stage=3, is_final=False)
+    assert (
+        s3.category_id == "02" and s3.scope_decision is None and s3.features["object_related_ignored"] is True
+    )
+    assert not ReviewCase.objects.filter(document=doc, case_subtype="manual_check").exists()
+    # Hinweisfall: die Ablage ist erfolgt, die Entscheidung bleibt im Pruefcenter sichtbar
+    hinweis = ReviewCase.objects.get(document=doc, case_subtype="ai_object_unverified")
+    assert hinweis.case_type == "move_proposal" and hinweis.status == "open"
+    assert "Anschrift" in hinweis.context["reason"]
+
+
+def test_kein_objektbezug_ohne_anschrift_bleibt_bei_fremder_objektnummer(
+    welt, fake_oauth, run_all, admin_user, fake_router
+):
+    """Nennt der Text eine fremde Objektnummer, steht die Aussage der KI nicht allein: das false gilt auch ohne
+    erfasste Anschrift, das Dokument bleibt in 06/04 (Fremdobjekt)."""
+    enable_ai(admin_user)
+    store.set(
+        "classification.threshold_stage3_call", 0.95, user=admin_user
+    )  # sonst entscheidet Stufe 1 allein
+    r = fake_router(answer=_answer("02", None, "gebaeudeversicherung", 0.95, object_related=False))
+    obj = welt["objects"]["624"]
+    ManagedObject.objects.filter(pk=obj.pk).update(street="", house_number="")
+    obj.refresh_from_db()
+    doc = make_document(
+        obj, {"filename": "fremd.pdf", "pages": [UNKLAR["pages"][0]]}
+    )  # Kopf nennt Objekt 623
+    start_run(obj)
+    run_all(obj)
+    doc.refresh_from_db()
+    assert '"anschrift_bekannt": false' in r.providers["openai"].sent[0]["user"]
+    assert doc.category_id == "06" and doc.subfolder.code == "04"
+    s3 = DocumentClassification.objects.get(document=doc, stage=3, is_final=False)
+    assert s3.category_id == "06" and s3.scope_decision == "unclear"
+    assert s3.features["object_related_ignored"] is False
+    assert not ReviewCase.objects.filter(document=doc, case_subtype="ai_object_unverified").exists()
+
+
+def test_kein_objektbezug_mit_anschrift_bleibt_sonstiges_und_nachklassifikation_manual_check(
+    welt, fake_oauth, run_all, admin_user, fake_router
+):
+    """Mit bekannter Anschrift gilt object_related false weiter (06, Fall manual_check). Diese Faelle holt
+    ai_reclassify nur mit --unterfall manual_check --alle nach (24.09.2026), der Standardlauf laesst sie liegen."""
+    from io import StringIO
+
+    enable_ai(admin_user)
+    r = fake_router(answer=_answer("02", None, "gebaeudeversicherung", 0.95, object_related=False))
+    obj = welt["objects"]["623"]
+    doc = make_document(obj, UNKLAR)
+    start_run(obj)
+    run_all(obj)
+    doc.refresh_from_db()
+    auftrag = r.providers["openai"].sent[0]["user"]
+    assert '"anschrift_bekannt": true' in auftrag and "Joachimstraße 49" in auftrag
+    assert doc.category_id == "06" and doc.status == "review"
+    s3 = DocumentClassification.objects.get(document=doc, stage=3, is_final=False)
+    assert s3.category_id == "06" and s3.scope_decision == "unclear"
+    assert s3.features["object_related_ignored"] is False
+    case = ReviewCase.objects.get(document=doc, status="open")
+    assert case.case_subtype == "manual_check"
+
+    out = StringIO()
+    call_command("ai_reclassify", object="623", force=True, stdout=out)  # Standard: nur below_threshold
+    assert "0 Dokumente erneut eingereiht" in out.getvalue()
+    case.refresh_from_db()
+    assert case.status == "open"
+    with pytest.raises(CommandError, match="erfordert --alle"):
+        call_command("ai_reclassify", object="623", force=True, unterfall="manual_check")
+    with pytest.raises(CommandError, match="erlaubt"):
+        call_command("ai_reclassify", object="623", force=True, unterfall="duplicate", alle=True)
+
+    fake_router(answer=_answer("05", "08", "schriftverkehr", 0.95))
+    out = StringIO()
+    call_command(
+        "ai_reclassify",
+        object="623",
+        force=True,
+        unterfall="below_threshold,manual_check",
+        alle=True,
+        stdout=out,
+    )
+    assert "1 Dokumente erneut eingereiht" in out.getvalue()
+    case.refresh_from_db()
+    assert case.status == "dismissed" and case.resolution["unterfall"] == "manual_check"
+    run_all(obj)
+    doc.refresh_from_db()
+    assert (
+        doc.final_decided_by == "stage3" and doc.category_id == "05"
+    )  # ohne Eigentuemer: Pruefung, nicht 06

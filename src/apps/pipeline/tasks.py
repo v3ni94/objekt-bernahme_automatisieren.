@@ -830,6 +830,7 @@ def classify_ai(job: ProcessingJob) -> dict:
         "call_id": outcome.call_id,
         "reasoning": outcome.reasoning,
         "lease": outcome.lease,
+        "related_forced": outcome.related_forced,
     }
     enqueue(
         JobType.DECIDE,

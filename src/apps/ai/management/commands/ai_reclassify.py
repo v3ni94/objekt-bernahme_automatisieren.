@@ -4,7 +4,11 @@ stage3_status leer, 20.09.2026) gehen erneut durch classify (und damit Stufe 3),
 
 23.09.2026: Auswahl nach Objekt oder mit Ausnahmen (--ohne 133,216 fuer Sammelpfade ohne Objektbezug), Begrenzung
 (--limit) fuer Piloten, Zusammenfassung je Objekt statt einer Zeile je Dokument (12.500 offene Faelle); Einzelzeilen
-nur mit --details."""
+nur mit --details.
+
+24.09.2026: --unterfall manual_check mit --alle: Dokumente, die die KI als „kein Objektbezug“ nach 06 gelegt hat
+(4.303 Faelle, entstanden ohne Objektanschrift im Auftrag), gehen nach Aenderung von Auftrag oder Regeln erneut durch
+Stufe 3; --alle hebt fuer below_threshold die Beschraenkung auf Faelle ohne Stufe-3-Aufruf auf."""
 
 from __future__ import annotations
 
@@ -36,6 +40,17 @@ class Command(BaseCommand):
         parser.add_argument(
             "--details", action="store_true", help="eine Zeile je Dokument statt nur je Objekt"
         )
+        parser.add_argument(
+            "--unterfall",
+            default="below_threshold",
+            help="Unterfaelle (Komma-Liste): below_threshold (Standard), manual_check (KI-Einstufung Sonstiges)",
+        )
+        parser.add_argument(
+            "--alle",
+            action="store_true",
+            help="auch Faelle mit frueherem Stufe-3-Ergebnis (nach Aenderung von Auftrag oder Regeln); "
+            "fuer manual_check immer noetig",
+        )
         parser.add_argument("--dry-run", action="store_true")
         parser.add_argument("--force", action="store_true", help="auch wenn ai.reclassify_enabled falsch ist")
 
@@ -52,14 +67,22 @@ class Command(BaseCommand):
             | Q(context__stage3_status=None)
             | Q(context__stage3_status__isnull=True)
         )
-        cases = (
-            ReviewCase.objects.filter(
-                status=CaseStatus.OPEN, case_subtype="below_threshold", document__isnull=False
-            )
-            .filter(ohne_stufe3)
-            .select_related("document", "object")
-            .order_by("object__object_number", "id")
+        unterfaelle = [u.strip() for u in str(options["unterfall"] or "").split(",") if u.strip()]
+        unbekannt = [u for u in unterfaelle if u not in ("below_threshold", "manual_check")]
+        if unbekannt or not unterfaelle:
+            raise CommandError("--unterfall erlaubt below_threshold und manual_check")
+        if "manual_check" in unterfaelle and not options["alle"]:
+            # manual_check-Faelle tragen keinen stage3_status im Kontext; der Filter ohne_stufe3 wuerde sie still
+            # einschliessen, obwohl die KI bereits geantwortet hat. Der erneute Aufruf kostet Geld, daher ausdruecklich.
+            raise CommandError("--unterfall manual_check erfordert --alle (Faelle mit Stufe-3-Ergebnis)")
+        cases = ReviewCase.objects.filter(
+            status=CaseStatus.OPEN, case_subtype__in=unterfaelle, document__isnull=False
         )
+        if not options["alle"]:
+            # manual_check-Faelle haben immer ein Stufe-3-Ergebnis (die KI hat 06 gewaehlt); ohne --alle bleiben
+            # nur Faelle unter Schwelle ohne Stufe-3-Aufruf (24.09.2026)
+            cases = cases.filter(ohne_stufe3)
+        cases = cases.select_related("document", "object").order_by("object__object_number", "id")
         if options["object"]:
             cases = cases.filter(object__object_number=options["object"])
         if ohne:
@@ -84,7 +107,11 @@ class Command(BaseCommand):
                     )
                 continue
             case.status = CaseStatus.DISMISSED
-            case.resolution = {"decision": "reclassify", "reason": "Nachklassifikationslauf"}
+            case.resolution = {
+                "decision": "reclassify",
+                "reason": "Nachklassifikationslauf",
+                "unterfall": case.case_subtype,
+            }
             case.save(update_fields=["status", "resolution", "updated_at"])
             doc.status = "ocr_done"
             doc.category = None

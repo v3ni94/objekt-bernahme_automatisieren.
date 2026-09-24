@@ -23,6 +23,11 @@ def _request(filename: str, excerpt: str) -> ClassificationRequest:
         taxonomy=_taxonomy(),
         unit_label_patterns=["WE"],
         hints={"has_period_year": True},
+        object_context={
+            "objektnummer": "623",
+            "anschriften": ["Joachimstraße 49, 40545 Düsseldorf"],
+            "anschrift_bekannt": True,
+        },
     )
 
 
@@ -35,6 +40,7 @@ def test_konstante_teile_stehen_vorn_und_praefix_ist_fuer_alle_dokumente_gleich(
         "schema",
         "verwaltungsart",
         "einheitenmuster",
+        "objekt",
         "hinweise",
         "dateiname",
         "textauszug",
@@ -52,4 +58,21 @@ def test_reparaturhinweis_haengt_hinten_an_und_aendert_den_hash():
     assert system == system_r and user_r.startswith(user)
     assert user_r.endswith("Hinweis zur Korrektur der vorherigen Antwort: Unterordner nur als Code")
     assert prompt_hash(system, user) != prompt_hash(system_r, user_r)
-    assert PROMPT_VERSION == "2026-09-20.2"
+    assert PROMPT_VERSION == "2026-09-24.1"
+
+
+def test_objektangaben_und_objektbezugsregel_im_auftrag():
+    """24.09.2026: die KI bekommt Objektnummer und Anschriften; ohne Anschrift darf sie den Objektbezug nicht verneinen;
+    Unsicherheit heisst niedrige Konfidenz statt 0,9."""
+    system, user = build_messages(_request("A.pdf", "Jahresabrechnung 2024"))
+    payload = json.loads(user)
+    assert payload["objekt"] == {
+        "objektnummer": "623",
+        "anschriften": ["Joachimstraße 49, 40545 Düsseldorf"],
+        "anschrift_bekannt": True,
+    }
+    assert "anschrift_bekannt false, setze object_related nur dann false" in system
+    assert 'object_related false ist category immer "06" mit Unterordner "04"' in system
+    assert "Briefkopf der Hausverwaltung" in system
+    assert "Konfidenz höchstens 0,6" in system
+    assert "beleg_einheit" in system and "gesamtjahresabrechnung" in system

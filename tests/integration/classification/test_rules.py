@@ -55,6 +55,8 @@ def _flags_for(rule: Rule, *, negative: bool = False) -> dict:
         flags["foreign_object_numbers"] = ["631"]
     if "own_object_marker" in required:
         flags["own_object_marker"] = True
+    if "amount" in required:
+        flags["amounts"] = ["107,10"]
     return flags
 
 

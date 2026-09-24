@@ -434,6 +434,30 @@ def decide(
     decision = _decide_core(ctx, s1, s2, doc, stage3_enabled=stage3_enabled, s3=s3)
     if (
         s3 is not None
+        and getattr(s3, "related_forced", False)
+        and decision.category not in (None, "06")
+        and not decision.cases
+    ):
+        # Die KI sah keinen Objektbezug, das Objekt hat keine erfasste Anschrift (24.09.2026): Ablage erfolgt nach
+        # der Antwort, ein Hinweisfall macht die Entscheidung im Pruefcenter sichtbar, ohne die Ablage aufzuhalten
+        decision.cases.append(
+            CasePlan(
+                CaseType.MOVE_PROPOSAL,
+                "ai_object_unverified",
+                decision.candidates_top,
+                _proposal(decision),
+                {
+                    "reason": "KI sah keinen Objektbezug, Anschrift des Objekts nicht erfasst; Ablage nach Antwort",
+                    "stage3_status": s3.status,
+                    "stage3_reason": None,
+                    "provider": s3.provider,
+                },
+                priority=60,
+                informational=True,
+            )
+        )
+    elif (
+        s3 is not None
         and decision.decided_by == "stage3"
         and decision.category not in (None, "06")
         and not decision.cases

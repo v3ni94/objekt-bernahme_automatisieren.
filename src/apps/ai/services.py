@@ -36,6 +36,7 @@ class Stage3Outcome:
     call_id: int | None = None
     reasoning: str | None = None
     lease: dict | None = None  # Vertragsdaten eines Mieterdokuments (12.09.2026), lokal abgeglichen
+    related_forced: bool = False  # object_related false verworfen (Anschrift unbekannt, 24.09.2026)
 
 
 def unit_label_patterns(obj) -> list[str]:
@@ -61,6 +62,35 @@ def party_names(obj) -> list[str]:
     return names
 
 
+def _address_line(street, house_number, postal_code, city) -> str | None:
+    if not (street or "").strip():
+        return None
+    strasse = " ".join(p for p in [(street or "").strip(), (house_number or "").strip()] if p)
+    ort = " ".join(p for p in [(postal_code or "").strip(), (city or "").strip()] if p)
+    return f"{strasse}, {ort}" if ort else strasse
+
+
+def object_context(obj) -> dict:
+    """Objektangaben fuer die KI ohne Personenbezug (24.09.2026): Objektnummer und Anschriften (Hauptanschrift und
+    weitere Anschriften desselben Gebaeudes). Die Bezeichnung des Objekts bleibt weg, sie kann Personennamen tragen.
+    anschrift_bekannt false: die KI darf object_related nicht verneinen, und run_stage3 ignoriert ein false."""
+    anschriften = []
+    haupt = _address_line(obj.street, obj.house_number, obj.postal_code, obj.city)
+    if haupt:
+        anschriften.append(haupt)
+    for a in obj.additional_addresses or []:
+        if not isinstance(a, dict):
+            continue
+        zeile = _address_line(a.get("street"), a.get("house_number"), a.get("postal_code"), a.get("city"))
+        if zeile and zeile not in anschriften:
+            anschriften.append(zeile)
+    return {
+        "objektnummer": obj.object_number,
+        "anschriften": anschriften,
+        "anschrift_bekannt": bool(anschriften),
+    }
+
+
 def build_request(doc: Document, ctx: DocContext, s1_payload: dict | None) -> ClassificationRequest:
     obj = doc.object
     hints = {
@@ -81,6 +111,7 @@ def build_request(doc: Document, ctx: DocContext, s1_payload: dict | None) -> Cl
         taxonomy=taxonomy_from_catalog(),
         unit_label_patterns=unit_label_patterns(obj),
         hints=hints,
+        object_context=object_context(obj),
     )
 
 
@@ -126,8 +157,12 @@ def run_stage3(
             call_id=result.call.pk if result.call else None,
         )
     r = result.result
-    category = r.category if r.object_related else "06"
-    subfolder = r.subfolder if r.object_related else "04"
+    # Ohne bekannte Anschrift hat die KI keine Grundlage fuer "kein Objektbezug" (Befund 24.09.2026: 4.303
+    # Dokumente so nach 06 gelegt, davon 963 in Objekten ohne erfasste Strasse): das false wird verworfen, ausser
+    # der Text nennt lokal erkannt eine fremde Objektnummer (dann steht die Aussage der KI nicht allein)
+    related = r.object_related or (not req.address_known and not ctx.foreign_object_numbers)
+    category = r.category if related else "06"
+    subfolder = r.subfolder if related else "04"
     DocumentClassification.objects.create(
         document=doc,
         stage=3,
@@ -139,7 +174,7 @@ def run_stage3(
         else None,
         document_type=DocumentType.objects.filter(code=r.document_type).first() if r.document_type else None,
         period_year=r.period.year,
-        scope_decision="unclear" if not r.object_related else None,
+        scope_decision="unclear" if not related else None,
         confidence=r.confidence,
         reasoning=r.reasoning[:400],
         ai_call=result.call,
@@ -153,6 +188,7 @@ def run_stage3(
             "fallback_used": result.fallback_used,
             "attempts": result.attempts,
             "lease_extracted": bool(r.lease and not r.lease.empty),
+            "object_related_ignored": bool(related and not r.object_related),
         },
         is_final=False,
     )
@@ -162,13 +198,14 @@ def run_stage3(
         subfolder,
         r.document_type,
         float(r.confidence),
-        r.object_related,
+        related,
         r.period.year,
         result.provider,
         result.fallback_used,
         call_id=result.call.pk if result.call else None,
         reasoning=r.reasoning,
         lease=r.lease.model_dump() if r.lease and not r.lease.empty else None,
+        related_forced=bool(related and not r.object_related),
     )
 
 

@@ -62,12 +62,20 @@ class ClassificationRequest:
     taxonomy: Taxonomy
     unit_label_patterns: list[str] = field(default_factory=list)  # nur Praefixmuster (WE, GE, ST)
     hints: dict = field(default_factory=dict)  # ohne Personenbezug
+    # Objektangaben ohne Personenbezug (24.09.2026): Objektnummer und Anschriften, damit die KI den Objektbezug
+    # pruefen kann statt zu raten; anschrift_bekannt false verbietet object_related false (keine Grundlage)
+    object_context: dict = field(default_factory=dict)
+
+    @property
+    def address_known(self) -> bool:
+        return bool(self.object_context.get("anschrift_bekannt"))
 
     def prompt_payload(self) -> dict:
         return {
             "dateiname": self.filename_masked,
             "verwaltungsart": self.management_type,
             "einheitenmuster": self.unit_label_patterns,
+            "objekt": self.object_context,
             "hinweise": self.hints,
             "textauszug": self.excerpt_masked,
         }
