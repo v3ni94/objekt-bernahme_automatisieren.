@@ -4,17 +4,21 @@ konnte die KI den Objektbezug nicht pruefen und die Ablage lief nach 06 Sonstige
 
 Quelle sind die maskierten Seitentexte (document_pages.text_content, erste Seiten) der Dokumente des Objekts:
 Anschriftenbloecke (Strasse Hausnummer, Zeilenumbruch, PLZ Ort) und Inline-Anschriften (Strasse Hausnummer, PLZ Ort).
-Gezaehlt wird je Anschrift die Zahl der Dokumente, in denen sie vorkommt. Die eigene Firmenanschrift und andere
-Fremdanschriften lassen sich mit --ausser ausschliessen. Eindeutig ist ein Vorschlag, wenn er mindestens --min-hits
-Dokumente hat und mindestens dreimal so oft vorkommt wie der zweite. Mit --echt wird die Hauptanschrift nur bei
-eindeutigem Vorschlag und nur bei leerer Strasse gesetzt (nie ueberschreiben), mit Audit object.update und Grund.
-Ohne --echt Vorschau. Die Ausgabe nennt keine Dateinamen und keine Personennamen."""
+Anschriften werden je Strasse und PLZ zu einer Gruppe zusammengefasst (Schreibweisen Str., Strasse, Bindestrich,
+Hausnummern eines Gebaeudekomplexes), gezaehlt wird die Zahl der Dokumente. Ein Vorschlag gilt als belegt, wenn
+(a) die Strasse in der Objektbezeichnung steht (zwei unabhaengige Quellen), (b) die Anschrift im Text als WEG- oder
+Eigentuemergemeinschaftsname vorkommt oder (c) die Gruppe mindestens --min-hits Dokumente hat und dreimal so haeufig
+ist wie die zweite. Die Hausnummer kommt aus der Bezeichnung (etwa 67-85), sonst aus der haeufigsten Schreibweise in
+den Dokumenten. Fremdanschriften lassen sich mit --ausser ausschliessen. Mit --echt wird die Hauptanschrift nur bei
+belegtem Vorschlag und nur bei leerer Strasse gesetzt (nie ueberschreiben), mit Audit object.update und Grund. Ohne
+--echt Vorschau. Die Ausgabe nennt keine Dateinamen und keine Personennamen. Serverlauf 24.09.2026 (erste Fassung):
+7 Objekte, 0 eindeutig, weil Schreibweisen und Hausnummern getrennt gezaehlt wurden."""
 
 from __future__ import annotations
 
 import re
-from collections import defaultdict
-from dataclasses import dataclass
+from collections import Counter
+from dataclasses import dataclass, field
 
 from django.core.management.base import BaseCommand, CommandError
 from django.db.models import Q
@@ -30,7 +34,7 @@ _BLOCK = re.compile(
     rf"[ \t]*(?P<plz>\d{{5}})[ \t]+(?P<city>[A-ZÄÖÜ][^\n\d,;:()]{{2,40}}?)[ \t]*$"
 )
 _SUFFIX = (
-    r"(?:stra(?:ß|ss)e|str\.|weg|allee|platz|gasse|ring|damm|ufer|chaussee|park|promenade|markt|hof|steig|pfad"
+    r"(?:stra(?:ß|ss)e|str\.?|weg|allee|platz|gasse|ring|damm|ufer|chaussee|park|promenade|markt|hof|steig|pfad"
     r"|zeile|berg|tal|garten|h(?:ö|oe)he|kamp|wall|graben|feld|winkel|busch|siedlung|strand|deich|anger)"
 )
 _INLINE = re.compile(
@@ -42,6 +46,12 @@ _BAD_STREET = re.compile(
     r"|tel\.|fax|seite|blatt|datum|betreff|rechnung|konto|kunden|nr\.|nummer|vom|bis|ab)\b|\[NAME\]|\[|\]"
 )
 _BAD_CITY = re.compile(r"(?i)\b(gmbh|ag|kg|e\.?\s?v\.?|telefon|tel\.|fax|iban|konto)\b|\[")
+_WEG_PREFIX = re.compile(
+    r"(?i)^(weg|wohnungseigent(?:ue|ü)mergemeinschaft|eigent(?:ue|ü)mergemeinschaft|gemeinschaft der wohnungseigent"
+    r"(?:ue|ü)mer)\s+"
+)
+_ABBREV = re.compile(r"(?i)\bstr\.?$")
+_LIST_TOKEN = re.compile(r"^[.,/]\s*\d")
 
 
 def _clean(s: str) -> str:
@@ -49,47 +59,83 @@ def _clean(s: str) -> str:
 
 
 def _norm_street(s: str) -> str:
+    """Vergleichsform: Kleinschreibung, ss statt ß, Str. und Strasse gleichgesetzt, ohne Leerzeichen, Bindestriche
+    und Punkte (Am Panke-Park und Am Panke Park, Erkelenzer Str und Erkelenzer Straße fallen zusammen)."""
     s = _clean(s).lower().replace("ß", "ss")
-    s = re.sub(r"str\.(\s|$)", r"strasse\1", s)
-    return re.sub(r"[\s\-]+", "", s)
+    s = re.sub(r"\bstr\.?(?=\s|$)", "strasse", s)
+    s = re.sub(r"[\s\-.]+", "", s)
+    return re.sub(r"strasse$", "str", s)
 
 
 def _norm_nr(n: str) -> str:
     return re.sub(r"\s+", "", n).lower().replace("–", "-")
 
 
-def extract_addresses(text: str) -> list[tuple[str, str, str, str]]:
-    """Anschriften eines Textes als (Strasse, Hausnummer, PLZ, Ort), je Text ohne Wiederholung."""
+def _norm_name(name: str) -> str:
+    return re.sub(r"[\s\-.]+", "", (name or "").lower().replace("ß", "ss"))
+
+
+def extract_addresses(text: str) -> list[tuple[str, str, str, str, bool]]:
+    """Anschriften eines Textes als (Strasse, Hausnummer, PLZ, Ort, WEG-Name), je Text ohne Wiederholung."""
     found: dict[tuple, tuple] = {}
     for rx in (_BLOCK, _INLINE):
         for m in rx.finditer(text or ""):
             street, nr, plz, city = _clean(m["street"]), _norm_nr(m["nr"]), m["plz"], _clean(m["city"])
+            weg = bool(_WEG_PREFIX.match(street))
+            street = _clean(_WEG_PREFIX.sub("", street, count=1))
             if len(street) < 3 or _BAD_STREET.search(street) or _BAD_CITY.search(city) or plz == "00000":
                 continue
             if not re.search(r"[A-Za-zÄÖÜäöüß]{3}", street) or not re.search(r"[A-Za-zÄÖÜäöüß]{3}", city):
                 continue
             key = (_norm_street(street), nr, plz)
-            found.setdefault(key, (street, nr, plz, city))
+            alt = found.get(key)
+            found[key] = (street, nr, plz, city, weg or bool(alt and alt[4]))
     return list(found.values())
 
 
 @dataclass
-class Kandidat:
-    street: str
-    house_number: str
+class Gruppe:
+    """Eine Strasse mit PLZ: alle Hausnummern und Schreibweisen zusammen."""
+
+    street_norm: str
     postal_code: str
-    city: str
-    docs: int
+    docs: set = field(default_factory=set)
+    streets: Counter = field(default_factory=Counter)  # Schreibweise -> Dokumente
+    numbers: Counter = field(default_factory=Counter)  # Hausnummer -> Dokumente
+    cities: Counter = field(default_factory=Counter)
+    weg: bool = False
 
     @property
-    def anzeige(self) -> str:
-        return f"{self.street} {self.house_number}, {self.postal_code} {self.city}"
+    def count(self) -> int:
+        return len(self.docs)
+
+    @property
+    def street(self) -> str:
+        voll = [(n, s) for s, n in self.streets.items() if not _ABBREV.search(s)]
+        if voll:
+            return max(voll)[1]
+        return self.streets.most_common(1)[0][0]
+
+    @property
+    def city(self) -> str:
+        return self.cities.most_common(1)[0][0]
+
+    def house_number(self, aus_bezeichnung: str | None = None) -> str:
+        if aus_bezeichnung:
+            return aus_bezeichnung
+        bereiche = [(n, nr) for nr, n in self.numbers.items() if "-" in nr]
+        if bereiche and max(bereiche)[0] >= max(self.numbers.values()) * 0.5:
+            return max(bereiche)[1]  # ein Bereich wie 67-85 benennt den Gebaeudekomplex
+        return self.numbers.most_common(1)[0][0]
+
+    def anzeige(self, aus_bezeichnung: str | None = None) -> str:
+        return f"{self.street} {self.house_number(aus_bezeichnung)}, {self.postal_code} {self.city}"
 
 
 def candidates_for(
     obj, *, max_pages: int = 6000, pages_per_doc: int = 2, ausser=()
-) -> tuple[list[Kandidat], int, int]:
-    """Kandidaten nach Zahl der Dokumente (absteigend), geprueft Dokumente, geprueft Seiten."""
+) -> tuple[list[Gruppe], int, int]:
+    """Gruppen nach Zahl der Dokumente (absteigend), geprueft Dokumente, geprueft Seiten."""
     rows = (
         DocumentPage.objects.filter(
             document__object=obj, document__deleted_at__isnull=True, page_no__lte=pages_per_doc
@@ -99,29 +145,61 @@ def candidates_for(
         .order_by("-document_id", "page_no")
         .values_list("document_id", "text_content")[:max_pages]
     )
-    docs_by_key: dict[tuple, set] = defaultdict(set)
-    anzeige: dict[tuple, tuple] = {}
+    gruppen: dict[tuple, Gruppe] = {}
     docs: set[int] = set()
     pages = 0
     ausser_l = [a.lower() for a in ausser if a]
     for doc_id, text in rows:
         pages += 1
         docs.add(doc_id)
-        for street, nr, plz, city in extract_addresses(text):
+        for street, nr, plz, city, weg in extract_addresses(text):
             if any(a in f"{street} {nr} {plz} {city}".lower() for a in ausser_l):
                 continue
-            key = (_norm_street(street), nr, plz)
-            docs_by_key[key].add(doc_id)
-            anzeige.setdefault(key, (street, nr, plz, city))
-    out = [Kandidat(*anzeige[k], docs=len(ids)) for k, ids in docs_by_key.items()]
-    out.sort(key=lambda k: (-k.docs, k.street, k.house_number))
+            key = (_norm_street(street), plz)
+            g = gruppen.get(key)
+            if g is None:
+                g = gruppen[key] = Gruppe(key[0], plz)
+            g.docs.add(doc_id)
+            g.streets[street] += 1
+            g.numbers[nr] += 1
+            g.cities[city] += 1
+            g.weg = g.weg or weg
+    out = sorted(gruppen.values(), key=lambda g: (-g.count, g.street_norm))
     return out, len(docs), pages
 
 
-def is_unambiguous(cands: list[Kandidat], min_hits: int) -> bool:
-    if not cands or cands[0].docs < min_hits:
-        return False
-    return len(cands) == 1 or cands[0].docs >= 3 * cands[1].docs
+def number_from_name(name: str | None, street: str) -> str | None:
+    """Hausnummer oder Bereich hinter dem Strassennamen in der Objektbezeichnung (Am Panke Park 67-85 H5 -> 67-85);
+    None bei Listen wie 13.15.15a.15b, dann entscheidet die haeufigste Schreibweise in den Dokumenten."""
+    if not name or not street:
+        return None
+    teile = [re.escape(t) for t in re.split(r"[\s\-]+", street.strip()) if t]
+    if not teile:
+        return None
+    muster = r"[\s\-]*".join(teile)
+    # in Bezeichnungen folgt der Hausnummer oft ein Gebaeudekuerzel (H5): Buchstabenzusatz nur ohne Leerzeichen
+    nr = r"\d{1,4}[a-zA-Z]?(?:\s?[-–]\s?\d{1,4}[a-zA-Z]?)?"
+    m = re.search(rf"(?i){muster}\s*(?P<nr>{nr})(?![\w])(?P<rest>[.,/]\s*\d)?", name)
+    if not m or m["rest"]:
+        return None
+    return _norm_nr(m["nr"])
+
+
+def _begruendung(gruppen: list[Gruppe], obj, min_hits: int) -> tuple[Gruppe | None, str | None]:
+    """Belegter Vorschlag und Grund: Bezeichnung, WEG-Name oder Haeufigkeit; sonst (None, None)."""
+    if not gruppen:
+        return None, None
+    name_norm = _norm_name(obj.name)
+    passend = next((g for g in gruppen if len(g.street_norm) >= 5 and g.street_norm in name_norm), None)
+    if passend is not None and passend.count >= 2:
+        return passend, "Bezeichnung"
+    top = gruppen[0]
+    if top.weg and top.count >= 2:
+        return top, "WEG-Name"
+    zweite = gruppen[1].count if len(gruppen) > 1 else 0
+    if top.count >= min_hits and (zweite == 0 or top.count >= 3 * zweite):
+        return top, "Häufigkeit"
+    return None, None
 
 
 def _fmt(n: int) -> str:
@@ -129,7 +207,7 @@ def _fmt(n: int) -> str:
 
 
 class Command(BaseCommand):
-    help = "Anschrift eines Objekts aus den Seitentexten seiner Dokumente vorschlagen; --echt setzt eindeutige Vorschlaege"
+    help = "Anschrift eines Objekts aus den Seitentexten seiner Dokumente vorschlagen; --echt setzt belegte Vorschlaege"
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -139,14 +217,17 @@ class Command(BaseCommand):
             "--ausser", default=None, help="Anschriften mit diesen Textteilen ausschliessen (Komma-Liste)"
         )
         parser.add_argument(
-            "--min-hits", type=int, default=5, help="Mindestzahl Dokumente fuer einen eindeutigen Vorschlag"
+            "--min-hits",
+            type=int,
+            default=5,
+            help="Mindestzahl Dokumente fuer Eindeutigkeit nach Haeufigkeit",
         )
-        parser.add_argument("--top", type=int, default=5, help="so viele Kandidaten je Objekt zeigen")
+        parser.add_argument("--top", type=int, default=5, help="so viele Strassen je Objekt zeigen")
         parser.add_argument(
             "--seiten", type=int, default=6000, help="hoechstens so viele Seiten je Objekt lesen"
         )
         parser.add_argument(
-            "--echt", action="store_true", help="eindeutige Vorschlaege als Hauptanschrift setzen"
+            "--echt", action="store_true", help="belegte Vorschlaege als Hauptanschrift setzen"
         )
 
     def handle(self, *args, **options):
@@ -167,9 +248,9 @@ class Command(BaseCommand):
         ausser = [a.strip() for a in str(options["ausser"] or "").split(",") if a.strip()]
         min_hits = max(int(options["min_hits"] or 1), 1)
         top = max(int(options["top"] or 1), 1)
-        gesetzt = eindeutig = 0
+        gesetzt = belegt = 0
         for obj in objekte:
-            cands, n_docs, n_pages = candidates_for(
+            gruppen, n_docs, n_pages = candidates_for(
                 obj, max_pages=int(options["seiten"] or 6000), ausser=ausser
             )
             self.stdout.write(
@@ -177,43 +258,46 @@ class Command(BaseCommand):
                 f"{_fmt(n_pages)} Seiten geprueft"
                 + (f", erfasst: {obj.address}" if obj.street else ", keine Strasse erfasst")
             )
-            if not cands:
+            if not gruppen:
                 self.stdout.write("  keine Anschrift in den Texten gefunden")
                 continue
-            klar = is_unambiguous(cands, min_hits)
-            eindeutig += int(klar)
-            for i, k in enumerate(cands[:top], start=1):
-                anteil = round(100 * k.docs / n_docs) if n_docs else 0
-                marke = "  <- eindeutig" if (i == 1 and klar) else ("  <- nicht eindeutig" if i == 1 else "")
-                self.stdout.write(f"  {i}. {k.anzeige}: {_fmt(k.docs)} Dokumente ({anteil} %){marke}")
-            weitere = sorted(
-                {
-                    k.house_number
-                    for k in cands[1:]
-                    if _norm_street(k.street) == _norm_street(cands[0].street)
-                    and k.postal_code == cands[0].postal_code
-                }
-            )
-            if weitere:
-                self.stdout.write("  Hinweis: weitere Hausnummern derselben Strasse: " + ", ".join(weitere))
-            if not klar:
+            wahl, grund = _begruendung(gruppen, obj, min_hits)
+            nr_name = number_from_name(obj.name, wahl.street) if wahl is not None else None
+            belegt += int(wahl is not None)
+            for i, g in enumerate(gruppen[:top], start=1):
+                anteil = round(100 * g.count / n_docs) if n_docs else 0
+                marke = (
+                    f"  <- belegt ({grund})"
+                    if g is wahl
+                    else ("  <- nicht belegt" if i == 1 and wahl is None else "")
+                )
+                nummern = ", ".join(f"{nr} ({n})" for nr, n in g.numbers.most_common(6))
+                self.stdout.write(
+                    f"  {i}. {g.anzeige(nr_name if g is wahl else None)}: {_fmt(g.count)} Dokumente ({anteil} %){marke}"
+                )
+                if len(g.numbers) > 1 or len(g.streets) > 1:
+                    self.stdout.write(
+                        f"     Hausnummern: {nummern}"
+                        + (f" | Schreibweisen: {', '.join(g.streets)}" if len(g.streets) > 1 else "")
+                    )
+            if wahl is None:
                 continue
             if obj.street:
                 self.stdout.write("  Hauptanschrift bereits erfasst, bleibt unveraendert")
                 continue
-            best = cands[0]
+            anzeige = wahl.anzeige(nr_name)
             if not options["echt"]:
-                self.stdout.write(f"  Vorschau: wuerde Hauptanschrift setzen: {best.anzeige}")
+                self.stdout.write(f"  Vorschau: wuerde Hauptanschrift setzen: {anzeige} (Grund: {grund})")
                 continue
             before = _state(obj)
             neu = dict(before)
-            neu["street"], neu["house_number"] = best.street, best.house_number
-            neu["postal_code"] = neu["postal_code"] or best.postal_code
-            neu["city"] = neu["city"] or best.city
-            _save(obj, neu, before, REASON)
+            neu["street"], neu["house_number"] = wahl.street, wahl.house_number(nr_name)
+            neu["postal_code"] = neu["postal_code"] or wahl.postal_code
+            neu["city"] = neu["city"] or wahl.city
+            _save(obj, neu, before, f"{REASON}; Grund: {grund}")
             gesetzt += 1
-            self.stdout.write(f"  Hauptanschrift gesetzt: {obj.address}")
+            self.stdout.write(f"  Hauptanschrift gesetzt: {obj.address} (Grund: {grund})")
         self.stdout.write(
-            f"{len(objekte)} Objekte geprueft, {eindeutig} eindeutig, "
+            f"{len(objekte)} Objekte geprueft, {belegt} belegt, "
             + (f"{gesetzt} gesetzt" if options["echt"] else "Vorschau, nichts veraendert (mit --echt setzen)")
         )
