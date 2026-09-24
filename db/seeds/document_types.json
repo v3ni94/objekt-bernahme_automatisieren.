@@ -154,7 +154,9 @@
     "requires_tenant": false,
     "keywords": [
       "Kontoauszug",
-      "Kontoauszüge"
+      "Kontoauszüge",
+      "Saldenbestätigung",
+      "Zinsbescheinigung"
     ]
   },
   {
@@ -2336,6 +2338,126 @@
       "offene Aufgaben",
       "behördliche Anforderungen",
       "Aufgabenliste"
+    ]
+  },
+  {
+    "code": "heizkostenabrechnung_gesamt",
+    "category_code": "03",
+    "subfolder_code": null,
+    "name": "Heizkostenabrechnung Gesamtobjekt (Messdienst)",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Heizkostenabrechnung",
+      "Abrechnung der Heiz- und Warmwasserkosten",
+      "Gesamtabrechnung Wärme",
+      "Liegenschaft",
+      "Nutzerliste",
+      "Kostenaufstellung Messdienst"
+    ]
+  },
+  {
+    "code": "vermoegensbericht",
+    "category_code": "03",
+    "subfolder_code": null,
+    "name": "Vermögensbericht",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Vermögensbericht",
+      "Vermoegensbericht",
+      "Vermögensstatus",
+      "Gemeinschaftsvermögen",
+      "§ 28 Abs. 4 WEG"
+    ]
+  },
+  {
+    "code": "buchhaltungsliste",
+    "category_code": "03",
+    "subfolder_code": null,
+    "name": "Buchhaltungsliste (Journal, Kontenliste, Summen- und Saldenliste, OP-Liste)",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": false,
+    "keywords": [
+      "Buchungsjournal",
+      "Sachkontenliste",
+      "Kontenblätter",
+      "Summen- und Saldenliste",
+      "Offene-Posten-Liste",
+      "Kassenbuch",
+      "Rücklagenübersicht",
+      "Einnahmen-Ausgaben-Rechnung"
+    ]
+  },
+  {
+    "code": "eigentuemerbescheinigung",
+    "category_code": "05",
+    "subfolder_code": "05",
+    "name": "Bescheinigung für den Eigentümer (§ 35a EStG, Hausgeld, Rücklage)",
+    "requires_period": true,
+    "requires_owner": true,
+    "requires_tenant": false,
+    "keywords": [
+      "§ 35a EStG",
+      "haushaltsnahe Dienstleistungen",
+      "Handwerkerleistungen",
+      "Steuerbescheinigung",
+      "Hausgeldbescheinigung",
+      "Rücklagenbescheinigung",
+      "Bescheinigung für das Finanzamt"
+    ]
+  },
+  {
+    "code": "kuendigung_mietverhaeltnis",
+    "category_code": "04",
+    "subfolder_code": null,
+    "name": "Kündigung Mietverhältnis",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": true,
+    "keywords": [
+      "Kündigung",
+      "Kündigungsbestätigung",
+      "Eigenbedarf",
+      "Mietaufhebungsvertrag",
+      "Räumung"
+    ]
+  },
+  {
+    "code": "mieterhoehung",
+    "category_code": "04",
+    "subfolder_code": null,
+    "name": "Mieterhöhung und Mietanpassung",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": true,
+    "keywords": [
+      "Mieterhöhung",
+      "Mietanpassung",
+      "Mietspiegel",
+      "Vergleichsmiete",
+      "Indexmiete",
+      "Staffelmiete",
+      "Modernisierungsmieterhöhung"
+    ]
+  },
+  {
+    "code": "mahnung_mieter",
+    "category_code": "04",
+    "subfolder_code": null,
+    "name": "Mahnung und Zahlungserinnerung Mieter",
+    "requires_period": false,
+    "requires_owner": false,
+    "requires_tenant": true,
+    "keywords": [
+      "Mahnung",
+      "Zahlungserinnerung",
+      "Zahlungsaufforderung",
+      "Mietrückstand",
+      "Zahlungsverzug"
     ]
   }
 ]

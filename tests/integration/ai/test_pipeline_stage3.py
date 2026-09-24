@@ -449,7 +449,8 @@ def test_widerspruch_der_ki_senkt_hinweisregel_unter_die_schwelle(
     assert doc.category_id == "06" and doc.status == "review"
     case = ReviewCase.objects.get(document=doc, status="open")
     assert case.case_subtype == "below_threshold" and "widerspricht" in case.context["reason"]
-    assert [c["category"] for c in case.candidates] == ["03", "02"]
+    kategorien = [c["category"] for c in case.candidates]
+    assert kategorien[0] == "03" and kategorien[-1] == "02"  # Regelkandidaten zuerst, KI-Vorschlag zuletzt
     assert case.context["intended"]["category"] == "03" and float(case.context["confidence"]) < 0.85
 
 

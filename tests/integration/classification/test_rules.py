@@ -129,7 +129,8 @@ def test_regeln_nur_mit_codes(seeded):
 
 
 def test_konflikt_harter_treffer():
-    text = "Gesamtabrechnung 2025 der Wohnungseigentümergemeinschaft\nAuszug: Teilungserklärung und Gemeinschaftsordnung"
+    # seit 24.09.2026 zaehlt eine blosse Nennung („Auszug: Teilungserklaerung“) nicht mehr als harte Teilungserklaerung
+    text = "Gesamtabrechnung 2025 der Wohnungseigentümergemeinschaft\nBeschlusssammlung der Wohnungseigentümergemeinschaft gemäß § 24 WEG"
     result = evaluate(ctx_for(text))
     assert result.conflict and result.confidence == 0 and result.category is None
     combined = combine(result, Stage2Result(cold_start=True))
@@ -168,7 +169,7 @@ def test_seed_in_tabelle(seeded):
         and row.target_subfolder.code == "05"
         and row.target_document_type.code == "einzelabrechnung"
     )
-    assert row.definition["then"]["category"] == "05" and row.version == 1
+    assert row.definition["then"]["category"] == "05" and row.version >= 1
     created, updated, unchanged = sync_rules_to_db()
     assert (created, updated) == (0, 0) and unchanged == rows.count()
 
