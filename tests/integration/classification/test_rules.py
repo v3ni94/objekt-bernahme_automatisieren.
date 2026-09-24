@@ -60,6 +60,17 @@ def _flags_for(rule: Rule, *, negative: bool = False) -> dict:
     return flags
 
 
+def _negative_flags(rule: Rule, example: str) -> dict:
+    """Zielt das negative Beispiel auf einen Textausschluss (ein not_text_regex trifft), gelten die
+    Ausschlussentitaeten NICHT als vorhanden, damit wirklich der Textausschluss geprueft wird (Review 24.09.2026:
+    sonst scheiterte jedes negative Beispiel einer Regel mit not_entity schon an der Entitaet); sonst wie bisher."""
+    import re as _re
+
+    if any(_re.search(p, example) for p in rule.when.get("not_text_regex", [])):
+        return _flags_for(rule)
+    return _flags_for(rule, negative=True)
+
+
 @pytest.mark.parametrize("rule", load_seed_rules(), ids=lambda r: r.id)
 def test_regel_beispiele(rule: Rule):
     scope = (rule.scope.get("management_types") or ["weg"])[0]
@@ -68,7 +79,7 @@ def test_regel_beispiele(rule: Rule):
         ctx = ctx_for(example, management_type=scope, **_flags_for(rule))
         assert matches(rule, ctx) is not None, f"{rule.id}: positives Beispiel trifft nicht: {example}"
     for example in rule.examples.get("negative", []):
-        ctx = ctx_for(example, management_type=scope, **_flags_for(rule, negative=True))
+        ctx = ctx_for(example, management_type=scope, **_negative_flags(rule, example))
         hit = matches(rule, ctx)
         # ein negatives Beispiel darf nicht ausschliesslich ueber diese Regel treffen
         assert hit is None or hit.rule.hard is False or True
@@ -84,7 +95,7 @@ def test_negativbeispiele_treffen_nicht_die_eigene_regel():
         scope = (rule.scope.get("management_types") or ["weg"])[0]
         for example in rule.examples.get("negative", []):
             if (
-                matches(rule, ctx_for(example, management_type=scope, **_flags_for(rule, negative=True)))
+                matches(rule, ctx_for(example, management_type=scope, **_negative_flags(rule, example)))
                 is not None
             ):
                 failures.append((rule.id, example))
