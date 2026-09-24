@@ -1441,6 +1441,19 @@ Ein Backup auf derselben Maschine schützt vor Bedien- und Softwarefehlern, nich
 - Umsetzung: `rclone` im Backup-Image, Zugang als Secret `rclone.conf`, Aufruf am Ende von `backup.sh` bei `OFFSITE_ENABLED=true`; `backup` erhält dann zusätzlich das Netz `egress` (Zeile in `docker-compose.yml` einkommentieren). Aufbewahrung am Zielort getrennt konfigurieren.
 - Nachweis: mindestens eine Wiederherstellungsprobe aus der Offsite-Kopie mit Entschlüsselung (Abschnitt 5.6).
 
+#### 5.8.1 Einrichtung Schritt für Schritt (Stand 25.09.2026)
+
+Der Ablauf ist in `backup.sh` fertig hinterlegt und wartet nur auf die Entscheidung F26 (Zielort, Aufbewahrung am Zielort). Alle Schritte als root auf dem VPS; Schlüssel und Zugangsdaten gehören nie in Chat, Dokumentation oder Repository.
+
+1. Schlüsselpaar erzeugen: `docker compose exec backup age-keygen` gibt den privaten Schlüssel (`AGE-SECRET-KEY-...`) und in der Kommentarzeile den öffentlichen Schlüssel (`age1...`) aus. Den privaten Schlüssel sofort in den Passwortmanager des Auftraggebers übernehmen und die Sitzung schließen; er darf auf dem Server nirgends gespeichert werden. Nur den öffentlichen Schlüssel als eine Zeile nach `/srv/objektakte/secrets/backup_age_recipient` schreiben (root, Rechte 444 wie die übrigen Secrets).
+2. Zugang zum Zielort als rclone-Konfiguration nach `/srv/objektakte/secrets/rclone.conf` (Abschnitt `[offsite]`, Typ und Zugangsdaten je Anbieter; auf einem Arbeitsplatz mit `rclone config` erzeugen und übertragen). Zugangsdaten so eng wie möglich: nur Lesen und Schreiben im Sicherungsziel, kein Löschen, wenn der Anbieter das anbietet, damit ein kompromittierter Server die Kopien nicht vernichten kann.
+3. In `/opt/objektakte/.env` setzen: `OFFSITE_ENABLED=true` und `OFFSITE_REMOTE=offsite:<ziel>/objektakte`.
+4. Netz `egress` für den Dienst `backup` in `docker-compose.yml` einkommentieren (Änderung im Repository, danach Deploy), sonst erreicht `rclone` das Ziel nicht.
+5. Probelauf in tmux: `backup-voll` über den Deploy-Zugang. Die Schlusszeile muss `offsite=ok` zeigen, `status.json` führt das Feld `offsite`. Kontrolle am Ziel: `docker compose exec backup sh -c 'rclone lsl "$OFFSITE_REMOTE"'`.
+6. Wiederherstellungsprobe (Abschnitt 5.6): eine Datei vom Ziel auf einen Arbeitsplatz laden, mit `age -d -i <privater Schlüssel> -o <datei> <datei>.age` entschlüsseln und mit `gzip -t` prüfen. Erst danach gilt die Offsite-Kopie als eingerichtet.
+
+Verhalten: Dump, Archive der Fachverzeichnisse und Prüfsummen werden einzeln verschlüsselt und unter `<ziel>/JJJJ/MM/` abgelegt; die Übertragungsmenge je Lauf entspricht der Größe der Sicherung (mehrere GB, siehe Backup-Verzeichnis). Schlägt der Transport fehl, endet der Lauf mit `offsite=failed`, die lokale Sicherung bleibt gültig. `BACKUP_RETENTION_DAYS` räumt nur lokal auf; die Aufbewahrung am Ziel ist dort als Lebenszyklusregel oder Versionierung getrennt einzustellen. Der Modus `db-only` (Dump vor einer Migration) überträgt nichts.
+
 ---
 
 ## 6. Monitoring, Logs, Statusseite
