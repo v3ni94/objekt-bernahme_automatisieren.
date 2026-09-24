@@ -223,6 +223,16 @@ def combine_after_stage3(local: Combined, s3: Stage3Outcome) -> tuple[Combined, 
             f"{local.reason}; Stufe 3 stimmt zu ({s3.provider})",
             decided_by=local.decided_by,
         ), False
+    if s3.category == "06" and s3.object_related and local.category not in (None, "06"):
+        # „06“ mit Objektbezug heisst nur: die KI ist unsicher. Das ist kein Gegenvorschlag und darf den lokalen
+        # Kandidaten nicht verdraengen (24.09.2026: sonst Fall manual_check ohne Vorschlag statt below_threshold mit
+        # dem Regelkandidaten als Umzugsvorschlag fuer die Sammelaktion)
+        return Combined(
+            local.category,
+            local.confidence,
+            f"{local.reason}; Stufe 3 ohne eindeutige Zuordnung ({s3.provider})",
+            decided_by=local.decided_by,
+        ), False
     if s3.confidence >= t["threshold_stage3_override"]:
         return Combined(
             s3.category,

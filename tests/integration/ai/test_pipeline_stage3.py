@@ -361,3 +361,29 @@ def test_kein_objektbezug_mit_anschrift_bleibt_sonstiges_und_nachklassifikation_
     assert (
         doc.final_decided_by == "stage3" and doc.category_id == "05"
     )  # ohne Eigentuemer: Pruefung, nicht 06
+
+
+def test_unsichere_ki_antwort_06_verdraengt_lokalen_kandidaten_nicht(
+    welt, fake_oauth, run_all, admin_user, fake_router
+):
+    """24.09.2026: antwortet die KI unsicher mit 06 (Objektbezug ja), bleibt der Regelkandidat (hier 03 Beleg mit
+    0,8) als Vorschlag erhalten: Fall below_threshold mit Kandidat statt manual_check ohne Vorschlag."""
+    enable_ai(admin_user)
+    fake_router(answer=_answer("06", "01", None, 0.9, object_related=True))
+    obj = welt["objects"]["623"]
+    text = (
+        H623 + "Rechnung Nr. 4711 des Hausmeisterdienstes für die Treppenhausreinigung, "
+        "Rechnungsbetrag 250,00 EUR, zahlbar bis 30.09.2026"
+    )
+    doc = make_document(obj, {"filename": "Rechnung_4711.pdf", "pages": [text]})
+    start_run(obj)
+    run_all(obj)
+    doc.refresh_from_db()
+    assert doc.status == "review" and doc.category_id == "06"  # physisch 06/01, unter der Schwelle
+    case = ReviewCase.objects.get(document=doc, status="open")
+    assert case.case_subtype == "below_threshold"
+    assert case.candidates and case.candidates[0]["category"] == "03"
+    assert "ohne eindeutige Zuordnung" in case.context["reason"]
+    assert not ReviewCase.objects.filter(document=doc, case_subtype="manual_check").exists()
+    final = DocumentClassification.objects.get(document=doc, is_final=True)
+    assert final.category_id == "06" and doc.final_decided_by != "stage3"
