@@ -84,6 +84,9 @@ def test_vierzig_segmente_sammelaktion(
     run_all(obj)
     master.refresh_from_db()
     assert master.category_id == "03" and master.is_master_with_segments
+    # Leitfall der Jahresordner (24.09.2026): der Master liegt in 03_Buchhaltung/2025
+    assert master.drive_node is not None and master.drive_node.node_kind == "year_folder"
+    assert master.drive_node.year == 2025
     cases = list(ReviewCase.objects.filter(document=master, status="open").order_by("page_from"))
     assert len(cases) == 41  # 40 Segmente plus Bereich WE 41 (Einheit unbekannt)
     keys = {c.batch_key for c in cases}

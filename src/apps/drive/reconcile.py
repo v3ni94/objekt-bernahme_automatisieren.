@@ -17,7 +17,7 @@ import unicodedata
 from dataclasses import dataclass, field
 from datetime import timedelta
 
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 from apps.audit.services import record
@@ -197,6 +197,8 @@ class Plan:
     reviewed: set[str] = field(default_factory=set)
     renamed_to: dict[str, DriveNode] = field(default_factory=dict)  # erwarteter Name -> umbenannter Knoten
     resolved: dict[str, str] = field(default_factory=dict)  # Platzhalter -> Drive-ID
+    year_folder_ids: set[str] = field(default_factory=set)  # Jahresordner unter 03, gesehen in Schritt 5b
+    year_folders_checked: bool = False
     inventory_stats: dict = field(
         default_factory=lambda: {
             "new": 0,
@@ -556,27 +558,44 @@ def _plan(
                     )
                 )
     # Schritt 5b (24.09.2026): vorhandene Jahresordner JJJJ unter 03_Buchhaltung registrieren, damit Bestandsdateien
-    # darin einen drive_node bekommen und das Nachraeumen sie schuetzt; angelegt werden Jahresordner erst bei der Ablage
+    # darin einen drive_node bekommen und das Nachraeumen sie schuetzt; angelegt werden Jahresordner erst bei der
+    # Ablage. Mehrere Ordner desselben Jahres ergeben wie bei Unterordnern einen Prueffall statt einer stillen Wahl;
+    # aktive Jahreszeilen ohne Ordner unter dem Hauptordner werden bei der Ausfuehrung als fehlend markiert.
     for cat in cats:
         if cat.code != YEAR_FOLDER_CATEGORY or plan.has_review_for(cat.code):
             continue
         parent_node = _planned_parent(plan, cat.code, children, cat.folder_name)
         if parent_node is None:
             continue
+        je_jahr: dict[int, list[DriveNode]] = {}
         for child in drive.list_children(parent_node.id, folders_only=True):
             name = (child.name or "").strip()
-            if child.is_folder and _YEAR_NAME.fullmatch(name):
-                plan.add(
-                    Action(
-                        SyncActionType.REGISTER_FOLDER,
-                        category_code=cat.code,
-                        node=child,
-                        node_kind=NodeKind.YEAR_FOLDER,
-                        name_before=child.name,
-                        name_after=name,
-                        year=int(name),
-                    )
+            if child.is_folder and not child.trashed and _YEAR_NAME.fullmatch(name):
+                je_jahr.setdefault(int(name), []).append(child)
+        plan.year_folders_checked = True
+        for year, hits in sorted(je_jahr.items()):
+            plan.year_folder_ids.update(h.id for h in hits)
+            if len(hits) > 1:
+                plan.review(
+                    CaseType.DRIVE_STRUCTURE,
+                    "multiple_folders_same_name",
+                    category_code=cat.code,
+                    candidates=hits,
+                    drive=drive,
+                    note=f"Jahresordner {year}",
                 )
+                continue
+            plan.add(
+                Action(
+                    SyncActionType.REGISTER_FOLDER,
+                    category_code=cat.code,
+                    node=hits[0],
+                    node_kind=NodeKind.YEAR_FOLDER,
+                    name_before=hits[0].name,
+                    name_after=str(year),
+                    year=year,
+                )
+            )
     # Zusaetzliche Ordner (Fall H)
     known_names = {nfc(c.folder_name) for c in cats} | {
         norm(a) for al in cfg.legacy_aliases.values() for a in al
@@ -831,24 +850,32 @@ def _register_node(
         other.save(update_fields=["status", "updated_at"])
     now = timezone.now()
     if row is None:
-        row = DriveNodeRow.objects.create(
-            object=obj,
-            node_kind=node_kind,
-            category_id=category_code,
-            subfolder_id=subfolder_id,
-            year=year,
-            parent_node=parent_row,
-            drive_file_id=node.id,
-            drive_parent_id=node.parent_id,
-            drive_name=node.name,
-            expected_name=expected_name,
-            mime_type=node.mime_type,
-            is_folder=True,
-            created_by_app=created,
-            status=NodeStatus.ACTIVE,
-            last_verified_at=now,
-        )
-    else:
+        try:
+            with transaction.atomic():
+                return DriveNodeRow.objects.create(
+                    object=obj,
+                    node_kind=node_kind,
+                    category_id=category_code,
+                    subfolder_id=subfolder_id,
+                    year=year,
+                    parent_node=parent_row,
+                    drive_file_id=node.id,
+                    drive_parent_id=node.parent_id,
+                    drive_name=node.name,
+                    expected_name=expected_name,
+                    mime_type=node.mime_type,
+                    is_folder=True,
+                    created_by_app=created,
+                    status=NodeStatus.ACTIVE,
+                    last_verified_at=now,
+                )
+        except IntegrityError:
+            # Ablage und Abgleich registrieren denselben Ordner gleichzeitig (24.09.2026): Zeile nachlesen und
+            # wie eine vorhandene behandeln statt den Job oder den Lauf scheitern zu lassen
+            row = DriveNodeRow.objects.filter(drive_file_id=node.id).first()
+            if row is None:
+                raise
+    if True:
         row.object = obj
         row.node_kind = node_kind
         row.category_id = category_code
@@ -1059,6 +1086,21 @@ def _execute(
         if run.file_count_before is None:
             run.file_count_before = n_after
             run.summary["id_hash_before"] = h_after
+    if plan.year_folders_checked:
+        # Schritt 5b: aktive Jahreszeilen, deren Ordner nicht mehr unter dem Hauptordner 03 liegt (Papierkorb,
+        # verschoben), gelten als fehlend; die naechste Ablage legt den Jahresordner neu an oder findet ihn per Namen
+        fehlend = 0
+        for row in DriveNodeRow.objects.filter(
+            object=obj,
+            node_kind=NodeKind.YEAR_FOLDER,
+            category_id=YEAR_FOLDER_CATEGORY,
+            status=NodeStatus.ACTIVE,
+        ).exclude(drive_file_id__in=plan.year_folder_ids):
+            row.status = NodeStatus.MISSING
+            row.save(update_fields=["status", "updated_at"])
+            fehlend += 1
+        if fehlend:
+            run.summary["year_folders_missing"] = fehlend
     executed_writes = sum(1 for a in plan.actions if a.is_write and a.result == "ok")
     run.no_changes = executed_writes == 0 and not any(
         a.action_type == SyncActionType.CREATE_REVIEW and a.result == "ok" for a in plan.actions

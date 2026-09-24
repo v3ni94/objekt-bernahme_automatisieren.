@@ -10,6 +10,7 @@ endgueltig geloescht. Schalter drive.auto_cleanup_enabled."""
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass, field
 
 from django.conf import settings
@@ -30,6 +31,7 @@ from apps.drive.takeover import (
 from apps.objects.models import ManagedObject
 
 logger = logging.getLogger(__name__)
+_YEAR_NAME = re.compile(r"(19|20)\d{2}")
 
 LOCK_SECONDS = 600
 
@@ -92,6 +94,25 @@ def plan_tree(
             plan.blocker = f"mehr als {limit} Dateien (drive.takeover_max_files)"
             return plan
     plan.total_files = len(files)
+    # Jahresordner JJJJ unter dem Hauptordner 03 gehoeren zur Sollstruktur (24.09.2026), auch bevor der Abgleich sie
+    # registriert hat: von Hand angelegte, noch leere Jahresordner bleiben stehen
+    from apps.documents.periods import YEAR_FOLDER_CATEGORY
+    from apps.drive.models import DriveNode as DriveNodeRow
+    from apps.drive.models import NodeKind, NodeStatus
+
+    main03 = set(
+        DriveNodeRow.objects.filter(
+            node_kind=NodeKind.MAIN_FOLDER,
+            category_id=YEAR_FOLDER_CATEGORY,
+            status=NodeStatus.ACTIVE,
+            drive_file_id__in=folders,
+        ).values_list("drive_file_id", flat=True)
+    )
+    protected = protected | {
+        fid
+        for fid in folders
+        if parent_of.get(fid) in main03 and _YEAR_NAME.fullmatch(paths[fid].rsplit("/", 1)[-1].strip())
+    }
     registered = set(
         Document.objects.filter(
             drive_file_id__in=[n.id for n, _p, _e in files], deleted_at__isnull=True

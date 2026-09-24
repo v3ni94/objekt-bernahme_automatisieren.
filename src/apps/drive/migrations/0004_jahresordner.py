@@ -2,6 +2,9 @@
 # Der generierte Schluessel laesst sich nicht aendern, er wird entfernt und neu angelegt (Bestandszeilen bleiben).
 # Datenbankseitig laeuft alles in EINER ALTER-Anweisung, damit waehrend des Deploys (Migration bei laufenden alten
 # Containern) kein Zwischenzustand ohne position_key entsteht; der Django-Zustand wird getrennt gefuehrt.
+# Rueckwaerts laeuft die Migration nur, solange keine Zeilen mit node_kind year_folder existieren (der alte
+# CHECK und der alte Schluessel ohne Jahr wuerden sie verletzen); danach ist die Sicherung vor der Migration
+# der Rueckweg, nicht migrate drive 0003. Empfehlung fuer das Deploy: Worker vorher anhalten (worker-stop).
 
 import django.db.models.functions.comparison
 from django.db import migrations, models

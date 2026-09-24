@@ -33,7 +33,7 @@ def _erste_ablage(objekt, pdf_factory, run_all):
 
 
 def _anderes_ziel(objekt, drive, aktueller_elternordner):
-    for code in ("02", "03", "01"):
+    for code in ("02", "01"):  # nicht 03: dort entscheidet seit 24.09.2026 das Jahr ueber den Zielordner
         row = ensure_category_folder(objekt, code, None, drive=drive)
         if row.drive_file_id != aktueller_elternordner:
             return code, row

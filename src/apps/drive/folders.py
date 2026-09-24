@@ -29,7 +29,7 @@ def _find_or_create(
     existing = [
         c
         for c in drive.list_children(parent_id, folders_only=True)
-        if c.is_folder and nfc(c.name) == nfc(name)
+        if c.is_folder and not c.trashed and nfc(c.name) == nfc(name)
     ]
     if existing:
         return existing[0], False
@@ -243,7 +243,13 @@ def _ensure_year_folder(
         status=NodeStatus.ACTIVE,
     ).first()
     if row is not None:
-        return row
+        live = drive.get(row.drive_file_id)
+        if live is not None and not live.trashed and live.parent_id == main.drive_file_id:
+            return row
+        # Ordner von Hand in den Papierkorb gelegt oder verschoben: Zeile gilt als fehlend, der Ordner wird per
+        # Namen wiedergefunden oder neu angelegt (Review 24.09.2026)
+        row.status = NodeStatus.MISSING
+        row.save(update_fields=["status", "updated_at"])
     node, created = _find_or_create(drive, main.drive_file_id, str(year), object_id=obj.pk, user=user)
     return _register_node(
         obj,

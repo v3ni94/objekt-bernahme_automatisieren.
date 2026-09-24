@@ -191,3 +191,176 @@ def test_abgleich_registriert_vorhandene_jahresordner(objekt, drive):
         == 1
     )
     assert ensure_category_folder(objekt, "03", None, drive=drive, year=2024).pk == row.pk
+
+
+def test_bestandsdateien_in_und_unter_03(objekt, drive, run_all):
+    """Abgleich: Bestandsdateien im Jahresordner bekommen den Jahresknoten (Kategorie 03); erneute Ablage laesst sie
+    stehen (already_there); eine flach liegende Bestandsdatei mit Jahr wird per Elternwechsel verschoben, nie hochgeladen."""
+    main = ensure_category_folder(objekt, "03", None, drive=drive)
+    jahr = drive.add_folder(main.drive_file_id, "2024")
+    im_jahr = drive.add_file(jahr, "Beleg_im_Jahresordner.pdf", b"a", mime_type="application/pdf")
+    flach = drive.add_file(main.drive_file_id, "Beleg_flach.pdf", b"b", mime_type="application/pdf")
+    reconcile(objekt, drive)
+    d1 = Document.objects.get(drive_file_id=im_jahr)
+    d2 = Document.objects.get(drive_file_id=flach)
+    assert d1.source == "drive_existing"
+    assert d1.drive_node.node_kind == NodeKind.YEAR_FOLDER and d1.drive_node.year == 2024
+    assert d2.drive_node.node_kind == NodeKind.MAIN_FOLDER and d2.drive_node.category_id == "03"
+    for d in (d1, d2):
+        Document.objects.filter(pk=d.pk).update(
+            category_id="03", subfolder=None, period_year=2024, status="classified"
+        )
+        d.refresh_from_db()
+        enqueue(
+            JobType.FILE_TO_DRIVE,
+            objekt,
+            key=idempotency_key(JobType.FILE_TO_DRIVE, objekt.pk, d.sha256 or f"doc-{d.pk}"),
+            document=d,
+            payload={"category": "03", "subfolder": None},
+        )
+    run_all(objekt)
+    d1.refresh_from_db()
+    d2.refresh_from_db()
+    j1 = ProcessingJob.objects.filter(document=d1, job_type=JobType.FILE_TO_DRIVE).order_by("-id").first()
+    j2 = ProcessingJob.objects.filter(document=d2, job_type=JobType.FILE_TO_DRIVE).order_by("-id").first()
+    assert j1.status == JobStatus.DONE and j1.result.get("action") == "already_there", j1.last_error
+    assert j2.status == JobStatus.DONE and j2.result.get("action") == "moved", j2.last_error
+    assert drive.get(d2.drive_file_id).parent_id == jahr and d2.drive_node.year == 2024
+    assert not [op for op in drive.ops if op[0] == "upload"]
+
+
+def test_zeitraum_ueber_jahreswechsel_und_stammakte_ohne_jahresordner(
+    objekt, stammdaten, pdf_factory, run_all, drive
+):
+    pdf = pdf_factory("konto.pdf", [page_lines("K", 1, 1)])
+    doc, _run = ingest.ingest_upload(objekt, filename="konto.pdf", data=pdf.read_bytes())
+    run_all(objekt)
+    Document.objects.filter(pk=doc.pk).update(
+        category_id="03",
+        subfolder=None,
+        period_year=None,
+        period_from=date(2025, 10, 1),
+        period_to=date(2026, 9, 30),
+        document_date=date(2026, 10, 5),
+    )
+    doc.refresh_from_db()
+    _ablegen(objekt, doc, run_all)
+    assert (
+        doc.drive_node.node_kind == NodeKind.YEAR_FOLDER and doc.drive_node.year == 2025
+    )  # Beginn des Zeitraums
+
+    pdf2 = pdf_factory("police.pdf", [page_lines("P", 1, 1)])
+    doc2, _run = ingest.ingest_upload(objekt, filename="police.pdf", data=pdf2.read_bytes())
+    run_all(objekt)
+    Document.objects.filter(pk=doc2.pk).update(category_id="02", period_year=2025, status="classified")
+    doc2.refresh_from_db()
+    enqueue(
+        JobType.FILE_TO_DRIVE,
+        objekt,
+        key=idempotency_key(JobType.FILE_TO_DRIVE, objekt.pk, doc2.sha256),
+        document=doc2,
+        payload={"category": "02", "subfolder": "08"},
+    )
+    run_all(objekt)
+    doc2.refresh_from_db()
+    assert doc2.drive_node.node_kind == NodeKind.SUBFOLDER and doc2.drive_node.subfolder.code == "08"
+    assert not DriveNode.objects.filter(
+        object=objekt, node_kind=NodeKind.YEAR_FOLDER, category_id="02"
+    ).exists()
+
+
+def test_umzugsbefehl_zieht_falsches_jahr_und_zaehlt_offene_faelle(
+    objekt, stammdaten, pdf_factory, run_all, drive
+):
+    pdf = pdf_factory("b.pdf", [page_lines("B", 1, 1)])
+    doc, _run = ingest.ingest_upload(objekt, filename="b.pdf", data=pdf.read_bytes())
+    run_all(objekt)
+    Document.objects.filter(pk=doc.pk).update(
+        category_id="03",
+        subfolder=None,
+        period_year=2025,
+        period_from=None,
+        period_to=None,
+        document_date=None,
+    )
+    doc.refresh_from_db()
+    _ablegen(objekt, doc, run_all)
+    assert doc.drive_node.year == 2025
+    Document.objects.filter(pk=doc.pk).update(period_year=2026)  # Jahr nach der Ablage korrigiert
+    out = StringIO()
+    call_command("buchhaltung_jahresordner", stdout=out)
+    text = out.getvalue()
+    assert f"Objekt {objekt.object_number}, Jahr 2026: 1" in text and "im falschen Jahr: 1" in text
+    call_command("buchhaltung_jahresordner", "--echt", stdout=StringIO())
+    run_all(objekt)
+    doc.refresh_from_db()
+    assert doc.status == "filed" and doc.drive_node.year == 2026
+    assert drive.get(drive.get(doc.drive_file_id).parent_id).name == "2026"
+    Document.objects.filter(pk=doc.pk).update(status="review", period_year=2024)
+    out = StringIO()
+    call_command("buchhaltung_jahresordner", stdout=out)
+    assert "mit offenem Fall (ziehen mit der Entscheidung um): 1" in out.getvalue()
+    assert "Umzug in Jahresordner: 0" in out.getvalue()
+
+
+def test_doppelte_jahresordner_ergeben_prueffall(objekt, drive):
+    from apps.review.models import ReviewCase
+
+    main = ensure_category_folder(objekt, "03", None, drive=drive)
+    drive.add_folder(main.drive_file_id, "2024")
+    drive.add_folder(main.drive_file_id, " 2024 ")
+    reconcile(objekt, drive)
+    assert not DriveNode.objects.filter(
+        object=objekt, node_kind=NodeKind.YEAR_FOLDER, status=NodeStatus.ACTIVE
+    ).exists()
+    fall = ReviewCase.objects.filter(
+        object=objekt, case_type="drive_structure", case_subtype="multiple_folders_same_name", status="open"
+    )
+    assert fall.exists()
+
+
+def test_fehlender_jahresordner_wird_erkannt(objekt, drive):
+    """Ordner 2025 von Hand in den Papierkorb gelegt: der Abgleich setzt die Zeile auf fehlend, die naechste Ablage
+    legt neu an; ohne Abgleich erkennt die Ordneranlage den fehlenden Ordner selbst (Live-Pruefung)."""
+    alt = ensure_category_folder(objekt, "03", None, drive=drive, year=2025)
+    drive.set_trashed(alt.drive_file_id, True)
+    reconcile(objekt, drive)
+    alt.refresh_from_db()
+    assert alt.status == NodeStatus.MISSING
+    neu = ensure_category_folder(objekt, "03", None, drive=drive, year=2025)
+    assert neu.pk != alt.pk and neu.status == NodeStatus.ACTIVE and not drive.get(neu.drive_file_id).trashed
+    drive.set_trashed(neu.drive_file_id, True)
+    neu2 = ensure_category_folder(objekt, "03", None, drive=drive, year=2025)
+    neu.refresh_from_db()
+    assert neu2.pk != neu.pk and neu.status == NodeStatus.MISSING and neu2.status == NodeStatus.ACTIVE
+    assert (
+        DriveNode.objects.filter(
+            object=objekt, node_kind=NodeKind.YEAR_FOLDER, year=2025, status=NodeStatus.ACTIVE
+        ).count()
+        == 1
+    )
+
+
+def test_sammelaktion_zeigt_jahr_aus_dokumentdatum(objekt, stammdaten, pdf_factory, run_all, drive):
+    from apps.review.models import ReviewCase
+    from apps.review.services import bulk_rows
+
+    pdf = pdf_factory("r.pdf", [page_lines("R", 1, 1)])
+    doc, _run = ingest.ingest_upload(objekt, filename="r.pdf", data=pdf.read_bytes())
+    run_all(objekt)
+    Document.objects.filter(pk=doc.pk).update(
+        period_year=None, period_from=None, period_to=None, document_date=date(2026, 2, 15), status="review"
+    )
+    ReviewCase.objects.filter(document=doc).update(status="dismissed")
+    case = ReviewCase.objects.create(
+        object=objekt,
+        document=doc,
+        case_type="unclear",
+        case_subtype="below_threshold",
+        status="open",
+        context={"intended": {"category": "03", "subfolder": None, "document_type": "beleg"}},
+    )
+    row = bulk_rows([case.pk])[0]
+    assert (row.folder_name, row.folder_exists) == ("03_Buchhaltung/2026", False), row.errors
+    ensure_category_folder(objekt, "03", None, drive=drive, year=2026)
+    assert bulk_rows([case.pk])[0].folder_exists is True

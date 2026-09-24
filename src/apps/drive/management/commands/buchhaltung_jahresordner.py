@@ -15,6 +15,7 @@ from apps.documents.models import Document
 from apps.documents.periods import YEAR_FOLDER_CATEGORY, document_filing_year
 from apps.drive.models import NodeKind
 from apps.pipeline.jobs import JobType, enqueue, idempotency_key
+from apps.pipeline.models import JobStatus, ProcessingJob
 
 
 class Command(BaseCommand):
@@ -30,7 +31,7 @@ class Command(BaseCommand):
             Document.objects.filter(
                 category_id=YEAR_FOLDER_CATEGORY,
                 subfolder__isnull=True,
-                status="filed",
+                status__in=["filed", "review"],
                 drive_file_id__isnull=False,
                 deleted_at__isnull=True,
                 object__deleted_at__isnull=True,
@@ -48,13 +49,18 @@ class Command(BaseCommand):
         je_ziel: Counter = Counter()
         eingereiht = 0
         for doc in docs.iterator(chunk_size=500):
-            node = doc.drive_node
-            if node is not None and node.node_kind == NodeKind.YEAR_FOLDER:
-                zaehler["bereits_im_jahresordner"] += 1
+            if doc.status == "review":
+                # liegt mit offenem Fall physisch in 03 und zieht mit der Entscheidung im Pruefcenter um
+                zaehler["mit_offenem_fall"] += 1
                 continue
             year = document_filing_year(doc)
+            node = doc.drive_node
+            im_jahresordner = node is not None and node.node_kind == NodeKind.YEAR_FOLDER
             if year is None:
                 zaehler["ohne_jahr"] += 1
+                continue
+            if im_jahresordner and node.year == year:
+                zaehler["bereits_im_jahresordner"] += 1
                 continue
             if not doc.sha256:
                 zaehler["ohne_hash"] += 1
@@ -62,24 +68,33 @@ class Command(BaseCommand):
             if limit and eingereiht >= limit:
                 zaehler["begrenzung"] += 1
                 continue
+            if im_jahresordner:
+                zaehler["falsches_jahr"] += 1  # Jahr nach der Ablage geaendert (Import, Datenkorrektur)
             je_ziel[(doc.object.object_number, year)] += 1
             eingereiht += 1
             if not options["echt"]:
                 continue
             doc.status = "classified"
             doc.save(update_fields=["status", "updated_at"])
+            payload = {"category": YEAR_FOLDER_CATEGORY, "subfolder": None}
+            # ein noch wartender Ablagejob traegt sonst seine alte Zielangabe (Muster Pruefcenter)
+            ProcessingJob.objects.filter(
+                document=doc, job_type=JobType.FILE_TO_DRIVE, status=JobStatus.PENDING
+            ).update(payload=payload, last_error=None, next_attempt_at=None)
             enqueue(
                 JobType.FILE_TO_DRIVE,
                 doc.object,
                 key=idempotency_key(JobType.FILE_TO_DRIVE, doc.object_id, doc.sha256),
                 document=doc,
-                payload={"category": YEAR_FOLDER_CATEGORY, "subfolder": None},
+                payload=payload,
             )
         for (nr, year), n in sorted(je_ziel.items()):
             self.stdout.write(f"Objekt {nr}, Jahr {year}: {n}")
         self.stdout.write(
             f"Umzug in Jahresordner: {eingereiht} | bereits im Jahresordner: {zaehler['bereits_im_jahresordner']} | "
-            f"ohne Jahr (bleiben flach in 03): {zaehler['ohne_jahr']} | ohne Hash: {zaehler['ohne_hash']}"
+            f"ohne Jahr (bleiben flach in 03): {zaehler['ohne_jahr']} | ohne Hash: {zaehler['ohne_hash']} | "
+            f"im falschen Jahr: {zaehler['falsches_jahr']} | "
+            f"mit offenem Fall (ziehen mit der Entscheidung um): {zaehler['mit_offenem_fall']}"
         )
         if zaehler["begrenzung"]:
             self.stdout.write(f"Begrenzung {limit} erreicht, {zaehler['begrenzung']} nicht eingereiht")

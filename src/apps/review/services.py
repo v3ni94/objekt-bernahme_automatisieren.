@@ -321,7 +321,12 @@ def proposal_target(case: ReviewCase) -> Target:
             segment.get("document_type"),
         )
     else:
-        t.category = intended.get("category") or t.category or doc.category_id
+        gewollt = intended.get("category")
+        if gewollt and gewollt != (t.category or doc.category_id):
+            # Zielkategorie weicht von der Klassifikation ab (Vorschlag unter Schwelle, 24.09.2026): Unterordner und
+            # Dokumentart der alten Kategorie (etwa 01 aus 06/01) passen nicht zum neuen Ziel und fallen weg
+            t.subfolder, t.document_type = None, None
+        t.category = gewollt or t.category or doc.category_id
         t.subfolder = intended.get("subfolder") or t.subfolder
         t.document_type = intended.get("document_type") or t.document_type
     t.period_year = t.period_year or doc.period_year
