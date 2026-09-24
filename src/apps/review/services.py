@@ -1370,10 +1370,12 @@ def bulk_max() -> int:
     return int(store.get("review.bulk_max_cases", 500))
 
 
-def _folder_for_target(obj, target: Target) -> tuple[str | None, bool]:
-    """Zielpfad aus Benennungsfunktion und drive_nodes (Folder-ID-Cache), ohne Drive-Aufruf."""
+def _folder_for_target(obj, target: Target, document=None) -> tuple[str | None, bool]:
+    """Zielpfad aus Benennungsfunktion und drive_nodes (Folder-ID-Cache), ohne Drive-Aufruf; fuer 03 mit Jahresordner
+    (24.09.2026) aus Abrechnungsjahr, Zeitraum oder Dokumentdatum."""
+    from apps.documents.periods import filing_year, is_year_folder_target
     from apps.drive.models import DriveNode as DriveNodeRow
-    from apps.drive.models import NodeStatus
+    from apps.drive.models import NodeKind, NodeStatus
     from apps.drive.naming import (
         OwnerFileNamingConfig,
         OwnerNameInput,
@@ -1389,14 +1391,28 @@ def _folder_for_target(obj, target: Target) -> tuple[str | None, bool]:
             if target.subfolder
             else None
         )
-        path = "/".join(p for p in [cat, sub.folder_name if sub else None] if p)
-        exists = DriveNodeRow.objects.filter(
-            object=obj,
-            category_id=target.category,
-            status=NodeStatus.ACTIVE,
-            owner_file__isnull=True,
-            subfolder=sub,
-        ).exists()
+        year = None
+        if is_year_folder_target(target.category, target.subfolder):
+            year = filing_year(
+                target.period_year, target.period_from, getattr(document, "document_date", None)
+            )
+        path = "/".join(p for p in [cat, sub.folder_name if sub else None, str(year) if year else None] if p)
+        if year:
+            exists = DriveNodeRow.objects.filter(
+                object=obj,
+                category_id=target.category,
+                node_kind=NodeKind.YEAR_FOLDER,
+                year=year,
+                status=NodeStatus.ACTIVE,
+            ).exists()
+        else:
+            exists = DriveNodeRow.objects.filter(
+                object=obj,
+                category_id=target.category,
+                status=NodeStatus.ACTIVE,
+                owner_file__isnull=True,
+                subfolder=sub,
+            ).exists()
         return path, exists
     sub = (
         DocumentSubfolder.objects.filter(category_id="05", code=target.subfolder).first()
@@ -1545,7 +1561,9 @@ def bulk_rows(
         folder, exists = (None, False)
         if not errors:
             try:
-                folder, exists = _folder_for_target(case.object or case.document.object, merged)
+                folder, exists = _folder_for_target(
+                    case.object or case.document.object, merged, case.document
+                )
             except Exception as exc:  # Pfadbildung ist Anzeige, kein Abbruchgrund
                 warnings.append(f"Zielpfad nicht bestimmbar: {exc}")
         owner = Owner.objects.filter(pk=merged.owner_id).first() if merged.owner_id else None

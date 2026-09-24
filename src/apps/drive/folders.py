@@ -162,9 +162,16 @@ def invalidate_owner_folder_cache(owner_file_id: int) -> None:
 
 
 def ensure_category_folder(
-    obj, category_code: str, subfolder_code: str | None, *, drive: DriveAdapter, user=None
+    obj,
+    category_code: str,
+    subfolder_code: str | None,
+    *,
+    drive: DriveAdapter,
+    user=None,
+    year: int | None = None,
 ) -> DriveNodeRow:
-    """Hauptordner 01 bis 06 und Unterordner von 06 als drive_nodes; setzt den Objektordner aus dem Abgleich voraus."""
+    """Hauptordner 01 bis 06 und Unterordner von 06 als drive_nodes; setzt den Objektordner aus dem Abgleich voraus.
+    year (24.09.2026): Jahresordner JJJJ unter dem Hauptordner (03_Buchhaltung), lazy bei der Ablage angelegt."""
     from apps.documents.models import DocumentCategory
     from apps.drive.reconcile import _register_node
 
@@ -192,7 +199,9 @@ def ensure_category_folder(
             created=created,
         )
     if not subfolder_code:
-        return main
+        if year is None:
+            return main
+        return _ensure_year_folder(obj, main, category_code, int(year), drive=drive, user=user)
     sub = DocumentSubfolder.objects.get(category=category, code=subfolder_code)
     row = DriveNodeRow.objects.filter(
         object=obj,
@@ -217,6 +226,36 @@ def ensure_category_folder(
             created=created,
         )
     return row
+
+
+def _ensure_year_folder(
+    obj, main: DriveNodeRow, category_code: str, year: int, *, drive, user=None
+) -> DriveNodeRow:
+    """Jahresordner JJJJ unter dem Hauptordner: vorhandene Zeile, sonst Ordner per Namensvergleich finden (auch von
+    Hand angelegte) oder anlegen und als year_folder registrieren (Wunsch GF 24.09.2026)."""
+    from apps.drive.reconcile import _register_node
+
+    row = DriveNodeRow.objects.filter(
+        object=obj,
+        node_kind=NodeKind.YEAR_FOLDER,
+        category_id=category_code,
+        year=year,
+        status=NodeStatus.ACTIVE,
+    ).first()
+    if row is not None:
+        return row
+    node, created = _find_or_create(drive, main.drive_file_id, str(year), object_id=obj.pk, user=user)
+    return _register_node(
+        obj,
+        node,
+        node_kind=NodeKind.YEAR_FOLDER,
+        category_code=category_code,
+        subfolder_id=None,
+        expected_name=str(year),
+        parent_row=main,
+        created=created,
+        year=year,
+    )
 
 
 def _register_tenant(tenant_file: TenantFile, node: DriveNode, *, parent_row, created: bool) -> DriveNodeRow:

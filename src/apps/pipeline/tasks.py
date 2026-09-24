@@ -18,6 +18,7 @@ from django.utils import timezone
 
 from apps.config import store
 from apps.documents.models import Document, DocumentEntity, DocumentPage
+from apps.documents.periods import document_filing_year, is_year_folder_target
 from apps.pipeline import analysis as analysis_mod
 from apps.pipeline import ocr as ocr_mod
 from apps.pipeline import storage
@@ -1042,8 +1043,15 @@ def file_to_drive(job: ProcessingJob) -> dict:
                     TenantFile.objects.get(pk=payload["tenant_file_id"]), drive=drive
                 )
             else:
+                # Jahresordner unter 03_Buchhaltung (24.09.2026): Jahr aus Abrechnungsjahr, Zeitraum oder Dokumentdatum
+                # zum Ablagezeitpunkt, ohne Jahr flach im Hauptordner
+                year = (
+                    document_filing_year(doc)
+                    if is_year_folder_target(payload["category"], payload.get("subfolder"))
+                    else None
+                )
                 target = ensure_category_folder(
-                    job.object, payload["category"], payload.get("subfolder"), drive=drive
+                    job.object, payload["category"], payload.get("subfolder"), drive=drive, year=year
                 )
         except FolderError as exc:
             # Zielstruktur fehlt noch (Objektordner oder Hauptordner nicht registriert): der Ordnerabgleich laeuft

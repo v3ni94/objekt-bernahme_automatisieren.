@@ -36,6 +36,7 @@
 #   paperless-feld-abgleich <branch> <objekt>[+echt]  Feld MHV Objekt je Dokument gegen die Zuordnung pruefen; echt uebernimmt Abweichungen (leer -> Eingang)
 #   objekt-anschriften <branch> [echt|korrigieren|korrigieren+echt]  Weitere Anschriften (Eckobjekte) aus den Objektbezeichnungen ableiten (echt = speichern, sonst Vorschau; korrigieren = vom Kommando gesetzte Hauptanschriften neu ableiten)
 #   anschrift-kandidaten <branch> [objekt=NR,NR+ausser=TEXT+min=N+top=N+echt]  Anschrift aus den Seitentexten der Dokumente vorschlagen (Objekte ohne Strasse); echt = eindeutige Vorschlaege setzen
+#   buchhaltung-jahresordner <branch> [objekt=NR+limit=N+echt]  Abgelegte Dokumente in 03_Buchhaltung in die Jahresordner 03/JJJJ bringen (Ablage erneut einreihen, nur verschieben)
 #   zuordnung-pruefen <branch> [<objekt>][+echt][+details][+ohne-ki][+limit=N]  Gegenprobe der Objektzuordnung fuer Paperless-Feldimporte (Vorschau ohne KI; echt loest mit KI auf; laeuft im worker-io)
 #   backup-voll <branch>      Volle Sicherung sofort (Datenbank und Fachverzeichnisse, rund 20 Minuten, nur in tmux); schreibt status.json
 #   altbestand-aufarbeiten <branch> [echt] Alle Altbestand-Ordner mit Objekt aufarbeiten (echt = Celery-Aufgabe, sonst Vorschau)
@@ -929,6 +930,24 @@ PY
     docker compose exec -T web python manage.py objekt_anschrift_kandidaten "${args[@]}"
     echo "$(date -Is) anschrift-kandidaten ${ARG:-ohne-argument}" >> "$LOG"
     ;;
+  buchhaltung-jahresordner)
+    # Bereits in 03_Buchhaltung abgelegte Dokumente in die Jahresordner 03/JJJJ bringen (Wunsch GF 24.09.2026): der
+    # Befehl reiht die Ablage erneut ein, die Worker verschieben die vorhandene Drive-Datei per Elternwechsel (nie
+    # loeschen). Argumente mit + getrennt: objekt=NR, limit=N, echt; ohne echt Vorschau je Objekt und Jahr.
+    args=()
+    IFS='+' read -r -a teile <<<"${ARG:-}"
+    for t in "${teile[@]}"; do
+      case "$t" in
+        "") ;;
+        echt) args+=(--echt) ;;
+        objekt=*) args+=(--objekt "${t#objekt=}") ;;
+        limit=*) args+=(--limit "${t#limit=}") ;;
+        *) echo "Argument unbekannt: $t (erlaubt: objekt=NR, limit=N, echt)"; exit 2 ;;
+      esac
+    done
+    docker compose exec -T web python manage.py buchhaltung_jahresordner "${args[@]}"
+    echo "$(date -Is) buchhaltung-jahresordner ${ARG:-ohne-argument}" >> "$LOG"
+    ;;
   altbestand-objekte)
     # Objekte fuer alle Altbestand-Quellen ohne Objekt anlegen; Argument "echt" legt an, sonst nur Vorschau
     if [ "${ARG:-}" = "echt" ]; then
@@ -1289,5 +1308,5 @@ PY
     done
     echo "wirksam mit der Aktion deploy; Sicherung .env.bak"
     ;;
-  *) echo "Nur check, pull, befund, env-init, ps, logs, smoke, cert-retry, db-status, db-reset, first-run, deploy, rollback, create-admin, oauth-check, deploy-tests, doc-status, config-set, altbestand-import, altbestand-objekte, altbestand-aufarbeiten, verarbeitung-alle, paperless-feld-alle, redis-status, env-set, jobs-bereinigen, disk-status, lauf-monitor, fehler-wiederaufnehmen, transit-bereinigen, drive-dubletten, worker-drosseln, work-bereinigen, last-status, worker-stop, worker-start, ai-check, ai-reclassify, review-status, sync-status, sync-retry, classifier-status, zuordnung-pruefen, objekt-anschriften, anschrift-kandidaten, paperless-feld-abgleich, backup-voll oder reconcile-all erlaubt"; exit 2 ;;
+  *) echo "Nur check, pull, befund, env-init, ps, logs, smoke, cert-retry, db-status, db-reset, first-run, deploy, rollback, create-admin, oauth-check, deploy-tests, doc-status, config-set, altbestand-import, altbestand-objekte, altbestand-aufarbeiten, verarbeitung-alle, paperless-feld-alle, redis-status, env-set, jobs-bereinigen, disk-status, lauf-monitor, fehler-wiederaufnehmen, transit-bereinigen, drive-dubletten, worker-drosseln, work-bereinigen, last-status, worker-stop, worker-start, ai-check, ai-reclassify, review-status, sync-status, sync-retry, classifier-status, zuordnung-pruefen, objekt-anschriften, anschrift-kandidaten, buchhaltung-jahresordner, paperless-feld-abgleich, backup-voll oder reconcile-all erlaubt"; exit 2 ;;
 esac

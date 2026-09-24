@@ -566,13 +566,14 @@ Modell `drive.DriveNode`. drive nodes.
 | created_at | datetime(6) | nein |  |
 | updated_at | datetime(6) | nein |  |
 | object_id | bigint | ja | → objects.id |
-| node_kind | varchar(24) | nein | data_root, object_root, main_folder, subfolder, owner_file_folder, owner_file_subfolder, tenant_file_folder, tenant_file_subfolder, list_file |
+| node_kind | varchar(24) | nein | data_root, object_root, main_folder, subfolder, owner_file_folder, owner_file_subfolder, tenant_file_folder, tenant_file_subfolder, list_file, year_folder |
 | category_code | varchar(2) | ja | → document_categories.code |
 | subfolder_id | bigint | ja | → document_subfolders.id |
 | owner_file_id | bigint | ja | → owner_files.id |
 | tenant_file_id | bigint | ja | → tenant_files.id |
 | list_type | varchar(16) | ja | owner_list, tenant_list |
 | list_format | varchar(8) | ja | xlsx, pdf |
+| year | smallint UNSIGNED | ja |  |
 | parent_node_id | bigint | ja | → drive_nodes.id |
 | drive_file_id | varchar(128) | nein |  |
 | drive_parent_id | varchar(128) | ja |  |
@@ -1729,9 +1730,9 @@ Celery-Queues aus den Settings: `ai`, `classify`, `io`, `lists`, `ocr`
 | classification.stage2_min_samples_per_class | classification | integer | `15` |
 | classification.stage3_max_tokens | classification | integer | `3000` |
 | classification.text_max_chars | classification | integer | `4000` |
-| classification.threshold_auto_file | classification | decimal | `0.9` |
+| classification.threshold_auto_file | classification | decimal | `0.85` |
 | classification.threshold_stage3_call | classification | decimal | `0.9` |
-| classification.threshold_stage3_override | classification | decimal | `0.9` |
+| classification.threshold_stage3_override | classification | decimal | `0.85` |
 | completeness.contact_channels_required | completeness | integer | `1` |
 | completeness.default_period_years | completeness | integer | `3` |
 | completeness.mostly_complete_pct | completeness | integer | `90` |

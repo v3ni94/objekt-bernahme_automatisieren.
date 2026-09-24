@@ -23,6 +23,7 @@ from django.utils import timezone
 from apps.audit.services import record
 from apps.config import store
 from apps.documents.models import Document, DocumentCategory, DocumentSubfolder
+from apps.documents.periods import YEAR_FOLDER_CATEGORY
 from apps.drive.adapter import DriveAdapter, DriveError, DriveNode, count_tree, sort_deterministic
 from apps.drive.models import DriveNode as DriveNodeRow
 from apps.drive.models import DriveSyncAction, DriveSyncRun, NodeKind, NodeStatus, SyncActionType
@@ -32,6 +33,7 @@ from apps.objects.models import ManagedObject
 from apps.pipeline.models import JobType, ProcessingJob
 from apps.review.models import CaseStatus, CaseType, ReviewCase
 
+_YEAR_NAME = re.compile(r"(19|20)\d{2}")
 logger = logging.getLogger(__name__)
 
 
@@ -165,6 +167,7 @@ class Action:
     file_count_before: int | None = None
     id_hash_before: str | None = None
     node_kind: str | None = None
+    year: int | None = None  # Jahresordner unter 03 (24.09.2026)
     note: str | None = None
     review: dict | None = None
     inventory: list[dict] | None = None
@@ -552,6 +555,28 @@ def _plan(
                         node_kind=NodeKind.SUBFOLDER,
                     )
                 )
+    # Schritt 5b (24.09.2026): vorhandene Jahresordner JJJJ unter 03_Buchhaltung registrieren, damit Bestandsdateien
+    # darin einen drive_node bekommen und das Nachraeumen sie schuetzt; angelegt werden Jahresordner erst bei der Ablage
+    for cat in cats:
+        if cat.code != YEAR_FOLDER_CATEGORY or plan.has_review_for(cat.code):
+            continue
+        parent_node = _planned_parent(plan, cat.code, children, cat.folder_name)
+        if parent_node is None:
+            continue
+        for child in drive.list_children(parent_node.id, folders_only=True):
+            name = (child.name or "").strip()
+            if child.is_folder and _YEAR_NAME.fullmatch(name):
+                plan.add(
+                    Action(
+                        SyncActionType.REGISTER_FOLDER,
+                        category_code=cat.code,
+                        node=child,
+                        node_kind=NodeKind.YEAR_FOLDER,
+                        name_before=child.name,
+                        name_after=name,
+                        year=int(name),
+                    )
+                )
     # Zusaetzliche Ordner (Fall H)
     known_names = {nfc(c.folder_name) for c in cats} | {
         norm(a) for al in cfg.legacy_aliases.values() for a in al
@@ -787,6 +812,7 @@ def _register_node(
     expected_name: str | None,
     parent_row: DriveNodeRow | None,
     created: bool,
+    year: int | None = None,
 ) -> DriveNodeRow:
     row = DriveNodeRow.objects.filter(drive_file_id=node.id).first()
     position = DriveNodeRow.objects.filter(
@@ -794,6 +820,7 @@ def _register_node(
         node_kind=node_kind,
         category_id=category_code,
         subfolder_id=subfolder_id,
+        year=year,
         owner_file__isnull=True,
         tenant_file__isnull=True,
         list_type__isnull=True,
@@ -809,6 +836,7 @@ def _register_node(
             node_kind=node_kind,
             category_id=category_code,
             subfolder_id=subfolder_id,
+            year=year,
             parent_node=parent_row,
             drive_file_id=node.id,
             drive_parent_id=node.parent_id,
@@ -825,6 +853,7 @@ def _register_node(
         row.node_kind = node_kind
         row.category_id = category_code
         row.subfolder_id = subfolder_id
+        row.year = year
         row.parent_node = parent_row or row.parent_node
         row.drive_name = node.name
         row.drive_parent_id = node.parent_id
@@ -894,6 +923,7 @@ def _execute(
                     expected_name=action.name_after,
                     parent_row=parent_row,
                     created=False,
+                    year=action.year,
                 )
                 if action.node_kind == NodeKind.MAIN_FOLDER:
                     main_rows[action.category_code] = row

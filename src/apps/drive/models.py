@@ -25,6 +25,7 @@ class NodeKind(models.TextChoices):
     TENANT_FILE_FOLDER = "tenant_file_folder", "Mieterakte"
     TENANT_FILE_SUBFOLDER = "tenant_file_subfolder", "Unterordner der Mieterakte"
     LIST_FILE = "list_file", "Listen-Datei"
+    YEAR_FOLDER = "year_folder", "Jahresordner (03 Buchhaltung)"
 
 
 class NodeStatus(models.TextChoices):
@@ -87,6 +88,7 @@ class DriveNode(TimestampedModel):
     )
     list_type = models.CharField(max_length=16, choices=ListType.choices, null=True, blank=True)
     list_format = models.CharField(max_length=8, choices=ListFormat.choices, null=True, blank=True)
+    year = models.PositiveSmallIntegerField(null=True, blank=True)  # Jahresordner unter 03 (24.09.2026)
     parent_node = models.ForeignKey(
         "self",
         null=True,
@@ -118,6 +120,7 @@ class DriveNode(TimestampedModel):
                     ifnull_int("tenant_file_id"),
                     ifnull_str("list_type"),
                     ifnull_str("list_format"),
+                    ifnull_int("year"),
                 ),
             ),
             default=Value(None),
