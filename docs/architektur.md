@@ -595,7 +595,7 @@ Startwerte (ANNAHME A11): threshold_auto_file 0,90, threshold_stage3_call 0,90 (
 
 ### 6.7 KI-Provider-Abstraktion (Stufe 3)
 
-Stufe 3 erhält nie Originaldateien, nie Bank- oder Ausweisdaten und keine Stammdatenlisten, sondern nur den maskierten, gekürzten Textauszug, den maskierten Dateinamen, die Verwaltungsart als Code, die Taxonomie mit Codes und Definitionen aus CR 5 und 6, Präfixmuster der Einheiten (keine konkreten Einheiten oder Namen) und Hinweise ohne Personenbezug. Der Abgleich der zurückgemeldeten Namen und Einheiten gegen owners, tenants und units erfolgt ausschließlich lokal.
+Stufe 3 erhält nie Originaldateien, nie Bank- oder Ausweisdaten und keine Stammdatenlisten, sondern nur den maskierten, gekürzten Textauszug, den maskierten Dateinamen, die Verwaltungsart als Code, die Taxonomie mit Codes und Definitionen aus CR 5 und 6, Präfixmuster der Einheiten (keine konkreten Einheiten oder Namen), die Objektangaben (Objektnummer und Gebäudeanschriften des Objekts ohne Bezeichnung, seit 24.09.2026, damit die KI den Objektbezug prüfen kann) und Hinweise ohne Personenbezug. Der Abgleich der zurückgemeldeten Namen und Einheiten gegen owners, tenants und units erfolgt ausschließlich lokal.
 
 ```python
 class ClassificationProvider(Protocol):
@@ -611,6 +611,7 @@ class ClassificationRequest:
     taxonomy: Taxonomy         # Codes 01 bis 06, Unterordner- und Unterartcodes mit Definitionen
     unit_label_patterns: list[str]
     hints: dict                # z. B. {"rule_candidates": ["03"], "has_period_year": true}
+    object_context: dict       # {"objektnummer": "623", "anschriften": ["Musterstraße 49, 12345 Musterstadt"], "anschrift_bekannt": true}
 ```
 
 Antwortschema (strikt, additionalProperties false, beim Anbieter über dessen Mechanismus für strukturierte Ausgaben erzwungen und lokal validiert): object_related (bool), category (Code 01 bis 06), subfolder (Code oder null), document_type (Code oder null), period (year, from, to, document_date), mentioned_units, mentioned_parties, confidence (0 bis 1), reasoning (höchstens 400 Zeichen). Das Ergebnisformat ist für beide Anbieter identisch.
@@ -937,7 +938,7 @@ Aufbewahrungsfristen je Kategorie, Unterordner oder Unterart in retention_polici
 
 ### 9.8 Externe KI und Compliance-Voraussetzungen
 
-Technische Maßnahmen: nur maskierte Textauszüge, keine Originaldateien, keine Bank- oder Ausweisdaten, keine Stammdatenlisten, Kontextfelder ohne Personennamen; Endpunkt und Region je Provider konfigurierbar; Provider erst nach Freigabe aktivierbar; Kosten je Objekt protokolliert und begrenzt. Organisatorische Voraussetzungen des Auftraggebers vor dem ersten externen Aufruf mit Produktivdaten (Einschätzung aus technischer Sicht, keine Rechtsberatung; Prüfung durch Datenschutzberater empfohlen): Auftragsverarbeitungsverträge mit OpenAI und Anthropic in der API-Variante, verbindliche EU-Endpunkte und Regionen, schriftliche Bestätigung des Trainings-Opt-outs und der Aufbewahrung von API-Eingaben, Prüfung des Workspace-Vertrags für Drive, Ergänzung des Verzeichnisses der Verarbeitungstätigkeiten, AVV mit dem Hosting-Anbieter, Aufbewahrungsfristen, Dokumentation der technischen und organisatorischen Maßnahmen, Prüfung der Notwendigkeit einer Datenschutz-Folgenabschätzung, Informationspflichten gegenüber Eigentümern und Mietern, Information der Mitarbeiter über das Audit-Protokoll, Freigabe des Berechtigungskonzepts, Verfahren für Auskunfts- und Löschersuchen. Diese Liste steht als Checkliste mit Status im Umsetzungsplan.
+Technische Maßnahmen: nur maskierte Textauszüge, keine Originaldateien, keine Bank- oder Ausweisdaten, keine Stammdatenlisten, Kontextfelder ohne Personennamen (Objektnummer und Gebäudeanschriften des Objekts gehen mit, die Objektbezeichnung nicht); Endpunkt und Region je Provider konfigurierbar; Provider erst nach Freigabe aktivierbar; Kosten je Objekt protokolliert und begrenzt. Organisatorische Voraussetzungen des Auftraggebers vor dem ersten externen Aufruf mit Produktivdaten (Einschätzung aus technischer Sicht, keine Rechtsberatung; Prüfung durch Datenschutzberater empfohlen): Auftragsverarbeitungsverträge mit OpenAI und Anthropic in der API-Variante, verbindliche EU-Endpunkte und Regionen, schriftliche Bestätigung des Trainings-Opt-outs und der Aufbewahrung von API-Eingaben, Prüfung des Workspace-Vertrags für Drive, Ergänzung des Verzeichnisses der Verarbeitungstätigkeiten, AVV mit dem Hosting-Anbieter, Aufbewahrungsfristen, Dokumentation der technischen und organisatorischen Maßnahmen, Prüfung der Notwendigkeit einer Datenschutz-Folgenabschätzung, Informationspflichten gegenüber Eigentümern und Mietern, Information der Mitarbeiter über das Audit-Protokoll, Freigabe des Berechtigungskonzepts, Verfahren für Auskunfts- und Löschersuchen. Diese Liste steht als Checkliste mit Status im Umsetzungsplan.
 
 ### 9.9 Lizenzen
 

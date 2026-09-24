@@ -451,3 +451,24 @@ def test_widerspruch_der_ki_senkt_hinweisregel_unter_die_schwelle(
     assert case.case_subtype == "below_threshold" and "widerspricht" in case.context["reason"]
     assert [c["category"] for c in case.candidates] == ["03", "02"]
     assert case.context["intended"]["category"] == "03" and float(case.context["confidence"]) < 0.85
+
+
+def test_ki_zustimmung_ersetzt_dokumentart_der_regel_nicht(
+    welt, fake_oauth, run_all, admin_user, fake_router
+):
+    """Review 24.09.2026: stimmt die KI der Kategorie zu, nennt aber eine andere Dokumentart, bleibt die Dokumentart
+    der Regel (03 hat keine Unterordner, die Luecke im Unterordner darf die Dokumentart nicht mitreissen)."""
+    enable_ai(admin_user)
+    fake_router(answer=_answer("03", None, "beleg", 0.9))
+    obj = welt["objects"]["623"]
+    text = (
+        H623
+        + "Hausgeldabrechnung 2025 für alle Einheiten der Gemeinschaft, Verteilungsschlüssel Miteigentumsanteile"
+    )
+    doc = make_document(obj, {"filename": "Hausgeldabrechnung_2025.pdf", "pages": [text]})
+    start_run(obj)
+    run_all(obj)
+    doc.refresh_from_db()
+    assert doc.category_id == "03" and doc.status == "filed"
+    final = DocumentClassification.objects.get(document=doc, is_final=True)
+    assert final.document_type.code == "gesamtjahresabrechnung" and "stimmt zu" in final.reasoning

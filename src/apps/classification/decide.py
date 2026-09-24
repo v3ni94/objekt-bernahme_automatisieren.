@@ -534,8 +534,13 @@ def _decide_core(
             if period.year is None and s3.period_year:
                 period.year = s3.period_year
                 period.source = "stage3"
-        elif base.category == s3.category and base.subfolder is None:
-            base.subfolder, base.document_type = s3.subfolder, s3.document_type
+        elif base.category == s3.category:
+            # Ergaenzen statt ersetzen (Review 24.09.2026): Unterordner und Dokumentart der Regel bleiben, die KI
+            # fuellt nur Luecken; 03 hat keine Unterordner, dort verlor die Regel sonst ihre Dokumentart
+            if base.subfolder is None and s3.subfolder:
+                base.subfolder = s3.subfolder
+            if base.document_type is None and s3.document_type:
+                base.document_type = s3.document_type
         base.candidates_top = (base.candidates_top or []) + (
             [
                 {
