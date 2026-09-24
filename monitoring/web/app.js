@@ -92,16 +92,17 @@
 
   // ---------- Verlaufsdiagramme ----------
   function chart(el, unit, labels, data, p) {
-    const series = [{}].concat(labels.map((l, i) => ({
+    const zeit = { label: "Zeit", value: (u, v) => v == null ? "" : new Date(v * 1000).toLocaleString("de-DE") };
+    const series = [zeit].concat(labels.map((l, i) => ({
       label: l, stroke: FARBEN[i % FARBEN.length], width: 1.5,
       fill: labels.length === 1 ? "rgba(227,172,72,0.14)" : undefined,
-      value: (u, v) => FMT[unit](v),
+      value: (u, v) => v == null ? "" : FMT[unit](v),
     })));
     const achse = { stroke: "#9F9F9F", grid: { stroke: "#EEECE7", width: 1 }, ticks: { stroke: "#DDDBD6", width: 1 } };
     const o = {
       width: Math.max(280, el.clientWidth), height: 230, series,
       axes: [
-        Object.assign({ values: (u, sp) => sp.map(fmtZeit) }, achse),
+        Object.assign({ values: (u, sp) => sp.map(fmtZeit), space: () => (bereichSek() <= 86400 ? 70 : 118) }, achse),
         Object.assign({ size: 72, values: (u, sp) => sp.map(v => FMT[unit](v)) }, achse),
       ],
       scales: { x: { time: true }, y: { range: (u, min, max) => {
