@@ -9,7 +9,7 @@ pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 def test_seed_legt_alle_katalogschluessel_an(seeded):
     assert AppSetting.objects.count() == len(store.seeds())
     assert set(store.seeds()) <= set(store.catalog())
-    assert store.get("classification.threshold_auto_file") == 0.90
+    assert store.get("classification.threshold_auto_file") == 0.85  # Vorgabe GF 24.09.2026, vorher 0,9
     assert store.get("security.iban_decrypt_roles") == []
 
 
