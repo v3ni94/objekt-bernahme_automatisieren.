@@ -1,0 +1,61 @@
+# Messquellen der Statusseite. Aufbewahrung und Speicherobergrenze stehen in docker-compose.yml.
+global:
+  scrape_interval: 15s
+  scrape_timeout: 10s
+  evaluation_interval: 30s
+
+scrape_configs:
+  - job_name: wirt
+    static_configs:
+      - targets: ["wirt:9100"]
+
+  - job_name: container
+    scrape_interval: 30s
+    static_configs:
+      - targets: ["cadvisor:8080"]
+    metric_relabel_configs:
+      # Nur benannte Container (keine Zwischenebenen der cgroups) und nur die Reihen, die die Oberflaeche zeigt.
+      - source_labels: [name]
+        regex: .+
+        action: keep
+      - source_labels: [__name__]
+        regex: container_(cpu_usage_seconds_total|cpu_cfs_throttled_seconds_total|memory_working_set_bytes|memory_usage_bytes|spec_memory_limit_bytes|spec_cpu_quota|spec_cpu_period|network_receive_bytes_total|network_transmit_bytes_total|fs_reads_bytes_total|fs_writes_bytes_total|last_seen|start_time_seconds|oom_events_total)
+        action: keep
+
+  - job_name: pruefungen
+    # HTTP-Pruefungen: Ziel muss mit 2xx antworten (nach Weiterleitungen). Weitere Dienste hier ergaenzen.
+    scrape_interval: 60s
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets:
+          - https://uebernahme.muellerhv.de/
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox:9115
+
+  - job_name: pruefungen_erreichbar
+    # Dienste mit Anmeldung davor: 401 und 403 gelten als erreichbar (TLS und Antwortzeit werden trotzdem gemessen).
+    scrape_interval: 60s
+    metrics_path: /probe
+    params:
+      module: [http_erreichbar]
+    static_configs:
+      - targets:
+          - https://status.mueller-holding.ag/
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox:9115
+
+  - job_name: messdatenbank
+    static_configs:
+      - targets: ["localhost:9090"]

@@ -1,0 +1,139 @@
+# Statusseite der Mueller Holding AG (status.mueller-holding.ag): Messwerte des VPS und aller Container, gespeichert
+# in Prometheus (Aufbewahrung 400 Tage), Oberflaeche im CI der Mueller Holding AG hinter Traefik mit Basic Auth.
+# Eigenes Compose-Projekt, unabhaengig von der Objektakte. Einrichtung: docs/betrieb/statusseite.md.
+# Messtakt: Wirt alle 15 s (node_exporter), Container alle 30 s (cAdvisor), HTTP-Pruefungen alle 60 s (Blackbox).
+name: status
+
+x-logging: &logging
+  logging:
+    driver: json-file
+    options: { max-size: "10m", max-file: "3" }
+
+services:
+  node-exporter:
+    # Werte des Wirts (CPU je Kern, Speicher, Netz, Datentraeger, Prozesse). Braucht das Netz des Wirts fuer die
+    # echten Schnittstellen und lauscht deshalb nur auf der Gateway-Adresse des Messnetzes, nicht oeffentlich.
+    image: prom/node-exporter:v1.8.2
+    <<: *logging
+    restart: unless-stopped
+    network_mode: host
+    pid: host
+    command:
+      - --path.rootfs=/host
+      - --path.procfs=/host/proc
+      - --path.sysfs=/host/sys
+      - --web.listen-address=${STATUS_GATEWAY}:9100
+      - --collector.processes
+      - --collector.filesystem.mount-points-exclude=^/(dev|proc|sys|run|var/lib/docker/.+|var/lib/containers/.+)($$|/)
+      - --collector.netdev.device-exclude=^(veth.*|br-.*|docker0|lo)$$
+    volumes:
+      - /:/host:ro,rslave
+    security_opt:
+      - no-new-privileges:true
+
+  cadvisor:
+    # Werte je Container (CPU, Speicher, Netz, E/A). privileged und /dev/kmsg entsprechen der Vorgabe des Projekts.
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    <<: *logging
+    restart: unless-stopped
+    privileged: true
+    devices:
+      - /dev/kmsg
+    command:
+      - --docker_only=true
+      - --housekeeping_interval=30s
+      - --store_container_labels=false
+      - --whitelisted_container_labels=com.docker.compose.project,com.docker.compose.service
+      - --disable_metrics=percpu,sched,tcp,udp,advtcp,hugetlb,referenced_memory,cpu_topology,resctrl,cpuset,process,memory_numa
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    networks:
+      - mess
+
+  blackbox:
+    # HTTP-Pruefungen der eigenen Dienste (Erreichbarkeit, Antwortzeit, Zertifikatslaufzeit).
+    image: prom/blackbox-exporter:v0.25.0
+    <<: *logging
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/blackbox/blackbox.yml
+    volumes:
+      - ./blackbox/blackbox.yml:/etc/blackbox/blackbox.yml:ro
+    networks:
+      - mess
+    security_opt:
+      - no-new-privileges:true
+
+  prometheus:
+    # Speicher der Messwerte. Kein Zugriff von aussen, die Oberflaeche fragt ueber nginx nur die Leseschnittstelle ab.
+    image: prom/prometheus:v2.54.1
+    <<: *logging
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=${PROM_RETENTION_TIME:-400d}
+      - --storage.tsdb.retention.size=${PROM_RETENTION_SIZE:-60GB}
+      - --web.page-title=Statusseite Mueller Holding AG
+    extra_hosts:
+      - "wirt:${STATUS_GATEWAY}"
+    volumes:
+      - ./prometheus:/etc/prometheus:ro
+      - prometheus-data:/prometheus
+    networks:
+      - mess
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 4G
+    security_opt:
+      - no-new-privileges:true
+
+  web:
+    # Oberflaeche im CI der Mueller Holding AG (statisch) plus Durchreichen der Leseabfragen an Prometheus.
+    build: ./web
+    image: status-web:local
+    <<: *logging
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+    networks:
+      - mess
+      - proxy
+    security_opt:
+      - no-new-privileges:true
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: "${TRAEFIK_NETWORK}"
+      traefik.http.routers.mhag-status.rule: "Host(`${STATUS_DOMAIN}`)"
+      traefik.http.routers.mhag-status.entrypoints: "${TRAEFIK_ENTRYPOINT}"
+      traefik.http.routers.mhag-status.tls: "true"
+      traefik.http.routers.mhag-status.tls.certresolver: "${TRAEFIK_CERTRESOLVER}"
+      traefik.http.routers.mhag-status.middlewares: "mhag-status-auth,mhag-status-headers"
+      traefik.http.middlewares.mhag-status-auth.basicauth.users: "${STATUS_BASIC_AUTH}"
+      traefik.http.middlewares.mhag-status-auth.basicauth.realm: "Statusseite Mueller Holding AG"
+      traefik.http.middlewares.mhag-status-headers.headers.stsSeconds: "31536000"
+      traefik.http.middlewares.mhag-status-headers.headers.contentTypeNosniff: "true"
+      traefik.http.middlewares.mhag-status-headers.headers.customFrameOptionsValue: "DENY"
+      traefik.http.middlewares.mhag-status-headers.headers.referrerPolicy: "no-referrer"
+      traefik.http.services.mhag-status.loadbalancer.server.port: "8080"
+
+networks:
+  mess:
+    # Festes Teilnetz, damit node-exporter auf der Gateway-Adresse lauschen kann (nur aus diesem Netz erreichbar).
+    driver: bridge
+    ipam:
+      config:
+        - subnet: "${STATUS_SUBNET}"
+          gateway: "${STATUS_GATEWAY}"
+  proxy:
+    external: true
+    name: "${TRAEFIK_NETWORK}"
+
+volumes:
+  prometheus-data: {}

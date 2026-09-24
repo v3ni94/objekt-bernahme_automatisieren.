@@ -1,0 +1,111 @@
+/* Statusseite Mueller Holding AG: Gestaltungssprache Goldpunkt (Kopfnaht, Goldbalken, Versal-Labels, Fussband). */
+:root {
+  --gold: #E3AC48;
+  --anthrazit: #2E2D2E;
+  --grau: #9F9F9F;
+  --beige: #FBF6EC;
+  --haar: #DDDBD6;
+  --text: #1A1A1A;
+  --papier: #FFFFFF;
+  --gut: #6F8F5A;
+  --warn: #C9902E;
+  --schlecht: #B4413C;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--papier); color: var(--text);
+  font-family: Carlito, Calibri, "Segoe UI", system-ui, sans-serif; font-size: 15px; line-height: 1.45; }
+body { min-height: 100vh; display: flex; flex-direction: column; position: relative; }
+a { color: var(--anthrazit); }
+h1 { font-size: 30px; margin: 2px 0 0; color: var(--anthrazit); font-weight: 700; letter-spacing: 0.01em; }
+.versal { font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--grau); font-weight: 700; }
+.versal.klein { margin: 6px 0 8px; }
+.goldbalken { width: 54px; height: 3px; background: var(--gold); margin: 8px 0 6px; }
+.unterzeile { margin: 0; color: var(--grau); }
+
+.marke { position: fixed; right: -60px; bottom: 30px; width: 620px; max-width: 70vw; opacity: 0.055; pointer-events: none; z-index: 0; }
+.kopf, main, .fussband { position: relative; z-index: 1; }
+
+.kopf { padding: 22px 32px 0; }
+.kopfnaht { height: 1px; background: var(--haar); position: relative; }
+.kopfnaht::before { content: ""; position: absolute; left: 0; top: -1px; width: 128px; height: 3px; background: var(--gold); }
+.kopfzeile { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; padding: 16px 0 8px; }
+.logo { width: 118px; height: auto; }
+
+main { flex: 1; padding: 6px 32px 40px; max-width: 1480px; width: 100%; margin: 0 auto; }
+
+.leiste { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 0 8px; border-bottom: 1px solid var(--haar); }
+.bereiche { display: flex; flex-wrap: wrap; gap: 4px; }
+.bereich { border: 1px solid var(--haar); background: var(--papier); color: var(--anthrazit); padding: 6px 12px; cursor: pointer; font: inherit; }
+.bereich.aktiv { border-color: var(--gold); box-shadow: inset 0 -3px 0 var(--gold); font-weight: 700; }
+.leiste-rechts { display: flex; align-items: center; gap: 14px; color: var(--grau); font-size: 14px; }
+.knopf { border: 1px solid var(--anthrazit); background: var(--anthrazit); color: #fff; padding: 6px 12px; cursor: pointer; font: inherit; }
+.knopf:hover { background: #454445; }
+.auto input { accent-color: var(--gold); }
+.hinweis { margin: 12px 0 0; padding: 10px 14px; background: var(--beige); border-left: 3px solid var(--schlecht); }
+
+.kacheln { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 14px; padding: 18px 0 8px; }
+.kachel { border-top: 1px solid var(--haar); padding: 10px 2px 4px; position: relative; }
+.kachel::before { content: ""; position: absolute; left: 0; top: -1px; width: 28px; height: 3px; background: var(--gold); }
+.kachel .wert { font-size: 26px; font-weight: 700; color: var(--anthrazit); line-height: 1.15; margin-top: 4px; }
+.kachel .neben { color: var(--grau); font-size: 13px; }
+.kachel.warn .wert { color: var(--warn); }
+.kachel.schlecht .wert { color: var(--schlecht); }
+
+details { border-top: 1px solid var(--haar); margin-top: 18px; padding-bottom: 6px; }
+summary { list-style: none; cursor: pointer; display: flex; align-items: baseline; gap: 16px; padding: 14px 0 6px; }
+summary::-webkit-details-marker { display: none; }
+summary::before { content: "+"; color: var(--gold); font-weight: 700; width: 12px; display: inline-block; }
+details[open] > summary::before { content: "−"; }
+.summe { color: var(--grau); font-size: 14px; }
+.absatz { padding: 4px 0 6px; }
+
+.raster { display: grid; grid-template-columns: repeat(auto-fit, minmax(440px, 1fr)); gap: 22px 28px; padding: 6px 0 10px; }
+.panel { min-width: 0; }
+.panel .titel { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 4px; }
+.panel .titel .name { font-weight: 700; color: var(--anthrazit); }
+.panel .titel .jetzt { color: var(--grau); font-size: 13px; }
+.panel .leer { color: var(--grau); font-size: 13px; padding: 30px 0; text-align: center; background: var(--beige); }
+.uplot { font-family: inherit; }
+.uplot .u-legend { font-size: 12px; color: var(--anthrazit); }
+.uplot .u-legend .u-marker { border-radius: 0; }
+
+.kerne { display: grid; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); gap: 6px; }
+.kern { border: 1px solid var(--haar); padding: 5px 7px 6px; cursor: pointer; background: var(--papier); position: relative; font-size: 12px; }
+.kern:hover, .kern.aktiv { border-color: var(--gold); }
+.kern .nr { color: var(--grau); font-size: 11px; letter-spacing: 0.06em; }
+.kern .pz { font-weight: 700; color: var(--anthrazit); font-size: 14px; }
+.kern .balken { height: 4px; background: var(--beige); margin-top: 4px; }
+.kern .balken i { display: block; height: 100%; background: var(--gold); }
+.kern.hoch .pz { color: var(--schlecht); }
+
+.tabelle { width: 100%; border-collapse: collapse; font-size: 14px; }
+.tabelle th { background: var(--anthrazit); color: #fff; text-align: left; padding: 6px 9px; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; font-weight: 700; }
+.tabelle td { padding: 6px 9px; border-bottom: 1px solid var(--haar); white-space: nowrap; }
+.tabelle tbody tr:nth-child(even) td { background: var(--beige); }
+.tabelle tr.klick { cursor: pointer; }
+.tabelle tr.klick:hover td, .tabelle tr.aktiv td { box-shadow: inset 3px 0 0 var(--gold); }
+.tabelle td.zahl { text-align: right; font-variant-numeric: tabular-nums; }
+.status { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+.status.ok { background: var(--gut); }
+.status.fehl { background: var(--schlecht); }
+.status.unbekannt { background: var(--grau); }
+.fussnote { color: var(--grau); font-size: 13px; margin: 6px 0 0; }
+
+.fussband { background: var(--anthrazit); color: #fff; border-top: 1px solid var(--gold); padding: 16px 32px 18px; display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; flex-wrap: wrap; }
+.fussband .firma { font-weight: 700; font-size: 14px; }
+.fussband .register { color: #8F8C87; font-size: 11.5px; margin-top: 8px; }
+.fuss-rechts { display: flex; align-items: center; gap: 12px; font-size: 13px; }
+.goldpunkt { width: 9px; height: 9px; border-radius: 50%; background: var(--gold); display: inline-block; }
+.fussband .domain { color: var(--gold); font-weight: 700; }
+.fussband .punkt { color: var(--gold); }
+.fussband .mail { color: #D7D5D0; }
+
+@media (max-width: 720px) {
+  .kopf, main { padding-left: 16px; padding-right: 16px; }
+  .fussband { padding-left: 16px; padding-right: 16px; }
+  .raster { grid-template-columns: 1fr; }
+  h1 { font-size: 24px; }
+  .logo { width: 84px; }
+  .tabelle { display: block; overflow-x: auto; }
+}

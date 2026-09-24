@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Systemstatus Müller Holding AG</title>
+<link rel="icon" type="image/png" href="assets/logo.png">
+<link rel="stylesheet" href="vendor/uPlot.min.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<img class="marke" src="assets/marke.png" alt="">
+
+<header class="kopf">
+  <div class="kopfnaht"></div>
+  <div class="kopfzeile">
+    <div>
+      <div class="versal">Müller Holding AG</div>
+      <h1>Systemstatus</h1>
+      <div class="goldbalken"></div>
+      <p class="unterzeile">Auslastung, Verfügbarkeit und Verlauf des Servers</p>
+    </div>
+    <img class="logo" src="assets/logo.png" alt="Müller Holding AG">
+  </div>
+</header>
+
+<main>
+  <section class="leiste" aria-label="Zeitbereich">
+    <div class="bereiche" id="bereiche"></div>
+    <div class="leiste-rechts">
+      <label class="auto"><input type="checkbox" id="auto" checked> automatisch aktualisieren</label>
+      <button type="button" class="knopf" id="jetzt">Aktualisieren</button>
+      <span class="stand" id="stand">Stand: wird geladen</span>
+    </div>
+  </section>
+  <div class="hinweis" id="hinweis" hidden></div>
+
+  <section class="kacheln" id="kacheln" aria-label="Kennzahlen"></section>
+
+  <details open id="sek-cpu">
+    <summary><span class="versal">Prozessor</span><span class="summe" id="summe-cpu"></span></summary>
+    <div class="absatz">
+      <div class="versal klein">CPU je Kern (aktuell, Klick zeigt den Verlauf)</div>
+      <div class="kerne" id="kerne"></div>
+      <div class="raster" id="raster-kern"></div>
+    </div>
+    <div class="raster" id="raster-cpu"></div>
+  </details>
+
+  <details open id="sek-mem">
+    <summary><span class="versal">Arbeitsspeicher</span><span class="summe" id="summe-mem"></span></summary>
+    <div class="raster" id="raster-mem"></div>
+  </details>
+
+  <details open id="sek-net">
+    <summary><span class="versal">Netzwerk</span><span class="summe" id="summe-net"></span></summary>
+    <div class="raster" id="raster-net"></div>
+  </details>
+
+  <details open id="sek-disk">
+    <summary><span class="versal">Datenträger</span><span class="summe" id="summe-disk"></span></summary>
+    <div class="absatz">
+      <div class="versal klein">Belegung der Dateisysteme</div>
+      <table class="tabelle" id="tab-fs"><thead><tr><th>Einhängepunkt</th><th>Gerät</th><th>Größe</th><th>Belegt</th><th>Frei</th><th>Anteil</th></tr></thead><tbody></tbody></table>
+    </div>
+    <div class="raster" id="raster-disk"></div>
+  </details>
+
+  <details open id="sek-ctr">
+    <summary><span class="versal">Container</span><span class="summe" id="summe-ctr"></span></summary>
+    <div class="absatz">
+      <div class="versal klein">Alle Container (aktuell, Klick zeigt den Verlauf)</div>
+      <table class="tabelle" id="tab-ctr"><thead><tr><th>Container</th><th>Projekt</th><th>CPU (Kerne)</th><th>Arbeitsspeicher</th><th>Grenze</th><th>Netz</th><th>Läuft seit</th></tr></thead><tbody></tbody></table>
+      <div class="raster" id="raster-ctr-detail"></div>
+    </div>
+    <div class="raster" id="raster-ctr"></div>
+  </details>
+
+  <details open id="sek-avail">
+    <summary><span class="versal">Verfügbarkeit der Dienste</span><span class="summe" id="summe-avail"></span></summary>
+    <div class="absatz">
+      <table class="tabelle" id="tab-probe"><thead><tr><th>Dienst</th><th>Status</th><th>Antwortzeit</th><th>HTTP</th><th>Zertifikat gültig bis</th></tr></thead><tbody></tbody></table>
+    </div>
+    <div class="raster" id="raster-avail"></div>
+  </details>
+
+  <details id="sek-sys">
+    <summary><span class="versal">System und Messung</span><span class="summe" id="summe-sys"></span></summary>
+    <div class="raster" id="raster-sys"></div>
+    <p class="fussnote">Messtakt: Wirt alle 15 Sekunden, Container alle 30 Sekunden, HTTP-Prüfungen alle 60 Sekunden. Aufbewahrung der Messwerte 400 Tage. Verläufe zeigen je Zeitbereich rund 360 Stützpunkte, längere Bereiche werden entsprechend verdichtet. Ziehen mit der Maus vergrößert einen Ausschnitt, Doppelklick setzt zurück.</p>
+  </details>
+</main>
+
+<footer class="fussband">
+  <div class="fuss-links">
+    <div class="firma">Müller Holding AG</div>
+    <div class="register">Sitz: Monheim am Rhein · Registergericht: Amtsgericht Düsseldorf · HRB 104291 · Vorstand: Timo Müller · Aufsichtsratsvorsitzender: Jan Walprecht</div>
+  </div>
+  <div class="fuss-rechts">
+    <span class="goldpunkt"></span>
+    <span class="domain">mueller-holding.ag</span>
+    <span class="punkt">·</span>
+    <span class="mail">kontakt@mueller-holding.ag</span>
+  </div>
+</footer>
+
+<script src="vendor/uPlot.iife.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
