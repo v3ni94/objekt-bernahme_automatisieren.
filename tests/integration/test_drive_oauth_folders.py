@@ -13,9 +13,10 @@ from django.urls import reverse
 from django.utils import timezone
 
 from apps.audit.models import AuditEvent
+from apps.documents.models import DocumentSubfolder
 from apps.drive import oauth
 from apps.drive.adapter import InMemoryDriveAdapter
-from apps.drive.folders import FolderError, ensure_owner_folder
+from apps.drive.folders import FolderError, TargetError, ensure_owner_folder, owner_file_target
 from apps.drive.models import DriveNode, DriveSyncRun, OAuthToken
 from apps.drive.reconcile import DriveConfig, reconcile_object
 from apps.objects.models import ManagedObject, Unit
@@ -176,6 +177,18 @@ def test_eigentuemerakte_ordner(seeded):
     rows2 = ensure_owner_folder(akte, drive=drive)
     assert len(rows2) == 12 and DriveNode.objects.filter(owner_file=akte, status="active").count() == 12
     assert not [op for op in drive.ops[ops_before:] if op[0] in ("create_folder", "rename", "move")]
+    # Zielordner ausdruecklich: Unterordner je Code, ohne Code der Aktenordner, unbekannter Code ist ein Fehler
+    assert owner_file_target(rows2, "01").subfolder.code == "01"
+    assert owner_file_target(rows2, None).node_kind == "owner_file_folder"
+    with pytest.raises(TargetError):
+        owner_file_target(rows2, "99")
+    # Sollzahl aus dem Katalog: ein neu aktivierter Unterordner wird trotz Prozess-Cache angelegt
+    DocumentSubfolder.objects.create(
+        category_id="05", code="12", folder_name="12_Zusatz", display_name="Zusatz", sort_order=12
+    )
+    rows_neu = ensure_owner_folder(akte, drive=drive)
+    assert len(rows_neu) == 13 and owner_file_target(rows_neu, "12").subfolder.folder_name == "12_Zusatz"
+    assert len(drive.list_children(rows[0].drive_file_id)) == 12
     # manuelle Umbenennung in Drive wird uebernommen, nicht zurueckbenannt
     from apps.drive.folders import invalidate_owner_folder_cache
 

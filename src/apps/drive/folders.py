@@ -1,5 +1,6 @@
-"""Eigentuemer- und Mieterakten-Ordner in Drive (Fachentwurf F 6.3, Akten-Vorlage vom 11.09.2026): zwoelf
-drive_nodes je Eigentuemerakte, ein Ordner je Mieterakte unter 04, Vorpruefung per Namensvergleich (Wiederaufnahme),
+"""Eigentuemer- und Mieterakten-Ordner in Drive (Fachentwurf F 6.3, Akten-Vorlage vom 11.09.2026): je
+Eigentuemerakte der Aktenordner plus ein Unterordner je aktivem Katalogeintrag unter 05 (Stand 24.09.2026 elf,
+Sollzahl aus dem Katalog, keine Konstante), ein Ordner je Mieterakte unter 04, Vorpruefung per Namensvergleich (Wiederaufnahme),
 Prozess-Cache im Django-Cache (ANNAHME A-28, zehn Minuten). Umbenennung nur, wenn der Ordner in Drive noch den von
 der Anwendung vergebenen Namen traegt; ein von Hand vergebener Name bleibt (sync_file_names)."""
 
@@ -21,6 +22,34 @@ CACHE_SECONDS = 600
 
 class FolderError(Exception):
     pass
+
+
+class TargetError(Exception):
+    """Ablageziel innerhalb einer Akte nicht bestimmbar: der gewuenschte Unterordner ist weder angelegt noch im
+    Katalog aktiv. Anders als FolderError keine fehlende Struktur, die der Ordnerabgleich nachholt, sondern ein
+    Datenfehler; der Job soll nach seinen Versuchen mit Prueffall enden statt zu warten."""
+
+
+def owner_file_subfolders() -> list[DocumentSubfolder]:
+    """Sollbestand der Unterordner einer Eigentuemerakte laut Katalog (aktive Eintraege unter 05)."""
+    return list(DocumentSubfolder.objects.filter(category_id="05", is_active=True).order_by("sort_order"))
+
+
+def owner_file_target(rows: list[DriveNodeRow], sub_code: str | None) -> DriveNodeRow:
+    """Zielordner in der Eigentuemerakte: der Unterordner mit dem Code, ohne Code der Aktenordner selbst. Ein Code
+    ohne passende Zeile ist ein Fehler und kein stiller Rueckfall auf die erste Zeile (Befund 24.09.2026: die
+    Zeilen aus dem Cache-Pfad sind nicht sortiert, rows[0] war dort nicht zwingend der Aktenordner)."""
+    if not sub_code:
+        folder = next((r for r in rows if r.node_kind == NodeKind.OWNER_FILE_FOLDER), None)
+        if folder is None:
+            raise TargetError("Aktenordner der Eigentümerakte ist nicht registriert")
+        return folder
+    hit = next((r for r in rows if r.subfolder_id and r.subfolder.code == sub_code), None)
+    if hit is None:
+        raise TargetError(
+            f"Unterordner {sub_code} der Eigentümerakte ist nicht angelegt oder im Katalog nicht aktiv"
+        )
+    return hit
 
 
 def _find_or_create(
@@ -89,7 +118,9 @@ def _register(
 
 
 def ensure_owner_folder(owner_file: OwnerFile, *, drive: DriveAdapter, user=None) -> list[DriveNodeRow]:
-    """Aktenordner plus elf Unterordner anlegen oder bestaetigen; Ergebnis sind zwoelf drive_nodes-Zeilen."""
+    """Aktenordner plus die Unterordner laut Katalog anlegen oder bestaetigen; Ergebnis sind die drive_nodes-Zeilen
+    (Aktenordner zuerst). Der Prozess-Cache gilt nur, solange die registrierten Zeilen jeden aktiven Katalogeintrag
+    abdecken; ein neu aktivierter Unterordner wird so beim naechsten Aufruf angelegt (Sollzahl aus dem Katalog)."""
     main = DriveNodeRow.objects.filter(
         object=owner_file.object, node_kind=NodeKind.MAIN_FOLDER, category_id="05", status=NodeStatus.ACTIVE
     ).first()
@@ -97,11 +128,17 @@ def ensure_owner_folder(owner_file: OwnerFile, *, drive: DriveAdapter, user=None
         raise FolderError(
             "Hauptordner der Eigentümerakte ist nicht registriert; zuerst Ordnerabgleich ausführen"
         )
+    subs = owner_file_subfolders()
     cache_key = f"drive:node:{owner_file.pk}"
     cached = cache.get(cache_key)
     if cached:
-        rows = list(DriveNodeRow.objects.filter(owner_file=owner_file, status=NodeStatus.ACTIVE))
-        if len(rows) >= 12:
+        rows = list(
+            DriveNodeRow.objects.filter(owner_file=owner_file, status=NodeStatus.ACTIVE)
+            .select_related("subfolder")
+            .order_by("pk")
+        )
+        have = {r.subfolder_id for r in rows if r.subfolder_id}
+        if any(r.node_kind == NodeKind.OWNER_FILE_FOLDER for r in rows) and all(s.pk in have for s in subs):
             return rows
     existing_row = DriveNodeRow.objects.filter(
         owner_file=owner_file, node_kind=NodeKind.OWNER_FILE_FOLDER, status=NodeStatus.ACTIVE
@@ -128,7 +165,7 @@ def ensure_owner_folder(owner_file: OwnerFile, *, drive: DriveAdapter, user=None
     )
     rows = [folder_row]
     children = drive.list_children(folder.id, folders_only=True)
-    for sub in DocumentSubfolder.objects.filter(category_id="05", is_active=True).order_by("sort_order"):
+    for sub in subs:
         hit = [c for c in children if c.is_folder and nfc(c.name) == nfc(sub.folder_name)]
         if hit:
             node, made = hit[0], False

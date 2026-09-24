@@ -997,6 +997,7 @@ def file_to_drive(job: ProcessingJob) -> dict:
         ensure_category_folder,
         ensure_owner_folder,
         ensure_tenant_folder,
+        owner_file_target,
     )
     from apps.drive.models import DriveNode as DriveNodeRow
     from apps.drive.models import NodeStatus
@@ -1036,8 +1037,9 @@ def file_to_drive(job: ProcessingJob) -> dict:
             if payload.get("category") == "05":
                 akte = OwnerFile.objects.get(pk=payload["owner_file_id"])
                 rows = ensure_owner_folder(akte, drive=drive)
-                sub_code = payload.get("subfolder") or payload.get("link_subfolder")
-                target = next((r for r in rows if r.subfolder_id and r.subfolder.code == sub_code), rows[0])
+                # Unterordner laut Zuordnung, ohne Unterordner der Aktenordner; ein unbekannter Code ist ein Fehler
+                # (TargetError, nach den Versuchen Prueffall) und kein stiller Rueckfall auf die erste Zeile
+                target = owner_file_target(rows, payload.get("subfolder") or payload.get("link_subfolder"))
             elif payload.get("category") == "04" and payload.get("tenant_file_id"):
                 target = ensure_tenant_folder(
                     TenantFile.objects.get(pk=payload["tenant_file_id"]), drive=drive
