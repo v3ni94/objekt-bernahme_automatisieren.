@@ -1532,11 +1532,15 @@ def bulk_rows(
         errors, warnings = validate(case, merged) if case.document_id else (["Fall ohne Dokument"], [])
         if case.status not in (CaseStatus.OPEN, CaseStatus.IN_PROGRESS):
             errors.append("Fall bereits erledigt")
+        eigentuemer_kandidaten = [
+            c for c in (case.candidates or []) if isinstance(c, dict) and c.get("owner_id")
+        ]
         if (
-            len(case.candidates or []) > 1
+            len(eigentuemer_kandidaten) > 1
             and not merged.assignment_id
             and not (merged.owner_id and merged.unit_id)
         ):
+            # Kategoriekandidaten eines Falls unter Schwelle (Regel, KI) sind keine Eigentuemerauswahl (24.09.2026)
             errors.append("mehrere Kandidaten: Eigentümer wählen")
         folder, exists = (None, False)
         if not errors:

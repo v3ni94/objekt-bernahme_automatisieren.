@@ -98,9 +98,9 @@
     "MVW": "other"
   },
   "units.normalize_strip_leading_zeros": true,
-  "classification.threshold_auto_file": 0.9,
+  "classification.threshold_auto_file": 0.85,
   "classification.threshold_stage3_call": 0.9,
-  "classification.threshold_stage3_override": 0.9,
+  "classification.threshold_stage3_override": 0.85,
   "classification.stage2_conflict_p": 0.9,
   "classification.bonus_agree": 0.05,
   "classification.malus_disagree": 0.25,

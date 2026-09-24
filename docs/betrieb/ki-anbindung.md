@@ -8,6 +8,13 @@ Dokumente, bei denen Regeln (Stufe 1) und lokaler Klassifikator (Stufe 2) unter 
 
 Ist der Anbieter freigegeben, wirkt das sofort auf alle laufenden Verarbeitungsläufe: jeder classify-Job unter der Schwelle ruft die KI auf. Das Kostenlimit je Objekt (`ai.providers.openai.cost_limit_eur_per_object`) begrenzt den Betrag je Objekt; bei Erreichen gehen weitere Dokumente ohne KI nach 06/01_Unklar mit Grund Kostenlimit und können später mit `ai-reclassify` nachgeholt werden.
 
+Schwellen (Vorgabe der Geschäftsführung 24.09.2026): Die KI nennt immer den am besten passenden Platz der Struktur mit ihrer Konfidenz, „06“ nur bei fehlendem Objektbezug, Werbung oder unlesbarem Inhalt. Ab `classification.threshold_auto_file` (Seed 0,85, vorher 0,9) wird abgelegt oder verschoben; ab `classification.threshold_stage3_override` (Seed 0,85) überschreibt die KI einen abweichenden lokalen Kandidaten, darunter verliert der lokale Kandidat `classification.malus_disagree` (0,25) und das Dokument geht in die Prüfung. Unter der Schwelle liegt das Dokument in 06/01_Unklar, der beste Kandidat (Regel oder KI) ist das Ziel im Prüfcenter und in der Sammelaktion. Die Seeds ändern vorhandene Werte nicht; auf dem Server einmalig setzen:
+
+```bash
+d config-set $B classification.threshold_auto_file=0.85
+d config-set $B classification.threshold_stage3_override=0.85
+```
+
 ## Voraussetzungen (Geschäftsführung)
 
 1. Auftragsverarbeitungsvertrag mit OpenAI für die API-Nutzung abschließen (Data Processing Addendum in der OpenAI-Plattform), Kopie in die Verfahrensdokumentation (V-10).

@@ -58,7 +58,7 @@ def test_reparaturhinweis_haengt_hinten_an_und_aendert_den_hash():
     assert system == system_r and user_r.startswith(user)
     assert user_r.endswith("Hinweis zur Korrektur der vorherigen Antwort: Unterordner nur als Code")
     assert prompt_hash(system, user) != prompt_hash(system_r, user_r)
-    assert PROMPT_VERSION == "2026-09-24.1"
+    assert PROMPT_VERSION == "2026-09-24.2"
 
 
 def test_objektangaben_und_objektbezugsregel_im_auftrag():
@@ -74,5 +74,6 @@ def test_objektangaben_und_objektbezugsregel_im_auftrag():
     assert "anschrift_bekannt false, setze object_related nur dann false" in system
     assert 'object_related false ist category immer "06" mit Unterordner "04"' in system
     assert "Briefkopf der Hausverwaltung" in system
-    assert "Konfidenz höchstens 0,6" in system
+    assert "Unsicherheit über die Konfidenz aus" in system and "0,85 oder höher" in system
+    assert "höchstens 0,6" not in system
     assert "beleg_einheit" in system and "gesamtjahresabrechnung" in system

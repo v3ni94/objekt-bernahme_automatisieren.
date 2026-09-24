@@ -570,19 +570,28 @@ def _decide_core(
                 "skipped": s3.message or "Stufe 3 übersprungen",
             }[s3.status]
             base.reason = f"{combined.reason}; {stage3_reason}"
+        cands = base.candidates_top or []
         case_context = {
             "reason": base.reason,
             "confidence": base.confidence,
             "stage3_status": s3.status if s3 is not None else None,
             "stage3_reason": stage3_reason,
         }
+        if cands and cands[0].get("category"):
+            # Ziel im Pruefcenter und in der Sammelaktion ist der beste Kandidat (Regel oder KI), nicht 06/01
+            # (24.09.2026): der Sachbearbeiter bestaetigt oder korrigiert, die Datei liegt bis dahin in 06/01
+            case_context["intended"] = {
+                "category": cands[0].get("category"),
+                "subfolder": cands[0].get("subfolder"),
+                "document_type": cands[0].get("document_type"),
+            }
         if existing:
             base.move_allowed = False
             base.cases.append(
                 CasePlan(
                     CaseType.MOVE_PROPOSAL,
                     "below_threshold",
-                    top,
+                    cands,
                     _proposal(base),
                     case_context,
                     misc_subfolder="01",
@@ -590,7 +599,7 @@ def _decide_core(
             )
         else:
             base.cases.append(
-                CasePlan(CaseType.UNCLEAR, "below_threshold", top, None, case_context, misc_subfolder="01")
+                CasePlan(CaseType.UNCLEAR, "below_threshold", cands, None, case_context, misc_subfolder="01")
             )
         base.kpi_misc = True
         base.kpi_misc_adjusted = True

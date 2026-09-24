@@ -387,3 +387,67 @@ def test_unsichere_ki_antwort_06_verdraengt_lokalen_kandidaten_nicht(
     assert not ReviewCase.objects.filter(document=doc, case_subtype="manual_check").exists()
     final = DocumentClassification.objects.get(document=doc, is_final=True)
     assert final.category_id == "06" and doc.final_decided_by != "stage3"
+
+
+def test_ki_vorschlag_unter_schwelle_wird_ziel_im_pruefcenter(
+    welt, fake_oauth, run_all, admin_user, fake_router
+):
+    """24.09.2026 (Vorgabe GF): die KI nennt immer den besten Platz; unter 0,85 liegt das Dokument in 06/01 und der
+    Vorschlag ist Ziel im Pruefcenter und in der Sammelaktion, mit Stufe-3-Kandidat im Fall."""
+    from apps.review.services import bulk_rows, proposal_target
+
+    enable_ai(admin_user)
+    fake_router(answer=_answer("02", None, "gebaeudeversicherung", 0.7))
+    obj = welt["objects"]["623"]
+    doc = make_document(obj, UNKLAR)
+    start_run(obj)
+    run_all(obj)
+    doc.refresh_from_db()
+    assert doc.category_id == "06" and doc.subfolder.code == "01" and doc.status == "review"
+    case = ReviewCase.objects.get(document=doc, status="open")
+    assert case.case_subtype == "below_threshold"
+    assert case.context["intended"] == {
+        "category": "02",
+        "subfolder": None,
+        "document_type": "gebaeudeversicherung",
+    }
+    assert case.candidates and case.candidates[0]["stage"] == 3 and case.candidates[0]["category"] == "02"
+    assert "schlaegt vor" in case.context["reason"]
+    ziel = proposal_target(case)
+    assert ziel.category == "02" and ziel.document_type == "gebaeudeversicherung"
+    row = bulk_rows([case.pk])[0]
+    assert not [e for e in row.errors if "Kandidaten" in e]
+
+
+def test_ki_ab_85_prozent_legt_ab(welt, fake_oauth, run_all, admin_user, fake_router):
+    enable_ai(admin_user)
+    fake_router(answer=_answer("02", None, "gebaeudeversicherung", 0.86))
+    obj = welt["objects"]["623"]
+    doc = make_document(obj, UNKLAR)
+    start_run(obj)
+    run_all(obj)
+    doc.refresh_from_db()
+    assert doc.final_decided_by == "stage3" and doc.category_id == "02" and doc.status == "filed"
+
+
+def test_widerspruch_der_ki_senkt_hinweisregel_unter_die_schwelle(
+    welt, fake_oauth, run_all, admin_user, fake_router
+):
+    """Hinweisregel 03 Beleg (0,8) gegen KI 02/08 mit 0,7: kein Ueberschreiben, aber Abzug malus_disagree, das
+    Dokument geht mit beiden Kandidaten in die Pruefung statt ohne Bestaetigung nach 03."""
+    enable_ai(admin_user)
+    fake_router(answer=_answer("02", "08", "gebaeudeversicherung", 0.7))
+    obj = welt["objects"]["623"]
+    text = (
+        H623 + "Rechnung Nr. 4711 des Hausmeisterdienstes für die Treppenhausreinigung, "
+        "Rechnungsbetrag 250,00 EUR, zahlbar bis 30.09.2026"
+    )
+    doc = make_document(obj, {"filename": "Rechnung_4711.pdf", "pages": [text]})
+    start_run(obj)
+    run_all(obj)
+    doc.refresh_from_db()
+    assert doc.category_id == "06" and doc.status == "review"
+    case = ReviewCase.objects.get(document=doc, status="open")
+    assert case.case_subtype == "below_threshold" and "widerspricht" in case.context["reason"]
+    assert [c["category"] for c in case.candidates] == ["03", "02"]
+    assert case.context["intended"]["category"] == "03" and float(case.context["confidence"]) < 0.85

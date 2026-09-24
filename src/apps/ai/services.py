@@ -240,10 +240,22 @@ def combine_after_stage3(local: Combined, s3: Stage3Outcome) -> tuple[Combined, 
             f"Stufe 3 entscheidet ({s3.provider}): {s3.reasoning or ''}"[:300],
             decided_by="stage3",
         ), True
+    if local.category is None:
+        # kein lokaler Kandidat: die KI-Antwort ist der einzige Vorschlag und traegt ihre eigene Konfidenz; unter
+        # threshold_auto_file entsteht 06/01 mit dem Vorschlag als Ziel fuer das Pruefcenter (24.09.2026)
+        return Combined(
+            s3.category,
+            round(s3.confidence, 4),
+            f"Stufe 3 schlaegt vor ({s3.provider}): {s3.reasoning or ''}"[:300],
+            decided_by="stage3",
+        ), False
+    # Widerspruch unterhalb der Ueberschreibschwelle: der lokale Kandidat bleibt, verliert aber an Konfidenz, damit
+    # eine widersprochene Hinweisregel (0,8 bis 0,85) nicht ohne Bestaetigung ablegt (24.09.2026)
+    c = max(0.0, local.confidence - t["malus_disagree"])
     return Combined(
         local.category,
-        local.confidence,
-        f"{local.reason}; Stufe 3 widerspricht ohne ausreichende Konfidenz",
+        round(c, 4),
+        f"{local.reason}; Stufe 3 widerspricht ({s3.provider}, {s3.category or '-'} mit {s3.confidence:.2f})",
         decided_by=local.decided_by,
     ), False
 
