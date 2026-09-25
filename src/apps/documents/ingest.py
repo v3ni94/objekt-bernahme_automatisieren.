@@ -36,6 +36,8 @@ ALLOWED_SUFFIXES = {
     ".xlsm",
     ".csv",
     ".txt",
+    ".eml",
+    ".msg",
 }
 
 

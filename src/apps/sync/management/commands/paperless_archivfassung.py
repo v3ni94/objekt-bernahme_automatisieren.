@@ -23,6 +23,7 @@ from apps.config import store
 from apps.documents.ingest import safe_filename
 from apps.documents.models import DocumentSource, DocumentStatus
 from apps.pipeline import storage
+from apps.pipeline.analysis import detect_kind
 from apps.review.models import CaseStatus, CaseType, ReviewCase
 from apps.sync import services
 from apps.sync.flows.common import link_for, upsert_link
@@ -68,6 +69,10 @@ class Command(BaseCommand):
             doc = case.document
             if doc.deleted_at is not None:
                 ergebnis["Dokument geloescht"] += 1
+                continue
+            if detect_kind(Path(doc.current_name or ""), doc.mime_type) != "unsupported":
+                # Die Kette kennt das Format inzwischen (E-Mails seit 25.09.2026): formate_wiederaufnehmen
+                ergebnis["Format inzwischen verarbeitbar (formate_wiederaufnehmen)"] += 1
                 continue
             link = link_for(doc, SyncSystem.PAPERLESS)
             if link is None or not link.external_id:

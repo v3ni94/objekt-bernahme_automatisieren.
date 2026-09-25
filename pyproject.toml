@@ -57,6 +57,8 @@ worker = [
   "openai>=1.40",
   "anthropic>=0.34",
   "tenacity>=9.0",
+  # Outlook-Nachrichten (.msg) lesen: OLE-Container, Eigenschaftsstroeme (25.09.2026, Bestand 1.709 .msg in Drive)
+  "olefile>=0.47",
 ]
 dev = [
   "pytest>=8.3",

@@ -47,6 +47,7 @@
 #   sync-retry <branch> [echt|bestand+<id>]  Sync-Operationen mit Paperless-404 erneut einreihen (Vorschau ohne echt); Bestandslauf fortsetzen
 #   jobs-bereinigen <branch> [echt] Ueberzaehlige wartende Wiederholungsjobs (#n) bereinigen (echt = ausfuehren, sonst Vorschau)
 #   paperless-archivfassung <branch> [objekt=NR+limit=N+echt]  Faelle "nicht unterstuetztes Format" auf die PDF-Archivfassung von Paperless umstellen (Vorschau ohne echt)
+#   formate-wiederaufnehmen <branch> [objekt=NR+limit=N+echt]  Faelle "nicht unterstuetztes Format" mit inzwischen bekanntem Format (E-Mails) erledigen, Dokumente zurueck auf registriert (Vorschau ohne echt)
 #   redis-status <branch>     Redis: Speicher, Schluesselzahl, Warteschlangenlaengen, groesste Schluessel (nur lesend)
 #   env-set <branch> <SCHLUESSEL=wert[+SCHLUESSEL=wert]>  Freigegebene Betriebswerte in .env setzen (Ressourcen, Parallelitaet);
 #                             wirksam erst mit deploy; Sicherung .env.bak
@@ -1145,6 +1146,24 @@ PY
     echo "--- Docker-Volumes nach Groesse (ganzer Host, nur Namen) ---"
     docker system df -v 2>/dev/null | awk "/^VOLUME NAME/{f=1;next} f&&NF==0{f=0} f{print \$1, \$NF}" | sort -k2 -rh | head -12 || true
     ;;
+  formate-wiederaufnehmen)
+    # Offene Faelle "nicht unterstuetztes Format", deren Format die Kette inzwischen kennt (E-Mails .eml und .msg
+    # seit 25.09.2026), erledigen und die Dokumente zurueck auf registriert setzen. Argumente mit + getrennt:
+    # objekt=NR, limit=N, echt. Ohne echt Vorschau (Verteilung nach Format, Quelle und Objekt). Danach die
+    # Verarbeitung starten: verarbeitung-alle echt.
+    args=()
+    IFS='+' read -r -a parts <<< "${ARG:-}"
+    for p in "${parts[@]}"; do
+      case "$p" in
+        echt) args+=(--echt) ;;
+        objekt=*) args+=(--objekt "${p#objekt=}") ;;
+        limit=*) args+=(--limit "${p#limit=}") ;;
+        '') ;;
+        *) echo "Unbekanntes Argument: $p (erlaubt: objekt=NR, limit=N, echt)"; exit 2 ;;
+      esac
+    done
+    docker compose exec -T web python manage.py formate_wiederaufnehmen "${args[@]}"
+    ;;
   fehler-wiederaufnehmen)
     # Dokumente im Status Fehler gezielt wieder in die Kette nehmen, auch jenseits der drei automatischen
     # Wiederaufnahmen (nach einer Fehlerkorrektur im Code). Argumente mit + getrennt: objekt=503,
@@ -1327,5 +1346,5 @@ PY
     done
     echo "wirksam mit der Aktion deploy; Sicherung .env.bak"
     ;;
-  *) echo "Nur check, pull, befund, env-init, ps, logs, smoke, cert-retry, db-status, db-reset, first-run, deploy, rollback, create-admin, oauth-check, deploy-tests, doc-status, config-set, altbestand-import, altbestand-objekte, altbestand-aufarbeiten, verarbeitung-alle, paperless-feld-alle, redis-status, env-set, jobs-bereinigen, disk-status, lauf-monitor, fehler-wiederaufnehmen, transit-bereinigen, drive-dubletten, worker-drosseln, work-bereinigen, last-status, worker-stop, worker-start, ai-check, ai-reclassify, review-status, sync-status, sync-retry, classifier-status, zuordnung-pruefen, objekt-anschriften, anschrift-kandidaten, buchhaltung-jahresordner, paperless-feld-abgleich, paperless-archivfassung, backup-voll oder reconcile-all erlaubt"; exit 2 ;;
+  *) echo "Nur check, pull, befund, env-init, ps, logs, smoke, cert-retry, db-status, db-reset, first-run, deploy, rollback, create-admin, oauth-check, deploy-tests, doc-status, config-set, altbestand-import, altbestand-objekte, altbestand-aufarbeiten, verarbeitung-alle, paperless-feld-alle, redis-status, env-set, jobs-bereinigen, disk-status, lauf-monitor, fehler-wiederaufnehmen, transit-bereinigen, drive-dubletten, worker-drosseln, work-bereinigen, last-status, worker-stop, worker-start, ai-check, ai-reclassify, review-status, sync-status, sync-retry, classifier-status, zuordnung-pruefen, objekt-anschriften, anschrift-kandidaten, buchhaltung-jahresordner, paperless-feld-abgleich, paperless-archivfassung, formate-wiederaufnehmen, backup-voll oder reconcile-all erlaubt"; exit 2 ;;
 esac

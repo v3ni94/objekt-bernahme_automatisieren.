@@ -14,9 +14,13 @@ import re
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
+from apps.pipeline import email_text
+
 PDF_MIMES = {"application/pdf"}
 IMAGE_EXT = {".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp", ".gif", ".webp"}
 OFFICE_EXT = {".docx", ".xlsx", ".xlsm", ".csv", ".txt"}
+EMAIL_EXT = email_text.EMAIL_EXT  # .eml, .msg: Textseite ohne OCR (25.09.2026)
+EMAIL_MIMES = email_text.EMAIL_MIMES
 GOOGLE_DOC_PREFIX = "application/vnd.google-apps."
 logger = logging.getLogger(__name__)
 
@@ -33,7 +37,7 @@ class PageInfo:
 
 @dataclass
 class Analysis:
-    kind: str  # pdf | image | office | google_doc | unsupported
+    kind: str  # pdf | image | office | email | google_doc | unsupported
     page_count: int = 0
     pages: list[PageInfo] = field(default_factory=list)
     digital_pages: list[int] = field(default_factory=list)
@@ -48,7 +52,7 @@ class Analysis:
     @property
     def origin_kind(self) -> str | None:
         if self.kind not in ("pdf", "image"):
-            return "digital" if self.kind in ("office", "google_doc") else None
+            return "digital" if self.kind in ("office", "email", "google_doc") else None
         if self.ocr_pages and self.digital_pages:
             return "mixed"
         return "scan" if self.ocr_pages else "digital"
@@ -70,6 +74,8 @@ def detect_kind(path: Path, mime_type: str | None) -> str:
         return "image"
     if ext in OFFICE_EXT:
         return "office"
+    if ext in EMAIL_EXT or mime in EMAIL_MIMES:
+        return "email"
     return "unsupported"
 
 
@@ -233,12 +239,12 @@ def analyze_file(
         )
         result.kind = "image"
         return result
-    if kind == "office":
-        texts = extract_office_text(path)
-        result = Analysis(kind="office", page_count=len(texts), digital_pages=list(range(1, len(texts) + 1)))
+    if kind in ("office", "email"):
+        texts = extract_office_text(path) if kind == "office" else email_text.extract_email_text(path)
+        result = Analysis(kind=kind, page_count=len(texts), digital_pages=list(range(1, len(texts) + 1)))
         result.texts = {i + 1: t for i, t in enumerate(texts)}
         result.pages = [
-            PageInfo(i + 1, len(t), round(_alnum_ratio(t), 3), 0.0, True, "office_text")
+            PageInfo(i + 1, len(t), round(_alnum_ratio(t), 3), 0.0, True, f"{kind}_text")
             for i, t in enumerate(texts)
         ]
         return result

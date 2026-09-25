@@ -709,22 +709,26 @@ def test_wartende_uebernahme_wird_nicht_doppelt_eingereiht(objekt, paperless, op
 EML_BYTES = b"From: absender@example.test\r\nSubject: Testnachricht\r\n\r\nInhalt ohne echte Personen.\r\n"
 
 
-def test_nicht_verarbeitbares_original_kommt_als_archivfassung(paperless, eingang, ops):
-    """E-Mail-Original (.eml) kennt die Verarbeitung nicht; hat Paperless eine PDF-Archivfassung, laedt die
-    Uebernahme diese statt des Originals (25.09.2026, 6.527 Faelle "nicht unterstuetztes Format" im Bestand)."""
+HTML_BYTES = b"<html><body><p>Seite ohne echte Personen.</p></body></html>"
+
+
+def test_nicht_verarbeitbares_original_kommt_als_archivfassung(paperless, eingang, ops, run_all):
+    """HTML-Original kennt die Verarbeitung nicht; hat Paperless eine PDF-Archivfassung, laedt die Uebernahme diese
+    statt des Originals (25.09.2026, 6.527 Faelle "nicht unterstuetztes Format" im Bestand). E-Mails (.eml, .msg)
+    liest die Kette seit dem 25.09.2026 selbst: sie kommen als Original, auch wenn eine Archivfassung existiert."""
     archiv = pdf_bytes()
     remote_id = paperless.add_document(
-        "Nachricht",
-        content=EML_BYTES,
-        original_file_name="Nachricht.eml",
-        mime_type="message/rfc822",
+        "Seite",
+        content=HTML_BYTES,
+        original_file_name="Seite.html",
+        mime_type="text/html",
         archive_content=archiv,
     )
     paperless_pull.poll(force=True)
     ops()
     link = _link(remote_id)
     doc = link.document
-    assert doc.current_name == "Nachricht.pdf" and doc.original_name == "Nachricht.eml"
+    assert doc.current_name == "Seite.pdf" and doc.original_name == "Seite.html"
     assert doc.mime_type == "application/pdf" and doc.size_bytes == len(archiv)
     assert Path(doc.source_path).read_bytes() == archiv
     assert link.mime_type == "application/pdf" and link.synced_fields["variant"] == "archive"
@@ -732,13 +736,30 @@ def test_nicht_verarbeitbares_original_kommt_als_archivfassung(paperless, eingan
     assert downloads and downloads[-1][2] == {"original": False}
     # Ohne Archivfassung bleibt es beim Original (und spaeter beim Fall nicht unterstuetztes Format)
     remote_id = paperless.add_document(
-        "Nachricht 2", content=EML_BYTES, original_file_name="Nachricht_2.eml", mime_type="message/rfc822"
+        "Seite 2", content=HTML_BYTES, original_file_name="Seite_2.html", mime_type="text/html"
     )
     paperless_pull.poll(force=True)
     ops()
     link = _link(remote_id)
-    assert link.document.current_name == "Nachricht_2.eml" and link.synced_fields["variant"] == "original"
+    assert link.document.current_name == "Seite_2.html" and link.synced_fields["variant"] == "original"
     assert [c for c in paperless.calls if c[0] == "download"][-1][2] == {"original": True}
+    # E-Mail: Original, obwohl Paperless eine Archivfassung hat; die Kette liest sie als Textseite
+    remote_id = paperless.add_document(
+        "Nachricht",
+        content=EML_BYTES,
+        original_file_name="Nachricht.eml",
+        mime_type="message/rfc822",
+        archive_content=pdf_bytes(),
+    )
+    paperless_pull.poll(force=True)
+    ops()
+    link = _link(remote_id)
+    mail = link.document
+    assert mail.current_name == "Nachricht.eml" and link.synced_fields["variant"] == "original"
+    run_all(eingang)
+    mail.refresh_from_db()
+    assert mail.page_count == 1 and mail.origin_kind == "digital"
+    assert not ReviewCase.objects.filter(document=mail, case_subtype="unsupported_format").exists()
 
 
 def test_archivfassung_befehl_stellt_bestand_um(paperless, eingang, ops, run_all):
@@ -749,7 +770,7 @@ def test_archivfassung_befehl_stellt_bestand_um(paperless, eingang, ops, run_all
     from django.core.management import call_command
 
     remote_id = paperless.add_document(
-        "Nachricht", content=EML_BYTES, original_file_name="Nachricht.eml", mime_type="message/rfc822"
+        "Seite", content=HTML_BYTES, original_file_name="Seite.html", mime_type="text/html"
     )
     paperless_pull.poll(force=True)
     ops()
@@ -757,7 +778,7 @@ def test_archivfassung_befehl_stellt_bestand_um(paperless, eingang, ops, run_all
     doc = _link(remote_id).document
     doc.refresh_from_db()
     fall = ReviewCase.objects.get(document=doc, case_subtype="unsupported_format", status=CaseStatus.OPEN)
-    assert doc.status == "review" and doc.current_name == "Nachricht.eml"
+    assert doc.status == "review" and doc.current_name == "Seite.html"
     out = StringIO()
     call_command("paperless_archivfassung", stdout=out)
     assert "keine Archivfassung in Paperless 1" in out.getvalue() and "Vorschau" in out.getvalue()
@@ -773,7 +794,7 @@ def test_archivfassung_befehl_stellt_bestand_um(paperless, eingang, ops, run_all
     assert "umgestellt 1" in out.getvalue()
     doc.refresh_from_db()
     fall.refresh_from_db()
-    assert doc.status == "registered" and doc.current_name == "Nachricht.pdf" and doc.sha256 is None
+    assert doc.status == "registered" and doc.current_name == "Seite.pdf" and doc.sha256 is None
     assert doc.mime_type == "application/pdf" and Path(doc.source_path).read_bytes() == archiv
     assert fall.status == CaseStatus.RESOLVED and fall.resolution["action"] == "reprocess_archive"
     assert _link(remote_id).synced_fields["variant"] == "archive"
@@ -822,17 +843,17 @@ def test_archivfassung_auch_fuer_bestandsdatei_aus_drive(objekt, paperless, driv
 
     from django.core.management import call_command
 
-    doc = _bestandsdatei(objekt, drive, "Nachricht.eml", EML_BYTES, "message/rfc822")
-    ohne = _bestandsdatei(objekt, drive, "Termin.msg", b"msg-inhalt", "application/vnd.ms-outlook")
+    doc = _bestandsdatei(objekt, drive, "Seite.html", HTML_BYTES, "text/html")
+    ohne = _bestandsdatei(objekt, drive, "Altformat.doc", b"\xd0\xcf\x11\xe0 doc", "application/msword")
     ingest.ensure_run(objekt, documents=[doc, ohne])
     run_all(objekt)
     doc.refresh_from_db()
     ohne.refresh_from_db()
     assert doc.status == "review" and ohne.status == "review"
-    assert doc.sha256 == hashlib.sha256(EML_BYTES).hexdigest()
+    assert doc.sha256 == hashlib.sha256(HTML_BYTES).hexdigest()
     fall = ReviewCase.objects.get(document=doc, case_subtype="unsupported_format", status=CaseStatus.OPEN)
     remote_id = paperless.add_document(
-        "Nachricht", content=EML_BYTES, original_file_name="Nachricht.eml", mime_type="message/rfc822"
+        "Seite", content=HTML_BYTES, original_file_name="Seite.html", mime_type="text/html"
     )
     paperless_pull.poll(force=True)
     ops()
@@ -849,16 +870,14 @@ def test_archivfassung_auch_fuer_bestandsdatei_aus_drive(objekt, paperless, driv
     text = out.getvalue()
     assert "Offene Faelle: 2" in text and "Archivfassung vorhanden 1" in text
     assert "Ohne Paperless-Verknuepfung nach Quelle: Drive-Bestand 1" in text
-    assert "Ohne Paperless-Verknuepfung nach Endung: .msg 1" in text
-    assert "Termin" not in text  # keine Dateinamen in der Ausgabe
+    assert "Ohne Paperless-Verknuepfung nach Endung: .doc 1" in text
+    assert "Altformat" not in text  # keine Dateinamen in der Ausgabe
     out = StringIO()
     call_command("paperless_archivfassung", "--objekt", objekt.object_number, "--echt", stdout=out)
     assert "umgestellt 1" in out.getvalue()
     doc.refresh_from_db()
     fall.refresh_from_db()
-    assert (
-        doc.source == "drive_existing" and doc.status == "registered" and doc.current_name == "Nachricht.pdf"
-    )
+    assert doc.source == "drive_existing" and doc.status == "registered" and doc.current_name == "Seite.pdf"
     assert Path(doc.source_path).is_absolute() and Path(doc.source_path).read_bytes() == archiv
     assert fall.status == CaseStatus.RESOLVED
     ingest.ensure_run(objekt, documents=[doc])
@@ -874,6 +893,6 @@ def test_archivfassung_auch_fuer_bestandsdatei_aus_drive(objekt, paperless, driv
     # Drive-Datei unveraendert: die E-Mail bleibt, nur die lokale Arbeitsfassung ist das PDF
     ziel = Path(doc.source_path).parent / "drive-kontrolle.bin"
     drive.download(doc.drive_file_id, ziel)
-    assert ziel.read_bytes() == EML_BYTES and drive.get(doc.drive_file_id).name == "Nachricht.eml"
+    assert ziel.read_bytes() == HTML_BYTES and drive.get(doc.drive_file_id).name == "Seite.html"
     ohne.refresh_from_db()
     assert ohne.status == "review"  # ohne Verknuepfung unveraendert

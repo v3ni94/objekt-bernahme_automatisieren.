@@ -312,7 +312,7 @@ def analyze_pages(job: ProcessingJob) -> dict:
             doc.sha256,
             page_no,
             result.texts.get(page_no, ""),
-            source="text_layer" if result.kind != "office" else "office",
+            source="office" if result.kind in ("office", "email") else "text_layer",
             hmac_key=key,
         )
     doc.page_count = result.page_count

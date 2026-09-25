@@ -217,6 +217,8 @@ oauthlib==3.3.1
     # via requests-oauthlib
 ocrmypdf==17.11.0
     # via objektakte (pyproject.toml)
+olefile==0.47
+    # via objektakte (pyproject.toml)
 openai==3.11.0
     # via objektakte (pyproject.toml)
 openpyxl==3.1.5

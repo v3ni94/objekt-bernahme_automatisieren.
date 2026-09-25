@@ -1803,6 +1803,7 @@ Celery-Queues aus den Settings: `ai`, `classify`, `io`, `lists`, `ocr`
 | owner_file.unit_prefix_map | owner_file | object | `{"apartment": "WE", "commercial": "GE", "parking": "ST", "garage": "GA", "underground_p...` |
 | owner_file.unit_prefix_mode | owner_file | string | `"always_we"` |
 | paperless.api_version | paperless | integer | `10` |
+| paperless.archive_for_unsupported | paperless | boolean | `true` |
 | paperless.base_url | paperless | string | `null` |
 | paperless.enabled | paperless | boolean | `false` |
 | paperless.field_drive_name | paperless | string | `"MHV Drive-Link"` |
