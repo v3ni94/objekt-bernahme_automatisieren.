@@ -98,11 +98,16 @@ gesetzt. Kontrolle: `https://api.mueller-holding.ag/.well-known/openid-configura
    `STATUS_SSO_ISSUER=https://api.mueller-holding.ag`. Werte mit Dollarzeichen in einfache
    Anführungszeichen setzen.
 3. Umstellen, beide Zeilen gemeinsam: `COMPOSE_PROFILES=sso` und
-   `STATUS_MIDDLEWARES=mhag-status-fehler,mhag-status-auth,mhag-status-ratelimit,mhag-status-headers`.
+   `STATUS_MIDDLEWARES=mhag-status-auth,mhag-status-ratelimit,mhag-status-headers`.
 4. `cd /opt/objektakte/monitoring && docker compose up -d` (der Proxy startet, das Label des Routers
    `web` wird neu gesetzt). Kontrolle: `docker compose logs --tail 20 oauth2-proxy` zeigt die geladene
-   Discovery ohne Fehler; ein Browser ohne CRM-Sitzung landet auf der CRM-Anmeldung und danach auf der
-   Statusseite; ein Browser mit CRM-Sitzung sieht die Seite direkt.
+   Discovery ohne Fehler; `curl -s -o /dev/null -w '%{http_code} %{redirect_url}\n' https://status.mueller-holding.ag/`
+   liefert `302` mit Ziel `https://crm.mueller-holding.ag/oidc/authorize?...`; ein Browser ohne CRM-Sitzung
+   landet auf der CRM-Anmeldung und danach auf der Statusseite; ein Browser mit CRM-Sitzung sieht die
+   Seite direkt. Die Prüfanfrage von Traefik geht an den Wurzelpfad des Proxys (Upstream `static://202`),
+   ohne Sitzung reicht Traefik die 302-Antwort des Proxys durch. Der Pfad `/oauth2/auth` eignet sich dafür
+   nicht: er antwortet nur 401, und eine Fehler-Middleware würde die Umleitung mit Status 401 ausliefern,
+   dem Browser nicht folgen (leere Seite).
 5. Rückweg auf öffentlich: `COMPOSE_PROFILES=` leer und `STATUS_MIDDLEWARES=mhag-status-ratelimit,mhag-status-headers`,
    danach `docker compose up -d --remove-orphans`.
 
