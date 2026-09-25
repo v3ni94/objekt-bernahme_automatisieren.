@@ -1,7 +1,8 @@
 # Statusseite status.mueller-holding.ag (Stand 25.09.2026)
 
 Statusseite der Müller Holding AG für den VPS: Auslastung, Verfügbarkeit und Verlauf aller Messwerte des Wirts und
-aller Container, gespeichert für 400 Tage, Anzeige im CI der Müller Holding AG. Quelle: Verzeichnis `monitoring/` im
+aller Container, gespeichert für 400 Tage, Anzeige im CI der Müller Holding AG. Die Seite ist ohne Anmeldung
+öffentlich lesbar (Entscheidung Vorstand 25.09.2026). Quelle: Verzeichnis `monitoring/` im
 Repository, eigenes Compose-Projekt `status`, unabhängig von der Objektakte.
 
 ## Bestandteile und Messtakt
@@ -40,24 +41,7 @@ setzt zurück. Aktualisierung alle 30 Sekunden (Bereiche bis 24 Stunden) beziehu
    ```
 
    Die drei Werte in die `.env` der Statusseite eintragen.
-4. Zugang anlegen (Benutzer `status`, Passwort wird abgefragt und erscheint nicht im Verlauf):
-
-   ```
-   H=$(openssl passwd -apr1)
-   sed -i '/^STATUS_BASIC_AUTH=$/d' .env
-   printf "STATUS_BASIC_AUTH='status:%s'\n" "$H" >> .env
-   unset H
-   ```
-
-   Die einfachen Anführungszeichen sind Pflicht: ohne sie deutet Compose die `$`-Zeichen des Hashs als Variablen
-   und der Zugang wäre leer. Kontrolle, die Zeile muss den vollständigen Hash zeigen (Compose stellt jedes `$` als
-   `$$` dar):
-
-   ```
-   docker compose config | grep basicauth.users
-   ```
-
-5. Starten und prüfen:
+4. Starten und prüfen:
 
    ```
    docker compose up -d --build
@@ -66,8 +50,8 @@ setzt zurück. Aktualisierung alle 30 Sekunden (Bereiche bis 24 Stunden) beziehu
    ```
 
    `node-exporter` muss ohne Bindungsfehler laufen (er lauscht auf der Gateway-Adresse des Messnetzes). Danach
-   `https://status.mueller-holding.ag` mit dem Benutzer `status` aufrufen; die ersten Verläufe füllen sich innerhalb
-   von zwei Minuten, längere Zeitbereiche mit der Zeit.
+   `https://status.mueller-holding.ag` aufrufen; die ersten Verläufe füllen sich innerhalb von zwei Minuten, längere
+   Zeitbereiche mit der Zeit.
 
 ## Betrieb
 
@@ -86,7 +70,12 @@ setzt zurück. Aktualisierung alle 30 Sekunden (Bereiche bis 24 Stunden) beziehu
 
 ## Sicherheit
 
-- Zugang nur mit Benutzer und Passwort (Traefik Basic Auth) über TLS; die Seite ist für Suchmaschinen gesperrt.
+- Die Seite ist öffentlich ohne Anmeldung erreichbar (Entscheidung Vorstand 25.09.2026). Sichtbar sind damit
+  Containernamen, Auslastung, Dateisysteme, Schnittstellen und die Ergebnisse der HTTP-Prüfungen; Geheimnisse,
+  Dokumente oder personenbezogene Daten enthält sie nicht. Die Seite ist für Suchmaschinen gesperrt, und Traefik
+  begrenzt Anfragen je Adresse (30 je Sekunde, Spitze 80), damit die Messdatenbank über die offene Leseschnittstelle
+  nicht überlastet wird. Soll die Anmeldung wieder eingeschaltet werden: Middleware `basicauth` mit
+  `users` aus einer htpasswd-Zeile in `docker-compose.yml` ergänzen und in `mhag-status.middlewares` eintragen.
 - Prometheus, cAdvisor und Blackbox sind nur im Messnetz erreichbar; nginx reicht ausschließlich die beiden
   Leseabfragen durch, alle anderen Pfade der Prometheus-Schnittstelle liefern 404.
 - `node-exporter` läuft im Netz des Wirts (nötig für die echten Schnittstellen), lauscht aber nur auf der
