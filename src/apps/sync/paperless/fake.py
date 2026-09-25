@@ -155,6 +155,7 @@ class FakePaperless:
         original_file_name: str | None = None,
         mime_type: str = "application/pdf",
         archive_checksum: str | None = None,
+        archive_content: bytes | None = None,
         archive_serial_number: int | None = None,
         owner: int | None = None,
         notes: Iterable[str] = (),
@@ -177,9 +178,10 @@ class FakePaperless:
             "added": now,
             "modified": now,
             "original_file_name": original_file_name or f"{title}.pdf",
-            "archived_file_name": None,
+            "archived_file_name": f"{title}.pdf" if archive_content is not None else None,
             "checksum": self.checksum_of(content),
-            "archive_checksum": archive_checksum,
+            "archive_checksum": archive_checksum
+            or (self.checksum_of(archive_content) if archive_content is not None else None),
             "mime_type": mime_type,
             "tags": sorted({int(t) for t in tags}),
             "custom_fields": fields,
@@ -193,8 +195,17 @@ class FakePaperless:
             "versions": [],
             "deleted_at": None,
             "_bytes": bytes(content),
+            "_archive_bytes": bytes(archive_content) if archive_content is not None else None,
         }
         return doc_id
+
+    def set_archive(self, document_id: int, content: bytes) -> None:
+        """Traegt nachtraeglich eine PDF-Archivfassung ein (wie ein Nachlauf von Tika und Gotenberg in Paperless)."""
+        doc = self._doc(document_id)
+        doc["_archive_bytes"] = bytes(content)
+        doc["archive_checksum"] = self.checksum_of(content)
+        doc["archived_file_name"] = f"{doc['title']}.pdf"
+        self._touch(doc)
 
     def trash_document(self, document_id: int) -> None:
         """Legt ein Dokument in den Papierkorb (deleted_at gesetzt, weiter per ID lesbar, wie in Paperless-ngx)."""
@@ -400,7 +411,7 @@ class FakePaperless:
             "media_filename": f"{doc['id']:07d}.pdf",
             "has_archive_version": has_archive,
             "archive_checksum": doc.get("archive_checksum"),
-            "archive_size": len(doc["_bytes"]) if has_archive else None,
+            "archive_size": len(doc.get("_archive_bytes") or doc["_bytes"]) if has_archive else None,
             "archive_media_filename": f"{doc['id']:07d}.pdf" if has_archive else None,
             "original_metadata": [],
             "archive_metadata": [],
@@ -416,7 +427,8 @@ class FakePaperless:
         doc = self._doc(document_id)
         target = Path(target)
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_bytes(doc["_bytes"])
+        data = doc["_bytes"] if original or doc.get("_archive_bytes") is None else doc["_archive_bytes"]
+        target.write_bytes(data)
         return target
 
     def download_thumbnail(self, document_id: int, target: Path) -> Path:

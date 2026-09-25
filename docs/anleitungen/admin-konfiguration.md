@@ -241,6 +241,7 @@ Anbindung an Paperless-ngx (Ergänzung vom 12.09.2026, docs/architektur.md Absch
 | `paperless.webhook_enabled` | boolean | `true` | Webhook-Endpunkt für Paperless-Workflows annehmen (Kopfzeile X-MHV-Webhook-Token muss dem Secret PAPERLESS_WEBHOOK_TOKEN entsprechen) | Auftrag Paperless-ngx und Google Drive, 12.09.2026 | boolean |
 | `paperless.import_new_documents` | boolean | `true` | In Paperless neu eingegangene Dokumente übernehmen (Download ins Eingangsobjekt oder in das im Feld Objekt genannte Objekt) | Auftrag Paperless-ngx und Google Drive, 12.09.2026 | boolean |
 | `paperless.import_only_with_object` | boolean | `true` | Aus Paperless nur Dokumente übernehmen, die dort das Feld MHV Objekt tragen; ohne Feld bleibt das Dokument in Paperless (kein Eingang). Schutz vor der Übernahme eines ganzen DMS-Bestands ohne Objektbezug | Pilotbefund 13.09.2026 (Trockenlauf mit 96.145 Dokumenten ohne Objektbezug) | boolean |
+| `paperless.archive_for_unsupported` | boolean | `true` | Ist das Original aus Paperless für die Verarbeitung ungeeignet (E-Mail, Office-Altformat, HTML), wird die PDF-Archivfassung übernommen, die Paperless beim Eingang erzeugt hat; aus: Original übernehmen und Fall „nicht unterstütztes Format" | Bestandsbefund 25.09.2026 (6.527 Fälle „nicht unterstütztes Format" aus Paperless) | boolean |
 | `paperless.max_upload_mb` | integer | `100` | Größte Datei in MB, die nach Paperless übertragen wird; größere erhalten einen Indexbeleg | Auftrag Paperless-ngx und Google Drive, 12.09.2026 | min 1, max 2000 |
 
 ## Synchronisation (`sync.*`)

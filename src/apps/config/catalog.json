@@ -1845,6 +1845,16 @@
       }
     },
     {
+      "key": "paperless.archive_for_unsupported",
+      "category": "paperless",
+      "value_type": "boolean",
+      "description": "Ist das Original aus Paperless für die Verarbeitung ungeeignet (E-Mail, Office-Altformat, HTML), wird die PDF-Archivfassung übernommen, die Paperless beim Eingang erzeugt hat; aus: Original übernehmen und Fall nicht unterstütztes Format",
+      "source": "Bestandsbefund 25.09.2026: 6.527 Fälle nicht unterstütztes Format aus Paperless",
+      "schema": {
+        "type": "boolean"
+      }
+    },
+    {
       "key": "paperless.max_upload_mb",
       "category": "paperless",
       "value_type": "integer",

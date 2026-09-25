@@ -704,3 +704,88 @@ def test_wartende_uebernahme_wird_nicht_doppelt_eingereiht(objekt, paperless, op
     assert op1.status == OperationStatus.DONE and pending_pull(pid) is None
     op3, created3 = enqueue_from_webhook(pid, event="updated")
     assert created3 is True and op3.pk != op1.pk
+
+
+EML_BYTES = b"From: absender@example.test\r\nSubject: Testnachricht\r\n\r\nInhalt ohne echte Personen.\r\n"
+
+
+def test_nicht_verarbeitbares_original_kommt_als_archivfassung(paperless, eingang, ops):
+    """E-Mail-Original (.eml) kennt die Verarbeitung nicht; hat Paperless eine PDF-Archivfassung, laedt die
+    Uebernahme diese statt des Originals (25.09.2026, 6.527 Faelle "nicht unterstuetztes Format" im Bestand)."""
+    archiv = pdf_bytes()
+    remote_id = paperless.add_document(
+        "Nachricht",
+        content=EML_BYTES,
+        original_file_name="Nachricht.eml",
+        mime_type="message/rfc822",
+        archive_content=archiv,
+    )
+    paperless_pull.poll(force=True)
+    ops()
+    link = _link(remote_id)
+    doc = link.document
+    assert doc.current_name == "Nachricht.pdf" and doc.original_name == "Nachricht.eml"
+    assert doc.mime_type == "application/pdf" and doc.size_bytes == len(archiv)
+    assert Path(doc.source_path).read_bytes() == archiv
+    assert link.mime_type == "application/pdf" and link.synced_fields["variant"] == "archive"
+    downloads = [c for c in paperless.calls if c[0] == "download"]
+    assert downloads and downloads[-1][2] == {"original": False}
+    # Ohne Archivfassung bleibt es beim Original (und spaeter beim Fall nicht unterstuetztes Format)
+    remote_id = paperless.add_document(
+        "Nachricht 2", content=EML_BYTES, original_file_name="Nachricht_2.eml", mime_type="message/rfc822"
+    )
+    paperless_pull.poll(force=True)
+    ops()
+    link = _link(remote_id)
+    assert link.document.current_name == "Nachricht_2.eml" and link.synced_fields["variant"] == "original"
+    assert [c for c in paperless.calls if c[0] == "download"][-1][2] == {"original": True}
+
+
+def test_archivfassung_befehl_stellt_bestand_um(paperless, eingang, ops, run_all):
+    """Bestand: Dokument mit Fall nicht unterstuetztes Format wird per Befehl auf die spaeter vorhandene
+    Archivfassung umgestellt, Fall erledigt, Dokument laeuft von vorn durch die Kette."""
+    from io import StringIO
+
+    from django.core.management import call_command
+
+    remote_id = paperless.add_document(
+        "Nachricht", content=EML_BYTES, original_file_name="Nachricht.eml", mime_type="message/rfc822"
+    )
+    paperless_pull.poll(force=True)
+    ops()
+    run_all(eingang)
+    doc = _link(remote_id).document
+    doc.refresh_from_db()
+    fall = ReviewCase.objects.get(document=doc, case_subtype="unsupported_format", status=CaseStatus.OPEN)
+    assert doc.status == "review" and doc.current_name == "Nachricht.eml"
+    out = StringIO()
+    call_command("paperless_archivfassung", stdout=out)
+    assert "keine Archivfassung in Paperless 1" in out.getvalue() and "Vorschau" in out.getvalue()
+    archiv = pdf_bytes()
+    paperless.set_archive(remote_id, archiv)
+    out = StringIO()
+    call_command("paperless_archivfassung", stdout=out)
+    assert "Archivfassung vorhanden 1" in out.getvalue()
+    doc.refresh_from_db()
+    assert doc.status == "review"  # Vorschau aendert nichts
+    out = StringIO()
+    call_command("paperless_archivfassung", "--echt", stdout=out)
+    assert "umgestellt 1" in out.getvalue()
+    doc.refresh_from_db()
+    fall.refresh_from_db()
+    assert doc.status == "registered" and doc.current_name == "Nachricht.pdf" and doc.sha256 is None
+    assert doc.mime_type == "application/pdf" and Path(doc.source_path).read_bytes() == archiv
+    assert fall.status == CaseStatus.RESOLVED and fall.resolution["action"] == "reprocess_archive"
+    assert _link(remote_id).synced_fields["variant"] == "archive"
+    assert AuditEvent.objects.filter(action="sync.paperless_archive", entity_id=doc.pk).exists()
+    ingest.ensure_run(eingang, documents=[doc])
+    run_all(eingang)
+    doc.refresh_from_db()
+    assert doc.page_count == 1 and doc.sha256
+    assert not ReviewCase.objects.filter(
+        document=doc, case_subtype="unsupported_format", status=CaseStatus.OPEN
+    ).exists()
+    # Zweiter Aufruf findet nichts mehr
+    out = StringIO()
+    call_command("paperless_archivfassung", "--echt", stdout=out)
+    assert "keine offenen Faelle" in out.getvalue()

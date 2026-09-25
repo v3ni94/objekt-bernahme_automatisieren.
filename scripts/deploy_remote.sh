@@ -46,6 +46,7 @@
 #   classifier-status <branch> [list|train|train+force|deactivate]  Stufe 2: Kaltstartstatus, Modelle, Training (train+force auch waehrend laufender Verarbeitung), Modell abschalten
 #   sync-retry <branch> [echt|bestand+<id>]  Sync-Operationen mit Paperless-404 erneut einreihen (Vorschau ohne echt); Bestandslauf fortsetzen
 #   jobs-bereinigen <branch> [echt] Ueberzaehlige wartende Wiederholungsjobs (#n) bereinigen (echt = ausfuehren, sonst Vorschau)
+#   paperless-archivfassung <branch> [objekt=NR+limit=N+echt]  Faelle "nicht unterstuetztes Format" auf die PDF-Archivfassung von Paperless umstellen (Vorschau ohne echt)
 #   redis-status <branch>     Redis: Speicher, Schluesselzahl, Warteschlangenlaengen, groesste Schluessel (nur lesend)
 #   env-set <branch> <SCHLUESSEL=wert[+SCHLUESSEL=wert]>  Freigegebene Betriebswerte in .env setzen (Ressourcen, Parallelitaet);
 #                             wirksam erst mit deploy; Sicherung .env.bak
@@ -1162,6 +1163,24 @@ PY
     done
     docker compose exec -T web python manage.py fehler_wiederaufnehmen "${args[@]}"
     ;;
+  paperless-archivfassung)
+    # Dokumente aus Paperless mit offenem Fall "nicht unterstuetztes Format" (E-Mails, Office-Altformate, HTML)
+    # auf die PDF-Archivfassung von Paperless umstellen und zurueck auf registriert setzen. Argumente mit +
+    # getrennt: objekt=503, limit=200, echt. Ohne echt Vorschau (fragt je Fall die Archivfassung bei Paperless
+    # ab). Danach die Verarbeitung starten: verarbeitung-alle echt.
+    args=()
+    IFS='+' read -r -a parts <<< "${ARG:-}"
+    for p in "${parts[@]}"; do
+      case "$p" in
+        echt) args+=(--echt) ;;
+        objekt=*) args+=(--objekt "${p#objekt=}") ;;
+        limit=*) args+=(--limit "${p#limit=}") ;;
+        '') ;;
+        *) echo "Unbekanntes Argument: $p (erlaubt: objekt=NR, limit=N, echt)"; exit 2 ;;
+      esac
+    done
+    docker compose exec -T web python manage.py paperless_archivfassung "${args[@]}"
+    ;;
   lauf-monitor)
     # Fortschritt der Verarbeitung live (nur lesend): alle N Sekunden (Argument, Standard 10, mindestens 5) eine Zeile
     # mit Laeufen nach Status, offenen Jobs nach Art, Fortschritt in Prozent, Durchsatz und Hochrechnung des Endes aus
@@ -1308,5 +1327,5 @@ PY
     done
     echo "wirksam mit der Aktion deploy; Sicherung .env.bak"
     ;;
-  *) echo "Nur check, pull, befund, env-init, ps, logs, smoke, cert-retry, db-status, db-reset, first-run, deploy, rollback, create-admin, oauth-check, deploy-tests, doc-status, config-set, altbestand-import, altbestand-objekte, altbestand-aufarbeiten, verarbeitung-alle, paperless-feld-alle, redis-status, env-set, jobs-bereinigen, disk-status, lauf-monitor, fehler-wiederaufnehmen, transit-bereinigen, drive-dubletten, worker-drosseln, work-bereinigen, last-status, worker-stop, worker-start, ai-check, ai-reclassify, review-status, sync-status, sync-retry, classifier-status, zuordnung-pruefen, objekt-anschriften, anschrift-kandidaten, buchhaltung-jahresordner, paperless-feld-abgleich, backup-voll oder reconcile-all erlaubt"; exit 2 ;;
+  *) echo "Nur check, pull, befund, env-init, ps, logs, smoke, cert-retry, db-status, db-reset, first-run, deploy, rollback, create-admin, oauth-check, deploy-tests, doc-status, config-set, altbestand-import, altbestand-objekte, altbestand-aufarbeiten, verarbeitung-alle, paperless-feld-alle, redis-status, env-set, jobs-bereinigen, disk-status, lauf-monitor, fehler-wiederaufnehmen, transit-bereinigen, drive-dubletten, worker-drosseln, work-bereinigen, last-status, worker-stop, worker-start, ai-check, ai-reclassify, review-status, sync-status, sync-retry, classifier-status, zuordnung-pruefen, objekt-anschriften, anschrift-kandidaten, buchhaltung-jahresordner, paperless-feld-abgleich, paperless-archivfassung, backup-voll oder reconcile-all erlaubt"; exit 2 ;;
 esac

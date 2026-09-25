@@ -18,6 +18,7 @@ from apps.documents.ingest import ensure_run, safe_filename
 from apps.documents.models import Document, DocumentSource, DocumentStatus
 from apps.objects.models import ManagedObject
 from apps.pipeline import storage
+from apps.pipeline.analysis import detect_kind
 from apps.sync import config, services
 from apps.sync.flows.common import (
     PAPERLESS,
@@ -223,6 +224,17 @@ def _second_copy(local: Document, existing: ExternalLink, remote: dict, remote_i
     }
 
 
+def archive_fallback(name: str, mime: str | None, metadata: dict) -> bool:
+    """Original nicht verarbeitbar (weder PDF noch Bild noch Office), aber Paperless hat eine PDF-Archivfassung
+    (Tika und Gotenberg wandeln E-Mails, Office-Altformate und HTML beim Eingang um): dann wird die Archivfassung
+    uebernommen statt eines Falls "nicht unterstuetztes Format" (25.09.2026: 6.527 solche Faelle im Bestand)."""
+    if not config.archive_for_unsupported():
+        return False
+    if detect_kind(Path(name), mime) != "unsupported":
+        return False
+    return bool(metadata.get("has_archive_version"))
+
+
 def _import_new(client, remote: dict, metadata: dict, meta: dict) -> dict:
     """Neues Paperless-Dokument uebernehmen: identische Datei verknuepfen, sonst Original laden und registrieren."""
     from apps.sync.inbox import ensure_inbox_object
@@ -298,29 +310,36 @@ def _import_new(client, remote: dict, metadata: dict, meta: dict) -> dict:
             "ohne Feld MHV Objekt in Paperless; Übernahme nur mit Objektbezug (paperless.import_only_with_object)"
         )
     target = from_field or ensure_inbox_object()
-    name = safe_filename(
+    original_name = safe_filename(
         remote.get("original_file_name") or metadata.get("original_filename") or f"paperless-{remote_id}.pdf"
     )
-    if not Path(name).suffix:
-        name += ".pdf"
+    if not Path(original_name).suffix:
+        original_name += ".pdf"
+    mime = (
+        metadata.get("original_mime_type")
+        or mimetypes.guess_type(original_name)[0]
+        or "application/octet-stream"
+    )
+    name, variant = original_name, "original"
+    if archive_fallback(original_name, mime, metadata):
+        name, variant, mime = f"{Path(original_name).stem}.pdf", "archive", "application/pdf"
     storage.ensure_disk_reserve()
     target_dir = storage.upload_dir(target.pk)
     path = target_dir / name
     try:
-        client.download(remote_id, path, original=True)
+        client.download(remote_id, path, original=variant == "original")
     except Exception as exc:
         raise_mapped(exc)
     size = path.stat().st_size
     if size > int(config.store.get("documents.max_download_bytes", 524288000)):
         path.unlink(missing_ok=True)
         raise Block(f"Paperless-Dokument {remote_id} überschreitet die Größengrenze")
-    mime = metadata.get("original_mime_type") or mimetypes.guess_type(name)[0] or "application/octet-stream"
     with transaction.atomic():
         doc = Document.objects.create(
             object=target,
             size_bytes=size,
             mime_type=mime,
-            original_name=name,
+            original_name=original_name,
             current_name=name,
             source=DocumentSource.PAPERLESS,
             source_path=str(path),
@@ -346,6 +365,7 @@ def _import_new(client, remote: dict, metadata: dict, meta: dict) -> dict:
                 "modified": remote.get("modified"),
                 "correspondent": correspondent_name(client, remote),
                 "object_field": (_object_from_field(remote, meta) or ManagedObject()).object_number or None,
+                "variant": variant,
             },
         )
         record(
@@ -357,6 +377,7 @@ def _import_new(client, remote: dict, metadata: dict, meta: dict) -> dict:
                 "paperless_id": remote_id,
                 "size_bytes": size,
                 "mime_type": mime,
+                "variant": variant,
                 "inbox": target.is_system_inbox,
             },
         )

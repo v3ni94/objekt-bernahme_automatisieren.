@@ -77,6 +77,12 @@ def import_new_documents() -> bool:
     return bool(store.get("paperless.import_new_documents", True))
 
 
+def archive_for_unsupported() -> bool:
+    """Original ohne Verarbeitungsweg (E-Mail, Office-Altformat, HTML) als PDF-Archivfassung von Paperless
+    uebernehmen statt eines Falls "nicht unterstuetztes Format"."""
+    return bool(store.get("paperless.archive_for_unsupported", True))
+
+
 def import_only_with_object() -> bool:
     """Neue Paperless-Dokumente nur uebernehmen, wenn sie dort das Feld Objekt tragen (kein Eingang ohne Bezug)."""
     return bool(store.get("paperless.import_only_with_object", True))
