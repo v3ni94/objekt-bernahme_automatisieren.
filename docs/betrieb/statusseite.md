@@ -68,6 +68,48 @@ setzt zurück. Aktualisierung alle 30 Sekunden (Bereiche bis 24 Stunden) beziehu
   (`docker compose logs prometheus`). Fehlen die Kerne und Kennzahlen des Wirts, ist `node-exporter` nicht erreichbar
   (`docker compose logs node-exporter`, Bindung an `STATUS_GATEWAY`). Fehlen nur die Container, `cadvisor` prüfen.
 
+## Anmeldung über das CRM (optional)
+
+Die Seite ist ohne Anmeldung öffentlich lesbar (Entscheidung Vorstand 25.09.2026). Ergänzend kann sie
+so umgestellt werden, dass nur sieht, wer im CRM (crm.mueller-holding.ag) angemeldet ist. Ein Cookie des
+CRM gilt nicht auf der Statusdomain, deshalb übernimmt der Dienst oauth2-proxy die Anmeldung über den
+OIDC-Anbieter der Plattform: Traefik fragt vor jeder Anfrage beim Proxy nach, ohne Sitzung leitet der
+Proxy zur CRM-Anmeldeseite um, die bei bestehender CRM-Sitzung ohne Eingabe zurückkehrt. Danach führt
+der Proxy eine eigene Sitzung von zwölf Stunden. Jeder aktive CRM-Benutzer darf die Seite sehen, eine
+Freigabe je Rolle gibt es nicht.
+
+Voraussetzung im CRM (Repository CRM-HV-Verwaltungssoftware, Plan docs/plans/M30-sso.md): Stand mit
+der Anmeldebrücke `/oidc/authorize` ist deployt und `MHVP_WEB_CRM_URL` ist in der Umgebungsdatei
+gesetzt. Kontrolle: `https://api.mueller-holding.ag/.well-known/openid-configuration` nennt als
+`authorization_endpoint` die CRM-Domain.
+
+1. Client im CRM registrieren (im Verzeichnis der CRM-Installation, Dienst `api`; Runbook dort
+   `docs/runbooks/oidc-relying-parties.md`):
+
+   ```
+   docker compose ... exec api python -m mhvp.core.auth.oidc_clients create \
+     --client-id status-mhag --name "Statusseite Mueller Holding AG" \
+     --redirect-uri https://status.mueller-holding.ag/oauth2/callback
+   ```
+
+   Die Ausgabe zeigt `client_secret` genau einmal, das CRM speichert nur den Hash.
+2. In `/opt/objektakte/monitoring/.env` eintragen: `STATUS_SSO_CLIENT_ID=status-mhag`,
+   `STATUS_SSO_CLIENT_SECRET=<Secret>`, `STATUS_SSO_COOKIE_SECRET=<Ausgabe von openssl rand -base64 32 | tr -- '+/' '-_'>`,
+   `STATUS_SSO_ISSUER=https://api.mueller-holding.ag`. Werte mit Dollarzeichen in einfache
+   Anführungszeichen setzen.
+3. Umstellen, beide Zeilen gemeinsam: `COMPOSE_PROFILES=sso` und
+   `STATUS_MIDDLEWARES=mhag-status-fehler,mhag-status-auth,mhag-status-ratelimit,mhag-status-headers`.
+4. `cd /opt/objektakte/monitoring && docker compose up -d` (der Proxy startet, das Label des Routers
+   `web` wird neu gesetzt). Kontrolle: `docker compose logs --tail 20 oauth2-proxy` zeigt die geladene
+   Discovery ohne Fehler; ein Browser ohne CRM-Sitzung landet auf der CRM-Anmeldung und danach auf der
+   Statusseite; ein Browser mit CRM-Sitzung sieht die Seite direkt.
+5. Rückweg auf öffentlich: `COMPOSE_PROFILES=` leer und `STATUS_MIDDLEWARES=mhag-status-ratelimit,mhag-status-headers`,
+   danach `docker compose up -d --remove-orphans`.
+
+Abmelden: `https://status.mueller-holding.ag/oauth2/sign_out` beendet die Proxy-Sitzung, die CRM-Sitzung
+bleibt. Wird der Client im CRM deaktiviert oder das Secret rotiert, schlagen neue Anmeldungen sofort
+fehl; bestehende Proxy-Sitzungen laufen bis zu zwölf Stunden weiter.
+
 ## Sicherheit
 
 - Die Seite ist öffentlich ohne Anmeldung erreichbar (Entscheidung Vorstand 25.09.2026). Sichtbar sind damit

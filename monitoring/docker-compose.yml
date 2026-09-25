@@ -1,5 +1,6 @@
 # Statusseite der Mueller Holding AG (status.mueller-holding.ag): Messwerte des VPS und aller Container, gespeichert
-# in Prometheus (Aufbewahrung 400 Tage), Oberflaeche im CI der Mueller Holding AG hinter Traefik, oeffentlich lesbar.
+# in Prometheus (Aufbewahrung 400 Tage), Oberflaeche im CI der Mueller Holding AG hinter Traefik. Oeffentlich lesbar
+# oder, mit Profil "sso" (COMPOSE_PROFILES und STATUS_MIDDLEWARES in der .env), nur nach Anmeldung ueber das CRM.
 # Eigenes Compose-Projekt, unabhaengig von der Objektakte. Einrichtung: docs/betrieb/statusseite.md.
 # Messtakt: Wirt alle 15 s (node_exporter), Container alle 30 s (cAdvisor), HTTP-Pruefungen alle 60 s (Blackbox).
 name: status
@@ -114,9 +115,10 @@ services:
       traefik.http.routers.mhag-status.entrypoints: "${TRAEFIK_ENTRYPOINT}"
       traefik.http.routers.mhag-status.tls: "true"
       traefik.http.routers.mhag-status.tls.certresolver: "${TRAEFIK_CERTRESOLVER}"
-      # Oeffentlich ohne Anmeldung (Entscheidung Vorstand 25.09.2026); Anfragebegrenzung je Adresse schuetzt die
-      # Messdatenbank vor Ueberlastung ueber die offene Leseschnittstelle.
-      traefik.http.routers.mhag-status.middlewares: "mhag-status-ratelimit,mhag-status-headers"
+      # Middleware-Kette aus der .env: oeffentlich (Anfragebegrenzung, Kopfzeilen) oder mit CRM-Anmeldung
+      # (zusaetzlich mhag-status-fehler und mhag-status-auth des Dienstes oauth2-proxy, Profil "sso").
+      # Die Anfragebegrenzung je Adresse schuetzt die Messdatenbank vor Ueberlastung ueber die Leseschnittstelle.
+      traefik.http.routers.mhag-status.middlewares: "${STATUS_MIDDLEWARES:-mhag-status-ratelimit,mhag-status-headers}"
       traefik.http.middlewares.mhag-status-ratelimit.ratelimit.average: "30"
       traefik.http.middlewares.mhag-status-ratelimit.ratelimit.burst: "80"
       traefik.http.middlewares.mhag-status-ratelimit.ratelimit.period: "1s"
@@ -125,6 +127,64 @@ services:
       traefik.http.middlewares.mhag-status-headers.headers.customFrameOptionsValue: "DENY"
       traefik.http.middlewares.mhag-status-headers.headers.referrerPolicy: "no-referrer"
       traefik.http.services.mhag-status.loadbalancer.server.port: "8080"
+
+  oauth2-proxy:
+    # Anmeldung ueber das CRM: der OIDC-Anbieter der Plattform (STATUS_SSO_ISSUER) bestaetigt die Identitaet, der
+    # Proxy fuehrt eine eigene Sitzung (Cookie, 12 Stunden). Traefik fragt vor jeder Anfrage an die Oberflaeche hier
+    # nach (ForwardAuth); 401/403 werden in die Anmeldung umgeleitet, die bei bestehender CRM-Sitzung ohne Eingabe
+    # durchlaeuft. Nur im Profil "sso" aktiv (COMPOSE_PROFILES=sso in der .env), sonst nicht gestartet.
+    image: quay.io/oauth2-proxy/oauth2-proxy:v7.7.1
+    <<: *logging
+    restart: unless-stopped
+    profiles: ["sso"]
+    environment:
+      OAUTH2_PROXY_PROVIDER: oidc
+      OAUTH2_PROXY_PROVIDER_DISPLAY_NAME: CRM
+      OAUTH2_PROXY_OIDC_ISSUER_URL: "${STATUS_SSO_ISSUER}"
+      OAUTH2_PROXY_CLIENT_ID: "${STATUS_SSO_CLIENT_ID}"
+      OAUTH2_PROXY_CLIENT_SECRET: "${STATUS_SSO_CLIENT_SECRET}"
+      OAUTH2_PROXY_COOKIE_SECRET: "${STATUS_SSO_COOKIE_SECRET}"
+      OAUTH2_PROXY_REDIRECT_URL: "https://${STATUS_DOMAIN}/oauth2/callback"
+      OAUTH2_PROXY_HTTP_ADDRESS: "0.0.0.0:4180"
+      OAUTH2_PROXY_REVERSE_PROXY: "true"
+      OAUTH2_PROXY_EMAIL_DOMAINS: "*"
+      OAUTH2_PROXY_WHITELIST_DOMAINS: "${STATUS_DOMAIN}"
+      OAUTH2_PROXY_SKIP_PROVIDER_BUTTON: "true"
+      OAUTH2_PROXY_CODE_CHALLENGE_METHOD: S256
+      OAUTH2_PROXY_SCOPE: "openid email profile"
+      # Das ID-Token des CRM traegt kein email_verified; Benutzer werden im CRM vom Betreiber gepflegt.
+      OAUTH2_PROXY_INSECURE_OIDC_ALLOW_UNVERIFIED_EMAIL: "true"
+      OAUTH2_PROXY_COOKIE_NAME: "_mhag_status"
+      OAUTH2_PROXY_COOKIE_SECURE: "true"
+      OAUTH2_PROXY_COOKIE_SAMESITE: lax
+      OAUTH2_PROXY_COOKIE_EXPIRE: "12h"
+      OAUTH2_PROXY_SILENCE_PING_LOGGING: "true"
+      OAUTH2_PROXY_REQUEST_LOGGING: "false"
+    networks:
+      mess: {}
+      proxy:
+        aliases:
+          - mhag-status-oauth
+    security_opt:
+      - no-new-privileges:true
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: "${TRAEFIK_NETWORK}"
+      # Anmeldepfade (/oauth2/start, /oauth2/callback, /oauth2/sign_out) gehen direkt an den Proxy.
+      traefik.http.routers.mhag-status-oauth.rule: "Host(`${STATUS_DOMAIN}`) && PathPrefix(`/oauth2/`)"
+      traefik.http.routers.mhag-status-oauth.entrypoints: "${TRAEFIK_ENTRYPOINT}"
+      traefik.http.routers.mhag-status-oauth.tls: "true"
+      traefik.http.routers.mhag-status-oauth.tls.certresolver: "${TRAEFIK_CERTRESOLVER}"
+      traefik.http.routers.mhag-status-oauth.middlewares: "mhag-status-ratelimit,mhag-status-headers"
+      traefik.http.routers.mhag-status-oauth.service: "mhag-status-oauth"
+      traefik.http.services.mhag-status-oauth.loadbalancer.server.port: "4180"
+      # Pruefung je Anfrage; ohne Sitzung antwortet der Proxy 401, die Fehler-Middleware leitet zur Anmeldung um
+      # und nimmt die urspruengliche Adresse als Ruecksprungziel mit.
+      traefik.http.middlewares.mhag-status-auth.forwardauth.address: "http://mhag-status-oauth:4180/oauth2/auth"
+      traefik.http.middlewares.mhag-status-auth.forwardauth.trustForwardHeader: "true"
+      traefik.http.middlewares.mhag-status-fehler.errors.status: "401-403"
+      traefik.http.middlewares.mhag-status-fehler.errors.service: "mhag-status-oauth"
+      traefik.http.middlewares.mhag-status-fehler.errors.query: "/oauth2/sign_in?rd={url}"
 
 networks:
   mess:
