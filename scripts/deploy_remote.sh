@@ -1166,8 +1166,8 @@ PY
   paperless-archivfassung)
     # Dokumente aus Paperless mit offenem Fall "nicht unterstuetztes Format" (E-Mails, Office-Altformate, HTML)
     # auf die PDF-Archivfassung von Paperless umstellen und zurueck auf registriert setzen. Argumente mit +
-    # getrennt: objekt=503, limit=200, echt. Ohne echt Vorschau (fragt je Fall die Archivfassung bei Paperless
-    # ab). Danach die Verarbeitung starten: verarbeitung-alle echt.
+    # getrennt: objekt=503, limit=200, echt. Ohne echt Vorschau (gebuendelte Abfrage der Archivfassung bei
+    # Paperless, nichts geaendert). Danach die Verarbeitung starten: verarbeitung-alle echt.
     args=()
     IFS='+' read -r -a parts <<< "${ARG:-}"
     for p in "${parts[@]}"; do

@@ -1,8 +1,9 @@
 """Dokumente aus Paperless mit offenem Fall "nicht unterstuetztes Format" auf die PDF-Archivfassung umstellen
 (25.09.2026). Die Uebernahme lud bis dahin immer das Original; E-Mails, Office-Altformate und HTML kennt die
 Verarbeitung nicht, Paperless hat sie beim Eingang aber mit Tika und Gotenberg in ein PDF gewandelt (6.527 Faelle im
-Bestand). Je Fall: Archivfassung bei Paperless abfragen, laden, Datei und Metadaten des Dokuments ersetzen, Dokument
-zurueck auf registriert (Hash, Seiten, Klassifikation werden neu berechnet), Fall erledigen. Ohne --echt Vorschau.
+Bestand). Archivfassung gebuendelt bei Paperless abfragen (id__in), je Fall laden, Datei und Metadaten des Dokuments
+ersetzen, Dokument zurueck auf registriert (Hash, Seiten, Klassifikation werden neu berechnet), Fall erledigen.
+Ohne --echt Vorschau (nur die gebuendelte Abfrage, nichts geaendert).
 Danach die Verarbeitung starten (verarbeitung_alle_starten --echt), der Lauf nimmt die Dokumente von vorn auf.
 """
 
@@ -58,25 +59,49 @@ class Command(BaseCommand):
             cases = cases[: options["limit"]]
         ergebnis: Counter = Counter()
         je_objekt: Counter = Counter()
-        for case in cases.iterator(chunk_size=100):
-            doc = case.document
-            link = link_for(doc, SyncSystem.PAPERLESS)
+        kandidaten: list[tuple[ReviewCase, object]] = []
+        for case in cases.iterator(chunk_size=200):
+            link = link_for(case.document, SyncSystem.PAPERLESS)
             if link is None or not link.external_id:
                 ergebnis["ohne Paperless-Verknuepfung"] += 1
                 continue
-            try:
-                meta = client.get_metadata(int(link.external_id))
-            except PaperlessError as exc:
-                ergebnis[f"Paperless-Fehler ({type(exc).__name__})"] += 1
+            kandidaten.append((case, link))
+        # Archivfassung gebuendelt abfragen (id__in, je 100 IDs eine Anfrage) statt je Fall einzeln: bei 6.527
+        # Faellen sonst 6.527 Aufrufe ohne sichtbaren Fortschritt
+        archiv: dict[int, str | None] = {}
+        try:
+            for remote in client.list_documents(
+                ids=[int(link.external_id) for _, link in kandidaten], fields=["id", "archived_file_name"]
+            ):
+                archiv[int(remote["id"])] = remote.get("archived_file_name")
+        except PaperlessError as exc:
+            raise CommandError(f"Paperless nicht erreichbar: {type(exc).__name__}: {exc}") from exc
+        self.stdout.write(f"Offene Faelle: {len(kandidaten) + ergebnis['ohne Paperless-Verknuepfung']}")
+        self.stdout.flush()
+        umgestellt = 0
+        for case, link in kandidaten:
+            doc = case.document
+            remote_id = int(link.external_id)
+            if remote_id not in archiv:
+                ergebnis["in Paperless nicht gefunden"] += 1
                 continue
-            if not meta.get("has_archive_version"):
+            if not archiv[remote_id]:
                 ergebnis["keine Archivfassung in Paperless"] += 1
                 continue
             je_objekt[doc.object.object_number] += 1
             if not options["echt"]:
                 ergebnis["Archivfassung vorhanden"] += 1
                 continue
-            ergebnis["umgestellt" if self._umstellen(client, case, doc, link) else "zu gross"] += 1
+            try:
+                stand = self._umstellen(client, case, doc, link)
+            except PaperlessError as exc:
+                stand = f"Paperless-Fehler ({type(exc).__name__})"
+            ergebnis[stand] += 1
+            if stand == "umgestellt":
+                umgestellt += 1
+                if umgestellt % 200 == 0:
+                    self.stdout.write(f"... {umgestellt} umgestellt")
+                    self.stdout.flush()
         for nr, n in sorted(je_objekt.items(), key=lambda kv: int(kv[0]) if kv[0].isdigit() else 0):
             self.stdout.write(f"Objekt {nr}: {n}")
         self.stdout.write(
@@ -91,7 +116,7 @@ class Command(BaseCommand):
                 "Verarbeitung starten: verarbeitung_alle_starten --echt"
             )
 
-    def _umstellen(self, client, case: ReviewCase, doc, link) -> bool:
+    def _umstellen(self, client, case: ReviewCase, doc, link) -> str:
         remote_id = int(link.external_id)
         stem = Path(doc.current_name or doc.original_name or "").stem or f"paperless-{remote_id}"
         name = safe_filename(f"{stem}.pdf")
@@ -101,7 +126,7 @@ class Command(BaseCommand):
         size = path.stat().st_size
         if size > int(store.get("documents.max_download_bytes", 524288000)):
             path.unlink(missing_ok=True)
-            return False
+            return "zu gross"
         now = timezone.now()
         with transaction.atomic():
             doc.source_path = str(path)
@@ -147,4 +172,4 @@ class Command(BaseCommand):
                 object_id=doc.object_id,
                 after={"paperless_id": remote_id, "size_bytes": size, "case_id": case.pk},
             )
-        return True
+        return "umgestellt"
