@@ -111,8 +111,17 @@ def discover(job: ProcessingJob) -> dict:
 
 
 # ---------------------------------------------------------------- 2 hash
+def _local_replacement(doc: Document) -> bool:
+    """Bestandsdatei aus Drive mit lokaler Ersatzdatei (25.09.2026): source_path einer Drive-Bestandsdatei ist sonst
+    nur der Ordnerpfad in Drive. Die Umstellung auf die Paperless-Archivfassung (paperless_archivfassung) legt fuer
+    per Pruefsumme verknuepfte Bestandsdateien eine PDF-Fassung im Uploadverzeichnis ab; die Kette liest dann diese
+    Datei statt das nicht verarbeitbare Original erneut aus Drive zu laden. Die Drive-Datei bleibt unveraendert."""
+    path = Path(doc.source_path or "")
+    return path.is_absolute() and path.is_file()
+
+
 def _download(doc: Document, target_dir: Path) -> Path:
-    if doc.source == "drive_existing":
+    if doc.source == "drive_existing" and not _local_replacement(doc):
         from apps.drive import oauth
 
         adapter = oauth.get_adapter()

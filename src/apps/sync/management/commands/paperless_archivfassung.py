@@ -5,6 +5,10 @@ Bestand). Archivfassung gebuendelt bei Paperless abfragen (id__in), je Fall lade
 ersetzen, Dokument zurueck auf registriert (Hash, Seiten, Klassifikation werden neu berechnet), Fall erledigen.
 Ohne --echt Vorschau (nur die gebuendelte Abfrage, nichts geaendert).
 Danach die Verarbeitung starten (verarbeitung_alle_starten --echt), der Lauf nimmt die Dokumente von vorn auf.
+Auswahl ueber die Paperless-Verknuepfung, nicht ueber die Dokumentquelle (25.09.2026, zweiter Stand): eine
+Bestandsdatei aus Drive, die die Uebernahme per Pruefsumme mit dem Paperless-Dokument verknuepft hat, behaelt die
+Quelle drive_existing; mit dem Quellfilter fand der Befehl auf dem Server 3 von 6.527 Faellen. Faelle ohne
+Verknuepfung werden nach Quelle und Dateiendung gezaehlt, damit der Rest sichtbar bleibt.
 """
 
 from collections import Counter
@@ -47,8 +51,6 @@ class Command(BaseCommand):
                 case_type=CaseType.UNCLEAR,
                 case_subtype="unsupported_format",
                 document__isnull=False,
-                document__source=DocumentSource.PAPERLESS,
-                document__deleted_at__isnull=True,
             )
             .select_related("document", "document__object")
             .order_by("id")
@@ -59,11 +61,21 @@ class Command(BaseCommand):
             cases = cases[: options["limit"]]
         ergebnis: Counter = Counter()
         je_objekt: Counter = Counter()
+        rest_quelle: Counter = Counter()
+        rest_endung: Counter = Counter()
         kandidaten: list[tuple[ReviewCase, object]] = []
         for case in cases.iterator(chunk_size=200):
-            link = link_for(case.document, SyncSystem.PAPERLESS)
+            doc = case.document
+            if doc.deleted_at is not None:
+                ergebnis["Dokument geloescht"] += 1
+                continue
+            link = link_for(doc, SyncSystem.PAPERLESS)
             if link is None or not link.external_id:
                 ergebnis["ohne Paperless-Verknuepfung"] += 1
+                rest_quelle[
+                    DocumentSource(doc.source).label if doc.source in DocumentSource.values else doc.source
+                ] += 1
+                rest_endung[Path(doc.current_name or "").suffix.lower() or "(ohne)"] += 1
                 continue
             kandidaten.append((case, link))
         # Archivfassung gebuendelt abfragen (id__in, je 100 IDs eine Anfrage) statt je Fall einzeln: bei 6.527
@@ -76,7 +88,17 @@ class Command(BaseCommand):
                 archiv[int(remote["id"])] = remote.get("archived_file_name")
         except PaperlessError as exc:
             raise CommandError(f"Paperless nicht erreichbar: {type(exc).__name__}: {exc}") from exc
-        self.stdout.write(f"Offene Faelle: {len(kandidaten) + ergebnis['ohne Paperless-Verknuepfung']}")
+        self.stdout.write(f"Offene Faelle: {len(kandidaten) + sum(ergebnis.values())}")
+        if rest_quelle:
+            # Nur Zaehler je Quelle und Dateiendung, keine Dateinamen (Vertraulichkeit)
+            self.stdout.write(
+                "Ohne Paperless-Verknuepfung nach Quelle: "
+                + ", ".join(f"{k} {n}" for k, n in rest_quelle.most_common())
+            )
+            self.stdout.write(
+                "Ohne Paperless-Verknuepfung nach Endung: "
+                + ", ".join(f"{k} {n}" for k, n in rest_endung.most_common(12))
+            )
         self.stdout.flush()
         umgestellt = 0
         for case, link in kandidaten:

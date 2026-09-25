@@ -789,3 +789,91 @@ def test_archivfassung_befehl_stellt_bestand_um(paperless, eingang, ops, run_all
     out = StringIO()
     call_command("paperless_archivfassung", "--echt", stdout=out)
     assert "keine offenen Faelle" in out.getvalue()
+
+
+def _md5(data: bytes) -> str:
+    return hashlib.md5(data).hexdigest()  # noqa: S324 (Drive-Pruefsumme, keine Sicherheit)
+
+
+def _bestandsdatei(objekt, drive, name: str, data: bytes, mime: str):
+    file_id = drive.add_file(objekt.drive_root_folder_id, name, data, mime)
+    return Document.objects.create(
+        object=objekt,
+        drive_md5=_md5(data),
+        size_bytes=len(data),
+        mime_type=mime,
+        original_name=name,
+        current_name=name,
+        source="drive_existing",
+        drive_file_id=file_id,
+        source_path=f"Objekt/{name}",
+        status="registered",
+        first_seen_at=timezone.now(),
+    )
+
+
+def test_archivfassung_auch_fuer_bestandsdatei_aus_drive(objekt, paperless, drive, eingang, ops, run_all):
+    """Server 25.09.2026: 6.527 Faelle, der Befehl fand 3. Die Uebernahme verknuepft ein Paperless-Dokument, dessen
+    Datei schon als Drive-Bestand registriert ist, nur per Pruefsumme; das Dokument behaelt die Quelle Drive-Bestand.
+    Der Befehl waehlt deshalb ueber die Verknuepfung, die Kette liest danach die lokale PDF-Fassung statt die
+    E-Mail erneut aus Drive zu laden; die Drive-Datei bleibt unveraendert. Faelle ohne Verknuepfung erscheinen nach
+    Quelle und Endung in der Vorschau."""
+    from io import StringIO
+
+    from django.core.management import call_command
+
+    doc = _bestandsdatei(objekt, drive, "Nachricht.eml", EML_BYTES, "message/rfc822")
+    ohne = _bestandsdatei(objekt, drive, "Termin.msg", b"msg-inhalt", "application/vnd.ms-outlook")
+    ingest.ensure_run(objekt, documents=[doc, ohne])
+    run_all(objekt)
+    doc.refresh_from_db()
+    ohne.refresh_from_db()
+    assert doc.status == "review" and ohne.status == "review"
+    assert doc.sha256 == hashlib.sha256(EML_BYTES).hexdigest()
+    fall = ReviewCase.objects.get(document=doc, case_subtype="unsupported_format", status=CaseStatus.OPEN)
+    remote_id = paperless.add_document(
+        "Nachricht", content=EML_BYTES, original_file_name="Nachricht.eml", mime_type="message/rfc822"
+    )
+    paperless_pull.poll(force=True)
+    ops()
+    assert (
+        _link(remote_id).document_id == doc.pk
+        and Document.objects.filter(deleted_at__isnull=True).count() == 2
+    )
+    doc.refresh_from_db()
+    assert doc.source == "drive_existing"
+    archiv = pdf_bytes()
+    paperless.set_archive(remote_id, archiv)
+    out = StringIO()
+    call_command("paperless_archivfassung", stdout=out)
+    text = out.getvalue()
+    assert "Offene Faelle: 2" in text and "Archivfassung vorhanden 1" in text
+    assert "Ohne Paperless-Verknuepfung nach Quelle: Drive-Bestand 1" in text
+    assert "Ohne Paperless-Verknuepfung nach Endung: .msg 1" in text
+    assert "Termin" not in text  # keine Dateinamen in der Ausgabe
+    out = StringIO()
+    call_command("paperless_archivfassung", "--objekt", objekt.object_number, "--echt", stdout=out)
+    assert "umgestellt 1" in out.getvalue()
+    doc.refresh_from_db()
+    fall.refresh_from_db()
+    assert (
+        doc.source == "drive_existing" and doc.status == "registered" and doc.current_name == "Nachricht.pdf"
+    )
+    assert Path(doc.source_path).is_absolute() and Path(doc.source_path).read_bytes() == archiv
+    assert fall.status == CaseStatus.RESOLVED
+    ingest.ensure_run(objekt, documents=[doc])
+    run_all(objekt)
+    doc.refresh_from_db()
+    assert doc.page_count == 1 and doc.sha256 == hashlib.sha256(archiv).hexdigest()
+    assert (
+        doc.status not in ("registered", "review", "error")
+        or not ReviewCase.objects.filter(
+            document=doc, case_subtype="unsupported_format", status=CaseStatus.OPEN
+        ).exists()
+    )
+    # Drive-Datei unveraendert: die E-Mail bleibt, nur die lokale Arbeitsfassung ist das PDF
+    ziel = Path(doc.source_path).parent / "drive-kontrolle.bin"
+    drive.download(doc.drive_file_id, ziel)
+    assert ziel.read_bytes() == EML_BYTES and drive.get(doc.drive_file_id).name == "Nachricht.eml"
+    ohne.refresh_from_db()
+    assert ohne.status == "review"  # ohne Verknuepfung unveraendert
