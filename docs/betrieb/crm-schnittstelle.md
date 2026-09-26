@@ -88,10 +88,10 @@ Einstellungen (Neustart der Container `web` und `worker-io` nach Änderung):
 | Name | Herkunft | Bedeutung |
 |---|---|---|
 | `CRM_WEBHOOK_URL` | `.env` | Ziel, z. B. `https://<crm>/api/v1/integrations/objektakte/webhook`; leer bedeutet aus |
-| `CRM_WEBHOOK_SECRET` | Variable in `/srv/objektakte/.env` (alle Anwendungsdienste lesen die .env über `env_file`), alternativ Secret-Datei über `CRM_WEBHOOK_SECRET_FILE` | gemeinsames Geheimnis für die Signatur; leer bedeutet aus |
+| `CRM_WEBHOOK_SECRET` | Variable in `/opt/objektakte/.env` (alle Anwendungsdienste lesen die .env über `env_file`), alternativ Secret-Datei über `CRM_WEBHOOK_SECRET_FILE` | gemeinsames Geheimnis für die Signatur; leer bedeutet aus |
 | `CRM_WEBHOOK_TIMEOUT_S` | `.env`, Standard 10 | Zeitgrenze je Versuch in Sekunden |
 
-Einschalten (Stand 26.09.2026): URL und Geheimnis per Deploy-Aktion `env-set` in die `.env` schreiben (`CRM_WEBHOOK_URL=https://<crm-api>/api/v1/integrations/objektakte/webhook+CRM_WEBHOOK_SECRET=<geheimnis>`), danach `deploy`, damit `web` und `worker-io` neu starten. Eine Compose-Änderung ist nicht nötig, weil alle Anwendungsdienste die `.env` einlesen. Das Geheimnis wird auf dem Server erzeugt (`openssl rand -hex 32`) und im CRM als `OBJEKTAKTE_WEBHOOK_SECRET` hinterlegt, nie im Repository oder Chat. Wer lieber eine Secret-Datei nutzt, bindet sie analog zu `paperless_webhook_token` mit `CRM_WEBHOOK_SECRET_FILE: /run/secrets/crm_webhook_secret` ein.
+Einschalten (Stand 26.09.2026): URL und Geheimnis von Hand in `/opt/objektakte/.env` eintragen (`CRM_WEBHOOK_URL=https://<crm-api>/api/v1/integrations/objektakte/webhook`, `CRM_WEBHOOK_SECRET=<geheimnis>`); die Deploy-Aktion `env-set` nimmt nur freigegebene Ressourcenwerte ohne Sonderzeichen an und ist dafür nicht geeignet. Danach `deploy`, damit `web` und `worker-io` neu starten. Eine Compose-Änderung ist nicht nötig, weil alle Anwendungsdienste die `.env` einlesen. Das Geheimnis wird auf dem Server erzeugt (`openssl rand -hex 32`) und im CRM als `OBJEKTAKTE_WEBHOOK_SECRET` hinterlegt, nie im Repository oder Chat. Wer lieber eine Secret-Datei nutzt, bindet sie analog zu `paperless_webhook_token` mit `CRM_WEBHOOK_SECRET_FILE: /run/secrets/crm_webhook_secret` ein.
 
 ## 5 Datenschutz
 
