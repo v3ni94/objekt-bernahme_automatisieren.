@@ -19,7 +19,9 @@ DATABASES["default"].update(
     }
 )
 DATABASES["default"]["TEST"] = {
-    "NAME": "test_objektakte",
+    # Name je Lauf ueberschreibbar, damit parallele Testlaeufe in mehreren Arbeitsbaeumen sich nicht die
+    # Testdatenbank wegnehmen (26.09.2026)
+    "NAME": env_str("TEST_DB_TEST_NAME", "test_objektakte"),
     "CHARSET": "utf8mb4",
     "COLLATION": "utf8mb4_unicode_ci",
 }
