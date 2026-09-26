@@ -2039,6 +2039,16 @@
         "minimum": 20,
         "maximum": 1000
       }
+    },
+    {
+      "key": "sync.crm_uploads_enabled",
+      "category": "sync",
+      "value_type": "boolean",
+      "description": "Upload aus dem CRM über die Schnittstelle /api/crm/v1/ annehmen (Scope documents:write). Aus: der Endpunkt antwortet mit 503 und das CRM wiederholt später. Die Uploads laufen durch die normale Verarbeitung; Paperless erhält sie nur nach paperless.mode",
+      "source": "Auftrag Vorstand 26.09.2026 (Upload im CRM, Ablage in Drive und Paperless)",
+      "schema": {
+        "type": "boolean"
+      }
     }
   ]
 }

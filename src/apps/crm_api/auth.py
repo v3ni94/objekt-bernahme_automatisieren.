@@ -1,5 +1,5 @@
 """Bearer-Token mit Scopes fuer die CRM-Schnittstelle: fehlender oder falscher Token 401, fehlender Scope 403,
-nur GET (Schnittstellenvertrag M29 Stufe 3)."""
+lesend nur GET (Schnittstellenvertrag M29 Stufe 3); der Upload (documents:write) nimmt POST an."""
 
 from __future__ import annotations
 
@@ -80,15 +80,16 @@ def _denied(request, reason: str, token: CrmApiToken | None = None) -> None:
     )
 
 
-def require_scope(scope: str):
-    """Dekorator fuer die Endpunkte: Methode GET, gueltiger Token, Scope vorhanden."""
+def require_scope(scope: str, methods: tuple[str, ...] = ("GET", "HEAD")):
+    """Dekorator fuer die Endpunkte: erlaubte Methode, gueltiger Token, Scope vorhanden."""
+    allow = ", ".join(m for m in methods if m != "HEAD")
 
     def decorator(view):
         @wraps(view)
         def wrapped(request, *args, **kwargs):
-            if request.method not in ("GET", "HEAD"):
-                resp = error(405, "nur GET")
-                resp["Allow"] = "GET"
+            if request.method not in methods:
+                resp = error(405, f"nur {allow}")
+                resp["Allow"] = allow
                 return resp
             token = authenticate(request)
             if token is None:
@@ -100,8 +101,8 @@ def require_scope(scope: str):
             request.crm_token = token
             return view(request, *args, **kwargs)
 
-        # Sitzungslose Schnittstelle ohne Schreibzugriff: die CSRF-Pruefung entfaellt, damit andere Methoden mit
-        # 405 statt mit der CSRF-Fehlerseite beantwortet werden
+        # Sitzungslose Schnittstelle mit Bearer-Token (kein Cookie): die CSRF-Pruefung entfaellt, damit andere
+        # Methoden mit 405 statt mit der CSRF-Fehlerseite beantwortet werden
         return csrf_exempt(wrapped)
 
     return decorator

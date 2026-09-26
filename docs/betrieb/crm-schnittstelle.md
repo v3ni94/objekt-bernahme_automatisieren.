@@ -1,10 +1,10 @@
-# CRM-Schnittstelle (M29 Stufe 3)
+# CRM-Schnittstelle (M29 Stufe 3, Upload aus dem CRM)
 
-Stand: 26.09.2026. Lesende Schnittstelle der Anwendung für das CRM und ausgehende Webhooks (Modul `src/apps/crm_api`). Verbindlich ist der Schnittstellenvertrag M29 Stufe 3/4 zwischen objektakte und CRM; dieses Dokument beschreibt die Umsetzung auf der Seite objektakte und die Punkte, an denen der Vertrag Spielraum lässt.
+Stand: 26.09.2026. Lesende Schnittstelle der Anwendung für das CRM, Upload aus dem CRM in die Verarbeitung und ausgehende Webhooks (Modul `src/apps/crm_api`). Verbindlich ist der Schnittstellenvertrag M29 Stufe 3/4 zwischen objektakte und CRM; dieses Dokument beschreibt die Umsetzung auf der Seite objektakte und die Punkte, an denen der Vertrag Spielraum lässt.
 
 ## 1 Grundsätze
 
-- Nur lesend. Es gibt keinen schreibenden Endpunkt; andere Methoden als GET beantwortet die Schnittstelle mit 405.
+- Lesend bis auf den Upload. Einziger schreibender Endpunkt ist `POST objects/{number}/documents/` (Abschnitt 3a, Scope `documents:write`, Schalter `sync.crm_uploads_enabled`); alle übrigen Pfade beantworten andere Methoden als GET mit 405.
 - Keine Datenbankkopplung. Das CRM ruft die Endpunkte serverseitig mit einem Token auf (im CRM `OBJEKTAKTE_API_URL` und `OBJEKTAKTE_API_TOKEN`), nie aus dem Browser.
 - Objektschlüssel ist die Objektnummer `number` wie im Objektregister erfasst. Abfragen gehen über den Zahlenwert: `/objects/0523/` und `/objects/523/` liefern dasselbe Objekt.
 - Testobjekte (Kennzeichen „Testobjekt“) und das technische Eingangsobjekt erscheinen nicht, weder in der API noch in Webhooks.
@@ -20,7 +20,7 @@ docker compose exec -T web python manage.py crm_token sperren --id 3
 docker compose exec -T web python manage.py crm_token sperren --name crm
 ```
 
-- Scopes: `objects:read` (Endpunkte 1 und 2), `documents:read` (3), `persons:read` (4 und 5). Mehrere Scopes durch Leerzeichen oder Komma getrennt.
+- Scopes: `objects:read` (Endpunkte 1 und 2), `documents:read` (3 und Statusabfrage 7), `persons:read` (4 und 5), `documents:write` (Upload 6). Mehrere Scopes durch Leerzeichen oder Komma getrennt. Für den Upload das vorhandene Token nicht erweitern, sondern ein neues mit allen vier Scopes anlegen und das alte sperren.
 - Die letzte Ausgabezeile von `anlegen` ist der Klartext (Beginn `oak_`). Er wird direkt in die Secret-Verwaltung des CRM übertragen, nicht per E-Mail oder Chat.
 - Rotation: neues Token anlegen, im CRM eintragen, altes Token mit `sperren --id` sperren. Gesperrte Tokens bleiben als Nachweis in der Tabelle.
 - Anlage und Sperre stehen im Protokoll (`crm_token.create`, `crm_token.revoke`), abgewiesene Abrufe als `auth.denied` mit Objektart `crm_api`.
@@ -50,6 +50,25 @@ Festlegungen innerhalb des Vertrags:
 - Dokumente: alle Dokumente des Objekts mit Hash, ohne gelöschte und ohne in ein anderes Objekt übernommene. Dubletten tragen keinen eigenen Hash und erscheinen nicht. `doc_type` ist der Code der Dokumentart, `category` und `subfolder` die Ordnernamen wie in Drive, `status` der Verarbeitungsstatus (`filed` bedeutet abgelegt). `folder` filtert nach Hauptordner, als Code (`02`) oder Ordnername (`02_Stammakte`). `since` (ISO 8601, ohne Zeitzone als UTC gelesen, auch reines Datum) liefert Dokumente, deren Datensatz seit diesem Zeitpunkt geändert wurde.
 - Eigentümer: Zuordnungen, die heute gelten, je Eigentümer eine Zeile mit allen Einheiten des Objekts. `share` ist der Anteil an der Einheit aus der Zuordnung (z. B. `0.5`), wenn er für alle Einheiten des Eigentümers gleich ist, sonst null. Der Miteigentumsanteil der Einheit ist nicht Teil dieses Endpunkts.
 - Mieter: Mieter und Mitmieter mit heute geltender Zuordnung, ohne Bürgen; bei WEG mit Sondereigentumsverwaltung nur Einheiten in eigener Verwaltung (wie die Mieterliste). `lease_start` und `lease_end` aus dem Mietverhältnis, ersatzweise aus der Zuordnung; `lease_end` ist null, solange ein Mietverhältnis unbefristet ist.
+
+## 3a Upload aus dem CRM (Ergänzung 26.09.2026)
+
+| Nr. | Pfad | Methode | Scope | Inhalt |
+|---|---|---|---|---|
+| 6 | `objects/{number}/documents/` | POST | documents:write | Datei in die Verarbeitung geben |
+| 7 | `documents/{id}/` | GET | documents:read | Stand eines Dokuments |
+
+Upload als `multipart/form-data` mit den Feldern `file` (Pflicht), `crm_document_id` (Pflicht, 1 bis 64 Zeichen aus Buchstaben, Ziffern und `. _ : -`, Kennung des Dokuments im CRM) und `hints` (optional, JSON-Objekt). Erlaubte Schlüssel in `hints`: Listen `unit_labels`, `owner_refs`, `tenant_refs`, `contact_refs` (je höchstens 50 Einträge) und Texte `ticket_number`, `title`, `category`, `document_type`, `uploaded_by` (je höchstens 300 Zeichen), zusammen höchstens 8 KB. Die Hinweise tragen Kennungen und Bezeichnungen aus dem CRM, keine Namen oder Kontaktdaten; sie werden am Upload gespeichert (Tabelle `crm_uploads`) und in einem späteren Schritt für die Zuordnung zu Eigentümer- und Mieterakten genutzt.
+
+Ablauf: Die Datei geht durch dieselbe Annahme wie ein Upload in der Anwendung (Transitbereich, Status `registered`, Verarbeitungslauf des Objekts). Hash, Dublettenprüfung, OCR, Klassifikation und Ablage in Drive folgen der Pipeline; nach Paperless überträgt die Anwendung die Datei nur, wenn `paperless.mode` das für das Objekt erlaubt (`full`, im Pilotbetrieb nur Pilotobjekte). Nach der Ablage folgt der Webhook `document.filed`.
+
+Antworten: 202 mit dem Stand wie Endpunkt 7 und Kopfzeile `Location` bei Neuanlage; 200 mit demselben Dokument bei Wiederholung mit gleicher `crm_document_id` (idempotent); 400 bei fehlender Datei, ungültiger Kennung, ungültigen Hinweisen, nicht angenommenem Dateityp oder leerer Datei; 404 bei unbekannter Objektnummer; 409, wenn die Kennung bereits einem anderen Objekt gehört oder das Objekt archiviert ist; 413 über `documents.max_download_bytes`; 503 mit `Retry-After: 900`, solange `sync.crm_uploads_enabled` aus ist. Das CRM wiederholt bei 503 und Netzfehlern später.
+
+Endpunkt 7 liefert die Dokumentzeile wie Endpunkt 3 und zusätzlich `object_number`, `open_review_cases`, `deleted` und `duplicate_of` (bei einer Dublette die Zeile des Originals mit dessen Ablage, sonst null). Das CRM fragt damit den Stand ab, auch wenn Webhooks aus sind; eine Dublette wird nicht erneut abgelegt, das CRM verknüpft sein Dokument mit der Ablage des Originals.
+
+Neu in jeder Dokumentzeile (Endpunkt 3, 7 und Webhook): `crm_document_id` (Kennung aus dem Upload, sonst null) und `paperless_id` (Dokument-ID in Paperless, sonst null). Beides ist eine Erweiterung des Vertrags; ältere Abnehmer ignorieren die Felder.
+
+Einschalten: in der Anwendung unter Konfiguration, Gruppe sync, Schlüssel `sync.crm_uploads_enabled` (Rolle Administrator, mit Begründung im Änderungsprotokoll). Protokoll: jeder Upload als `crm_api.upload` mit Kennung, Token und den Schlüsseln der Hinweise.
 
 ## 4 Webhooks
 

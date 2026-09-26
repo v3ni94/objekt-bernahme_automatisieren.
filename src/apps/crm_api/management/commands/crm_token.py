@@ -39,7 +39,7 @@ class Command(BaseCommand):
         anlegen = sub.add_parser("anlegen", help="neues Token anlegen, Klartext wird einmal ausgegeben")
         anlegen.add_argument("--name", required=True)
         anlegen.add_argument(
-            "--scopes", nargs="+", required=True, help="objects:read, documents:read, persons:read"
+            "--scopes", nargs="+", required=True, help="objects:read, documents:read, persons:read, documents:write"
         )
         sub.add_parser("liste", help="Tokens mit Status und letzter Nutzung (ohne Klartext)")
         sperren = sub.add_parser("sperren", help="Token sperren")

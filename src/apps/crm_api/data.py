@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from datetime import UTC, date, datetime
 
-from django.db.models import Count, Q
+from django.db.models import Count, Prefetch, Q
 from django.utils import timezone
 
 from apps.documents.models import Document, DocumentType
@@ -20,6 +20,7 @@ from apps.parties.services import _period_filter
 from apps.requirements import engine
 from apps.requirements.models import CompletenessCheck, FindingStatus
 from apps.review.models import CaseStatus, ReviewCase
+from apps.sync.models import ExternalLink, LinkRole, SyncSystem
 from apps.sync.services import drive_link
 
 OPEN_CASE_STATUSES = (CaseStatus.OPEN, CaseStatus.IN_PROGRESS)
@@ -219,8 +220,17 @@ def documents_queryset(obj: ManagedObject):
         Document.objects.filter(object=obj, deleted_at__isnull=True, sha256__isnull=False)
         .exclude(sha256="")
         .exclude(status="moved_out")
-        .select_related("category", "subfolder", "document_type")
+        .select_related("category", "subfolder", "document_type", "crm_upload")
+        .prefetch_related(_paperless_prefetch())
         .order_by("pk")
+    )
+
+
+def _paperless_prefetch() -> Prefetch:
+    return Prefetch(
+        "sync_links",
+        queryset=ExternalLink.objects.filter(system=SyncSystem.PAPERLESS, role=LinkRole.ORIGINAL),
+        to_attr="paperless_links",
     )
 
 
@@ -246,7 +256,55 @@ def document_row(doc: Document) -> dict:
         "filed_at": iso(doc.filed_at),
         "mime_type": doc.mime_type or None,
         "size_bytes": doc.size_bytes,
+        # Ergaenzung 26.09.2026 (Upload aus dem CRM): Kennung des CRM-Dokuments und Dokument-ID in Paperless
+        "crm_document_id": _crm_document_id(doc),
+        "paperless_id": _paperless_id(doc),
     }
+
+
+def _crm_document_id(doc: Document) -> str | None:
+    try:
+        return doc.crm_upload.crm_document_id
+    except Document.crm_upload.RelatedObjectDoesNotExist:
+        return None
+
+
+def _paperless_id(doc: Document) -> int | None:
+    links = getattr(doc, "paperless_links", None)
+    if links is None:
+        links = list(
+            ExternalLink.objects.filter(document=doc, system=SyncSystem.PAPERLESS, role=LinkRole.ORIGINAL)
+        )
+    for link in links:
+        if link.external_id and link.external_id.isdigit():
+            return int(link.external_id)
+    return None
+
+
+def find_document(pk: int) -> Document | None:
+    """Dokument fuer die Statusabfrage; nur Dokumente sichtbarer Objekte, geloeschte eingeschlossen."""
+    return (
+        Document.objects.filter(pk=pk, object__is_system_inbox=False, object__is_test=False)
+        .select_related("object", "category", "subfolder", "document_type", "crm_upload", "duplicate_of")
+        .prefetch_related(_paperless_prefetch())
+        .first()
+    )
+
+
+def document_status(doc: Document) -> dict:
+    """Stand eines Dokuments fuer das CRM (Statusabfrage nach dem Upload): Zeile wie in der Dokumentliste plus
+    Objekt, offene Pruefungsfaelle, Loeschung und bei einer Dublette das Original mit seiner Ablage."""
+    open_cases = ReviewCase.objects.filter(document=doc, status__in=OPEN_CASE_STATUSES).count()
+    row = document_row(doc)
+    row.update(
+        {
+            "object_number": doc.object.object_number,
+            "open_review_cases": open_cases,
+            "deleted": doc.deleted_at is not None,
+            "duplicate_of": document_row(doc.duplicate_of) if doc.duplicate_of_id else None,
+        }
+    )
+    return row
 
 
 # ---------------------------------------------------------------- Personen

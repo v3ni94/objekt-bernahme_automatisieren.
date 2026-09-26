@@ -67,3 +67,61 @@ def test_ablage_ohne_webhook_url(
     monkeypatch.setattr(settings, "CRM_WEBHOOK_URL", "", raising=False)
     doc = _ablage(objekt, pdf_factory, run_all, django_capture_on_commit_callbacks)
     assert doc.status == "filed" and posts == []
+
+
+def test_upload_aus_dem_crm_bis_zur_ablage(
+    client,
+    objekt,
+    stammdaten,
+    pdf_factory,
+    run_all,
+    posts,
+    monkeypatch,
+    django_capture_on_commit_callbacks,
+    admin_user,
+):
+    """Ende zu Ende: Upload ueber die Schnittstelle, Verarbeitung bis filed, document.filed traegt die Kennung des
+    CRM-Dokuments; die Statusabfrage liefert denselben Stand."""
+    from io import StringIO
+
+    from django.core.files.uploadedfile import SimpleUploadedFile
+    from django.core.management import call_command
+
+    from apps.config import store
+    from apps.documents.models import Document
+
+    monkeypatch.setattr(settings, "CRM_WEBHOOK_URL", URL, raising=False)
+    monkeypatch.setattr(settings, "CRM_WEBHOOK_SECRET", SECRET, raising=False)
+    objekt.is_test = False
+    objekt.save(update_fields=["is_test", "updated_at"])
+    store.set("sync.crm_uploads_enabled", True, user=admin_user)
+    out = StringIO()
+    call_command(
+        "crm_token", "anlegen", "--name", "crm", "--scopes", "documents:write", "documents:read", stdout=out
+    )
+    auth = {"HTTP_AUTHORIZATION": f"Bearer {out.getvalue().strip().splitlines()[-1]}"}
+    pdf = pdf_factory(
+        "Scan_0815.pdf",
+        [["Gesamtabrechnung 2025 der WEG Musterstadt, Abrechnungsjahr 2025", "Gesamtkosten 45.000,00 EUR"]],
+    )
+    with django_capture_on_commit_callbacks(execute=True):
+        resp = client.post(
+            f"/api/crm/v1/objects/{objekt.object_number}/documents/",
+            {
+                "file": SimpleUploadedFile("Scan_0815.pdf", pdf.read_bytes(), content_type="application/pdf"),
+                "crm_document_id": "crm-doc-1",
+                "hints": json.dumps({"ticket_number": "TNR#412"}),
+            },
+            **auth,
+        )
+    assert resp.status_code == 202, resp.content
+    with django_capture_on_commit_callbacks(execute=True):
+        run_all(objekt)
+    doc = Document.objects.get(pk=resp.json()["id"])
+    assert doc.status == "filed" and doc.drive_file_id
+    events = [json.loads(c["data"]) for c in posts]
+    assert [e["event"] for e in events] == ["document.filed"]
+    assert events[0]["document"]["crm_document_id"] == "crm-doc-1"
+    status = client.get(f"/api/crm/v1/documents/{doc.pk}/", **auth).json()
+    assert status["status"] == "filed" and status["drive_file_id"] == doc.drive_file_id
+    assert status["crm_document_id"] == "crm-doc-1"

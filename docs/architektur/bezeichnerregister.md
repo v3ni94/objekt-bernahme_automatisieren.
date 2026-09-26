@@ -217,6 +217,20 @@ Modell `crm_api.CrmApiToken`. crm api tokens.
 
 Constraints und Indizes: `ix_crm_tokens_name`
 
+### crm_uploads
+
+Modell `crm_api.CrmUpload`. crm uploads.
+
+| Spalte | Typ | Null | Verweis oder Wertevorrat |
+|---|---|---|---|
+| id | bigint AUTO_INCREMENT | nein |  |
+| created_at | datetime(6) | nein |  |
+| updated_at | datetime(6) | nein |  |
+| document_id | bigint | nein | → documents.id |
+| crm_document_id | varchar(64) | nein |  |
+| hints | json | nein |  |
+| token_id | bigint | ja | → crm_api_tokens.id |
+
 ### classification_rules
 
 Modell `documents.ClassificationRule`. classification rules.
@@ -1864,6 +1878,7 @@ Celery-Queues aus den Settings: `ai`, `classify`, `io`, `lists`, `ocr`
 | sync.assignment_ai_min | sync | decimal | `0.85` |
 | sync.assignment_auto_min | sync | decimal | `0.85` |
 | sync.assignment_gap_min | sync | decimal | `0.25` |
+| sync.crm_uploads_enabled | sync | boolean | `false` |
 | sync.drive_changes_enabled | sync | boolean | `false` |
 | sync.drive_changes_interval_minutes | sync | integer | `5` |
 | sync.inbox_folder_id | sync | string | `null` |

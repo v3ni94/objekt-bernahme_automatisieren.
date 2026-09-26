@@ -275,6 +275,8 @@ def test_dokumentliste_mit_filtern(client, bestand):
         "filed_at": doc["filed_at"],
         "mime_type": "application/pdf",
         "size_bytes": 1234,
+        "crm_document_id": None,
+        "paperless_id": None,
     }
     assert doc["filed_at"].endswith("+00:00")
     assert body["results"][1]["filed_at"] is None and body["results"][1]["drive_url"] is None

@@ -626,5 +626,6 @@
   "sync.assignment_ai_min": 0.85,
   "sync.rule_min_confirmations": 2,
   "sync.operation_max_attempts": 5,
-  "sync.inventory_page_size": 200
+  "sync.inventory_page_size": 200,
+  "sync.crm_uploads_enabled": false
 }

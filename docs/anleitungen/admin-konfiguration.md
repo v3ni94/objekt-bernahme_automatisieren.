@@ -2,7 +2,7 @@
 
 Stand: 26.09.2026, erzeugt aus `src/apps/config/catalog.json` und `db/seeds/app_settings.json` (Definition of Done CR 14: Namensmuster Objektordner, Unterstruktur, Schwellwerte, Duplikat-Option, KI-Provider, Aufbewahrungsfristen). Änderungen erfolgen in der Anwendung unter Konfiguration (Recht `settings.write`), jede Änderung steht im Audit (`setting.update`). Werte wirken ohne Neustart; Ausnahmen stehen in der Spalte Wirkung. Seed-Werte sind Vorschläge (ANNAHME), sofern die Quelle nichts anderes sagt.
 
-Schlüssel: 158 in 21 Gruppen (seit 12.09.2026 zusätzlich `paperless.*` und `sync.*` für die Synchronisation mit Paperless-ngx und Google Drive, seit 26.09.2026 `email.*` für die Regel 06 Sonstiges bei E-Mails).
+Schlüssel: 159 in 21 Gruppen (seit 12.09.2026 zusätzlich `paperless.*` und `sync.*` für die Synchronisation mit Paperless-ngx und Google Drive, seit 26.09.2026 `email.*` für die Regel 06 Sonstiges bei E-Mails).
 
 ## Google Drive und Objektordner (`drive.*`)
 
@@ -272,6 +272,7 @@ Drive-Änderungsprotokoll, Eingangsobjekt und Eingangsordner, Schwellen der Obje
 | `sync.rule_min_confirmations` | integer | `2` | Anzahl bestätigter Beispiele mit gleicher Merkmalskombination, ab der eine Zuordnungsregel entsteht | Auftrag Paperless-ngx und Google Drive, 12.09.2026 | min 2, max 20 |
 | `sync.operation_max_attempts` | integer | `5` | Höchstzahl der Versuche je Synchronisationsoperation, danach sichtbar in der Fehlerliste | Auftrag Paperless-ngx und Google Drive, 12.09.2026 | min 1, max 20 |
 | `sync.inventory_page_size` | integer | `200` | Paketgröße des Bestandslaufs (Dateien je Schritt) | Auftrag Paperless-ngx und Google Drive, 12.09.2026 | min 20, max 1000 |
+| `sync.crm_uploads_enabled` | boolean | `false` | Upload aus dem CRM über `/api/crm/v1/` annehmen (Scope `documents:write`); aus: 503, das CRM wiederholt später. Paperless erhält die Uploads nur nach `paperless.mode` | Auftrag Vorstand 26.09.2026 | |
 
 ## Umgebungsvariablen (.env)
 

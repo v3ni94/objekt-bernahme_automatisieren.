@@ -1,7 +1,8 @@
 """Endpunkte der lesenden CRM-Schnittstelle unter /api/crm/v1/ (Schnittstellenvertrag M29 Stufe 3).
 
-Nur GET, Antworten JSON (UTF-8), Paginierung ?page=1&page_size=100 (hoechstens 500). Unbekannte Objektnummer 404.
-Es gibt keinen schreibenden Endpunkt.
+Lesend nur GET, Antworten JSON (UTF-8), Paginierung ?page=1&page_size=100 (hoechstens 500). Unbekannte Objektnummer
+404. Einziger schreibender Endpunkt ist der Upload aus dem CRM (POST auf die Dokumentliste, Scope documents:write,
+Schalter sync.crm_uploads_enabled, apps.crm_api.uploads); dazu die Statusabfrage je Dokument.
 """
 
 from __future__ import annotations
@@ -10,10 +11,11 @@ from datetime import UTC, datetime, time
 
 from django.utils import timezone
 from django.utils.dateparse import parse_date, parse_datetime
+from django.views.decorators.csrf import csrf_exempt
 
-from apps.crm_api import data
+from apps.crm_api import data, uploads
 from apps.crm_api.auth import error, json_response, require_scope
-from apps.crm_api.models import SCOPE_DOCUMENTS, SCOPE_OBJECTS, SCOPE_PERSONS
+from apps.crm_api.models import SCOPE_DOCUMENTS, SCOPE_DOCUMENTS_WRITE, SCOPE_OBJECTS, SCOPE_PERSONS
 
 DEFAULT_PAGE_SIZE = 100
 MAX_PAGE_SIZE = 500
@@ -98,8 +100,20 @@ def object_detail(request, number: str):
     return json_response(data.object_detail(obj))
 
 
-@require_scope(SCOPE_DOCUMENTS)
+@csrf_exempt
 def object_documents(request, number: str):
+    """GET Dokumentliste (documents:read), POST Upload aus dem CRM (documents:write)."""
+    if request.method == "POST":
+        return object_documents_upload(request, number)
+    if request.method not in ("GET", "HEAD"):
+        resp = error(405, "nur GET, POST")
+        resp["Allow"] = "GET, POST"
+        return resp
+    return object_documents_list(request, number)
+
+
+@require_scope(SCOPE_DOCUMENTS)
+def object_documents_list(request, number: str):
     obj = data.find_object(number)
     if obj is None:
         return _not_found()
@@ -127,3 +141,43 @@ def object_tenants(request, number: str):
     if obj is None:
         return _not_found()
     return _page_response(request, data.tenants(obj))
+
+
+@require_scope(SCOPE_DOCUMENTS_WRITE, methods=("POST",))
+def object_documents_upload(request, number: str):
+    if not uploads.uploads_enabled():
+        resp = error(503, "Upload über die CRM-Schnittstelle ist ausgeschaltet (sync.crm_uploads_enabled)")
+        resp["Retry-After"] = "900"
+        return resp
+    obj = data.find_object(number)
+    if obj is None:
+        return _not_found()
+    file = request.FILES.get("file")
+    if file is None:
+        return error(400, "Datei fehlt (Feld file)")
+    try:
+        crm_document_id = uploads.parse_crm_document_id(request.POST.get("crm_document_id"))
+        hints = uploads.parse_hints(request.POST.get("hints"))
+        upload, created = uploads.accept(
+            obj,
+            crm_document_id=crm_document_id,
+            filename=file.name,
+            data=file.read(),
+            hints=hints,
+            token=request.crm_token,
+            request=request,
+        )
+    except uploads.UploadError as exc:
+        return error(exc.status, exc.message)
+    doc = data.find_document(upload.document_id)
+    resp = json_response(data.document_status(doc), status=202 if created else 200)
+    resp["Location"] = f"/api/crm/v1/documents/{doc.pk}/"
+    return resp
+
+
+@require_scope(SCOPE_DOCUMENTS)
+def document_detail(request, pk: int):
+    doc = data.find_document(pk)
+    if doc is None:
+        return error(404, "Dokument nicht gefunden")
+    return json_response(data.document_status(doc))
