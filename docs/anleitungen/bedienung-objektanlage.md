@@ -19,7 +19,7 @@ Ablauf der ersten Anmeldung:
 2. Anmeldung mit E-Mail und Passwort.
 3. Admins: Die Anwendung verlangt sofort die Einrichtung des zweiten Faktors (TOTP). Den angezeigten QR-Code mit einer Authenticator-App scannen und den sechsstelligen Code bestätigen. Ohne zweiten Faktor ist für Admins keine Seite erreichbar. Sachbearbeiter melden sich mit E-Mail und Passwort an; sie können den zweiten Faktor freiwillig unter „Konto“ einrichten. Welche Rollen ihn brauchen, steht in der Konfiguration (`security.mfa_required_roles`, Vorgabe nur `admin`).
 4. Bei jeder weiteren Anmeldung: E-Mail, Passwort, dann der aktuelle Code aus der App, sofern ein zweiter Faktor eingerichtet ist. Nach dem Code fragt die Anwendung „Dieses Gerät merken?“. Mit „Für 90 Tage merken“ entfällt die Codeabfrage auf diesem Browser für 90 Tage (Vorgabe `MFA_TRUST_DAYS` in `.env`); das Vertrauen liegt als signiertes Cookie im Browser und erlischt bei Passwortwechsel, beim Zurücksetzen des zweiten Faktors und beim Löschen der Browserdaten. Auf gemeinsam genutzten oder fremden Geräten „Nicht merken“ wählen.
-5. Passwort ändern und zweiten Faktor verwalten unter „Konto“.
+5. Zweiten Faktor verwalten unter „Konto“. Passwort ändern über die Adresse `/konto/password/change/`; die Konto-Seite enthält keinen Link dorthin.
 
 Wenn etwas nicht klappt:
 

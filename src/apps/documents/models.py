@@ -197,6 +197,9 @@ class Decider(models.TextChoices):
     STAGE2 = "stage2", "Stufe 2"
     STAGE3 = "stage3", "Stufe 3"
     HUMAN = "human", "Mensch"
+    # E-Mail ohne erkannte Dokumentart, mit Schalter email.auto_misc ohne Pruefungsfall nach 06/01 abgelegt
+    # (26.09.2026, Vorlage E-4 Weg 1); Kennzeichen fuer Berichte und Nachklassifikation
+    EMAIL_AUTO = "email_auto", "E-Mail automatisch nach Sonstiges"
 
 
 class Document(SoftDeleteModel):
@@ -796,6 +799,10 @@ class RuleKind(models.TextChoices):
     ENTITY = "entity", "erkannte Entität"
     PERIOD = "period", "Zeitbezug"
     COMPOSITE = "composite", "zusammengesetzte Regel (Definition nach E 2.2)"
+    # E-Mail-Regeln (26.09.2026, Vorlage E-4): Muster gegen den bereinigten Betreff bzw. gegen Absenderadresse
+    # und Absendername; die Definition bleibt eine zusammengesetzte Regel nach E 2.2
+    EMAIL_SUBJECT = "email_subject", "Betreff einer E-Mail"
+    EMAIL_SENDER = "email_sender", "Absender einer E-Mail"
 
 
 class ClassificationRule(TimestampedModel):

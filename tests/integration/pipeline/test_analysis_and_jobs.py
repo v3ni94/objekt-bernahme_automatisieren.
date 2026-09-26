@@ -76,6 +76,14 @@ def test_formatweiche(tmp_path):
     assert analysis.detect_kind(Path("a.docx"), None) == "office"
     assert analysis.detect_kind(Path("a"), "application/vnd.google-apps.document") == "google_doc"
     assert analysis.detect_kind(Path("a.zip"), None) == "unsupported"
+    assert analysis.detect_kind(Path("a.htm"), None) == "html"
+    assert analysis.detect_kind(Path("a.bin"), "text/html") == "html"
+    assert analysis.detect_kind(Path("a.doc"), None) == "office_legacy"
+    assert analysis.detect_kind(Path("a.bin"), "application/vnd.ms-excel") == "office_legacy"
+    # Praesentationen: kein libreoffice-impress im Worker-Image, deshalb unsupported (Paperless-Archivfassung)
+    assert analysis.detect_kind(Path("a.ppt"), None) == "unsupported"
+    assert analysis.detect_kind(Path("a.bin"), "application/vnd.ms-powerpoint") == "unsupported"
+    assert analysis.detect_kind(Path("a.tmp"), None) == "unsupported"
     img = tmp_path / "scan.png"
     Image.new("RGB", (600, 800), (255, 255, 255)).save(img)
     result = analysis.analyze_file(

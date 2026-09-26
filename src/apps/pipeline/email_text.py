@@ -306,8 +306,163 @@ def msg_text(path: Path) -> str:
         return msg_text_from_reader(_MsgReader(ole))
 
 
-def extract_email_text(path: Path) -> list[str]:
-    """Eine Textseite je Nachricht; .msg ueber den OLE-Container, alles andere als RFC 822."""
-    if path.suffix.lower() == ".msg":
+def extract_email_text(path: Path, suffix: str | None = None) -> list[str]:
+    """Eine Textseite je Nachricht; .msg ueber den OLE-Container, alles andere als RFC 822. suffix uebersteuert
+    die Endung der Datei, wenn die Art aus dem Inhalt erkannt wurde (26.09.2026, apps.pipeline.sniff)."""
+    if (suffix or path.suffix).lower() == ".msg":
         return [msg_text(path)]
     return [eml_text(path.read_bytes())]
+
+
+# ---------------------------------------------------------------- Kopfzeilen (26.09.2026)
+# Kopfzeilen als Daten fuer Regeln und Entscheidung (Regel 06 Sonstiges fuer E-Mails, Vorlage E-4): Betreff,
+# Absender, Empfaenger, Datum. Die Textseite oben bleibt unveraendert; diese Funktionen lesen dieselben Quellen
+# noch einmal und liefern ein dict statt Text.
+_SUBJECT_PREFIX = re.compile(
+    r"^\s*(?:\[[^\]]{1,40}\]\s*)?(?:(?:aw|re|wg|fw|fwd|antw|antwort|tr|sv|vs)\s*(?:\^?\d+)?\s*:\s*)+",
+    re.IGNORECASE,
+)
+_TEXT_HEADER = re.compile(r"^(Von|An|Datum|Betreff):\s*(.*)$")
+EMAIL_TITLE_MAX = 120  # Laenge des Ablage-Titels ohne Endung (Dateiname in Drive)
+
+
+def clean_subject(subject: str | None) -> str:
+    """Betreff ohne Antwort- und Weiterleitungspraefixe (AW:, WG:, Re:, Fwd:, FW:, auch mehrfach, mit Zaehler wie
+    AW^2: und mit Kennung in eckigen Klammern davor), Leerraum bereinigt; leer ohne Betreff."""
+    text = " ".join((subject or "").split())
+    while True:
+        stripped = _SUBJECT_PREFIX.sub("", text, count=1).strip()
+        if stripped == text:
+            break
+        text = stripped
+    return text
+
+
+def _address(value: str | None) -> tuple[str | None, str | None]:
+    """Anzeigename und Adresse aus 'Name <adresse>'; nur der erste Absender, Adresse in Kleinschreibung."""
+    if not value:
+        return None, None
+    value = " ".join(value.split())
+    name, addr = email.utils.parseaddr(value)
+    if not addr or "@" not in addr:
+        # kein Adressteil (Exchange-Absender in Outlook nur als Name): der ganze Wert ist der Name
+        return value.strip('"') or None, None
+    return name.strip().strip('"') or None, addr.strip().lower()
+
+
+def _headers(
+    *,
+    subject: str | None,
+    sender: str | None,
+    to: str | None,
+    date: datetime | None,
+    sender_address: str | None = None,
+) -> dict:
+    name, addr = _address(sender)
+    if sender_address and "@" in sender_address:
+        addr = sender_address.strip().lower()
+    subject = " ".join((subject or "").split()) or None
+    return {
+        "subject": subject,
+        "subject_clean": clean_subject(subject),
+        "from_name": name,
+        "from_address": addr,
+        "to": " ".join((to or "").split()) or None,
+        "date": date.isoformat(timespec="minutes") if date is not None else None,
+    }
+
+
+def eml_headers(data: bytes) -> dict:
+    msg = email.message_from_bytes(data, policy=email.policy.default)
+
+    def header(name: str) -> str | None:
+        try:
+            value = msg.get(name)
+        except Exception:  # noqa: BLE001 (defekte Kopfzeile)
+            return None
+        return str(value) if value else None
+
+    date = None
+    try:
+        raw = header("Date")
+        date = email.utils.parsedate_to_datetime(raw) if raw else None
+    except Exception:  # noqa: BLE001 (unbekanntes Datumsformat)
+        logger.debug("Datum der E-Mail nicht lesbar")
+    return _headers(subject=header("Subject"), sender=header("From"), to=header("To"), date=date)
+
+
+def _filetime_datetime(value: int) -> datetime | None:
+    if not value:
+        return None
+    try:
+        return _FILETIME_EPOCH + timedelta(microseconds=value // 10)
+    except (OverflowError, ValueError):
+        return None
+
+
+def msg_headers_from_reader(reader: _MsgReader) -> dict:
+    props = reader.fixed_properties()
+    cpid = props.get("3FDE") or props.get("3FFD")
+    if cpid:
+        cpid = int(cpid) & 0xFFFFFFFF
+        reader.codepage = {1252: "cp1252", 65001: "utf-8", 28591: "latin-1", 20127: "ascii"}.get(
+            cpid, "cp1252"
+        )
+    return _headers(
+        subject=reader.string("0037") or reader.string("0E1D"),
+        sender=reader.string("0C1A"),
+        to=reader.string("0E04"),
+        date=_filetime_datetime(props.get("0039") or props.get("0E06") or 0),
+        sender_address=reader.string("5D01") or reader.string("0C1F"),
+    )
+
+
+def msg_headers(path: Path) -> dict:
+    import olefile
+
+    if not olefile.isOleFile(str(path)):
+        raise ValueError("keine Outlook-Nachricht (kein OLE-Container)")
+    with olefile.OleFileIO(str(path)) as ole:
+        return msg_headers_from_reader(_MsgReader(ole))
+
+
+def parse_email_headers(path: Path) -> dict:
+    """Kopfzeilen einer E-Mail-Datei: subject, subject_clean, from_name, from_address, to, date (ISO 8601, mit
+    Zeitzone, sofern die Nachricht eine traegt). .msg ueber den OLE-Container, alles andere als RFC 822."""
+    if path.suffix.lower() == ".msg":
+        return msg_headers(path)
+    return eml_headers(path.read_bytes())
+
+
+def headers_from_text(text: str) -> dict | None:
+    """Kopfzeilen aus der Textseite (Zeilen Von, An, Datum, Betreff aus compose_text), wenn das Original nicht mehr
+    im Arbeitsverzeichnis liegt (Sweeper). None, wenn der Text keine Kopfzeilen traegt."""
+    head = (text or "").split("\n\n", 1)[0]
+    found: dict[str, str] = {}
+    for line in head.splitlines()[:8]:
+        m = _TEXT_HEADER.match(line.strip())
+        if m:
+            found.setdefault(m.group(1), m.group(2).strip())
+    if "Betreff" not in found and "Von" not in found:
+        return None
+    date = None
+    raw = found.get("Datum")
+    if raw:
+        try:
+            date = datetime.strptime(raw, "%d.%m.%Y %H:%M")
+        except ValueError:
+            date = None
+    return _headers(subject=found.get("Betreff"), sender=found.get("Von"), to=found.get("An"), date=date)
+
+
+def email_title(subject_clean: str | None, suffix: str) -> str | None:
+    """Ablage-Titel einer E-Mail: bereinigter Betreff ohne unzulaessige Zeichen, gekuerzt, mit der Endung der
+    Nachricht (Namensbildung wie bei den Akten: apps.drive.naming.clean_text). None ohne Betreff."""
+    from apps.drive.naming import clean_text
+
+    stem = clean_text(subject_clean or "")
+    if not stem:
+        return None
+    if len(stem) > EMAIL_TITLE_MAX:
+        stem = stem[:EMAIL_TITLE_MAX].rstrip(" .,;-")
+    return f"{stem}{suffix.lower()}"

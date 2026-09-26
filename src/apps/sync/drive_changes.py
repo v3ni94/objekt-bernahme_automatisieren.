@@ -130,6 +130,47 @@ def _register(node, obj_id: int, parent_node_row) -> Document | None:
     return doc
 
 
+def _restore(doc: Document, link: ExternalLink, node, change) -> None:
+    """Als geloescht markiertes Dokument nach Wiederherstellung der Drive-Datei aus dem Papierkorb wiederbeleben
+    (26.09.2026): Loeschkennzeichen zuruecksetzen, Status registriert, Verknuepfung abgeglichen, Kette ab discover;
+    der erledigte Pruefcenter-Fall bleibt erledigt, die Kette legt bei Bedarf einen neuen an."""
+    with transaction.atomic():
+        Document.objects.filter(pk=doc.pk, deleted_at__isnull=False).update(
+            deleted_at=None,
+            delete_reason=None,
+            status=DocumentStatus.REGISTERED,
+            error_message=None,
+            updated_at=timezone.now(),
+        )
+        synced = dict(link.synced_fields or {})
+        synced["name"] = node.name
+        mark_link(
+            link,
+            LinkState.SYNCED,
+            "in Drive aus dem Papierkorb wiederhergestellt",
+            parent_external_id=node.parent_id,
+            synced_fields=synced,
+            checksum_md5=node.md5,
+            last_seen_at=timezone.now(),
+        )
+        record(
+            "sync.drive_restored",
+            entity_type="document",
+            entity_id=doc.pk,
+            object_id=doc.object_id,
+            before={"deleted_at": doc.deleted_at.isoformat(), "delete_reason": doc.delete_reason},
+            after={"drive_file_id": change.file_id, "time": change.time, "status": DocumentStatus.REGISTERED},
+            reason="Drive-Datei aus dem Papierkorb wiederhergestellt (Aenderungsprotokoll)",
+        )
+    enqueue(
+        JobType.DISCOVER,
+        doc.object,
+        key=idempotency_key(JobType.DISCOVER, doc.object_id, node.id, node.md5 or node.modified_time or ""),
+        document=doc,
+        payload={"drive_file_id": node.id, "md5": node.md5, "restored": True},
+    )
+
+
 def _handle_change(change, resolver: Resolver, counters: dict) -> None:
     node = change.node
     link = (
@@ -149,6 +190,13 @@ def _handle_change(change, resolver: Resolver, counters: dict) -> None:
     if change.removed or node is None:
         if doc is not None:
             counters["removed_known"] += 1
+            if doc.deleted_at is not None:
+                # Als geloescht markiertes Dokument (restformate_bereinigen legt Temporaerdateien in den Papierkorb,
+                # 26.09.2026): die endgueltige Entfernung nach Ablauf des Papierkorbs ist die erwartete Folge, kein
+                # Konflikt; die Verknuepfung wird als bestaetigte Loeschung geschlossen
+                if link is not None:
+                    mark_link(link, LinkState.TOMBSTONE, "nach Papierkorb endgueltig entfernt")
+                return
             if link is not None:
                 mark_link(link, LinkState.MISSING, "in Drive entfernt oder kein Zugriff")
             conflict(
@@ -162,7 +210,9 @@ def _handle_change(change, resolver: Resolver, counters: dict) -> None:
             counters["trashed_known"] += 1
             if link is not None:
                 mark_link(link, LinkState.TRASHED, "in Drive im Papierkorb")
-            if doc.status not in ("duplicate", "moved_out"):
+            # Ein als geloescht markiertes Dokument (restformate_bereinigen legt Temporaerdateien selbst in den
+            # Papierkorb, 26.09.2026) erzeugt keinen Konflikt: der Papierkorb ist dort die gewollte Wirkung
+            if doc.status not in ("duplicate", "moved_out") and doc.deleted_at is None:
                 conflict(
                     doc,
                     "drive_trashed",
@@ -176,6 +226,17 @@ def _handle_change(change, resolver: Resolver, counters: dict) -> None:
         counters["folders"] += 1
         return
     if doc is not None:
+        if doc.deleted_at is not None:
+            # Datei eines als geloescht markierten Dokuments liegt wieder ausserhalb des Papierkorbs (26.09.2026):
+            # Wiederherstellung durch einen Nutzer in Drive. Eine Neuregistrierung scheitert am Unique-Constraint
+            # (object, drive_file_id), deshalb wird das vorhandene Dokument wiederbelebt und erneut in die Kette
+            # gegeben; andere Loeschgruende ohne Papierkorb-Verknuepfung bleiben unberuehrt
+            if link is not None and link.state == LinkState.TRASHED:
+                _restore(doc, link, node, change)
+                counters["restored"] = counters.get("restored", 0) + 1
+            else:
+                counters["unchanged_known"] += 1
+            return
         if node.md5 and doc.drive_md5 and node.md5 != doc.drive_md5:
             counters["changed_known"] += 1
             conflict(
@@ -249,6 +310,7 @@ def poll(*, force: bool = False, max_pages: int = 20) -> dict:
             "trashed_unknown",
             "removed_known",
             "removed_unknown",
+            "restored",
             "folders",
             "out_of_scope",
             "pages",
@@ -305,7 +367,9 @@ def poll(*, force: bool = False, max_pages: int = 20) -> dict:
             {"drive_id": drive_id, "set_at": timezone.now().isoformat()},
         )
     services.mark_now(SyncSystem.DRIVE, CURSOR_LAST, counters)
-    if any(counters[k] for k in ("registered", "changed_known", "trashed_known", "removed_known")):
+    if any(
+        counters[k] for k in ("registered", "changed_known", "trashed_known", "removed_known", "restored")
+    ):
         record("sync.drive_changes", entity_type="sync", after=counters)
     return {"cursor": new_start, **counters}
 

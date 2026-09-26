@@ -7,8 +7,18 @@ import pytest
 
 from apps.classification.confidence import Stage1Result, Stage2Result, combine
 from apps.classification.context import DocContext, PeriodRef
-from apps.classification.rules import Rule, RuleError, evaluate, load_seed_rules, matches, sync_rules_to_db
+from apps.classification.rules import (
+    Rule,
+    RuleError,
+    evaluate,
+    load_seed_rules,
+    matches,
+    sync_rules_to_db,
+    uses_email_sender,
+    uses_email_subject,
+)
 from apps.documents.models import ClassificationRule, DocumentCategory
+from apps.pipeline.email_text import headers_from_text
 
 pytestmark = pytest.mark.django_db
 
@@ -28,6 +38,14 @@ def ctx_for(text: str, *, management_type="weg", filename="dokument.pdf", **flag
     for k, v in flags.items():
         setattr(ctx, k, v)
     return ctx
+
+
+def _email_flags(rule: Rule, example: str) -> dict:
+    """E-Mail-Regeln (26.09.2026): das Beispiel ist die Textseite einer Nachricht (Zeilen Von, Betreff, dann der
+    Text); die Kopfzeilen werden daraus wie in der Kette aus der Textseite gelesen."""
+    if not (uses_email_subject(rule) or uses_email_sender(rule)):
+        return {}
+    return {"email": headers_from_text(example)}
 
 
 def _flags_for(rule: Rule, *, negative: bool = False) -> dict:
@@ -76,10 +94,12 @@ def test_regel_beispiele(rule: Rule):
     scope = (rule.scope.get("management_types") or ["weg"])[0]
     assert rule.examples.get("positive"), "jede Regel braucht ein positives Beispiel"
     for example in rule.examples["positive"]:
-        ctx = ctx_for(example, management_type=scope, **_flags_for(rule))
+        ctx = ctx_for(example, management_type=scope, **_flags_for(rule), **_email_flags(rule, example))
         assert matches(rule, ctx) is not None, f"{rule.id}: positives Beispiel trifft nicht: {example}"
     for example in rule.examples.get("negative", []):
-        ctx = ctx_for(example, management_type=scope, **_negative_flags(rule, example))
+        ctx = ctx_for(
+            example, management_type=scope, **_negative_flags(rule, example), **_email_flags(rule, example)
+        )
         hit = matches(rule, ctx)
         # ein negatives Beispiel darf nicht ausschliesslich ueber diese Regel treffen
         assert hit is None or hit.rule.hard is False or True
@@ -94,10 +114,13 @@ def test_negativbeispiele_treffen_nicht_die_eigene_regel():
     for rule in load_seed_rules():
         scope = (rule.scope.get("management_types") or ["weg"])[0]
         for example in rule.examples.get("negative", []):
-            if (
-                matches(rule, ctx_for(example, management_type=scope, **_negative_flags(rule, example)))
-                is not None
-            ):
+            ctx = ctx_for(
+                example,
+                management_type=scope,
+                **_negative_flags(rule, example),
+                **_email_flags(rule, example),
+            )
+            if matches(rule, ctx) is not None:
                 failures.append((rule.id, example))
     assert failures == []
 
@@ -161,8 +184,13 @@ def test_validierung():
 
 
 def test_seed_in_tabelle(seeded):
-    rows = ClassificationRule.objects.filter(rule_kind="composite")
+    rows = ClassificationRule.objects.filter(rule_kind__in=["composite", "email_subject", "email_sender"])
     assert rows.count() == len(load_seed_rules())
+    # E-Mail-Regeln (26.09.2026) tragen ihre Art in rule_kind, die uebrigen bleiben composite
+    assert rows.get(code="R-03-EMAIL-RECHNUNG-001").rule_kind == "email_subject"
+    assert rows.filter(rule_kind="composite").count() == len(
+        [r for r in load_seed_rules() if not r.id.split("-")[2] == "EMAIL"]
+    )
     row = rows.get(code="R-05-ABR-001")
     assert (
         row.target_category_id == "05"

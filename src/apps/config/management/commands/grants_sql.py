@@ -74,6 +74,16 @@ WORKER_DELETE = {
 }
 # Tabellen mit Chiffraten: kein Lesezugriff fuer app_ro
 ENCRYPTED = {"oauth_tokens", "mfa_authenticator", "owners", "tenants", "users"}
+# Scratch-Datenbanken der Deployment-Tests (26.09.2026, docs/betrieb/deployment-test.md): T6 (restore_probe.sh im
+# Backup-Container) spielt den Dump als app_backup in <db>_restore_probe ein, T8 (Aktion migrations-roundtrip) migriert
+# als app_migrate in <db>_probe. Beide Konten brauchen CREATE und DROP auf genau diesen Namen; die Produktionsdatenbank
+# bleibt davon unberuehrt. GRANT auf eine noch nicht vorhandene Datenbank ist in MariaDB zulaessig.
+SCRATCH_GRANTS = {"_restore_probe": "app_backup", "_probe": "app_migrate"}
+
+
+def _mask(name: str) -> str:
+    """Datenbankname fuer den Datenbankteil eines GRANT: _ und % maskieren, sonst wirken sie als Platzhalter."""
+    return name.replace("_", r"\_").replace("%", r"\%")
 
 
 class Command(BaseCommand):
@@ -115,5 +125,9 @@ class Command(BaseCommand):
                 lines.append(f"GRANT SELECT ON `{db}`.`{t}` TO 'app_worker'@'%';")
             if t not in ENCRYPTED:
                 lines.append(f"GRANT SELECT ON `{db}`.`{t}` TO 'app_ro'@'%';")
+        for suffix, account in sorted(SCRATCH_GRANTS.items()):
+            # Im Datenbankteil eines GRANT auf Datenbankebene sind _ und % Platzhalter wie in LIKE; ohne Maskierung
+            # traefe objektakte_probe auch objektakteXprobe. Maskiert gilt das Recht nur fuer genau diesen Namen (26.09.2026).
+            lines.append(f"GRANT ALL PRIVILEGES ON `{_mask(db + suffix)}`.* TO '{account}'@'%';")
         lines.append("FLUSH PRIVILEGES;")
         self.stdout.write("\n".join(lines) + "\n")

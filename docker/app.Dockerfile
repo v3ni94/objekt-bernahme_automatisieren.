@@ -1,6 +1,7 @@
 # Anwendungs-Image mit zwei Zielen (Beschluss B-44, docs/architektur.md 4.1):
 #   web    Django, gunicorn, Celery Beat; ohne OCR-Binaerdateien (oeffentlich erreichbarer Dienst)
-#   worker zusaetzlich Tesseract mit deu, ocrmypdf, Ghostscript, qpdf, poppler und die ML-Bibliotheken
+#   worker zusaetzlich Tesseract mit deu, ocrmypdf, Ghostscript, qpdf, poppler, LibreOffice (Writer, Calc)
+#          fuer Office-Altformate und die ML-Bibliotheken
 # Ein einziger Python-Interpreter je Ziel (Erfahrung aus M0: keine Mischung aus pip und Distributionspaketen).
 # Basis-Image und Paketstand zum Umsetzungszeitpunkt pruefen (docs/architektur/image.md).
 
@@ -60,9 +61,18 @@ FROM runtime-base AS worker
 # TESSDATA_VARIANT: debian (Sprachdaten des Distributionspakets, Groesse im OCR-Probelauf pruefen),
 # fast (tessdata_fast) oder standard (tessdata). Entscheidung nach M0 (Frage F18).
 ARG TESSDATA_VARIANT=debian
+# LibreOffice (26.09.2026, Vorlage E-1 Office-Altformate): libreoffice-writer und libreoffice-calc wandeln
+# .doc, .xls, .rtf, .odt, .ods headless in PDF (apps.pipeline.office_convert, Binaerdatei ueber SOFFICE_BIN,
+# Standard soffice). Bewusst kein libreoffice-impress: Praesentationen (.ppt, .odp) zaehlt die Formatweiche
+# (apps.pipeline.analysis.OFFICE_LEGACY_EXT) nicht zu den Altformaten, sie laufen ueber die Paperless-Archivfassung.
+# Wer Impress ergaenzt, muss dort .ppt und application/vnd.ms-powerpoint aufnehmen (sonst wandelt der Worker sie
+# nicht). Ohne Empfehlungen (kein Java, keine Hilfe, keine Sprachpakete); das Worker-Image waechst
+# dennoch um einige hundert MB, was nur dieses Ziel betrifft: web baut aus derselben runtime-base ohne diese
+# Stufe. fonts-liberation liefert metrisch zu Arial, Times New Roman und Courier New passende Schriften, damit
+# Seitenumbrueche der Altdokumente erhalten bleiben; fonts-dejavu-core bleibt fuer die Vorschauen.
 RUN apt-get update && apt-get install -y --no-install-recommends \
       tesseract-ocr tesseract-ocr-deu ghostscript qpdf poppler-utils unpaper pngquant \
-      fonts-dejavu-core curl \
+      libreoffice-writer libreoffice-calc fonts-dejavu-core fonts-liberation curl \
  && rm -rf /var/lib/apt/lists/* \
  && TD=/usr/share/tesseract-ocr/5/tessdata \
  && case "${TESSDATA_VARIANT}" in \
@@ -75,7 +85,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=builder-worker /opt/venv /opt/venv
 ENV OMP_THREAD_LIMIT=1
 # Startskripte des Venv pruefen (fangen einen falschen Shebang-Pfad zur Bauzeit statt im Betrieb)
-RUN celery --version && python -c "import ocrmypdf, pdfplumber, sklearn"
+RUN celery --version && python -c "import ocrmypdf, pdfplumber, sklearn" && soffice --version
 USER app
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 CMD ["celery", "-A", "objektakte", "worker", "-Q", "ocr", "--concurrency", "1"]

@@ -246,6 +246,8 @@
   "import.ocr_cell_confidence_min": 70,
   "reports.misc_share_target_pct": 5,
   "reports.review_age_warning_days": 10,
+  "email.auto_misc": false,
+  "email.match_sender_to_party": false,
   "security.store_full_iban": false,
   "security.iban_decrypt_roles": [],
   "security.mfa_required_roles": [
@@ -570,6 +572,7 @@
   },
   "processing.work_orphan_hours": 48,
   "processing.heartbeat_seconds": 30,
+  "processing.office_convert_timeout_s": 120,
   "ocr.language": "deu",
   "ocr.image_cover_ratio": 0.9,
   "classification.own_company_names": [

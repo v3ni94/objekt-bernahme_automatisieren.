@@ -85,7 +85,10 @@ docker compose run --rm --no-deps web app-migrate
 # ueberschreibt keine im Admin geaenderten Werte (Test "zweiter Lauf ohne Aenderung").
 docker compose run --rm --no-deps web app-seed
 
-# 5b. Tabellenrechte nachziehen (B-43): SQL aus dem Modellregister, als root ausgefuehrt
+# 5b. Tabellenrechte nachziehen (B-43): SQL aus dem Modellregister, als root ausgefuehrt. Vorher Reste der
+# Scratch-Datenbanken der Deployment-Tests entfernen (26.09.2026): restore-probe und migrations-roundtrip loeschen sie
+# selbst, nach KILL oder Containerneustart koennen sie stehen bleiben (Produktionskopie in Datenbankgroesse).
+docker compose exec -T db sh -c 'mariadb -uroot -p"$(cat /run/secrets/db_root_password)" -e "DROP DATABASE IF EXISTS \`${MARIADB_DATABASE}_restore_probe\`; DROP DATABASE IF EXISTS \`${MARIADB_DATABASE}_probe\`;"'
 docker compose run --rm --no-deps -T web app-grants-sql \
   | docker compose exec -T db sh -c 'mariadb -uroot -p"$(cat /run/secrets/db_root_password)" "$MARIADB_DATABASE"'
 

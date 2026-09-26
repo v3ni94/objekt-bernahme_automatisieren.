@@ -934,7 +934,9 @@ def apply_decision(
             label_unit_id=target.unit_id,
             label_assignment_id=links[0].assignment_id if links and links[0].assignment_id else None,
             label_period_year=target.period_year,
-            label_scope=final.scope_decision,
+            # ck_decisions_scope kennt nur object, accounting, owner, tenant; eine Entscheidung nach 06 (scope
+            # unclear) scheiterte bis 26.09.2026 am Check (Befund Sammelaktion manuelle-pruefung)
+            label_scope=final.scope_decision if final.scope_decision != "unclear" else None,
             system_was_correct=system_correct,
         )
         # Trainingsdatum (CR 11): auch Bestaetigungen; Ablagen in 06 nur mit Bestaetigung (hier gegeben)
@@ -1027,7 +1029,17 @@ def defer(
     return case
 
 
-def dismiss(case: ReviewCase, user, *, reason: str, request=None) -> ReviewDecision:
+def dismiss(
+    case: ReviewCase,
+    user,
+    *,
+    reason: str,
+    request=None,
+    is_bulk: bool = False,
+    bulk_key: str | None = None,
+) -> ReviewDecision:
+    """Fall ohne Ablage schliessen; is_bulk und bulk_key kennzeichnen die Sammelaktion per Kommando
+    (faelle_sammelaktion --aktion verwerfen, 26.09.2026), die Entscheidung bleibt je Fall abfragbar."""
     if not reason or not reason.strip():
         raise ReviewError("Grund ist Pflicht")
     with transaction.atomic():
@@ -1038,6 +1050,8 @@ def dismiss(case: ReviewCase, user, *, reason: str, request=None) -> ReviewDecis
         case.resolved_by = user
         case.resolved_at = timezone.now()
         case.resolution = {"decision": "reject", "reason": reason}
+        if bulk_key:
+            case.resolution["bulk_key"] = bulk_key
         case.save(update_fields=["status", "resolved_by", "resolved_at", "resolution", "updated_at"])
         decision = ReviewDecision.objects.create(
             review_case=case,
@@ -1047,8 +1061,10 @@ def dismiss(case: ReviewCase, user, *, reason: str, request=None) -> ReviewDecis
             decision_type=DecisionType.REJECT,
             decided_by=user,
             decided_at=timezone.now(),
+            is_bulk=is_bulk,
+            bulk_key=bulk_key,
             before_state={"status": "open"},
-            after_state={"reason": reason},
+            after_state={"reason": reason, "bulk_key": bulk_key} if bulk_key else {"reason": reason},
             system_was_correct=None,
         )
         action = "review.dismiss_object_case" if case.case_type in OBJECT_CASE_TYPES else "review.dismiss"
@@ -1060,6 +1076,7 @@ def dismiss(case: ReviewCase, user, *, reason: str, request=None) -> ReviewDecis
             request=request,
             actor=user,
             reason=reason,
+            after={"bulk_key": bulk_key} if bulk_key else None,
         )
     return decision
 

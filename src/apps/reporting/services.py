@@ -55,6 +55,8 @@ class ObjectKpi:
     ai_cost_month: Decimal = Decimal("0")
     imports: dict = field(default_factory=dict)
     last_run_at: object = None
+    email_auto_misc: int = 0  # E-Mails ohne Dokumentart, automatisch nach 06/01 (email.auto_misc, 26.09.2026)
+    email_sender_matched: int = 0  # E-Mails ueber die Absenderadresse einer Akte zugeordnet (Weg 2)
 
 
 def business_days(start: date, end: date) -> int:
@@ -89,6 +91,11 @@ def object_kpi(obj: ManagedObject, *, today: date | None = None) -> ObjectKpi:
         document__in=classified, is_final=True, features__kpi_misc_adjusted=True
     ).count()
     k.misc_share_adjusted = _pct(adjusted, k.docs_classified)
+    # E-Mails (Vorlage E-4, 26.09.2026): Zaehler der beiden konfigurierbaren Wege
+    k.email_auto_misc = classified.filter(final_decided_by="email_auto").count()
+    k.email_sender_matched = DocumentClassification.objects.filter(
+        document__in=classified, is_final=True, features__email_sender_match__in=["owner", "tenant"]
+    ).count()
     last_run = (
         ProcessingRun.objects.filter(object=obj, status__in=("done", "failed"))
         .order_by("-finished_at")
@@ -203,6 +210,8 @@ CSV_COLUMNS = [
     "Anteil Stufe 3 %",
     "Importzeilen",
     "Import unsicher",
+    "E-Mails automatisch 06",
+    "E-Mails nach Absender zugeordnet",
 ]
 
 
@@ -244,6 +253,8 @@ def overview_csv(rows: list[ObjectKpi]) -> str:
                 _de(k.ai_share_pct),
                 k.imports.get("rows_total", 0),
                 k.imports.get("rows_uncertain", 0),
+                k.email_auto_misc,
+                k.email_sender_matched,
             ]
         )
     return buf.getvalue()

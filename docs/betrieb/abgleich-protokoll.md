@@ -76,3 +76,12 @@ Ergebnis: ausstehend.
 | Fall | Objekt | Entscheidung | Datum |
 |---|---|---|---|
 | ausstehend | | | |
+
+## 9. Stichprobe der Paperless-Zuordnung (Vorlage E-3, Nachweis für Punkt 3)
+
+Ablauf in docs/betrieb/paperless-sync.md Abschnitt 6.2: Deploy-Aktion `zuordnung-stichprobe` zieht je Hauptkategorie 50 abgelegte Paperless-Dokumente als CSV, der Sachbearbeiter füllt die Spalte `pruefung` (richtig, falsch, unklar), die Auswertung (`ergebnis=<pfad>`) schreibt die Tabelle unten als Markdown nach `exports/stichproben/`. Die Tabelle wird je Lauf hier eingefügt; nichts wird vorab eingetragen.
+
+| Lauf | Datum | Seed | Umfang je Kategorie | CSV | Quote richtig gesamt | Befund falsch (Dokument-IDs) | Nacharbeit |
+|---|---|---|---|---|---|---|---|
+| ausstehend | | | | | | | |
+

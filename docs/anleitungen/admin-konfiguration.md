@@ -1,8 +1,8 @@
 # Admin-Konfiguration (app_settings)
 
-Stand: 12.09.2026, erzeugt aus `src/apps/config/catalog.json` und `db/seeds/app_settings.json` (Definition of Done CR 14: Namensmuster Objektordner, Unterstruktur, Schwellwerte, Duplikat-Option, KI-Provider, Aufbewahrungsfristen). Änderungen erfolgen in der Anwendung unter Konfiguration (Recht `settings.write`), jede Änderung steht im Audit (`setting.update`). Werte wirken ohne Neustart; Ausnahmen stehen in der Spalte Wirkung. Seed-Werte sind Vorschläge (ANNAHME), sofern die Quelle nichts anderes sagt.
+Stand: 26.09.2026, erzeugt aus `src/apps/config/catalog.json` und `db/seeds/app_settings.json` (Definition of Done CR 14: Namensmuster Objektordner, Unterstruktur, Schwellwerte, Duplikat-Option, KI-Provider, Aufbewahrungsfristen). Änderungen erfolgen in der Anwendung unter Konfiguration (Recht `settings.write`), jede Änderung steht im Audit (`setting.update`). Werte wirken ohne Neustart; Ausnahmen stehen in der Spalte Wirkung. Seed-Werte sind Vorschläge (ANNAHME), sofern die Quelle nichts anderes sagt.
 
-Schlüssel: 149 in 20 Gruppen (seit 12.09.2026 zusätzlich `paperless.*` und `sync.*` für die Synchronisation mit Paperless-ngx und Google Drive).
+Schlüssel: 158 in 21 Gruppen (seit 12.09.2026 zusätzlich `paperless.*` und `sync.*` für die Synchronisation mit Paperless-ngx und Google Drive, seit 26.09.2026 `email.*` für die Regel 06 Sonstiges bei E-Mails).
 
 ## Google Drive und Objektordner (`drive.*`)
 
@@ -171,12 +171,22 @@ Schlüssel: 149 in 20 Gruppen (seit 12.09.2026 zusätzlich `paperless.*` und `sy
 | `reports.misc_share_target_pct` | integer | `5` | Zielwert Anteil 06_Sonstiges je Objekt in Prozent | CR 8 | min 0, max 100 |
 | `reports.review_age_warning_days` | integer | `10` | Warnung ab diesem Alter offener Review-Fälle in Arbeitstagen | ANNAHME A25, Frage F22 | min 1 |
 
+## E-Mails (`email.*`)
+
+Beide Schalter gehören zur Regel 06 Sonstiges für E-Mails (Entscheidungsvorlage E-4, 26.09.2026). Sie sind mit `false` ausgeliefert und werden erst gesetzt, wenn die Verteilung aus `review-status` ausgewertet und der Weg von der Geschäftsführung freigegeben ist (Deploy-Aktion `config-set`). Grundlage beider Wege sind die Kopfzeilen der Nachricht (Betreff ohne AW:, WG:, Re:, Fwd:, Absender, Empfänger, Datum), die die Kette je Job aus dem Original oder der Textseite liest; es gibt dafür keine Datenbankspalte.
+
+| Schlüssel | Typ | Seed | Bedeutung | Quelle | Wertebereich |
+|---|---|---|---|---|---|
+| `email.auto_misc` | boolean | `false` | Weg 1: E-Mails (.eml, .msg) ohne erkannte Dokumentart (keine Kategorie erreicht `classification.threshold_auto_file`) werden ohne Prüfungsfall nach 06/01_Unklar abgelegt, auch Bestandsdateien aus Drive werden dorthin verschoben. Der Dateiname in Drive ist der bereinigte Betreff mit der Endung der Nachricht. Kennzeichen: `final_decided_by = email_auto` am Dokument, Notiz in der finalen Klassifikationszeile (`features.email_auto_misc`), Zähler im Objektbericht (E-Mails automatisch in 06) und in `review-status` (entschieden durch). Bei vorübergehendem Ausfall der Stufe 3 (Anbieter gestört, Kostendeckel erreicht) entsteht weiter der Fall `below_threshold` für `ai-reclassify`. Wirkung: sofort für alle folgenden Entscheidungen; bereits erzeugte Fälle bleiben. `false`: Prüfungsfall `below_threshold` wie bei allen Dokumenten unter der Schwelle | Vorlage E-4 | boolean |
+| `email.match_sender_to_party` | boolean | `false` | Weg 2: stimmt die Absenderadresse (Groß- und Kleinschreibung unerheblich) mit dem Feld E-Mail eines Eigentümers oder Mieters überein, der eine Zuordnung auf einer Einheit des Objekts hat, wird die E-Mail dessen Akte zugeordnet: Eigentümerakte, Unterordner 08_Korrespondenz, Dokumentart Schriftverkehr; Mieterakte, Dokumentart Mieterkorrespondenz (die Mieterakte hat im Seed keine Unterordner, `tenant_file.subfolders`). Zielt die Regel schon auf dieselbe Akte (Kategorie 05 bzw. 04), bleiben Unterordner und Dokumentart der Regel. Eigentümer vor Mieter; die Einheit ergibt sich aus der Zuordnung des Absenders (Entscheidungstabelle B-09, bei mehreren Einheiten Prüfungsfall wie bisher). Eine im Text genannte Einheit gilt nur, wenn der Absender dort zugeordnet ist; beim Eigentumsnachweis bleibt die Einheit des Textes. Führen mehrere Eigentümer oder mehrere Mieter des Objekts dieselbe Adresse, unterbleibt die Zuordnung: Kennzeichen `owner_ambiguous` bzw. `tenant_ambiguous`, die Entscheidung läuft wie ohne Abgleich mit Schwelle und Prüfungsfall, Stufe 3 bleibt möglich. Eine sichere Entscheidung für eine andere Kategorie (harte oder sichere Regel, KI über `classification.threshold_auto_file`, etwa ein weitergeleitetes Protokoll) bleibt bestehen, der Treffer wird nur als Kennzeichen geführt. Bei Treffer ruft die Kette Stufe 3 nicht auf. In reiner WEG-Verwaltung bleibt es für Mieterdokumente beim Fall 06/02. Wirkung: sofort. `false`: Entscheidung nur nach Regeln, Klassifikator und Stufe 3 | Vorlage E-4 | boolean |
+
 ## Verarbeitung (`processing.*`)
 
 | Schlüssel | Typ | Seed | Bedeutung | Quelle | Wertebereich |
 |---|---|---|---|---|---|
 | `processing.heartbeat_seconds` | integer | `30` | Abstand der Heartbeats laufender Jobs in Sekunden (ANNAHME A-13) | A-13 | min 5 |
 | `processing.max_parallel_objects` | integer | `1` | Gleichzeitig verarbeitete Objekte (Obergrenze 64 seit 21.09.2026 für den 64-Kern-Server; OCR-Prozesse und Ablage-Threads passend dimensionieren; die Drive-Schreibsperre eines Objekts umfasst seit 20.09.2026 nur noch die Ordnerauflösung, mehrere Dokumente desselben Objekts legen seither parallel ab) | ANNAHME A20, Frage F18 | min 1, max 64 |
+| `processing.office_convert_timeout_s` | integer | `120` | Zeitlimit in Sekunden für die Umwandlung eines Office-Altformats (.doc, .xls, .rtf, .odt, .ods) in PDF über LibreOffice; danach Fall „nicht unterstütztes Format“ mit Notiz (26.09.2026) | Vorlage E-1 | min 10, max 500 |
 | `processing.work_orphan_hours` | integer | `48` | Frist, nach der verwaiste Arbeitsverzeichnisse unter work/ ohne aktiven Job geräumt werden (E 10.4 Punkt 4); ANNAHME | E 10.4 | min 1 |
 
 ## OCR (`ocr.*`)

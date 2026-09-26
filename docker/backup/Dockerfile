@@ -10,7 +10,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Werkzeuge des Healthchecks und der Sicherung zur Bauzeit pruefen
 RUN pgrep --version >/dev/null && mariadb-dump --version >/dev/null && age --version >/dev/null \
  && jq --version >/dev/null && rclone --version >/dev/null
-COPY docker/backup/backup.sh docker/backup/restore.sh docker/backup/entrypoint.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/backup.sh /usr/local/bin/restore.sh /usr/local/bin/entrypoint.sh
+# restore_probe.sh (26.09.2026): Wiederherstellungsprobe T6 in eine Scratch-Datenbank, docs/betrieb.md 5.4.1
+COPY docker/backup/backup.sh docker/backup/restore.sh docker/backup/restore_probe.sh docker/backup/entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/backup.sh /usr/local/bin/restore.sh /usr/local/bin/restore_probe.sh /usr/local/bin/entrypoint.sh
 VOLUME ["/backup"]
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

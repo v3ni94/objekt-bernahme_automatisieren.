@@ -23,7 +23,7 @@ from apps.config import store
 from apps.documents.ingest import safe_filename
 from apps.documents.models import DocumentSource, DocumentStatus
 from apps.pipeline import storage
-from apps.pipeline.analysis import detect_kind
+from apps.pipeline.analysis import UNREADABLE_KINDS, detect_kind
 from apps.review.models import CaseStatus, CaseType, ReviewCase
 from apps.sync import services
 from apps.sync.flows.common import link_for, upsert_link
@@ -70,8 +70,15 @@ class Command(BaseCommand):
             if doc.deleted_at is not None:
                 ergebnis["Dokument geloescht"] += 1
                 continue
-            if detect_kind(Path(doc.current_name or ""), doc.mime_type) != "unsupported":
-                # Die Kette kennt das Format inzwischen (E-Mails seit 25.09.2026): formate_wiederaufnehmen
+            geprueft = (case.context or {}).get("content_checked") is True
+            if (
+                detect_kind(Path(doc.current_name or ""), doc.mime_type) not in UNREADABLE_KINDS
+                and not geprueft
+            ):
+                # Die Kette kennt das Format inzwischen (E-Mails seit 25.09.2026, HTML und Office-Altformate
+                # ueber LibreOffice seit 26.09.2026): formate_wiederaufnehmen (Altformate: Gruppe office).
+                # Hat die Formatweiche den Inhalt schon geprueft (content_checked), zaehlt der MIME-Typ nicht
+                # mehr (Rechnung.tmp mit application/pdf, Inhalt unbekannt): Archivfassung zulassen (26.09.2026)
                 ergebnis["Format inzwischen verarbeitbar (formate_wiederaufnehmen)"] += 1
                 continue
             link = link_for(doc, SyncSystem.PAPERLESS)

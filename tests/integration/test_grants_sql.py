@@ -99,3 +99,19 @@ def test_worker_darf_akten_und_objektordner_schreiben():
         "objects",
     ):
         assert f"GRANT SELECT, INSERT, UPDATE ON `{db}`.`{tabelle}` TO 'app_worker'@'%';" in text, tabelle
+
+
+def test_scratch_datenbanken_der_deployment_tests_erhalten_rechte():
+    """T6 (restore_probe.sh als app_backup) und T8 (migrations-roundtrip als app_migrate) brauchen CREATE und DROP
+    auf ihre Scratch-Datenbanken; die Produktionsdatenbank erhaelt dadurch kein zusaetzliches Recht (26.09.2026)."""
+    zeilen = _sql()
+    db = connection.settings_dict["NAME"]
+    # Unterstriche maskiert (26.09.2026): im Datenbankteil eines GRANT sind _ und % Platzhalter wie in LIKE,
+    # unmaskiert traefe objektakte_probe auch objektakteXprobe
+    m = db.replace("_", "\\_")
+    assert f"GRANT ALL PRIVILEGES ON `{m}\\_restore\\_probe`.* TO 'app_backup'@'%';" in zeilen
+    assert f"GRANT ALL PRIVILEGES ON `{m}\\_probe`.* TO 'app_migrate'@'%';" in zeilen
+    assert not any("PRIVILEGES ON `" in z and "_probe`" in z and "\\_probe`" not in z for z in zeilen)
+    assert not any(z.startswith(f"GRANT ALL PRIVILEGES ON `{db}`.*") for z in zeilen)
+    # app_backup bleibt auf der Produktionsdatenbank ohne Schreibrecht (nur ueber 01_accounts.sh gesetzt, hier nicht)
+    assert not any("TO 'app_backup'" in z and f"`{db}`.`" in z for z in zeilen)

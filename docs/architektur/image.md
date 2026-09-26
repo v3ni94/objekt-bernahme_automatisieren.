@@ -33,6 +33,7 @@ Prüfung der Trennung: Im Ziel `web` läuft zur Bauzeit `manage.py check`; das l
 ## Ziel worker
 
 - Zusätzlich: `tesseract-ocr`, `tesseract-ocr-deu`, `ghostscript`, `qpdf`, `poppler-utils`, `unpaper`, `pngquant`, `fonts-dejavu-core`, `curl`.
+- Seit 26.09.2026 `libreoffice-writer`, `libreoffice-calc` (ohne empfohlene Pakete) und `fonts-liberation` für die Umwandlung von Office-Altformaten `.doc`, `.xls`, `.rtf`, `.odt`, `.ods` in PDF (`apps.pipeline.office_convert`, Binärdatei über `SOFFICE_BIN`, Standard `soffice`); bewusst kein `libreoffice-impress`, Präsentationen (`.ppt`, `.odp`) laufen über die Paperless-Archivfassung. Größe des Worker-Images nach dem Bau prüfen, das Ziel `web` ist nicht betroffen. `soffice --version` läuft als Bauzeitprüfung.
 - Sprachdaten über das Build-Argument `TESSDATA_VARIANT`: `debian` (Paketstand; im OCR-Probelauf war die Datei rund 1,5 MB groß, was auf die schnelle Variante hindeutet), `fast` (tessdata_fast), `standard` (tessdata). Entscheidung nach M0 (Frage F18).
 - `OMP_THREAD_LIMIT=1`, damit ein OCR-Prozess genau einen Kern belegt.
 

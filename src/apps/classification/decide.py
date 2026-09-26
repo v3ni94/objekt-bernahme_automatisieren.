@@ -99,6 +99,10 @@ class Decision:
     kpi_misc_adjusted: bool = False
     candidates_top: list[dict] = field(default_factory=list)
     stage3_provider: str | None = None  # Anbieter, wenn Stufe 3 entschieden hat (finale Zeile, E 7.2)
+    # E-Mails (26.09.2026, Vorlage E-4): Weg 1 automatische Ablage nach 06/01 ohne Fall, Weg 2 Absender ist
+    # Eigentuemer ("owner") oder Mieter ("tenant") des Objekts
+    email_auto_misc: bool = False
+    email_sender_match: str | None = None
 
     @property
     def review_required(self) -> bool:
@@ -412,6 +416,119 @@ def _segment_entities(ctx: DocContext, page_from: int, page_to: int, key: str) -
 # ---------------------------------------------------------------- Entscheidung
 
 
+SENDER_AMBIGUOUS = {"owner": "owner_ambiguous", "tenant": "tenant_ambiguous"}
+
+
+def email_sender_lookup(ctx: DocContext, obj) -> tuple[str, int | None] | None:
+    """Weg 2 der Vorlage E-4 (26.09.2026), Schalter email.match_sender_to_party: Absenderadresse der E-Mail gegen
+    die E-Mail-Adressen der Eigentuemer und Mieter mit Zuordnung auf einer Einheit des Objekts. Rueckgabe
+    ("owner", id) oder ("tenant", id) bei genau einem Treffer, sonst None; Eigentuemer vor Mieter.
+    Gesamtreview 26.09.2026: owners.email ist nicht eindeutig (Bevollmaechtigte, Familienmitglieder). Fuehren
+    mehrere verschiedene Eigentuemer (bzw. Mieter) dieselbe Adresse, ist die Zuordnung mehrdeutig; Rueckgabe
+    ("owner_ambiguous", None) bzw. ("tenant_ambiguous", None), die Entscheidung laeuft dann den Normalweg mit
+    Schwelle und Fall, statt die E-Mail ohne Fall in der Akte der kleinsten ID abzulegen."""
+    if ctx.email is None or not bool(store.get("email.match_sender_to_party", False)):
+        return None
+    address = (ctx.email.get("from_address") or "").strip().lower()
+    if not address:
+        return None
+    owner_ids = list(
+        OwnerUnitAssignment.active.filter(
+            unit__object=obj,
+            unit__deleted_at__isnull=True,
+            owner__deleted_at__isnull=True,
+            owner__email__iexact=address,
+        )
+        .order_by("owner_id")
+        .values_list("owner_id", flat=True)
+        .distinct()[:2]
+    )
+    if len(owner_ids) > 1:
+        return SENDER_AMBIGUOUS["owner"], None
+    if owner_ids:
+        return "owner", owner_ids[0]
+    from apps.parties.models import TenantUnitAssignment
+
+    tenant_ids = list(
+        TenantUnitAssignment.active.filter(
+            unit__object=obj,
+            unit__deleted_at__isnull=True,
+            tenant__deleted_at__isnull=True,
+            tenant__email__iexact=address,
+        )
+        .order_by("tenant_id")
+        .values_list("tenant_id", flat=True)
+        .distinct()[:2]
+    )
+    if len(tenant_ids) > 1:
+        return SENDER_AMBIGUOUS["tenant"], None
+    if tenant_ids:
+        return "tenant", tenant_ids[0]
+    return None
+
+
+def email_sender_party(ctx: DocContext, obj) -> tuple[str, int] | None:
+    """Eindeutiger Absendertreffer aus email_sender_lookup, ("owner", id) oder ("tenant", id); bei fehlendem oder
+    mehrdeutigem Treffer None (Gesamtreview 26.09.2026: dann auch kein Verzicht auf Stufe 3)."""
+    found = email_sender_lookup(ctx, obj)
+    if found is None or found[1] is None:
+        return None
+    return found[0], found[1]
+
+
+def _apply_sender_match(base: Decision, ctx: DocContext, party: tuple[str, int], obj=None) -> None:
+    """Absender ist Eigentuemer oder Mieter des Objekts: die E-Mail gehoert in dessen Akte, Unterordner
+    Korrespondenz (05/08 schriftverkehr bzw. 04 mieterkorrespondenz). Zielt die Regel schon auf dieselbe Akte
+    (Kategorie 05 bzw. 04), bleiben Unterordner und Dokumentart der Regel.
+    Gesamtreview 26.09.2026: die Einheit ergibt sich aus der Zuordnung des Absenders (B-09). Im Text erkannte
+    Einheiten bleiben nur, soweit der Absender dort eine aktive Zuordnung hat; nennt der Text keine seiner
+    Einheiten, entscheidet owner_checks ueber Zweig d) (eine Einheit bestaetigt, mehrere Einheiten Fall
+    multiple_units). Ausnahme Eigentumsnachweis der Regel: dort bleiben die Einheiten des Textes, damit der Fall
+    new_assignment_proposed fuer eine neu erworbene Einheit entstehen kann."""
+    kind, party_id = party
+    if kind == "owner":
+        ctx.owner_ids = [party_id, *[o for o in ctx.owner_ids if o != party_id]]
+        if base.category != "05" or not base.subfolder:
+            base.subfolder, base.document_type = "08", "schriftverkehr"
+        base.category, base.scope = "05", "owner"
+        if obj is not None and base.document_type not in OWNERSHIP_TYPES:
+            own_units = set(
+                OwnerUnitAssignment.active.filter(
+                    owner_id=party_id, unit__object=obj, unit__deleted_at__isnull=True
+                ).values_list("unit_id", flat=True)
+            )
+            ctx.unit_ids = [u for u in ctx.unit_ids if u in own_units]
+        base.reason = (
+            "Absender ist Eigentümer des Objekts (E-Mail-Adresse); Korrespondenz in der Eigentümerakte"
+        )
+    else:
+        ctx.tenant_ids = [party_id, *[t for t in ctx.tenant_ids if t != party_id]]
+        if base.category != "04":
+            base.document_type = "mieterkorrespondenz"
+        base.category, base.subfolder, base.scope = "04", None, "tenant"
+        base.reason = "Absender ist Mieter des Objekts (E-Mail-Adresse); Korrespondenz in der Mieterakte"
+    base.confidence = max(base.confidence, EMAIL_SENDER_MATCH_CONFIDENCE)
+    base.decided_by = "stage1"
+    base.email_sender_match = kind
+
+
+EMAIL_SENDER_MATCH_CONFIDENCE = 0.95
+SENDER_MATCH_OVERRIDABLE = (None, "04", "05", "06")
+
+
+def sender_match_applies(base: Decision, threshold_auto_file: float) -> bool:
+    """Weg 2 greift nur, wenn die bisherige Entscheidung nicht verbindlich auf eine andere Akte zeigt: keine
+    Kategorie, 06, unter der Schwelle oder bereits dieselbe Akte (05 bzw. 04). Eine sichere Entscheidung fuer 01,
+    02, 03 usw. bleibt (Gegenpruefung 26.09.2026)."""
+    return base.category in SENDER_MATCH_OVERRIDABLE or base.confidence < threshold_auto_file
+
+
+def _stage3_temporarily_failed(s3) -> bool:
+    """Stufe 3 hat nur voruebergehend nicht geantwortet (Anbieter gestoert, Kostendeckel erreicht): ein spaeterer
+    Nachklassifikationslauf kann die Entscheidung noch verbessern."""
+    return s3 is not None and s3.status in ("provider_error", "budget_blocked")
+
+
 def _misc_subfolder(s1: Stage1Result) -> str:
     """Unterordner unter 06: nur aus Regeln, die selbst 06 setzen, und nur, wenn der Katalog ihn kennt, sonst 01.
     23.09.2026: 47 Ablagen scheiterten mit DoesNotExist, weil die Abstufung nach 06 den Stufe-1-Unterordner der
@@ -556,9 +673,36 @@ def _decide_core(
             else []
         )
     existing = doc.source == "drive_existing"
+    # E-Mail von Eigentuemer oder Mieter des Objekts (Weg 2, Vorlage E-4, 26.09.2026): Zuordnung zur Akte vor der
+    # Schwellenpruefung, damit die Korrespondenz nicht in 06/01 landet; Schalter email.match_sender_to_party.
+    # Gegenpruefung 26.09.2026: eine sichere Entscheidung fuer eine andere Kategorie (harte oder sichere Regel,
+    # KI ueber der Schwelle, z. B. Protokoll oder Teilungserklaerung per E-Mail vom Eigentuemer) bleibt bestehen;
+    # der Absendertreffer wird dann nur als Kennzeichen gefuehrt.
+    # Gesamtreview 26.09.2026: mehrdeutige Absenderadresse (mehrere Eigentuemer bzw. Mieter) nur als Kennzeichen
+    # owner_ambiguous bzw. tenant_ambiguous, Entscheidung und Fall wie ohne Abgleich.
+    party = email_sender_lookup(ctx, obj)
+    if party is not None:
+        if party[1] is not None and sender_match_applies(base, t["threshold_auto_file"]):
+            _apply_sender_match(base, ctx, (party[0], party[1]), obj)
+        else:
+            base.email_sender_match = party[0]
     # Schritt 5: keine Kategorie erreicht die Schwelle -> 06/01_Unklar mit Fall
     if base.category is None or base.confidence < t["threshold_auto_file"]:
         base.physical_category, base.physical_subfolder = "06", "01"
+        if ctx.is_email and bool(store.get("email.auto_misc", False)) and not _stage3_temporarily_failed(s3):
+            # Weg 1 der Vorlage E-4 (26.09.2026), Schalter email.auto_misc: E-Mail ohne erkannte Dokumentart ohne
+            # Pruefungsfall nach 06/01 mit dem bereinigten Betreff als Titel; Kennzeichen final_decided_by =
+            # email_auto und Notiz in der finalen Klassifikationszeile, Zaehler in den Berichten. Bewusste
+            # 06-Entscheidung, deshalb auch fuer Bestandsdateien verschiebbar (wie 03 und 04, B-10). Nicht bei
+            # voruebergehendem Ausfall der Stufe 3 (Gegenpruefung 26.09.2026): dann entsteht der Fall
+            # below_threshold, den ai_reclassify nach Behebung erneut einreiht.
+            base.category, base.subfolder, base.document_type, base.scope = "06", "01", None, "unclear"
+            base.decided_by = "email_auto"
+            base.reason = f"{combined.reason}; E-Mail ohne erkannte Dokumentart, automatisch nach 06/01 (email.auto_misc)"
+            base.email_auto_misc = True
+            base.kpi_misc, base.kpi_misc_adjusted = True, True
+            base.move_allowed = True
+            return base
         stage3_reason = None
         if s3 is not None and s3.status in (
             "provider_error",
@@ -995,7 +1139,7 @@ def persist(
             )
         final = DocumentClassification(
             document=doc,
-            stage={"stage1": 1, "stage2": 2, "stage3": 3}.get(decision.decided_by, 2),
+            stage={"stage1": 1, "stage2": 2, "stage3": 3, "email_auto": 1}.get(decision.decided_by, 2),
             provider=provider_final,
             model=s2.model_version if s2 is not None and decision.decided_by == "stage2" else None,
             category_id=decision.category,
@@ -1019,6 +1163,8 @@ def persist(
                 "top": decision.candidates_top,
                 "kpi_misc": decision.kpi_misc,
                 "kpi_misc_adjusted": decision.kpi_misc_adjusted,
+                "email_auto_misc": decision.email_auto_misc,
+                "email_sender_match": decision.email_sender_match,
             },
             is_final=not dry_run,
         )
@@ -1046,6 +1192,11 @@ def persist(
         doc.classifier_version = s2.model_version if s2 is not None else None
         doc.is_master_with_segments = bool(decision.segments)
         doc.status = "review" if decision.review_required else "classified"
+        title = email_document_title(ctx, doc) if decision.move_allowed else None
+        if title and title != doc.current_name:
+            # Ablage-Titel einer E-Mail ist der bereinigte Betreff (26.09.2026, Vorlage E-4); der Dateiname in
+            # Drive folgt beim Upload bzw. per Umbenennung in file_to_drive, original_name bleibt
+            doc.current_name = title
         doc.save()
         if (
             s1.hard
@@ -1053,10 +1204,13 @@ def persist(
             and not decision.review_required
             and decision.category
             and decision.category != "06"
+            and not (decision.email_sender_match in ("owner", "tenant") and decision.category != s1.category)
         ):
             # E 3.4 Nr. 1: harte Regeltreffer ohne Pruefbedarf werden gewichtetes Trainingsbeispiel fuer Stufe 2.
             # Bis 20.09.2026 war das nicht angebunden, deshalb blieb Stufe 2 trotz Tausender Ablagen in der
-            # Kaltstartphase und jede unsichere Entscheidung ging an Stufe 3.
+            # Kaltstartphase und jede unsichere Entscheidung ging an Stufe 3. Kein Beispiel, wenn der
+            # Absenderabgleich (Weg 2) die Kategorie der Regel ersetzt hat (Gegenpruefung 26.09.2026): das Label
+            # stammt dann aus der Adresse, nicht aus dem Text.
             try:
                 from apps.classification.stage2 import input_text
                 from apps.classification.training import add_rule_sample
@@ -1155,11 +1309,25 @@ def persist(
                 status="confirmed" if not decision.review_required else "suggested",
                 classification=final,
             )
-        if decision.physical_category == "06":
+        if decision.physical_category == "06" and not decision.email_auto_misc:
+            # Ausnahme: E-Mail ohne Dokumentart mit Schalter email.auto_misc (Weg 1, Vorlage E-4)
             assert any(c.misc_subfolder or c.case_type for c in decision.cases), (
                 "Ablage in 06 ohne Review-Fall (CR 8)"
             )
     return final
+
+
+def email_document_title(ctx: DocContext, doc: Document) -> str | None:
+    """Dateiname einer E-Mail fuer die Ablage: bereinigter Betreff mit der Endung der Nachricht; None fuer andere
+    Formate oder ohne Betreff (dann bleibt der bisherige Name)."""
+    if ctx.email is None:
+        return None
+    from pathlib import Path
+
+    from apps.pipeline.email_text import email_title
+
+    suffix = Path(doc.current_name or doc.original_name or "").suffix or ".eml"
+    return email_title(ctx.email.get("subject_clean"), suffix)
 
 
 def _sub(category: str | None, code: str | None):

@@ -38,6 +38,34 @@ def on_document_hashed(doc) -> None:
     )
 
 
+def on_document_renamed(doc) -> None:
+    """Nach der Umbenennung durch die Formatweiche (26.09.2026, tasks._rename_by_content): die Uebertragung nach
+    Paperless erneut vormerken, wenn die erste (nach dem Hash) die Datei wegen der Temporaer-Endung uebersprungen
+    hat; eine wartende oder erledigte erste Uebertragung bleibt allein massgeblich (kein zweiter Upload)."""
+    from apps.sync import operations
+    from apps.sync.models import OperationStatus, SyncOperation
+
+    if doc.source == "paperless" or not doc.sha256:
+        return
+    if not config.writes_allowed(doc.object):
+        return
+    if _paperless_link(doc) is not None:
+        return
+    first_key = operations.op_key(OperationKind.PAPERLESS_PUSH, doc.uuid, doc.sha256)
+    first = SyncOperation.objects.filter(op_key=first_key).first()
+    if first is not None and first.status != OperationStatus.SKIPPED:
+        return
+    operations.enqueue(
+        OperationKind.PAPERLESS_PUSH,
+        system=SyncSystem.PAPERLESS,
+        key=operations.op_key(OperationKind.PAPERLESS_PUSH, doc.uuid, doc.sha256, "renamed"),
+        document=doc,
+        source_system=SyncSystem.APP,
+        source_revision=doc.sha256,
+        payload={"reason": "renamed"},
+    )
+
+
 def on_document_filed(doc) -> None:
     """Nach der Ablage in Drive: Kennzeichen an der Drive-Datei setzen und Drive-Link sowie Objektbezug in
     Paperless nachtragen."""

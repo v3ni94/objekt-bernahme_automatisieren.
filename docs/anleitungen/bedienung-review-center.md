@@ -83,6 +83,25 @@ Für gleichartige Fälle (gleiches Objekt, gleiche Herkunft, Kategorie, Unterord
 
 Grenzen: höchstens 500 Fälle je Sammelaktion (Konfiguration review.bulk_max_cases). Die Vorschau schreibt nichts; erst „Ausführen“ ändert Daten.
 
+### Sammelaktion je Objekt und Unterart (Kommando faelle_sammelaktion, seit 26.09.2026)
+
+Für den Prüfrückstand gibt es zusätzlich ein Server-Kommando, das Fälle nach Objekt und Unterart auswählt und über dieselben Wege wie die Oberfläche erledigt (Deploy-Aktion `faelle-sammelaktion`, Plan in docs/plan/pruefrueckstand.md). Es läuft nicht in der Oberfläche; der Admin startet es auf dem Server.
+
+| Aktion | Auswahl (Standard) | Wirkung |
+|---|---|---|
+| kandidat-bestaetigen | Unterart below_threshold mit Kandidat (Regel oder KI), Konfidenz mindestens `min` (Vorgabe 0,7) | wie Speichern mit dem Vorschlag: Klassifikation Stufe 4, Verknüpfungen, Fall erledigt, Ablagejob |
+| verwerfen | Unterart ai_sample (andere über `unterart=`) | wie Verwerfen mit Grund; Objektfälle bleiben der Einzelbearbeitung vorbehalten |
+| manuelle-pruefung | Unterart manual_check | Ablage in 06/02_Manuelle_Pruefung mit Begründung, Fall erledigt |
+
+Ablauf:
+
+1. Vorschau: `faelle-sammelaktion <branch> aktion=kandidat-bestaetigen+min=0.7` (ohne `echt`). Die Ausgabe zeigt Zähler je Objekt, Unterart und Zielbereich, dazu übersprungene Fälle (ohne Kandidat, unter Mindestkonfidenz) und blockierte Zeilen (dieselben Fehler wie die rote Ampel der Massenbearbeitung, etwa „mehrere Kandidaten: Eigentümer wählen“). Es wird nichts geändert.
+2. Ausführung: dieselben Argumente plus `benutzer=EMAIL+echt`, zunächst mit `objekt=NR+limit=N` als Pilot. Der Benutzer muss aktiv sein und die Berechtigung review.decide haben (dieselbe Hürde wie die Oberfläche), sonst bricht das Kommando vor dem ersten Fall ab. Er erscheint als Entscheider in Fall, Entscheidung und Audit. `limit=N` zählt ausführbare Fälle; blockierte Zeilen verbrauchen die Begrenzung nicht, ein Pilot kommt also auch dann voran, wenn die ältesten Fälle blockiert sind. Für `verwerfen` ist `grund=TEXT` ein einzelnes Wort ohne Leerzeichen und Umlaute (Zeichenvorrat der Deploy-Aktion); Unterstriche werden als Leerzeichen übernommen, ohne Angabe gilt der Standardtext des Kommandos. Lange Läufe (mehrere tausend Fälle) besser je Objekt oder mit `limit` in Teilschritten ausführen, damit ein Abbruch der SSH-Sitzung wenig offen lässt.
+3. Ergebnis: Die Fälle stehen im Prüfcenter als erledigt oder verworfen mit einem gemeinsamen bulk_key. Das Kommando gibt ihn bei `echt` als erste Zeile aus, vor dem ersten Block; am Ende schreibt es das Audit `review.bulk_command` mit den Zählern. Bricht der Lauf ab (SSH-Trennung, Zeitüberschreitung), bleiben die bis dahin getroffenen Entscheidungen wirksam, das Audit `review.bulk_command` fehlt dann; der Schlüssel steht in der ersten Ausgabezeile und in den je Block geschriebenen Audits `review.bulk_execute` (after_state.bulk_key) beziehungsweise je Fall in `review.dismiss`. Ein erneuter Start mit denselben Argumenten nimmt nur die noch offenen Fälle. Die Ablage läuft als Job in der Queue io; Drive wird im Kommando nicht aufgerufen.
+4. Korrektur: wie bei jeder Entscheidung über Wiedereröffnen im Einzelfall.
+
+Ein erneuter Lauf mit denselben Argumenten findet keine Fälle mehr; erledigte und verworfene Fälle werden nie erneut angefasst. Blockierte Fälle (rote Zeilen) bleiben offen und gehören in die Massenbearbeitung der Oberfläche, wo Kandidat oder Einheit je Zeile gewählt werden.
+
 ## 7. Serienmodus und Tastatur
 
 Serienmodus: Sicht wählen, ersten Fall öffnen, entscheiden mit Umschalt + Enter („Speichern und nächster“). Die Anwendung öffnet den nächsten offenen Fall derselben Sicht. Esc führt zur Liste zurück. Die Taste ? zeigt die Belegung.

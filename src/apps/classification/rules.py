@@ -30,6 +30,7 @@ ENTITY_NAMES = {
     "iban",
     "id_document",
     "amount",
+    "email",  # Dokument ist eine E-Mail mit Kopfzeilen (26.09.2026)
 }
 CONDITION_KEYS = {
     "filename_regex",
@@ -43,7 +44,22 @@ CONDITION_KEYS = {
     "min_pages",
     "max_pages",
     "any_of",
+    "email_subject_regex",  # gegen subject_clean der E-Mail (26.09.2026, Vorlage E-4)
+    "email_sender_regex",  # gegen from_address und from_name der E-Mail
 }
+REGEX_KEYS = (
+    "filename_regex",
+    "text_regex",
+    "head_regex",
+    "not_text_regex",
+    "not_filename_regex",
+    "email_subject_regex",
+    "email_sender_regex",
+)
+TEXT_FEATURE_KEYS = ("text_regex", "head_regex")
+# Betreff-Regeln zaehlen als starkes Merkmal nur zusammen mit Textmerkmalen (Schwellen unveraendert): ohne
+# text_regex, head_regex oder verlangte Entitaet ist der Treffer weich und bleibt unter threshold_auto_file
+EMAIL_SUBJECT_ONLY_CONFIDENCE = 0.6
 
 
 class RuleError(ValueError):
@@ -141,7 +157,7 @@ def validate(rule: Rule) -> None:
     for name in [*rule.when.get("entity_required", []), *rule.when.get("not_entity", [])]:
         if name not in ENTITY_NAMES:
             raise RuleError(f"{rule.id}: unbekannte Entität {name}")
-    for key in ("filename_regex", "text_regex", "head_regex", "not_text_regex", "not_filename_regex"):
+    for key in REGEX_KEYS:
         for pattern in [*rule.when.get(key, []), *rule.when.get("any_of", {}).get(key, [])]:
             try:
                 re.compile(pattern)
@@ -152,6 +168,39 @@ def validate(rule: Rule) -> None:
             raise RuleError(f"{rule.id}: Verwaltungsart {mt!r} muss ein Code sein (weg, rental, weg_with_se)")
     if not 0 <= rule.confidence <= 1:
         raise RuleError(f"{rule.id}: confidence außerhalb 0 bis 1")
+    if uses_email_subject(rule) and rule.hard and not has_text_feature(rule):
+        raise RuleError(f"{rule.id}: Betreff-Regel ohne Textmerkmal darf nicht hart sein (Vorlage E-4)")
+
+
+def uses_email_subject(rule: Rule) -> bool:
+    return "email_subject_regex" in rule.when or "email_subject_regex" in rule.when.get("any_of", {})
+
+
+def uses_email_sender(rule: Rule) -> bool:
+    return "email_sender_regex" in rule.when or "email_sender_regex" in rule.when.get("any_of", {})
+
+
+def has_text_feature(rule: Rule) -> bool:
+    """Textmerkmal im Sinne der Vorlage E-4: Text- oder Kopfmuster (auch in any_of) oder eine verlangte Entitaet
+    ausser 'email' selbst."""
+    if any(k in rule.when for k in TEXT_FEATURE_KEYS):
+        return True
+    any_of = rule.when.get("any_of", {})
+    if "email_subject_regex" not in any_of and any(k in any_of for k in TEXT_FEATURE_KEYS):
+        # any_of mit Betreffmuster ist schon ueber den Betreff allein erfuellt, die Textmuster darin sind dann
+        # kein sicheres Merkmal (Gegenpruefung 26.09.2026)
+        return True
+    return any(n != "email" for n in rule.when.get("entity_required", []))
+
+
+def rule_kind_for(rule: Rule) -> str:
+    """rule_kind der Tabellenzeile (RuleKind): email_subject bei Betreffmuster, email_sender bei Absendermuster,
+    sonst composite (26.09.2026)."""
+    if uses_email_subject(rule):
+        return "email_subject"
+    if uses_email_sender(rule):
+        return "email_sender"
+    return "composite"
 
 
 def rules_dir() -> Path:
@@ -221,6 +270,17 @@ def _condition(key: str, spec, ctx: DocContext) -> tuple[bool, str | None]:
         return ctx.page_count >= int(spec), None
     if key == "max_pages":
         return ctx.page_count <= int(spec), None
+    if key == "email_subject_regex":
+        # nur E-Mails; Muster gegen den bereinigten Betreff (ohne AW:, WG:, Re:, Fwd:)
+        if ctx.email is None:
+            return False, None
+        m = _any(spec, ctx.email.get("subject_clean") or "")
+        return m is not None, m and f"email_subject~{m}"
+    if key == "email_sender_regex":
+        if ctx.email is None:
+            return False, None
+        m = _any(spec, ctx.email.get("from_address") or "") or _any(spec, ctx.email.get("from_name") or "")
+        return m is not None, m and f"email_sender~{m}"
     return False, None
 
 
@@ -252,7 +312,11 @@ def matches(rule: Rule, ctx: DocContext) -> RuleHit | None:
             metadata[k] = ctx.metadata().get(v[1:-1])
         else:
             metadata[k] = v
-    return RuleHit(rule, rule.confidence, rule.hard, metadata, matched)
+    confidence, hard = rule.confidence, rule.hard
+    if uses_email_subject(rule) and not has_text_feature(rule):
+        # Betreff allein ist ein weiches Merkmal (Vorlage E-4): Konfidenz gedeckelt, nie hart, Schwellen unveraendert
+        confidence, hard = min(confidence, EMAIL_SUBJECT_ONLY_CONFIDENCE), False
+    return RuleHit(rule, confidence, hard, metadata, matched)
 
 
 def evaluate(ctx: DocContext, rules: list[Rule] | None = None) -> Stage1Result:
@@ -305,7 +369,7 @@ def sync_rules_to_db(rules: list[Rule] | None = None) -> tuple[int, int, int]:
         )
         values = {
             "name": rule.name,
-            "rule_kind": "composite",
+            "rule_kind": rule_kind_for(rule),
             "pattern": json.dumps(rule.when, ensure_ascii=False),
             "target_category_id": rule.category,
             "target_subfolder": sub,

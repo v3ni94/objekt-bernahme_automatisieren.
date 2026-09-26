@@ -710,38 +710,65 @@ EML_BYTES = b"From: absender@example.test\r\nSubject: Testnachricht\r\n\r\nInhal
 
 
 HTML_BYTES = b"<html><body><p>Seite ohne echte Personen.</p></body></html>"
+# Office-Altformat: OLE-Vorspann (office_legacy); seit dem 26.09.2026 wandelt LibreOffice im Worker es in PDF,
+# in diesen Tests fehlt LibreOffice (Fixture ohne_soffice), die Kette legt den Fall mit Notiz an
+DOC_BYTES = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1" + bytes(512)
+# Praesentation im OpenDocument-Format: kennt die Formatweiche nicht (kein Impress im Worker-Image)
+ODP_BYTES = b"PK\x03\x04" + bytes(64)
+ODP_MIME = "application/vnd.oasis.opendocument.presentation"
 
 
-def test_nicht_verarbeitbares_original_kommt_als_archivfassung(paperless, eingang, ops, run_all):
-    """HTML-Original kennt die Verarbeitung nicht; hat Paperless eine PDF-Archivfassung, laedt die Uebernahme diese
-    statt des Originals (25.09.2026, 6.527 Faelle "nicht unterstuetztes Format" im Bestand). E-Mails (.eml, .msg)
-    liest die Kette seit dem 25.09.2026 selbst: sie kommen als Original, auch wenn eine Archivfassung existiert."""
+@pytest.fixture
+def ohne_soffice(monkeypatch, tmp_path):
+    monkeypatch.setenv("SOFFICE_BIN", str(tmp_path / "soffice-fehlt"))
+
+
+def test_nicht_verarbeitbares_original_kommt_als_archivfassung(
+    paperless, eingang, ops, run_all, ohne_soffice
+):
+    """Ein Format, das die Verarbeitung nicht liest (hier .odp): hat Paperless eine PDF-Archivfassung, laedt die
+    Uebernahme diese statt des Originals (25.09.2026, 6.527 Faelle "nicht unterstuetztes Format" im Bestand).
+    E-Mails (.eml, .msg) liest die Kette seit dem 25.09.2026 selbst, HTML und Office-Altformate (.doc ueber
+    LibreOffice) seit dem 26.09.2026: sie kommen als Original, auch wenn eine Archivfassung existiert."""
     archiv = pdf_bytes()
     remote_id = paperless.add_document(
-        "Seite",
-        content=HTML_BYTES,
-        original_file_name="Seite.html",
-        mime_type="text/html",
+        "Vortrag",
+        content=ODP_BYTES,
+        original_file_name="Vortrag.odp",
+        mime_type=ODP_MIME,
         archive_content=archiv,
     )
     paperless_pull.poll(force=True)
     ops()
     link = _link(remote_id)
     doc = link.document
-    assert doc.current_name == "Seite.pdf" and doc.original_name == "Seite.html"
+    assert doc.current_name == "Vortrag.pdf" and doc.original_name == "Vortrag.odp"
     assert doc.mime_type == "application/pdf" and doc.size_bytes == len(archiv)
     assert Path(doc.source_path).read_bytes() == archiv
     assert link.mime_type == "application/pdf" and link.synced_fields["variant"] == "archive"
     downloads = [c for c in paperless.calls if c[0] == "download"]
     assert downloads and downloads[-1][2] == {"original": False}
-    # Ohne Archivfassung bleibt es beim Original (und spaeter beim Fall nicht unterstuetztes Format)
+    # Office-Altformat (26.09.2026): Original trotz Archivfassung, die Kette wandelt selbst
     remote_id = paperless.add_document(
-        "Seite 2", content=HTML_BYTES, original_file_name="Seite_2.html", mime_type="text/html"
+        "Schreiben",
+        content=DOC_BYTES,
+        original_file_name="Schreiben.doc",
+        mime_type="application/msword",
+        archive_content=pdf_bytes(),
     )
     paperless_pull.poll(force=True)
     ops()
     link = _link(remote_id)
-    assert link.document.current_name == "Seite_2.html" and link.synced_fields["variant"] == "original"
+    assert link.document.current_name == "Schreiben.doc" and link.synced_fields["variant"] == "original"
+    assert [c for c in paperless.calls if c[0] == "download"][-1][2] == {"original": True}
+    # Ohne Archivfassung bleibt es beim Original (und spaeter beim Fall nicht unterstuetztes Format)
+    remote_id = paperless.add_document(
+        "Schreiben 2", content=DOC_BYTES, original_file_name="Schreiben_2.doc", mime_type="application/msword"
+    )
+    paperless_pull.poll(force=True)
+    ops()
+    link = _link(remote_id)
+    assert link.document.current_name == "Schreiben_2.doc" and link.synced_fields["variant"] == "original"
     assert [c for c in paperless.calls if c[0] == "download"][-1][2] == {"original": True}
     # E-Mail: Original, obwohl Paperless eine Archivfassung hat; die Kette liest sie als Textseite
     remote_id = paperless.add_document(
@@ -760,17 +787,35 @@ def test_nicht_verarbeitbares_original_kommt_als_archivfassung(paperless, eingan
     mail.refresh_from_db()
     assert mail.page_count == 1 and mail.origin_kind == "digital"
     assert not ReviewCase.objects.filter(document=mail, case_subtype="unsupported_format").exists()
+    # HTML (26.09.2026): ebenfalls Original, die Kette liest es als Textseite
+    remote_id = paperless.add_document(
+        "Seite",
+        content=HTML_BYTES,
+        original_file_name="Seite.html",
+        mime_type="text/html",
+        archive_content=pdf_bytes(),
+    )
+    paperless_pull.poll(force=True)
+    ops()
+    link = _link(remote_id)
+    seite = link.document
+    assert seite.current_name == "Seite.html" and link.synced_fields["variant"] == "original"
+    run_all(eingang)
+    seite.refresh_from_db()
+    assert seite.page_count == 1 and seite.origin_kind == "digital"
+    assert not ReviewCase.objects.filter(document=seite, case_subtype="unsupported_format").exists()
 
 
-def test_archivfassung_befehl_stellt_bestand_um(paperless, eingang, ops, run_all):
-    """Bestand: Dokument mit Fall nicht unterstuetztes Format wird per Befehl auf die spaeter vorhandene
-    Archivfassung umgestellt, Fall erledigt, Dokument laeuft von vorn durch die Kette."""
+def test_archivfassung_befehl_stellt_bestand_um(paperless, eingang, ops, run_all, ohne_soffice):
+    """Bestand: Dokument mit Fall nicht unterstuetztes Format (hier .doc ohne LibreOffice, Umwandlung nicht
+    verfuegbar) wird per Befehl auf die spaeter vorhandene Archivfassung umgestellt, Fall erledigt, Dokument
+    laeuft von vorn durch die Kette."""
     from io import StringIO
 
     from django.core.management import call_command
 
     remote_id = paperless.add_document(
-        "Seite", content=HTML_BYTES, original_file_name="Seite.html", mime_type="text/html"
+        "Schreiben", content=DOC_BYTES, original_file_name="Schreiben.doc", mime_type="application/msword"
     )
     paperless_pull.poll(force=True)
     ops()
@@ -778,7 +823,9 @@ def test_archivfassung_befehl_stellt_bestand_um(paperless, eingang, ops, run_all
     doc = _link(remote_id).document
     doc.refresh_from_db()
     fall = ReviewCase.objects.get(document=doc, case_subtype="unsupported_format", status=CaseStatus.OPEN)
-    assert doc.status == "review" and doc.current_name == "Seite.html"
+    assert doc.status == "review" and doc.current_name == "Schreiben.doc"
+    assert fall.context["kind"] == "unsupported" and fall.context["content_checked"] is True
+    assert fall.context["note"] == "Umwandlung nicht verfügbar"
     out = StringIO()
     call_command("paperless_archivfassung", stdout=out)
     assert "keine Archivfassung in Paperless 1" in out.getvalue() and "Vorschau" in out.getvalue()
@@ -794,7 +841,7 @@ def test_archivfassung_befehl_stellt_bestand_um(paperless, eingang, ops, run_all
     assert "umgestellt 1" in out.getvalue()
     doc.refresh_from_db()
     fall.refresh_from_db()
-    assert doc.status == "registered" and doc.current_name == "Seite.pdf" and doc.sha256 is None
+    assert doc.status == "registered" and doc.current_name == "Schreiben.pdf" and doc.sha256 is None
     assert doc.mime_type == "application/pdf" and Path(doc.source_path).read_bytes() == archiv
     assert fall.status == CaseStatus.RESOLVED and fall.resolution["action"] == "reprocess_archive"
     assert _link(remote_id).synced_fields["variant"] == "archive"
@@ -833,7 +880,9 @@ def _bestandsdatei(objekt, drive, name: str, data: bytes, mime: str):
     )
 
 
-def test_archivfassung_auch_fuer_bestandsdatei_aus_drive(objekt, paperless, drive, eingang, ops, run_all):
+def test_archivfassung_auch_fuer_bestandsdatei_aus_drive(
+    objekt, paperless, drive, eingang, ops, run_all, ohne_soffice
+):
     """Server 25.09.2026: 6.527 Faelle, der Befehl fand 3. Die Uebernahme verknuepft ein Paperless-Dokument, dessen
     Datei schon als Drive-Bestand registriert ist, nur per Pruefsumme; das Dokument behaelt die Quelle Drive-Bestand.
     Der Befehl waehlt deshalb ueber die Verknuepfung, die Kette liest danach die lokale PDF-Fassung statt die
@@ -843,17 +892,17 @@ def test_archivfassung_auch_fuer_bestandsdatei_aus_drive(objekt, paperless, driv
 
     from django.core.management import call_command
 
-    doc = _bestandsdatei(objekt, drive, "Seite.html", HTML_BYTES, "text/html")
-    ohne = _bestandsdatei(objekt, drive, "Altformat.doc", b"\xd0\xcf\x11\xe0 doc", "application/msword")
+    doc = _bestandsdatei(objekt, drive, "Schreiben.doc", DOC_BYTES, "application/msword")
+    ohne = _bestandsdatei(objekt, drive, "Aufnahme.mp4", b"\x00\x00\x00\x18ftypmp42" + bytes(64), "video/mp4")
     ingest.ensure_run(objekt, documents=[doc, ohne])
     run_all(objekt)
     doc.refresh_from_db()
     ohne.refresh_from_db()
     assert doc.status == "review" and ohne.status == "review"
-    assert doc.sha256 == hashlib.sha256(HTML_BYTES).hexdigest()
+    assert doc.sha256 == hashlib.sha256(DOC_BYTES).hexdigest()
     fall = ReviewCase.objects.get(document=doc, case_subtype="unsupported_format", status=CaseStatus.OPEN)
     remote_id = paperless.add_document(
-        "Seite", content=HTML_BYTES, original_file_name="Seite.html", mime_type="text/html"
+        "Schreiben", content=DOC_BYTES, original_file_name="Schreiben.doc", mime_type="application/msword"
     )
     paperless_pull.poll(force=True)
     ops()
@@ -870,14 +919,16 @@ def test_archivfassung_auch_fuer_bestandsdatei_aus_drive(objekt, paperless, driv
     text = out.getvalue()
     assert "Offene Faelle: 2" in text and "Archivfassung vorhanden 1" in text
     assert "Ohne Paperless-Verknuepfung nach Quelle: Drive-Bestand 1" in text
-    assert "Ohne Paperless-Verknuepfung nach Endung: .doc 1" in text
-    assert "Altformat" not in text  # keine Dateinamen in der Ausgabe
+    assert "Ohne Paperless-Verknuepfung nach Endung: .mp4 1" in text
+    assert "Aufnahme" not in text  # keine Dateinamen in der Ausgabe
     out = StringIO()
     call_command("paperless_archivfassung", "--objekt", objekt.object_number, "--echt", stdout=out)
     assert "umgestellt 1" in out.getvalue()
     doc.refresh_from_db()
     fall.refresh_from_db()
-    assert doc.source == "drive_existing" and doc.status == "registered" and doc.current_name == "Seite.pdf"
+    assert (
+        doc.source == "drive_existing" and doc.status == "registered" and doc.current_name == "Schreiben.pdf"
+    )
     assert Path(doc.source_path).is_absolute() and Path(doc.source_path).read_bytes() == archiv
     assert fall.status == CaseStatus.RESOLVED
     ingest.ensure_run(objekt, documents=[doc])
@@ -890,9 +941,50 @@ def test_archivfassung_auch_fuer_bestandsdatei_aus_drive(objekt, paperless, driv
             document=doc, case_subtype="unsupported_format", status=CaseStatus.OPEN
         ).exists()
     )
-    # Drive-Datei unveraendert: die E-Mail bleibt, nur die lokale Arbeitsfassung ist das PDF
+    # Drive-Datei unveraendert: das Altformat bleibt, nur die lokale Arbeitsfassung ist das PDF
     ziel = Path(doc.source_path).parent / "drive-kontrolle.bin"
     drive.download(doc.drive_file_id, ziel)
-    assert ziel.read_bytes() == HTML_BYTES and drive.get(doc.drive_file_id).name == "Seite.html"
+    assert ziel.read_bytes() == DOC_BYTES and drive.get(doc.drive_file_id).name == "Schreiben.doc"
     ohne.refresh_from_db()
     assert ohne.status == "review"  # ohne Verknuepfung unveraendert
+
+
+def test_archivfassung_fuer_geprueften_inhalt_trotz_bekanntem_mime(
+    objekt, paperless, drive, eingang, ops, run_all
+):
+    """Rechnung.tmp mit MIME-Typ application/pdf aus Drive, Inhalt unbekannt (26.09.2026): die Formatweiche hat
+    den Inhalt geprueft (content_checked), der MIME-Typ zaehlt nicht mehr. Der Befehl darf den Fall nicht als
+    "Format inzwischen verarbeitbar" ueberspringen, sondern stellt ihn auf die Archivfassung um."""
+    from io import StringIO
+
+    from django.core.management import call_command
+
+    daten = bytes(range(256)) * 4
+    doc = _bestandsdatei(objekt, drive, "Rechnung.tmp", daten, "application/pdf")
+    ingest.ensure_run(objekt, documents=[doc])
+    run_all(objekt)
+    doc.refresh_from_db()
+    fall = ReviewCase.objects.get(document=doc, case_subtype="unsupported_format", status=CaseStatus.OPEN)
+    assert doc.current_name == "Rechnung.tmp" and fall.context["content_checked"] is True
+    remote_id = paperless.add_document(
+        "Rechnung", content=daten, original_file_name="Rechnung.tmp", mime_type="application/pdf"
+    )
+    paperless_pull.poll(force=True)
+    ops()
+    assert _link(remote_id).document_id == doc.pk
+    archiv = pdf_bytes()
+    paperless.set_archive(remote_id, archiv)
+    out = StringIO()
+    call_command("paperless_archivfassung", stdout=out)
+    text = out.getvalue()
+    assert "Archivfassung vorhanden 1" in text and "Format inzwischen verarbeitbar" not in text
+    out = StringIO()
+    call_command("paperless_archivfassung", "--objekt", objekt.object_number, "--echt", stdout=out)
+    assert "umgestellt 1" in out.getvalue()
+    doc.refresh_from_db()
+    fall.refresh_from_db()
+    assert (
+        doc.status == "registered"
+        and doc.current_name == "Rechnung.pdf"
+        and fall.status == CaseStatus.RESOLVED
+    )

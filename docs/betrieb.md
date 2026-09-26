@@ -1404,6 +1404,18 @@ curl -fsS https://uebernahme.muellerhv.de/healthz/ && echo OK
 # Anmeldung im Browser, Objektliste vergleichen, Statusseite: Job-Zaehler, letzte Sicherung, Token-Status
 ```
 
+### 5.4.1 Wiederherstellungsprobe ohne Eingriff (`restore-probe`, seit 26.09.2026)
+
+Für Test T6 und die quartalsweise Probe ohne zweite Instanz: `docker/backup/restore_probe.sh` im Backup-Container (Deploy-Aktion `restore-probe`, Aufruf von Hand `docker compose exec -T backup restore_probe.sh [/backup/db/objektakte_[TS].sql.gz]`).
+
+- Nimmt ohne Argument die jüngste Sicherung unter `/backup/db` (Zeitstempel im Dateinamen), prüft sie mit `gzip -t` und nennt die Prüfsumme aus `checksums_[TS].txt`.
+- Spielt den Dump als `app_backup` in die Scratch-Datenbank `objektakte_restore_probe` ein (`DB_NAME` plus `_restore_probe`); die konfigurierte Datenbank wird nie beschrieben, bei Namensgleichheit bricht das Skript ab. `DEFINER`-Klauseln der Trigger werden beim Einspielen entfernt, sonst verlangte MariaDB das Recht SUPER. Das Recht auf die Scratch-Datenbank setzt `grants_sql` bei jedem Deploy (Neuinstallationen über `01_accounts.sh`).
+- Vergleicht die Zeilenzahlen der Kerntabellen (`objects`, `units`, `owners`, `tenants`, `documents`, `document_pages`, `review_cases`, `processing_runs`, `processing_jobs`, `sync_links`, `audit_events`, `oauth_tokens`, `users`, `django_migrations`) mit der Produktion und zeigt den Token-Status aus `oauth_tokens` (nur Status und Anbieter, keine Chiffrate).
+- Löscht die Scratch-Datenbank in jedem Fall am Ende (auch nach Abbruch) und gibt das Protokoll nach Abschnitt 5.6 aus: Zeitstempel, Sicherungsdatei mit Prüfsumme, Zielumgebung, Dauer, Vergleichstabelle, Abweichungen. Exit 0, wenn das Einspielen gelang und keine Kerntabelle in der Sicherung fehlt; fehlende Kerntabellen werden im Abschnitt Abweichungen ausgewiesen und führen zu Exit 1. Abweichende Zeilenzahlen sind kein Fehler des Einspielens, weil die Produktion seit dem Dump weiterläuft. Für den Nachweis identischer Zeilenzahlen die Probe unmittelbar nach einer Sicherung ohne laufende Verarbeitung ausführen.
+- Nicht enthalten: Fachverzeichnisse, Smoke-Test und Stichproben in der Anwendung (Dokument öffnen, Eigentümerakte, Review-Fall); diese Felder des Protokolls werden von Hand ergänzt. Die vollständige Probe auf leerer Instanz nach Abschnitt 5.4 bleibt für die Offsite-Kopie (Abschnitt 5.8) erforderlich.
+- Last: der Dump wird auf demselben Datenbankserver ein zweites Mal aufgebaut (Plattenplatz in der Größe der Datenbank, Minuten je Gigabyte); außerhalb laufender Verarbeitung ausführen, bei großen Dumps in tmux.
+- Reste nach Abbruch: das Skript löscht die Scratch-Datenbank auch nach einem Signal (Abbruch des Workflow-Laufs, SSH-Abbruch, `docker compose stop backup`). Nur nach KILL oder einem Neustart des Backup-Containers während des Einspielens kann `objektakte_restore_probe` (Produktionskopie mit Personendaten und Token-Chiffraten, Plattenplatz in Datenbankgröße) stehen bleiben; das Gleiche gilt für `objektakte_probe` aus `migrations-roundtrip`. `db-status` weist vorhandene Reste aus, das nächste `deploy` entfernt beide vor dem Nachziehen der Rechte (Schritt 5b), der nächste Lauf der jeweiligen Probe ebenfalls; von Hand: `DROP DATABASE IF EXISTS` als root im db-Container.
+
 ### 5.5 Nacharbeiten nach der Wiederherstellung
 
 - OAuth: Die Tokens im Dump sind mit `TOKEN_KEY` verschlüsselt. Bei identischem Schlüssel funktioniert der Zugriff sofort (Statusseite zeigt `active`). Sonst Erstautorisierung nach Abschnitt 7.7 wiederholen.
@@ -1413,7 +1425,7 @@ curl -fsS https://uebernahme.muellerhv.de/healthz/ && echo OK
 
 ### 5.6 Testnachweis
 
-Die Wiederherstellung wird einmal in Grundform in M1 (ohne Fachdaten), vollständig vor Produktivstart (Test T6) und danach quartalsweise geprobt. Nachweis in `docs/betrieb/restore-protokoll.md`:
+Die Wiederherstellung wird einmal in Grundform in M1 (ohne Fachdaten), vollständig vor Produktivstart (Test T6) und danach quartalsweise geprobt. Nachweis in `docs/betrieb/restore-protokoll.md`: Die Deploy-Aktion `restore-probe` (Abschnitt 5.4.1) liefert die Felder Sicherung, Zielumgebung, Dauer und Vergleich der Zeilenzahlen als Ausgabe; Stichproben und Schlüsselverwahrung werden von Hand ergänzt.
 
 | Feld | Inhalt |
 |---|---|

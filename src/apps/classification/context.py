@@ -3,12 +3,15 @@ Seiten plus letzte Seite, erkannte Entitaeten, Verwaltungsart, eigene Firma, Ver
 
 from __future__ import annotations
 
+import logging
 import re
 from dataclasses import dataclass, field
 from datetime import date
 
 from apps.config import store
 from apps.documents.models import Document, DocumentEntity, DocumentPage
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -52,6 +55,13 @@ class DocContext:
     contract_partners: list[str] = field(default_factory=list)
     amounts: list[str] = field(default_factory=list)
     entity_pages: dict[str, dict[int, list[int]]] = field(default_factory=dict)  # typ -> seite -> ids
+    # Kopfzeilen einer E-Mail (26.09.2026, Vorlage E-4): subject, subject_clean, from_name, from_address, to, date;
+    # None fuer alle anderen Formate. Keine Datenbankspalte, wird je Job aus Original oder Textseite gelesen.
+    email: dict | None = None
+
+    @property
+    def is_email(self) -> bool:
+        return self.email is not None
 
     def has(self, name: str) -> bool:
         """Bedingung entity_required und not_entity (E 2.2)."""
@@ -70,6 +80,7 @@ class DocContext:
             "iban": self.iban_found,
             "id_document": self.id_document_found,
             "amount": bool(self.amounts),
+            "email": self.is_email,
         }.get(name, False)
 
     def metadata(self) -> dict:
@@ -232,6 +243,7 @@ def build_context(doc: Document, *, entities: list[DocumentEntity] | None = None
             ctx.entity_pages.setdefault(key, {}).setdefault(e.page_no, []).append(ref)
     ctx.unit_ids = seen_units
     ctx.period = period_from_entities(entities)
+    ctx.email = email_headers_for(doc, head)
     full_text = "\n".join(pages.values())
     own_names = [n for n in (store.get("classification.own_company_names", []) or []) if n]
     ctx.own_company_as_agent = any(_name_in(n, full_text) for n in own_names)
@@ -246,6 +258,34 @@ def build_context(doc: Document, *, entities: list[DocumentEntity] | None = None
     ):
         ctx.own_object_marker = True
     return ctx
+
+
+def email_headers_for(doc: Document, head: str) -> dict | None:
+    """Kopfzeilen fuer Dokumente der Art E-Mail (26.09.2026): aus dem Original im Arbeitsverzeichnis, sonst aus der
+    Textseite (Von, An, Datum, Betreff), wenn der Sweeper das Original schon geraeumt hat. Andere Formate: None."""
+    from pathlib import Path
+
+    from apps.pipeline import storage
+    from apps.pipeline.analysis import detect_kind
+    from apps.pipeline.email_text import headers_from_text, parse_email_headers
+
+    name = doc.current_name or doc.original_name or ""
+    if detect_kind(Path(name), doc.mime_type) != "email":
+        return None
+    original = storage.original_path(doc.sha256) if doc.sha256 else None
+    if original is not None and original.exists():
+        try:
+            return parse_email_headers(original)
+        except Exception:  # noqa: BLE001 (defekte Datei: die Textseite traegt die Kopfzeilen)
+            logger.debug("Kopfzeilen der E-Mail nicht aus dem Original lesbar: Dokument %s", doc.pk)
+    return headers_from_text(head) or {
+        "subject": None,
+        "subject_clean": "",
+        "from_name": None,
+        "from_address": None,
+        "to": None,
+        "date": None,
+    }
 
 
 def _name_in(name: str, text: str) -> bool:

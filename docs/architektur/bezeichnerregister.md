@@ -210,7 +210,7 @@ Modell `documents.ClassificationRule`. classification rules.
 | updated_at | datetime(6) | nein |  |
 | code | varchar(48) | nein |  |
 | name | varchar(120) | nein |  |
-| rule_kind | varchar(24) | nein | filename, folder, keyword, entity, period, composite |
+| rule_kind | varchar(24) | nein | filename, folder, keyword, entity, period, composite, email_subject, email_sender |
 | pattern | longtext | nein |  |
 | target_category_code | varchar(2) | ja | → document_categories.code |
 | target_subfolder_id | bigint | ja | → document_subfolders.id |
@@ -502,7 +502,7 @@ Modell `documents.Document`. documents.
 | period_from | date | ja |  |
 | period_to | date | ja |  |
 | final_confidence | numeric(5, 4) | ja |  |
-| final_decided_by | varchar(16) | ja | stage1, stage2, stage3, human |
+| final_decided_by | varchar(16) | ja | stage1, stage2, stage3, human, email_auto |
 | classifier_version | varchar(40) | ja |  |
 | is_master_with_segments | tinyint(1) | nein |  |
 | error_message | longtext | ja |  |
@@ -1760,6 +1760,8 @@ Celery-Queues aus den Settings: `ai`, `classify`, `io`, `lists`, `ocr`
 | drive.takeover_ignore_patterns | drive | list | `["*.tmp", "*.TMP", "~$*", "Thumbs.db", "desktop.ini", ".DS_Store", "*.lnk"]` |
 | drive.takeover_max_files | drive | integer | `500` |
 | drive.upload_chunk_bytes | drive | integer | `8388608` |
+| email.auto_misc | email | boolean | `false` |
+| email.match_sender_to_party | email | boolean | `false` |
 | import.column_confidence_min | import | decimal | `0.8` |
 | import.column_synonyms | import | object | `{"unit_label": ["WE", "Einheit", "Whg", "Wohnung", "Nr", "Nr.", "VE", "VE-Beschreibung"...` |
 | import.deposit_type_synonyms | import | object | `{"cash_account": ["Kautionskonto", "Konto", "Sparkonto", "Bar", "Barkaution", "Überweis...` |
@@ -1826,6 +1828,7 @@ Celery-Queues aus den Settings: `ai`, `classify`, `io`, `lists`, `ocr`
 | previews.retention_days_after_resolve | previews | integer | `90` |
 | processing.heartbeat_seconds | processing | integer | `30` |
 | processing.max_parallel_objects | processing | integer | `1` |
+| processing.office_convert_timeout_s | processing | integer | `120` |
 | processing.work_orphan_hours | processing | integer | `48` |
 | reports.misc_share_target_pct | reports | integer | `5` |
 | reports.review_age_warning_days | reports | integer | `10` |
@@ -1884,8 +1887,9 @@ Celery-Queues aus den Settings: `ai`, `classify`, `io`, `lists`, `ocr`
 | drive.authorize | Google-Verbindung hergestellt |
 | drive.token_refresh | Token erneuert |
 | drive.reconcile | Ordnerabgleich angestoßen |
-| drive.rename | Ordner in Drive umbenannt |
+| drive.rename | Ordner oder Datei in Drive umbenannt |
 | drive.move | Datei in Drive verschoben |
+| drive.rename_file | Datei in Drive umbenannt (Ablage-Titel, z. B. bereinigter Betreff einer E-Mail) |
 | drive.create_folder | Ordner in Drive angelegt |
 | drive.upload | Datei nach Drive hochgeladen |
 | drive.takeover | Bestand aus Drive-Ordner übernommen |
@@ -1897,11 +1901,14 @@ Celery-Queues aus den Settings: `ai`, `classify`, `io`, `lists`, `ocr`
 | drive.auto_cleanup | Nachräumen nach Verarbeitungslauf (leere Altordner, Systemdateien in den Papierkorb) |
 | drive.trash_failed | Verschieben in den Drive-Papierkorb fehlgeschlagen |
 | document.ingest | Dokument hochgeladen (Upload in die Verarbeitung) |
+| document.rename_by_content | Dateiname und MIME-Typ nach Inhaltsprüfung berichtigt (Temporär-Endung) |
 | processing.start | Verarbeitungslauf angefordert |
 | processing.start_all | Verarbeitungsläufe für alle Objekte mit offener Arbeit eingereiht |
 | processing.jobs_dedupe | Überzählige wartende Wiederholungsjobs bereinigt |
 | processing.transit_cleanup | Transit-Kopien abgelegter Dokumente gelöscht |
 | processing.sweep | Sweeper manuell ausgeführt |
+| pipeline.temp_file_trashed | Temporärdatei ohne erkennbaren Inhalt in den Drive-Papierkorb gelegt, Dokument als gelöscht markiert |
+| pipeline.manual_check_filed | Archiv oder Mediendatei ungelesen zur Ablage nach 06/02 Manuelle Prüfung eingereiht |
 | document.view | Dokument aus Eigentümerakte angesehen (nur bei security.log_document_views) |
 | document.download | Dokument aus Eigentümerakte heruntergeladen (nur bei security.log_document_views) |
 | review.assign | Fall zugewiesen |
@@ -1919,6 +1926,7 @@ Celery-Queues aus den Settings: `ai`, `classify`, `io`, `lists`, `ocr`
 | review.filter_saved | Gespeicherte Sicht angelegt oder geändert |
 | review.filter_deleted | Gespeicherte Sicht gelöscht |
 | review.bulk_preview | Vorschau der Massenbearbeitung (ohne Schreibwirkung) |
+| review.bulk_command | Sammelaktion per Kommando ausgeführt (faelle_sammelaktion) |
 | import.upload | Importdatei angenommen |
 | import.parse | Importzeilen erkannt |
 | import.row_commit | Importzeile übernommen oder abgelehnt |
@@ -1947,6 +1955,7 @@ Celery-Queues aus den Settings: `ai`, `classify`, `io`, `lists`, `ocr`
 | sync.paperless_index_stub | Indexbeleg in Paperless angelegt |
 | sync.drive_props_set | Drive-Kennzeichen (appProperties) gesetzt |
 | sync.drive_changes | Drive-Änderungsprotokoll verarbeitet |
+| sync.drive_restored | Drive-Datei aus dem Papierkorb wiederhergestellt, gelöschtes Dokument wiederbelebt |
 | sync.drive_snapshot | Exportfassung eines Google-Dokuments erzeugt |
 | sync.version_registered | neue Inhaltsversion eines Dokuments erfasst |
 | sync.webhook | Webhook von Paperless angenommen |

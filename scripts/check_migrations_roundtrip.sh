@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Test T8 (docs/betrieb.md 9): jede Migration vorwaerts und rueckwaerts auf leerer Datenbank.
 set -euo pipefail
-cd "$(dirname "$0")/.."
+# ROUNDTRIP_REPO (26.09.2026): Deploy-Aktion migrations-roundtrip reicht das Skript per Standardeingabe in den
+# Web-Container (bash -s, $0 ist dann kein Pfad) und nennt das Repository im Container (/app) ausdruecklich.
+cd "${ROUNDTRIP_REPO:-$(dirname "$0")/..}"
 PY="${PYTHON:-.venv/bin/python}"
 export DJANGO_SETTINGS_MODULE="${DJANGO_SETTINGS_MODULE:-objektakte.settings.test}" PYTHONPATH=src
 $PY manage.py migrate --noinput

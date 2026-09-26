@@ -312,3 +312,87 @@ def test_verlorene_aufgabe_wird_nach_zwei_stunden_erneut_uebertragen(objekt, pap
     paperless.process_tasks()
     ops()
     assert ExternalLink.objects.filter(document=doc, system="paperless", role=LinkRole.ORIGINAL).exists()
+
+
+def test_bestandsdatei_mit_temporaer_endung_wird_umbenannt_und_uebertragen(
+    objekt, paperless, drive, run_all, ops
+):
+    """Drive-Bestandsdatei Liste.hed mit Excel-Inhalt (26.09.2026): die Formatweiche benennt das Dokument in
+    Liste.xlsx um, die Ablage benennt die Drive-Datei nach, die Uebertragung nach Paperless laeuft unter dem neuen
+    Namen statt als Indexbeleg. War die erste Uebertragung schon an der Temporaer-Endung gescheitert, merkt der
+    Umbenennungs-Hook eine zweite vor; eine wartende erste bleibt allein massgeblich."""
+    import hashlib as _hashlib
+    from pathlib import Path
+
+    from django.utils import timezone
+
+    from apps.pipeline.jobs import enqueue, idempotency_key
+    from apps.pipeline.models import JobType
+    from apps.sync.models import OperationStatus, SyncOperation
+    from apps.sync.operations import op_key
+
+    data = (
+        Path(__file__).resolve().parents[2] / "fixtures" / "imports" / "eigentuemerliste_generic.xlsx"
+    ).read_bytes()
+    file_id = drive.add_file(objekt.drive_root_folder_id, "Liste.hed", data, "application/octet-stream")
+    doc = Document.objects.create(
+        object=objekt,
+        drive_md5=_hashlib.md5(data).hexdigest(),  # noqa: S324 (Drive-Pruefsumme, keine Sicherheit)
+        size_bytes=len(data),
+        mime_type="application/octet-stream",
+        original_name="Liste.hed",
+        current_name="Liste.hed",
+        source="drive_existing",
+        drive_file_id=file_id,
+        source_path="Objekt/Liste.hed",
+        status="registered",
+        first_seen_at=timezone.now(),
+    )
+    ingest.ensure_run(objekt, documents=[doc])
+    run_all(objekt)
+    doc.refresh_from_db()
+    assert doc.current_name == "Liste.xlsx" and doc.page_count >= 1  # eine Seite je Blatt
+    # In der Pruefung (Listenerkennung, Klassifikation ohne Treffer) bleibt die Drive-Datei unangetastet; erst die
+    # Ablage benennt sie nach dem Dokumentnamen um
+    assert doc.status == "review" and drive.get(file_id).name == "Liste.hed"
+    enqueue(
+        JobType.FILE_TO_DRIVE,
+        objekt,
+        key=idempotency_key(JobType.FILE_TO_DRIVE, objekt.pk, f"test-{doc.pk}"),
+        document=doc,
+        payload={"category": "06", "subfolder": "01"},
+    )
+    run_all(objekt)
+    assert drive.get(file_id).name == "Liste.xlsx"
+    ereignis = AuditEvent.objects.get(action="drive.rename", entity_id=doc.pk)
+    assert ereignis.before_state == {"name": "Liste.hed"} and ereignis.after_state["name"] == "Liste.xlsx"
+    run_all(objekt)  # zweite Ablage: nichts mehr umzubenennen
+    assert AuditEvent.objects.filter(action="drive.rename", entity_id=doc.pk).count() == 1
+    # Erste Uebertragung (nach dem Hash) wartet noch: der Umbenennungs-Hook merkt keine zweite vor
+    first = _push_ops(doc).get(op_key=op_key(OperationKind.PAPERLESS_PUSH, doc.uuid, doc.sha256))
+    assert first.status == OperationStatus.PENDING and _push_ops(doc).count() == 1
+    ops()
+    paperless.process_tasks()
+    ops()
+    link = ExternalLink.objects.get(document=doc, system="paperless", role=LinkRole.ORIGINAL)
+    remote = paperless.documents[int(link.external_id)]
+    assert remote["original_file_name"] == "Liste.xlsx"
+    assert [c[0] for c in paperless.calls].count("post_document") == 1
+    assert not SyncOperation.objects.filter(kind=OperationKind.PAPERLESS_INDEX_STUB, document=doc).exists()
+
+    # Betriebsfall: die erste Uebertragung lief vor der Umbenennung und wurde uebersprungen (Temporaer-Endung)
+    link.delete()
+    SyncOperation.objects.filter(document=doc).delete()
+    SyncOperation.objects.create(
+        op_key=op_key(OperationKind.PAPERLESS_PUSH, doc.uuid, doc.sha256),
+        kind=OperationKind.PAPERLESS_PUSH,
+        system="paperless",
+        document=doc,
+        status=OperationStatus.SKIPPED,
+        result={"skipped": "Dateityp nicht übertragbar: Indexbeleg vorgemerkt"},
+    )
+    hooks.on_document_renamed(doc)
+    zweite = _push_ops(doc).get(op_key=op_key(OperationKind.PAPERLESS_PUSH, doc.uuid, doc.sha256, "renamed"))
+    assert zweite.status == OperationStatus.PENDING and zweite.payload == {"reason": "renamed"}
+    hooks.on_document_renamed(doc)  # idempotent
+    assert _push_ops(doc).count() == 2

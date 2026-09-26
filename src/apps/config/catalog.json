@@ -1277,6 +1277,26 @@
       }
     },
     {
+      "key": "email.auto_misc",
+      "category": "email",
+      "value_type": "boolean",
+      "description": "Weg 1 der Vorlage E-4: E-Mails (.eml, .msg) ohne erkannte Dokumentart ohne Prüfungsfall nach 06/01_Unklar ablegen, Titel ist der bereinigte Betreff, Kennzeichen final_decided_by = email_auto; false: Prüfungsfall wie bei allen Dokumenten unter der Schwelle. Wird erst nach der Verteilung aus review-status gesetzt",
+      "source": "Entscheidungsvorlage E-4, 26.09.2026",
+      "schema": {
+        "type": "boolean"
+      }
+    },
+    {
+      "key": "email.match_sender_to_party",
+      "category": "email",
+      "value_type": "boolean",
+      "description": "Weg 2 der Vorlage E-4: stimmt die Absenderadresse einer E-Mail mit der E-Mail-Adresse eines Eigentümers oder Mieters des Objekts überein, wird die E-Mail dessen Akte zugeordnet (Eigentümerakte 08_Korrespondenz als Schriftverkehr, Mieterakte als Mieterkorrespondenz); false: Entscheidung nur nach Regeln und Klassifikator. Wird erst nach der Verteilung aus review-status gesetzt",
+      "source": "Entscheidungsvorlage E-4, 26.09.2026",
+      "schema": {
+        "type": "boolean"
+      }
+    },
+    {
       "key": "security.store_full_iban",
       "category": "security",
       "value_type": "boolean",
@@ -1473,6 +1493,19 @@
       "schema": {
         "type": "integer",
         "minimum": 5
+      }
+    },
+    {
+      "key": "processing.office_convert_timeout_s",
+      "category": "processing",
+      "value_type": "integer",
+      "nullable": false,
+      "description": "Zeitlimit in Sekunden für die Umwandlung eines Office-Altformats (.doc, .xls, .rtf, .odt, .ods) in PDF über LibreOffice; danach Fall „nicht unterstütztes Format“ mit Notiz (26.09.2026)",
+      "source": "Vorlage E-1, Gruppe Office-Altformate",
+      "schema": {
+        "type": "integer",
+        "minimum": 10,
+        "maximum": 500
       }
     },
     {

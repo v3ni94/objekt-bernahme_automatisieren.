@@ -38,6 +38,8 @@ ALLOWED_SUFFIXES = {
     ".txt",
     ".eml",
     ".msg",
+    ".html",  # Textseite ohne OCR (26.09.2026)
+    ".htm",
 }
 
 

@@ -21,7 +21,7 @@ from apps.documents.models import Document, DocumentEntity, DocumentPage
 from apps.documents.periods import document_filing_year, is_year_folder_target
 from apps.pipeline import analysis as analysis_mod
 from apps.pipeline import ocr as ocr_mod
-from apps.pipeline import storage
+from apps.pipeline import sniff, storage
 from apps.pipeline.entities import build_gazetteer, extract_page, match_iban_owners
 from apps.pipeline.jobs import (
     TERMINAL_STATUSES,
@@ -252,6 +252,38 @@ def _sync_hook(name: str, doc) -> None:
         logger.exception("Synchronisations-Hook %s nicht ausfuehrbar", name)
 
 
+def _rename_by_content(job: ProcessingJob, doc: Document, original: Path, suffix: str) -> Path:
+    """Massgebliche Endung aus der Inhaltspruefung persistieren (26.09.2026): Dokumentname und MIME-Typ, lokale
+    Kopie im Arbeitsverzeichnis (original.<endung>), Protokoll document.rename_by_content. Ohne Umbenennung bliebe
+    die Datei mit Temporaer-Endung in Drive, Paperless ueberspraenge sie und die Listenerkennung entfiele. Die
+    Drive-Datei einer Bestandsdatei benennt die Ablage (file_to_drive) um, die Paperless-Uebertragung wird erneut
+    vorgemerkt (hooks.on_document_renamed)."""
+    new_name = sniff.name_with_suffix(doc.current_name or "", suffix)
+    if not new_name or new_name == doc.current_name:
+        return original
+    target = original.with_name("original" + suffix.lower())
+    if target != original:
+        if target.exists():
+            target.unlink()
+        original.rename(target)
+    from apps.audit.services import record
+
+    before = {"name": doc.current_name, "mime_type": doc.mime_type}
+    doc.current_name = new_name
+    doc.mime_type = sniff.mime_for_suffix(suffix)
+    doc.save(update_fields=["current_name", "mime_type", "updated_at"])
+    record(
+        "document.rename_by_content",
+        entity_type="document",
+        entity_id=doc.pk,
+        object_id=job.object_id,
+        before=before,
+        after={"name": doc.current_name, "mime_type": doc.mime_type, "suffix": suffix.lower()},
+    )
+    _sync_hook("on_document_renamed", doc)
+    return target
+
+
 # ---------------------------------------------------------------- 3 analyze_pages
 @job_task(JobType.ANALYZE_PAGES)
 def analyze_pages(job: ProcessingJob) -> dict:
@@ -288,8 +320,19 @@ def analyze_pages(job: ProcessingJob) -> dict:
         cover_ratio=float(store.get("ocr.image_cover_ratio", 0.9)),
         chunk_pages=int(store.get("ocr.chunk_pages", 20)),
         work=work,
+        office_timeout_s=int(store.get("processing.office_convert_timeout_s", 120)),
     )
-    if result.kind in ("unsupported", "google_doc"):
+    if result.content_checked and result.kind != "unsupported" and result.suffix:
+        renamed = _rename_by_content(job, doc, original, result.suffix)
+        if result.pdf_path == str(original):
+            result.pdf_path = str(
+                renamed
+            )  # OCR-Bloecke und Vorschau lesen die lokale Kopie unter neuem Namen
+        original = renamed
+    if result.kind == "google_doc" or result.kind in analysis_mod.UNREADABLE_KINDS:
+        # office_legacy (26.09.2026): LibreOffice wandelt in work/converted.pdf, danach wie PDF; ohne LibreOffice
+        # oder bei gescheiterter Umwandlung kommt die Art unsupported mit Notiz hierher (Gruppe office in
+        # formate_wiederaufnehmen). content_checked kennzeichnet Faelle, deren Inhalt die Formatweiche geprueft hat
         _review_once(
             job.object,
             case_type=CaseType.UNCLEAR,
@@ -297,7 +340,18 @@ def analyze_pages(job: ProcessingJob) -> dict:
             document=doc,
             key=f"unsupported:{doc.pk}",
             misc_code="02",
-            context={"mime_type": doc.mime_type, "name": doc.current_name, "note": result.note},
+            context={
+                "mime_type": doc.mime_type,
+                "name": doc.current_name,
+                "note": result.note,
+                "kind": result.kind,
+                "content_checked": result.content_checked,
+                "detected_kind": result.detected_kind,
+                # Inhaltspruefung (26.09.2026): False nur, wenn keine Signatur erkannt wurde; restformate_bereinigen
+                # (Gruppe temporaer) nimmt ausschliesslich solche Faelle
+                "content_recognized": result.content_recognized,
+                "content_suffix": result.content_suffix,
+            },
         )
         doc.status = "review"
         doc.save(update_fields=["status", "updated_at"])
@@ -312,7 +366,7 @@ def analyze_pages(job: ProcessingJob) -> dict:
             doc.sha256,
             page_no,
             result.texts.get(page_no, ""),
-            source="office" if result.kind in ("office", "email") else "text_layer",
+            source="office" if result.kind in analysis_mod.TEXT_KINDS else "text_layer",
             hmac_key=key,
         )
     doc.page_count = result.page_count
@@ -731,6 +785,16 @@ def classify(job: ProcessingJob) -> dict:
     # Sperren (Ausweiskopie, Kategorie 01) prueft classify_ai ueber stage3_allowed und protokolliert den Grund im Fall
     stage3 = stage2.stage3_enabled() and combined.stage3_required
     stage3_purpose = None
+    stage3_skipped = None
+    if stage3:
+        from apps.classification import decide as decide_mod
+
+        if decide_mod.email_sender_party(ctx, job.object) is not None:
+            # Weg 2 (Vorlage E-4, Gegenpruefung 26.09.2026): Absender ist Eigentuemer oder Mieter des Objekts, die
+            # Ablage steht in decide ueber den Absenderabgleich fest; kein kostenpflichtiger Aufruf und keine
+            # Weitergabe des Auszugs an den Anbieter (Datenminimierung)
+            stage3 = False
+            stage3_skipped = "Absender ist Partei des Objekts (email.match_sender_to_party)"
     if (
         not stage3
         and combined.category == "04"
@@ -776,6 +840,7 @@ def classify(job: ProcessingJob) -> dict:
             "reason": combined.reason,
         },
         "stage3_purpose": stage3_purpose,
+        "stage3_skipped": stage3_skipped,
     }
     next_type = JobType.CLASSIFY_AI if stage3 else JobType.DECIDE
     enqueue(
@@ -1091,6 +1156,32 @@ def file_to_drive(job: ProcessingJob) -> dict:
                 after={"from": current_parent, "to": target.drive_file_id, "name": doc.current_name},
             )
         action = "moved" if current_parent != target.drive_file_id else "already_there"
+        if doc.current_name and node.name != doc.current_name:
+            if sniff.name_with_suffix(node.name, Path(doc.current_name).suffix) == doc.current_name:
+                # Die Formatweiche hat nur die Endung nach dem Inhalt geaendert (26.09.2026, _rename_by_content);
+                # die Drive-Datei traegt noch den Ursprungsnamen mit Temporaer-Endung. Protokoll mit beiden Namen
+                # (Dateinamen ohne Betreff)
+                node = drive.rename(doc.drive_file_id, doc.current_name)
+                record(
+                    "drive.rename",
+                    entity_type="document",
+                    entity_id=doc.pk,
+                    object_id=job.object_id,
+                    before={"name": doc.original_name},
+                    after={"name": doc.current_name, "drive_file_id": doc.drive_file_id},
+                )
+            else:
+                # Ablage-Titel weicht vom Namen in Drive ab (E-Mail: bereinigter Betreff, 26.09.2026): Datei
+                # umbenennen, damit Drive und Datenbank denselben Namen fuehren; Protokoll ohne den alten Namen
+                # (kann Betreff sein)
+                node = drive.rename(doc.drive_file_id, doc.current_name)
+                record(
+                    "drive.rename_file",
+                    entity_type="document",
+                    entity_id=doc.pk,
+                    object_id=job.object_id,
+                    after={"drive_file_id": doc.drive_file_id, "to": target.drive_file_id},
+                )
         if prior is not None:
             _remove_transit_copy(doc)
     else:

@@ -104,9 +104,15 @@ def build_request(doc: Document, ctx: DocContext, s1_payload: dict | None) -> Cl
         "page_count": ctx.page_count,
         "source_folder": (ctx.folder_code or "").split("/")[0] or None,
     }
+    names = party_names(obj)
+    if ctx.email is not None:
+        # E-Mail (26.09.2026): Kennzeichen und bereinigter Betreff als Hinweis, Parteinamen wie im Dateinamen
+        # maskiert (Ue15, Gegenpruefung 26.09.2026); Absender und Empfaenger gehen nicht als Hinweis mit
+        hints["is_email"] = True
+        hints["email_subject"] = mask_filename((ctx.email.get("subject_clean") or "")[:120], names) or None
     return ClassificationRequest(
         excerpt_masked=build_excerpt(ctx.pages),
-        filename_masked=mask_filename(doc.current_name or "", party_names(obj)),
+        filename_masked=mask_filename(doc.current_name or "", names),
         management_type=obj.management_type,
         taxonomy=taxonomy_from_catalog(),
         unit_label_patterns=unit_label_patterns(obj),

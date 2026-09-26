@@ -16,7 +16,7 @@
 #   cert-retry <branch>       Neue Zertifikatsanforderung ausloesen (Web-Container neu aufbauen);
 #                             hoechstens einmal je Stunde, Let's Encrypt begrenzt Fehlversuche
 #   logs <branch> [dienst]    Letzte Logzeilen; ohne Dienst die der Anwendungsdienste (nur lesend)
-#   db-status <branch>        Datenbankkonten und Tabellenzahl anzeigen (nur lesend)
+#   db-status <branch>        Datenbankkonten, Tabellenzahl und Reste der Scratch-Datenbanken anzeigen (nur lesend)
 #   db-reset <branch>         Datenverzeichnis der Datenbank leeren und neu initialisieren; bricht ab,
 #                             sobald ein Schema vorhanden ist (Schutz gegen Datenverlust)
 #   oauth-check <branch>      Google-Verbindung: Konfiguration ohne Geheimnisse und Probe der Client-Zugangsdaten
@@ -25,7 +25,16 @@
 #                             Textes (kostet wenige Token, wird nicht in ai_calls protokolliert)
 #   ai-reclassify <branch> [<objekt>][+echt]  Unklar-Faelle mit Grund Stufe 3 nicht freigegeben, KI nicht verfuegbar oder
 #                             Kostenlimit erneut klassifizieren (ohne echt nur Vorschau; ohne Objekt alle Objekte)
-#   deploy-tests <branch>     Deployment-Tests T2, T3, T11, T14 (nur lesend)
+#   deploy-tests <branch>     Deployment-Tests T2, T3, T4/T5 (Pruefabfragen), T11, T12, T13, T14 (nur lesend)
+#   restart-probe <branch> [echt]  T4/T5: Jobzaehler und Sweeper-Logzeilen; mit echt nur den Dienst worker neu starten
+#                             und Zaehler vorher und nachher zeigen (Serverneustart selbst bleibt Handarbeit)
+#   restore-probe <branch>    T6: juengste Sicherung in die Scratch-Datenbank <DB_NAME>_restore_probe einspielen,
+#                             Zeilenzahlen und Token-Status gegen die Produktion, Scratch-Datenbank loeschen (Protokoll G 7.4)
+#   migrations-roundtrip <branch>  T8: Migrationen vorwaerts und rueckwaerts gegen die Scratch-Datenbank <DB_NAME>_probe
+#                             im db-Container (angelegt und geloescht), nie gegen die Produktionsdatenbank
+#   oauth-proof <branch> [tage]  T9: Token-Metadaten und Refresh-Ereignisse ohne Chiffrate (drive_oauth_proof, nur lesend)
+#   perf-probe <branch> [pages=N+procs=1,2]  T10: OCR-Messcontainer scripts/perf_probe.sh mit kleinen Parametern, nur ohne
+#                             laufende Verarbeitung; zeigt OOM-Kill-Status aller Container (Freigabe V-03)
 #   doc-status <branch> [nr]  Dokumente je Objekt und Status, offene und fehlgeschlagene Jobs (nur lesend);
 #                             mit Objektnummer je Dokument Stufen, Entitaetenzaehler und Faelle, ohne Namen
 #   reconcile-all <branch> [ohne-ordner]  Ordnerabgleich aller aktiven Objekte (legt fehlende Struktur an); ohne-ordner = nur Objekte ohne Objektordner
@@ -38,16 +47,20 @@
 #   anschrift-kandidaten <branch> [objekt=NR,NR+ausser=TEXT+min=N+top=N+echt]  Anschrift aus den Seitentexten der Dokumente vorschlagen (Objekte ohne Strasse); echt = eindeutige Vorschlaege setzen
 #   buchhaltung-jahresordner <branch> [objekt=NR+limit=N+echt]  Abgelegte Dokumente in 03_Buchhaltung in die Jahresordner 03/JJJJ bringen (Ablage erneut einreihen, nur verschieben)
 #   zuordnung-pruefen <branch> [<objekt>][+echt][+details][+ohne-ki][+limit=N]  Gegenprobe der Objektzuordnung fuer Paperless-Feldimporte (Vorschau ohne KI; echt loest mit KI auf; laeuft im worker-io)
+#   zuordnung-stichprobe <branch> [je=50+seed=N+objekt=NR+csv=<pfad>+ueberschreiben] | [ergebnis=<pfad>]  Stichprobe der Paperless-Zuordnung als CSV-Pruefliste ziehen (nur lesend, laeuft im worker-io); ergebnis= wertet die ausgefuellte CSV aus
 #   backup-voll <branch>      Volle Sicherung sofort (Datenbank und Fachverzeichnisse, rund 20 Minuten, nur in tmux); schreibt status.json
 #   altbestand-aufarbeiten <branch> [echt] Alle Altbestand-Ordner mit Objekt aufarbeiten (echt = Celery-Aufgabe, sonst Vorschau)
 #   verarbeitung-alle <branch> [echt][+ohne=133,216]  Verarbeitungslaeufe fuer alle Objekte mit offener Arbeit (echt = einreihen, sonst Vorschau; ohne = Objekte ausnehmen)
 #   review-status <branch> [<objekt>]   Offene Pruefcenter-Faelle je Art und Unterart, Vorschlaege, KI-Nachklassifizierbarkeit, E-Mail-Faelle und abgelegte E-Mails (keine Personendaten)
+#   email-status <branch> [<objekt>]     E-Mails (Regel 06 Sonstiges, Vorlage E-4): Schalterstand, E-Mail-Dokumente nach Status und Ziel, Treffer der E-Mail-Regeln, Absenderabgleich, automatische Ablagen nach 06/01 (nur lesend, keine Personendaten)
+#   faelle-sammelaktion <branch> [aktion=kandidat-bestaetigen|verwerfen|manuelle-pruefung+unterart=A,B+objekt=NR+min=0.7+limit=N+benutzer=EMAIL+grund=TEXT+echt]  Pruefrueckstand je Objekt und Unterart abarbeiten: Kandidaten ab Schwelle bestaetigen, ai_sample verwerfen, manual_check nach 06/02 (Vorschau ohne echt; echt braucht benutzer=EMAIL)
 #   sync-status <branch> [live]          Verbindung Drive, Anwendung, Paperless: Schalter, Verbindungstest, Cursor, Auffindbarkeit je Quelle, Operationen (lesend; live = echter Verbindungstest)
 #   classifier-status <branch> [list|train|train+force|deactivate]  Stufe 2: Kaltstartstatus, Modelle, Training (train+force auch waehrend laufender Verarbeitung), Modell abschalten
 #   sync-retry <branch> [echt|bestand+<id>]  Sync-Operationen mit Paperless-404 erneut einreihen (Vorschau ohne echt); Bestandslauf fortsetzen
 #   jobs-bereinigen <branch> [echt] Ueberzaehlige wartende Wiederholungsjobs (#n) bereinigen (echt = ausfuehren, sonst Vorschau)
 #   paperless-archivfassung <branch> [objekt=NR+limit=N+echt]  Faelle "nicht unterstuetztes Format" auf die PDF-Archivfassung von Paperless umstellen (Vorschau ohne echt)
-#   formate-wiederaufnehmen <branch> [objekt=NR+limit=N+echt]  Faelle "nicht unterstuetztes Format" mit inzwischen bekanntem Format (E-Mails) erledigen, Dokumente zurueck auf registriert (Vorschau ohne echt)
+#   formate-wiederaufnehmen <branch> [objekt=NR+limit=N+gruppe=bekannt|temporaer|html|office+echt]  Faelle "nicht unterstuetztes Format" wieder aufnehmen: bekannt (E-Mails, HTML), temporaer (Temporaer-Endung, ohne Endung, unbekannte Endung, Inhalt ungeprueft), html, office (Altformate .doc, .xls, .ppt, .rtf, .odt, .ods ueber LibreOffice im Worker-Image); Dokumente zurueck auf registriert (Vorschau ohne echt)
+#   restformate-bereinigen <branch> gruppe=temporaer|archive-medien[+objekt=NR+limit=N+echt]  Restformate (E-1): Temporaerdateien ohne erkennbaren Inhalt in den Drive-Papierkorb (gruppe=temporaer) oder Archive und Medien nach 06/02 Manuelle Pruefung (gruppe=archive-medien); ohne echt Vorschau
 #   redis-status <branch>     Redis: Speicher, Schluesselzahl, Warteschlangenlaengen, groesste Schluessel (nur lesend)
 #   env-set <branch> <SCHLUESSEL=wert[+SCHLUESSEL=wert]>  Freigegebene Betriebswerte in .env setzen (Ressourcen, Parallelitaet);
 #                             wirksam erst mit deploy; Sicherung .env.bak
@@ -90,7 +103,9 @@ case "$BRANCH" in *[!A-Za-z0-9._/-]*|*..*|"") case "$ACTION" in rollback|check) 
 if [ "$ACTION" = "config-set" ]; then
   case "${ARG:-}" in *[!A-Za-z0-9@._+=:,/{}\[\]\"-]*) echo "Argument unzulaessig (config-set: JSON ohne Leerzeichen; erlaubt sind Buchstaben, Ziffern, doppelte Anfuehrungszeichen und @._+=:,/{}[]-)"; exit 2 ;; esac
 else
-  case "${ARG:-}" in *[!A-Za-z0-9@._+=,-]*) echo "Argument unzulaessig"; exit 2 ;; esac
+  # Schraegstrich seit 26.09.2026 fuer zuordnung-stichprobe (ergebnis=/data/exports/stichproben/<datei>.csv); der
+  # Zweig selbst laesst nur diesen Pfad zu. Zeichenvorrat gleich dem Filter in .github/workflows/deploy.yml.
+  case "${ARG:-}" in *[!A-Za-z0-9@._+=,/-]*) echo "Argument unzulaessig"; exit 2 ;; esac
 fi
 echo "$(date -Is) $ACTION ${BRANCH:-} ${ARG:-} von ${SSH_CLIENT:-unbekannt}" >> "$LOG"
 case "$ACTION" in
@@ -215,7 +230,8 @@ with urllib.request.urlopen(req, timeout=10) as r:
   db-status)
     docker compose exec -T db sh -c 'mariadb -uroot -p"$(cat /run/secrets/db_root_password)" -N -e "
       SELECT CONCAT(\"Konto: \", user) FROM mysql.user WHERE user LIKE \"app_%\" ORDER BY user;
-      SELECT CONCAT(\"Tabellen in $MARIADB_DATABASE: \", COUNT(*)) FROM information_schema.tables WHERE table_schema = \"$MARIADB_DATABASE\";"'
+      SELECT CONCAT(\"Tabellen in $MARIADB_DATABASE: \", COUNT(*)) FROM information_schema.tables WHERE table_schema = \"$MARIADB_DATABASE\";
+      SELECT CONCAT(\"Scratch-Datenbank vorhanden (Rest einer abgebrochenen Probe, naechstes deploy entfernt sie): \", schema_name) FROM information_schema.schemata WHERE schema_name IN (\"${MARIADB_DATABASE}_restore_probe\", \"${MARIADB_DATABASE}_probe\");"'
     ;;
   db-reset)
     TABLES="$(docker compose exec -T db sh -c 'mariadb -uroot -p"$(cat /run/secrets/db_root_password)" -N -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = \"$MARIADB_DATABASE\" AND table_name = \"django_migrations\""' 2>/dev/null | tr -d '[:space:]')"
@@ -640,6 +656,40 @@ if n_abg:
     print("  entschieden durch: " + ", ".join(f"{r['final_decided_by'] or '-'}={r['n']}" for r in rows))
 PY
     ;;
+  email-status)
+    # E-Mail-Auswertung der Regel 06 Sonstiges (Vorlage E-4, 26.09.2026): Stand der Schalter email.auto_misc und
+    # email.match_sender_to_party, E-Mail-Dokumente (.eml, .msg) nach Status, Kategorie/Unterordner und Entscheider,
+    # Treffer der E-Mail-Regeln, Zuordnungen ueber die Absenderadresse, automatische Ablagen nach 06/01; optional
+    # je Objekt (Argument Objektnummer). Nur lesend, Ausgabe nur Zaehler und Codes. Die Schalter selbst werden mit
+    # config-set gesetzt, z. B. config-set $B email.auto_misc=true, erst nach der Verteilung aus review-status.
+    args=()
+    [ -n "${ARG:-}" ] && args+=(--objekt "$ARG")
+    docker compose exec -T web python manage.py email_status "${args[@]}"
+    ;;
+  faelle-sammelaktion)
+    # Pruefrueckstand je Objekt und Unterart ueber die Dienste des Pruefcenters (docs/plan/pruefrueckstand.md).
+    # Argumente mit + getrennt: aktion=kandidat-bestaetigen|verwerfen|manuelle-pruefung (Pflicht), unterart=A,B,
+    # objekt=NR, min=0.7 (Mindestkonfidenz des Kandidaten), limit=N, benutzer=EMAIL (Pflicht bei echt), grund=TEXT,
+    # echt. Ohne echt Vorschau: Zaehler je Objekt, Unterart und Ziel, keine Personendaten, nichts geaendert.
+    # grund=TEXT ohne Leerzeichen (Zeichenfilter oben), sonst gilt der Standardtext des Kommandos.
+    args=()
+    IFS='+' read -r -a parts <<< "${ARG:-}"
+    for p in "${parts[@]}"; do
+      case "$p" in
+        echt) args+=(--echt) ;;
+        aktion=*) args+=(--aktion "${p#aktion=}") ;;
+        unterart=*) args+=(--unterart "${p#unterart=}") ;;
+        objekt=*) args+=(--objekt "${p#objekt=}") ;;
+        min=*) args+=(--min-konfidenz "${p#min=}") ;;
+        limit=*) args+=(--limit "${p#limit=}") ;;
+        benutzer=*) args+=(--benutzer "${p#benutzer=}") ;;
+        grund=*) args+=(--grund "${p#grund=}") ;;
+        '') ;;
+        *) echo "Unbekanntes Argument: $p (erlaubt: aktion=..., unterart=A,B, objekt=NR, min=0.7, limit=N, benutzer=EMAIL, grund=TEXT, echt)"; exit 2 ;;
+      esac
+    done
+    docker compose exec -T web python manage.py faelle_sammelaktion "${args[@]}"
+    ;;
   deploy-tests)
     # Deployment-Tests T2, T3, T11 und T14 (docs/betrieb/deployment-test.md), nur lesend
     dom="$(envval APP_DOMAIN)"
@@ -659,6 +709,227 @@ PY
     curl -s -o /dev/null -w '  /healthz/ %{http_code} (erwartet 200)\n' --max-time 10 "https://${dom}/healthz/"
     echo "  /healthz/ Inhalt: $(curl -s --max-time 10 "https://${dom}/healthz/")"
     curl -s -o /dev/null -w '  /readyz/ ohne Token %{http_code} (erwartet 401)\n' --max-time 10 "https://${dom}/readyz/"
+    # T4/T5 (26.09.2026): Pruefabfragen aus docs/betrieb/deployment-test.md lesend; der Neustart selbst laeuft ueber
+    # restart-probe (worker) oder von Hand (Server, Zeitfenster F27). Keine Dateinamen, keine Personendaten.
+    echo "T4/T5 Wiederaufnahme (erwartet: 0 Doppelte, erneut eingereihte Jobs enden fertig, Sweeper im Log):"
+    docker compose exec -T web python manage.py shell <<'PY'
+from datetime import timedelta
+from django.db.models import Count
+from django.utils import timezone
+from apps.documents.models import Document
+from apps.pipeline.models import JobStatus, JobType, ProcessingJob, ProcessingJobEvent
+
+# Pruefabfrage T4/T5: keine Doppelverarbeitung je (object_id, sha256) unter den nicht geloeschten Dokumenten
+dubletten = (
+    Document.objects.filter(deleted_at__isnull=True)
+    .values("object_id", "sha256")
+    .annotate(c=Count("id"))
+    .filter(c__gt=1)
+    .count()
+)
+print(f"  Doppelte (object_id, sha256) unter nicht geloeschten Dokumenten: {dubletten} (erwartet 0)")
+seit = timezone.now() - timedelta(days=7)
+wieder = ProcessingJobEvent.objects.filter(
+    created_at__gte=seit, from_status=JobStatus.RUNNING, to_status=JobStatus.PENDING
+).count()
+print(f"  Vom Sweeper erneut eingereihte Jobs (7 Tage): {wieder}")
+ocr = ProcessingJob.objects.filter(job_type=JobType.OCR_CHUNK, updated_at__gte=seit)
+print(
+    f"  OCR-Bloecke (7 Tage): {ocr.filter(status=JobStatus.DONE, attempt_count__gt=1).count()} nach Wiederholung fertig, "
+    f"{ocr.filter(status=JobStatus.FAILED).count()} fehlgeschlagen, {ocr.filter(status=JobStatus.RUNNING).count()} laufend"
+)
+dok = Document.objects.filter(deleted_at__isnull=True, updated_at__gte=seit).values("status").annotate(c=Count("id"))
+print("  Dokumente nach Status (7 Tage geaendert): " + (", ".join(f"{r['status']}={r['c']}" for r in dok.order_by("status")) or "keine"))
+PY
+    n=$(docker compose logs --no-color --tail 5000 worker-io 2>/dev/null | grep -c 'pipeline.sweep' || true)
+    echo "  Sweeper-Logzeilen (pipeline.sweep, worker-io, letzte 5.000 Zeilen): $n"
+    docker compose logs --no-color --tail 5000 worker-io 2>/dev/null | grep 'pipeline.sweep' | grep -i 'succeeded' | tail -2 | cut -c1-220 | sed 's/^/    /' || true
+    # T12 (26.09.2026): Host-Sicherheit lesend nach docs/betrieb.md 1.4; ohne passwortloses sudo aus den Konfigurationsdateien
+    echo "T12 Host-Sicherheit (erwartet: PermitRootLogin no, PasswordAuthentication no, ufw aktiv mit 22, 80, 443, unattended-upgrades aktiv, Zeitzone Europe/Berlin):"
+    if sudo -n sshd -T >/dev/null 2>&1; then
+      sudo -n sshd -T 2>/dev/null | grep -Ei '^(permitrootlogin|passwordauthentication) ' | sed 's/^/  sshd -T: /' || true
+    else
+      # sshd nimmt die erste Nennung; Dateien unter sshd_config.d werden vor der Hauptdatei gelesen. Die Ausgabe wird
+      # auf Leere geprueft (ein || am Pipeline-Ende haengt an sed, das immer 0 liefert): auskommentierte Vorgaben
+      # der Distribution zaehlen nicht, dann gelten die Standardwerte (PasswordAuthentication yes).
+      out="$(grep -HEi '^[[:space:]]*(PermitRootLogin|PasswordAuthentication)[[:space:]]' /etc/ssh/sshd_config.d/*.conf /etc/ssh/sshd_config 2>/dev/null || true)"
+      if [ -n "$out" ]; then
+        printf '%s\n' "$out" | sed 's/^/  /'
+      else
+        echo "  keine explizite Einstellung gefunden oder sshd_config nicht lesbar: Standardwerte gelten (PasswordAuthentication yes), von Hand pruefen (sudo sshd -T)"
+      fi
+    fi
+    if sudo -n ufw status verbose >/dev/null 2>&1; then
+      sudo -n ufw status verbose 2>/dev/null | sed 's/^/  ufw: /'
+    else
+      echo "  ufw: nur mit sudo pruefbar (sudo ufw status verbose)"
+    fi
+    echo "  unattended-upgrades: enabled=$(systemctl is-enabled unattended-upgrades 2>/dev/null || echo unbekannt), active=$(systemctl is-active unattended-upgrades 2>/dev/null || echo unbekannt)"
+    if [ -r /etc/apt/apt.conf.d/20auto-upgrades ]; then sed 's/^/  20auto-upgrades: /' /etc/apt/apt.conf.d/20auto-upgrades; else echo "  20auto-upgrades: fehlt oder nicht lesbar"; fi
+    echo "  Zeitzone: $(timedatectl show -p Timezone --value 2>/dev/null || cat /etc/timezone 2>/dev/null || echo unbekannt), NTP synchron: $(timedatectl show -p NTPSynchronized --value 2>/dev/null || echo unbekannt)"
+    # T13 (26.09.2026): TOTP-Pflicht aus dem Katalog, Verweigerungen der letzten 30 Tage, Nutzer je Rolle ohne Namen
+    echo "T13 Login und Rollen (erwartet: admin in den Pflichtrollen, auth.denied bei verweigertem Zugriff):"
+    docker compose exec -T web python manage.py shell <<'PY'
+from collections import Counter
+from datetime import timedelta
+from allauth.mfa.models import Authenticator
+from django.db.models import Count
+from django.utils import timezone
+from apps.accounts.middleware import mfa_required_roles
+from apps.accounts.models import User
+from apps.audit.models import AuditEvent
+
+rollen = mfa_required_roles()
+print(f"  Pflichtrollen zweiter Faktor (security.mfa_required_roles): {', '.join(rollen) or 'keine'}; admin enthalten: {'ja' if 'admin' in rollen else 'NEIN'}")
+totp = set(Authenticator.objects.filter(type=Authenticator.Type.TOTP).values_list("user_id", flat=True))
+nutzer = User.objects.filter(deleted_at__isnull=True)
+for r in nutzer.values("role__code").annotate(c=Count("id")).order_by("role__code"):
+    ids = set(nutzer.filter(role__code=r["role__code"]).values_list("id", flat=True))
+    aktiv = nutzer.filter(role__code=r["role__code"], status=User.Status.ACTIVE).count()
+    pflicht = "Pflicht" if r["role__code"] in rollen else "freiwillig"
+    print(f"  Rolle {r['role__code']}: {r['c']} Nutzer, {aktiv} aktiv, {len(ids & totp)} mit TOTP ({pflicht})")
+seit = timezone.now() - timedelta(days=30)
+ev = AuditEvent.objects.filter(action="auth.denied", occurred_at__gte=seit)
+print(f"  auth.denied (30 Tage): {ev.count()}")
+gruende = Counter()
+for e in ev.only("entity_type", "after_state").iterator():
+    gruende[(e.entity_type, (e.after_state or {}).get("permission") or "-")] += 1
+for (et, perm), n in sorted(gruende.items()):
+    print(f"    {et} {perm}: {n}")
+PY
+    ;;
+  restart-probe)
+    # T4/T5 Wiederaufnahme (26.09.2026): ohne "echt" nur die Zaehler (Jobs nach Status, Laeufe, Sweeper-Logzeilen).
+    # Mit "echt" wird ausschliesslich der OCR-Worker (Dienst worker) neu gestartet; Zaehler vorher und nachher sowie die
+    # Sweeper-Logzeilen seit dem Neustart belegen die Mechanik (Sweeper beim Start, Wiederholung ohne Doppelte).
+    # Ein Serverneustart (T4) bleibt Handarbeit im Zeitfenster F27. Laufende OCR-Bloecke werden nach WORKER_STOP_GRACE
+    # abgebrochen und vom Sweeper erneut eingereiht; deshalb nur mit Freigabe und ausserhalb grosser Laeufe.
+    case "${ARG:-}" in ""|echt) ;; *) echo "Argument unbekannt: $ARG (erlaubt: echt)"; exit 2 ;; esac
+    zaehler() {
+      docker compose exec -T web python manage.py shell <<'PY'
+from django.db.models import Count
+from apps.documents.models import Document
+from apps.pipeline.models import JobStatus, ProcessingJob, ProcessingRun, RunStatus
+
+jobs = {r["status"]: r["c"] for r in ProcessingJob.objects.values("status").annotate(c=Count("id"))}
+print("  Jobs: " + ", ".join(f"{s}={jobs.get(s, 0)}" for s in JobStatus.values))
+offen = ProcessingJob.objects.filter(status__in=[JobStatus.PENDING, JobStatus.RUNNING]).values("job_type", "status").annotate(c=Count("id"))
+print("  offene Jobs je Art: " + (", ".join(f"{r['job_type']}/{r['status']}={r['c']}" for r in offen.order_by("job_type", "status")) or "keine"))
+runs = {r["status"]: r["c"] for r in ProcessingRun.objects.values("status").annotate(c=Count("id"))}
+print("  Laeufe: " + ", ".join(f"{s}={runs.get(s, 0)}" for s in RunStatus.values))
+dubletten = (
+    Document.objects.filter(deleted_at__isnull=True).values("object_id", "sha256").annotate(c=Count("id")).filter(c__gt=1).count()
+)
+print(f"  Doppelte (object_id, sha256): {dubletten}, Dokumente im Status error: {Document.objects.filter(deleted_at__isnull=True, status='error').count()}")
+PY
+    }
+    echo "Zaehler vorher ($(date +%H:%M:%S)):"
+    zaehler
+    if [ "${ARG:-}" = "echt" ]; then
+      SEIT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+      echo "Neustart des Dienstes worker ..."
+      docker compose restart worker
+      st=""
+      for i in $(seq 1 24); do
+        sleep 5
+        st="$(docker compose ps worker --format '{{.Health}}' 2>/dev/null || true)"
+        [ "$st" = "healthy" ] && break
+      done
+      echo "worker: ${st:-unbekannt} nach $((i * 5)) s"
+      sleep 15
+      echo "Zaehler nachher ($(date +%H:%M:%S)):"
+      zaehler
+      echo "Sweeper-Logzeilen seit Neustart (pipeline.sweep, worker-io):"
+      out="$(docker compose logs --no-color --since "$SEIT" worker-io 2>/dev/null | grep 'pipeline.sweep' | tail -5 | cut -c1-220 || true)"
+      if [ -n "$out" ]; then
+        printf '%s\n' "$out" | sed 's/^/  /'
+      else
+        echo "  noch keine (Beat holt den Sweep binnen einer Minute nach; spaeter mit deploy-tests pruefen)"
+      fi
+      echo "$(date -Is) restart-probe echt (worker neu gestartet)" >> "$LOG"
+    else
+      n=$(docker compose logs --no-color --tail 2000 worker-io 2>/dev/null | grep -c 'pipeline.sweep' || true)
+      echo "Sweeper-Logzeilen (pipeline.sweep, worker-io, letzte 2.000 Zeilen): $n"
+      echo "Vorschau: kein Neustart. Mit Argument echt wird nur der Dienst worker neu gestartet."
+    fi
+    ;;
+  restore-probe)
+    # T6 (26.09.2026): Wiederherstellungsprobe ohne Eingriff, docker/backup/restore_probe.sh im Backup-Container:
+    # juengste Sicherung in <DB_NAME>_restore_probe einspielen, Zeilenzahlen und Token-Status gegen die Produktion,
+    # Scratch-Datenbank am Ende loeschen; Protokoll nach G 7.4 in der Ausgabe. Das Skript ist erst nach einem deploy
+    # (neues Backup-Image) vorhanden. Dauer je nach Dumpgroesse Minuten; bei grossen Dumps in tmux starten.
+    docker compose exec -T backup /usr/local/bin/restore_probe.sh
+    echo "$(date -Is) restore-probe abgeschlossen" >> "$LOG"
+    ;;
+  migrations-roundtrip)
+    # T8 (26.09.2026): scripts/check_migrations_roundtrip.sh gegen die Scratch-Datenbank <DB_NAME>_probe im db-Container,
+    # zu Beginn angelegt und am Ende geloescht; nie gegen die Produktionsdatenbank (harter Abbruch bei Namensgleichheit).
+    # Laeuft im Web-Image als app_migrate (Rechte auf <DB_NAME>_probe aus grants_sql, hier zusaetzlich gesetzt, weil das
+    # Recht erst mit dem naechsten Deploy dauerhaft wird); das Skript kommt per Standardeingabe, das Image enthaelt scripts/
+    # nicht. Belastet den Datenbankserver nur mit einem leeren Schema.
+    PROD="$(envval DB_NAME)"; PROBE="${PROD}_probe"; MIG="$(envval DB_MIGRATE_USER)"
+    [ -n "$PROD" ] || { echo "DB_NAME fehlt in .env"; exit 2; }
+    [ -n "$MIG" ] || { echo "DB_MIGRATE_USER fehlt in .env"; exit 2; }
+    [ "$PROBE" != "$PROD" ] || { echo "ABBRUCH: Scratch-Datenbank waere die Produktionsdatenbank ($PROD)"; exit 2; }
+    case "$PROBE$MIG" in *[!A-Za-z0-9_]*) echo "unzulaessiger Name ($PROBE, $MIG)"; exit 2 ;; esac
+    dbroot() { docker compose exec -T -e SQL="$1" db sh -c 'mariadb -uroot -p"$(cat /run/secrets/db_root_password)" -N -e "$SQL"'; }
+    # Im Datenbankteil des GRANT sind _ und % Platzhalter; maskiert gilt das Recht nur fuer genau diesen Namen
+    PROBE_MASK="${PROBE//_/\\_}"
+    dbroot "DROP DATABASE IF EXISTS \`$PROBE\`; CREATE DATABASE \`$PROBE\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci; GRANT ALL PRIVILEGES ON \`$PROBE_MASK\`.* TO '$MIG'@'%'; FLUSH PRIVILEGES;"
+    # Loeschen ueber den EXIT-Trap: bash fuehrt ihn auch nach HUP (SSH-Abbruch), INT und TERM aus, ein nachgestelltes
+    # DROP liefe nach einem Signal nicht mehr
+    trap 'dbroot "DROP DATABASE IF EXISTS \`$PROBE\`" && echo "Scratch-Datenbank $PROBE geloescht" || echo "WARNUNG: Scratch-Datenbank $PROBE konnte nicht geloescht werden; von Hand entfernen oder naechstes deploy"' EXIT
+    echo "Scratch-Datenbank $PROBE angelegt (Produktion: $PROD); Migrationen vorwaerts und rueckwaerts als $MIG ..."
+    rc=0
+    docker compose run --rm --no-deps -T -e DB_NAME="$PROBE" -e OBJEKTAKTE_SKIP_SCHEMA_CHECK=1 -e PYTHON=python -e ROUNDTRIP_REPO=/app \
+      web sh -c 'export DB_USER="$DB_MIGRATE_USER" DB_PASSWORD_FILE="$DB_MIGRATE_PASSWORD_FILE"; exec bash -s' \
+      < scripts/check_migrations_roundtrip.sh || rc=$?
+    if [ "$rc" -eq 0 ]; then echo "T8 bestanden: Migrationen vorwaerts und rueckwaerts fehlerfrei ($PROBE)"; else echo "T8 nicht bestanden (Exit $rc)"; exit "$rc"; fi
+    ;;
+  oauth-proof)
+    # T9 (26.09.2026, nur lesend): Token-Metadaten und Refresh-Ereignisse ohne Chiffrate, Kriterium <tage> Tage ohne
+    # Neuanmeldung (Standard 8, docs/betrieb.md 7.9); Ausgabe als Markdown fuer docs/betrieb/oauth-nachweis.md
+    TAGE="${ARG:-8}"
+    case "$TAGE" in ''|*[!0-9]*) echo "Tage muessen aus Ziffern bestehen"; exit 2 ;; esac
+    docker compose exec -T web python manage.py drive_oauth_proof --days "$TAGE"
+    ;;
+  perf-probe)
+    # T10 (26.09.2026): OCR-Messcontainer scripts/perf_probe.sh mit kleinen Parametern (Standard 20 Seiten, Prozesse 1,2;
+    # hoechstens 200 Seiten), nur wenn keine Verarbeitung laeuft (kein Lauf wartend oder laufend, kein Job wartend
+    # oder laufend; wartende Jobs ohne Lauf, etwa aus dem Dokumenteneingang, arbeiten die Worker sonst waehrend der
+    # Messung ab und verfaelschen sie).
+    # Ausgabe unter /srv/objektakte/deploy/perf-probe/<TS>; dazu der OOM-Kill-Status aller Container. Freigabe V-03.
+    PAGES=20; PROCS="1,2"
+    IFS='+' read -r -a teile <<<"${ARG:-}"
+    for t in "${teile[@]}"; do
+      case "$t" in
+        "") ;;
+        pages=*) PAGES="${t#pages=}"; case "$PAGES" in ''|*[!0-9]*) echo "pages muss aus Ziffern bestehen"; exit 2 ;; esac ;;
+        procs=*) PROCS="${t#procs=}"; case "$PROCS" in ''|*[!0-9,auto]*) echo "procs: Zahlen und auto, mit Komma getrennt"; exit 2 ;; esac ;;
+        *) echo "Argument unbekannt: $t (erlaubt: pages=N, procs=1,2,auto)"; exit 2 ;;
+      esac
+    done
+    [ "$PAGES" -le 200 ] || { echo "pages hoechstens 200 (kleine Messung neben dem Betrieb)"; exit 2; }
+    AKTIV="$(docker compose exec -T web python manage.py shell <<'PY'
+from apps.pipeline.models import JobStatus, ProcessingJob, ProcessingRun, RunStatus
+
+print(
+    ProcessingRun.objects.filter(status__in=[RunStatus.PENDING, RunStatus.RUNNING]).count()
+    + ProcessingJob.objects.filter(status__in=[JobStatus.PENDING, JobStatus.RUNNING]).count()
+)
+PY
+)"
+    AKTIV="$(echo "$AKTIV" | tr -d '[:space:]')"
+    [ "${AKTIV:-x}" = "0" ] || { echo "Abbruch: Verarbeitung aktiv oder nicht pruefbar (${AKTIV:-keine Antwort} offene Laeufe oder wartende und laufende Jobs); Messung nur im Leerlauf (sonst worker-stop, danach worker-start)"; exit 2; }
+    OUT="/srv/objektakte/deploy/perf-probe/$(date +%Y%m%d-%H%M%S)"
+    echo "Verarbeitung im Leerlauf; Messung mit $PAGES Seiten, Prozesse $PROCS, Ausgabe $OUT"
+    bash scripts/perf_probe.sh --pages "$PAGES" --scan-share 0.5 --procs "$PROCS" --out "$OUT"
+    echo "OOM-Kill-Status der Container (erwartet ueberall false):"
+    docker ps --filter name=objektakte- --format '{{.Names}}' | while read -r c; do
+      echo "  $c OOMKilled=$(docker inspect --format '{{.State.OOMKilled}}' "$c" 2>/dev/null || echo unbekannt)"
+    done
+    [ -f "$OUT/performance-entscheidung.md" ] && { echo "Auszug $OUT/performance-entscheidung.md:"; sed -n 1,40p "$OUT/performance-entscheidung.md"; }
+    echo "$(date -Is) perf-probe pages=$PAGES procs=$PROCS out=$OUT" >> "$LOG"
     ;;
   doc-status)
     # Dokumente je Objekt und Status, offene und fehlgeschlagene Jobs; keine Dateinamen, keine Personendaten
@@ -930,6 +1201,31 @@ PY
     # im Web-Container brach der Lauf mit fehlendem Modul ab); das Kommando haelt nach drei KI-Fehlversuchen an.
     docker compose exec -T worker-io python manage.py paperless_zuordnung_pruefen "${args[@]}"
     ;;
+  zuordnung-stichprobe)
+    # Stichprobe der Paperless-Zuordnung (Vorlage E-3, Nachweis Abnahmepunkt 3), nur lesend. Ziehen: Argumente mit +
+    # getrennt: je=50 (Dokumente je Hauptkategorie), seed=N (wiederholbare Auswahl, sonst Tagesdatum), objekt=NR.
+    # CSV nach /data/exports/stichproben/<JJJJ-MM-TT>_stichprobe.csv (Host: /srv/objektakte/exports/stichproben/).
+    # Auswerten: ergebnis=/data/exports/stichproben/<datei>.csv liest die Spalte pruefung und schreibt
+    # <JJJJ-MM-TT>_ergebnis.md daneben. Laeuft im worker-io, weil der Web-Container exports nur lesend einbindet.
+    # Datei holen und zurueckspielen (auf dem Server als deploy):
+    #   docker compose cp worker-io:/data/exports/stichproben/2026-09-26_stichprobe.csv ./2026-09-26_stichprobe.csv
+    #   docker compose cp ./2026-09-26_stichprobe.csv worker-io:/data/exports/stichproben/2026-09-26_stichprobe.csv
+    args=()
+    IFS='+' read -r -a teile <<<"${ARG:-}"
+    for t in "${teile[@]}"; do
+      case "$t" in
+        "") ;;
+        je=*) n="${t#je=}"; case "$n" in *[!0-9]*|"") echo "je braucht eine Zahl"; exit 2 ;; esac; args+=(--je-kategorie "$n") ;;
+        seed=*) n="${t#seed=}"; case "$n" in *[!0-9]*|"") echo "seed braucht eine Zahl"; exit 2 ;; esac; args+=(--seed "$n") ;;
+        objekt=*) n="${t#objekt=}"; case "$n" in *[!0-9]*|"") echo "objekt braucht eine Nummer"; exit 2 ;; esac; args+=(--objekt "$n") ;;
+        ergebnis=*) p="${t#ergebnis=}"; case "$p" in /data/exports/stichproben/*.csv) args+=(--ergebnis "$p") ;; *) echo "ergebnis muss unter /data/exports/stichproben/ liegen und auf .csv enden"; exit 2 ;; esac ;;
+        csv=*) p="${t#csv=}"; case "$p" in /data/exports/stichproben/*.csv) args+=(--csv "$p") ;; *) echo "csv muss unter /data/exports/stichproben/ liegen und auf .csv enden"; exit 2 ;; esac ;;
+        ueberschreiben) args+=(--ueberschreiben) ;;
+        *) echo "Argument unbekannt: $t (erlaubt: je=N, seed=N, objekt=NR, csv=/data/exports/stichproben/<datei>.csv, ueberschreiben, ergebnis=/data/exports/stichproben/<datei>.csv)"; exit 2 ;;
+      esac
+    done
+    docker compose exec -T worker-io python manage.py zuordnung_stichprobe "${args[@]}"
+    ;;
   backup-voll)
     # Volle Sicherung sofort im Backup-Container (Datenbank und Fachverzeichnisse, zuletzt 1.315 s); schreibt
     # status.json und macht den Healthcheck wieder gruen. Nur in tmux starten. Hintergrund 22.09.2026: der Cron-Lauf
@@ -1188,10 +1484,14 @@ PY
     docker system df -v 2>/dev/null | awk "/^VOLUME NAME/{f=1;next} f&&NF==0{f=0} f{print \$1, \$NF}" | sort -k2 -rh | head -12 || true
     ;;
   formate-wiederaufnehmen)
-    # Offene Faelle "nicht unterstuetztes Format", deren Format die Kette inzwischen kennt (E-Mails .eml und .msg
-    # seit 25.09.2026), erledigen und die Dokumente zurueck auf registriert setzen. Argumente mit + getrennt:
-    # objekt=NR, limit=N, echt. Ohne echt Vorschau (Verteilung nach Format, Quelle und Objekt). Danach die
-    # Verarbeitung starten: verarbeitung-alle echt.
+    # Offene Faelle "nicht unterstuetztes Format" wieder aufnehmen und die Dokumente zurueck auf registriert
+    # setzen. Argumente mit + getrennt: objekt=NR, limit=N, gruppe=bekannt|temporaer|html|office, echt.
+    # Gruppe bekannt (Standard): Format inzwischen bekannt (E-Mails seit 25.09.2026, HTML seit 26.09.2026);
+    # temporaer: Temporaer-Endung, ohne Endung oder unbekannte Endung, Inhalt noch ungeprueft; html: nur HTML;
+    # office (26.09.2026): Office-Altformate .doc, .xls, .ppt, .rtf, .odt, .ods, Umwandlung ueber LibreOffice
+    # (nur mit dem Worker-Image dieses Standes, sonst entsteht der Fall mit Notiz "Umwandlung nicht verfuegbar"
+    # erneut). Ohne echt Vorschau (Verteilung nach Endung, Format, Quelle und Objekt, keine Dateinamen).
+    # Danach die Verarbeitung starten: verarbeitung-alle echt.
     args=()
     IFS='+' read -r -a parts <<< "${ARG:-}"
     for p in "${parts[@]}"; do
@@ -1199,11 +1499,34 @@ PY
         echt) args+=(--echt) ;;
         objekt=*) args+=(--objekt "${p#objekt=}") ;;
         limit=*) args+=(--limit "${p#limit=}") ;;
+        gruppe=*) args+=(--gruppe "${p#gruppe=}") ;;
         '') ;;
-        *) echo "Unbekanntes Argument: $p (erlaubt: objekt=NR, limit=N, echt)"; exit 2 ;;
+        *) echo "Unbekanntes Argument: $p (erlaubt: objekt=NR, limit=N, gruppe=bekannt|temporaer|html|office, echt)"; exit 2 ;;
       esac
     done
     docker compose exec -T web python manage.py formate_wiederaufnehmen "${args[@]}"
+    ;;
+  restformate-bereinigen)
+    # Restformate nach Entscheidungsvorlage E-1 (26.09.2026) bereinigen. gruppe=temporaer: offene Faelle "nicht
+    # unterstuetztes Format" mit Temporaer-Endung oder ohne Endung, deren Inhalt die Kette geprueft hat
+    # (content_checked): Drive-Datei in den Papierkorb (nie endgueltig, 30 Tage wiederherstellbar), Dokument als
+    # geloescht markiert, Fall erledigt. gruppe=archive-medien: .zip, .mp4, .mov, .avi, .mkv, .mp3, .wav ungelesen
+    # nach 06/02 Manuelle Pruefung ueber den Ablagejob. Argumente mit + getrennt: gruppe=temporaer|archive-medien
+    # (Pflicht), objekt=NR, limit=N, echt. Ohne echt Vorschau (Zaehler je Objekt und Endung, keine Dateinamen).
+    # Freigabe GF vor echt (Papierkorb-Aktion).
+    args=()
+    IFS='+' read -r -a parts <<< "${ARG:-}"
+    for p in "${parts[@]}"; do
+      case "$p" in
+        echt) args+=(--echt) ;;
+        gruppe=*) args+=(--gruppe "${p#gruppe=}") ;;
+        objekt=*) args+=(--objekt "${p#objekt=}") ;;
+        limit=*) args+=(--limit "${p#limit=}") ;;
+        '') ;;
+        *) echo "Unbekanntes Argument: $p (erlaubt: gruppe=temporaer|archive-medien, objekt=NR, limit=N, echt)"; exit 2 ;;
+      esac
+    done
+    docker compose exec -T web python manage.py restformate_bereinigen "${args[@]}"
     ;;
   fehler-wiederaufnehmen)
     # Dokumente im Status Fehler gezielt wieder in die Kette nehmen, auch jenseits der drei automatischen
@@ -1387,5 +1710,5 @@ PY
     done
     echo "wirksam mit der Aktion deploy; Sicherung .env.bak"
     ;;
-  *) echo "Nur check, pull, befund, env-init, ps, logs, smoke, cert-retry, db-status, db-reset, first-run, deploy, rollback, create-admin, oauth-check, deploy-tests, doc-status, config-set, altbestand-import, altbestand-objekte, altbestand-aufarbeiten, verarbeitung-alle, paperless-feld-alle, redis-status, env-set, jobs-bereinigen, disk-status, lauf-monitor, fehler-wiederaufnehmen, transit-bereinigen, drive-dubletten, worker-drosseln, work-bereinigen, last-status, worker-stop, worker-start, ai-check, ai-reclassify, review-status, sync-status, sync-retry, classifier-status, zuordnung-pruefen, objekt-anschriften, anschrift-kandidaten, buchhaltung-jahresordner, paperless-feld-abgleich, paperless-archivfassung, formate-wiederaufnehmen, backup-voll oder reconcile-all erlaubt"; exit 2 ;;
+  *) echo "Nur check, pull, befund, env-init, ps, logs, smoke, cert-retry, db-status, db-reset, first-run, deploy, rollback, create-admin, oauth-check, deploy-tests, doc-status, config-set, altbestand-import, altbestand-objekte, altbestand-aufarbeiten, verarbeitung-alle, paperless-feld-alle, redis-status, env-set, jobs-bereinigen, disk-status, lauf-monitor, fehler-wiederaufnehmen, transit-bereinigen, drive-dubletten, worker-drosseln, work-bereinigen, last-status, worker-stop, worker-start, ai-check, ai-reclassify, review-status, sync-status, sync-retry, classifier-status, zuordnung-pruefen, objekt-anschriften, anschrift-kandidaten, buchhaltung-jahresordner, paperless-feld-abgleich, paperless-archivfassung, formate-wiederaufnehmen, restformate-bereinigen, zuordnung-stichprobe, email-status, faelle-sammelaktion, backup-voll, restart-probe, restore-probe, migrations-roundtrip, oauth-proof, perf-probe oder reconcile-all erlaubt"; exit 2 ;;
 esac

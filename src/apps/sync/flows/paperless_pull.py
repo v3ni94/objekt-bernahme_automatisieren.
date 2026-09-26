@@ -18,7 +18,7 @@ from apps.documents.ingest import ensure_run, safe_filename
 from apps.documents.models import Document, DocumentSource, DocumentStatus
 from apps.objects.models import ManagedObject
 from apps.pipeline import storage
-from apps.pipeline.analysis import detect_kind
+from apps.pipeline.analysis import UNREADABLE_KINDS, detect_kind
 from apps.sync import config, services
 from apps.sync.flows.common import (
     PAPERLESS,
@@ -230,7 +230,9 @@ def archive_fallback(name: str, mime: str | None, metadata: dict) -> bool:
     uebernommen statt eines Falls "nicht unterstuetztes Format" (25.09.2026: 6.527 solche Faelle im Bestand)."""
     if not config.archive_for_unsupported():
         return False
-    if detect_kind(Path(name), mime) != "unsupported":
+    # 26.09.2026: HTML und Office-Altformate (.doc, .xls, ..., Umwandlung ueber LibreOffice im Worker) liest die
+    # Kette jetzt selbst, dafuer kommt das Original; Archivfassung nur noch fuer unsupported
+    if detect_kind(Path(name), mime) not in UNREADABLE_KINDS:
         return False
     return bool(metadata.get("has_archive_version"))
 

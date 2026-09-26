@@ -1,0 +1,381 @@
+[
+  {
+    "id": "R-03-EMAIL-RECHNUNG-001",
+    "name": "E-Mail: Rechnung (Betreff und Rechnungsmerkmale im Text)",
+    "version": 1,
+    "priority": 150,
+    "scope": {},
+    "when": {
+      "email_subject_regex": ["(?i)\\b(rechnung|invoice|rechnungs-?(nr|nummer)|gutschrift)\\b"],
+      "text_regex": [
+        "(?i)(rechnungs-?(nummer|nr|betrag|datum)|zahlbar|f(ae|ä)llig(keit)?|netto|brutto|mwst|umsatzsteuer|(ue|ü)berweis)"
+      ],
+      "not_text_regex": ["(?i)(einzel|hausgeld|jahres|betriebskosten|nebenkosten)-?abrechnung"]
+    },
+    "then": {"category": "03", "confidence": 0.9, "hard": false, "document_type": "beleg", "scope": "accounting"},
+    "examples": {
+      "positive": [
+        "Von: Handwerk Beispiel GmbH <buchhaltung@example.test>\nBetreff: AW: Rechnung Nr. 2026-0417 Dachrinne\n\nSehr geehrte Damen und Herren, anbei unsere Rechnung. Rechnungsbetrag 1.234,56 EUR brutto, zahlbar bis 15.10.2026."
+      ],
+      "negative": [
+        "Von: Handwerk Beispiel GmbH <buchhaltung@example.test>\nBetreff: Angebot Dachrinne\n\nanbei unser Angebot, gültig bis 30.10.2026, Angebotssumme netto 980,00 EUR.",
+        "Von: Verwaltung <info@example.test>\nBetreff: Rechnung\n\nGuten Tag, anbei die Hausgeldabrechnung 2025 mit Rechnungsbetrag."
+      ]
+    }
+  },
+  {
+    "id": "R-02-EMAIL-ANGEBOT-001",
+    "name": "E-Mail: Angebot oder Kostenvoranschlag",
+    "version": 1,
+    "priority": 150,
+    "scope": {},
+    "when": {
+      "email_subject_regex": ["(?i)\\b(angebot|kostenvoranschlag|kostenangebot|kva)\\b"],
+      "text_regex": [
+        "(?i)(angebots-?(nr|nummer|summe|preis)|kostenvoranschlag|g(ue|ü)ltig bis|netto|brutto|pauschal|position(en)?)"
+      ]
+    },
+    "then": {
+      "category": "02",
+      "confidence": 0.88,
+      "hard": false,
+      "subfolder": "13",
+      "document_type": "angebot_kostenvoranschlag",
+      "scope": "object"
+    },
+    "examples": {
+      "positive": [
+        "Von: Maler Beispiel <angebot@example.test>\nBetreff: WG: Angebot Treppenhausanstrich\n\nanbei unser Angebot Nr. 2026-88, Angebotssumme netto 4.500,00 EUR, gültig bis 31.10.2026."
+      ],
+      "negative": [
+        "Von: Maler Beispiel <angebot@example.test>\nBetreff: Rechnung Treppenhausanstrich\n\nanbei unsere Rechnung, Rechnungsbetrag brutto 5.355,00 EUR."
+      ]
+    }
+  },
+  {
+    "id": "R-05-EMAIL-MAHNUNG-001",
+    "name": "E-Mail: Mahnung an Eigentümer (Hausgeldrückstand)",
+    "version": 1,
+    "priority": 150,
+    "scope": {"management_types": ["weg", "weg_with_se"]},
+    "when": {
+      "email_subject_regex": ["(?i)\\b(mahnung|zahlungserinnerung|r(ue|ü)ckstand|erinnerung)\\b"],
+      "text_regex": ["(?i)(hausgeld|wohngeld|r(ue|ü)ckstand|offene(r|n)? (betrag|forderung|posten)|mahngeb(ue|ü)hr)"],
+      "entity_required": ["owner_candidate"]
+    },
+    "then": {"category": "05", "confidence": 0.88, "hard": false, "subfolder": "09", "document_type": "mahnung", "scope": "owner"},
+    "examples": {
+      "positive": [
+        "Von: Hausverwaltung <info@example.test>\nBetreff: Mahnung Hausgeld WE 5\n\nSehr geehrter Herr Altmann, der Hausgeldrückstand beträgt 640,00 EUR. Wir bitten um Ausgleich bis 10.10.2026."
+      ],
+      "negative": [
+        "Von: Hausverwaltung <info@example.test>\nBetreff: Einladung Eigentümerversammlung\n\nHiermit laden wir zur Eigentümerversammlung ein, Tagesordnung anbei."
+      ]
+    }
+  },
+  {
+    "id": "R-03-EMAIL-MAHNUNG-002",
+    "name": "E-Mail: Mahnung eines Lieferanten oder Dienstleisters",
+    "version": 1,
+    "priority": 148,
+    "scope": {},
+    "when": {
+      "email_subject_regex": ["(?i)\\b(mahnung|zahlungserinnerung)\\b"],
+      "text_regex": ["(?i)(unsere (rechnung|forderung)|rechnungs-?(nr|nummer)|noch nicht (bezahlt|beglichen|eingegangen)|ausstehend)"],
+      "not_entity": ["owner_candidate"],
+      "not_text_regex": ["(?i)(hausgeld|wohngeld)"]
+    },
+    "then": {"category": "03", "confidence": 0.85, "hard": false, "document_type": "beleg", "scope": "accounting"},
+    "examples": {
+      "positive": [
+        "Von: Aufzugsdienst Beispiel <rechnung@example.test>\nBetreff: Zahlungserinnerung Rechnung 4711\n\nunsere Rechnung 4711 vom 01.08.2026 ist noch nicht beglichen, ausstehend sind 312,40 EUR."
+      ],
+      "negative": [
+        "Von: Hausverwaltung <info@example.test>\nBetreff: Mahnung Hausgeld\n\nder Hausgeldrückstand beträgt 640,00 EUR."
+      ]
+    }
+  },
+  {
+    "id": "R-02-EMAIL-PROTOKOLL-001",
+    "name": "E-Mail: Protokoll der Eigentümerversammlung",
+    "version": 1,
+    "priority": 150,
+    "scope": {"management_types": ["weg", "weg_with_se"]},
+    "when": {
+      "email_subject_regex": ["(?i)\\b(protokoll|niederschrift)\\b"],
+      "text_regex": ["(?i)(eigent(ue|ü)mer-?versammlung|\\betv\\b|tagesordnung|\\btop\\s*\\d)"],
+      "not_text_regex": ["(?i)\\beinladung\\b"]
+    },
+    "then": {
+      "category": "02",
+      "confidence": 0.9,
+      "hard": false,
+      "subfolder": "06",
+      "document_type": "versammlungsprotokoll",
+      "scope": "object"
+    },
+    "examples": {
+      "positive": [
+        "Von: Hausverwaltung <info@example.test>\nBetreff: Protokoll ETV 2026\n\nanbei das Protokoll der Eigentümerversammlung vom 12.06.2026 mit den Beschlüssen zu TOP 1 bis TOP 7."
+      ],
+      "negative": [
+        "Von: Wartungsdienst <service@example.test>\nBetreff: Protokoll Aufzugswartung\n\nanbei das Wartungsprotokoll der Anlage, nächste Prüfung 2027."
+      ]
+    }
+  },
+  {
+    "id": "R-02-EMAIL-EINLADUNG-001",
+    "name": "E-Mail: Einladung zur Eigentümerversammlung",
+    "version": 1,
+    "priority": 152,
+    "scope": {"management_types": ["weg", "weg_with_se"]},
+    "when": {
+      "email_subject_regex": ["(?i)\\beinladung\\b"],
+      "text_regex": ["(?i)(eigent(ue|ü)mer-?versammlung|\\betv\\b|tagesordnung)"]
+    },
+    "then": {
+      "category": "02",
+      "confidence": 0.9,
+      "hard": false,
+      "subfolder": "06",
+      "document_type": "einladung_eigentuemerversammlung",
+      "scope": "object"
+    },
+    "examples": {
+      "positive": [
+        "Von: Hausverwaltung <info@example.test>\nBetreff: Einladung zur Eigentümerversammlung 2026\n\nhiermit laden wir Sie zur ordentlichen Eigentümerversammlung am 12.06.2026 ein. Tagesordnung anbei."
+      ],
+      "negative": [
+        "Von: Hausverwaltung <info@example.test>\nBetreff: Einladung Sommerfest\n\nwir laden alle Bewohner zum Sommerfest im Hof ein."
+      ]
+    }
+  },
+  {
+    "id": "R-04-EMAIL-KUENDIGUNG-001",
+    "name": "E-Mail: Kündigung eines Mietverhältnisses",
+    "version": 1,
+    "priority": 150,
+    "scope": {"management_types": ["rental", "weg_with_se"]},
+    "when": {
+      "email_subject_regex": ["(?i)k(ue|ü)ndigung"],
+      "text_regex": ["(?i)(mietverh(ae|ä)ltnis|mietvertrag|wohnung|k(ue|ü)ndigungsfrist|auszug|(ue|ü)bergabe der wohnung)"],
+      "not_text_regex": ["(?i)(wartungs|dienstleistungs|hausmeister|reinigungs|winterdienst|versorgungs|versicherungs)-?vertrag"]
+    },
+    "then": {"category": "04", "confidence": 0.88, "hard": false, "document_type": "kuendigung_mietverhaeltnis", "scope": "tenant"},
+    "examples": {
+      "positive": [
+        "Von: Mia Mieterling <mieterling@example.test>\nBetreff: Kündigung Wohnung 4\n\nhiermit kündige ich das Mietverhältnis über die Wohnung 4 fristgerecht zum 31.12.2026."
+      ],
+      "negative": [
+        "Von: Hausverwaltung <info@example.test>\nBetreff: Kündigung Wartungsvertrag Aufzug\n\nhiermit kündigen wir den Wartungsvertrag zum Jahresende."
+      ]
+    }
+  },
+  {
+    "id": "R-02-EMAIL-KUENDIGUNG-002",
+    "name": "E-Mail: Kündigung eines Dienstleistungs- oder Wartungsvertrags",
+    "version": 1,
+    "priority": 150,
+    "scope": {},
+    "when": {
+      "email_subject_regex": ["(?i)k(ue|ü)ndigung"],
+      "text_regex": ["(?i)(wartungs|dienstleistungs|hausmeister|reinigungs|winterdienst|garten(pflege)?|versorgungs|strom|gas)-?vertrag"]
+    },
+    "then": {
+      "category": "02",
+      "confidence": 0.85,
+      "hard": false,
+      "subfolder": "10",
+      "document_type": "dienstleistervertrag",
+      "scope": "object"
+    },
+    "examples": {
+      "positive": [
+        "Von: Hausverwaltung <info@example.test>\nBetreff: Kündigung Wartungsvertrag Aufzug\n\nhiermit kündigen wir den Wartungsvertrag für die Aufzugsanlage fristgerecht zum 31.12.2026."
+      ],
+      "negative": [
+        "Von: Mia Mieterling <mieterling@example.test>\nBetreff: Kündigung Wohnung 4\n\nhiermit kündige ich das Mietverhältnis fristgerecht."
+      ]
+    }
+  },
+  {
+    "id": "R-02-EMAIL-SCHADEN-001",
+    "name": "E-Mail: Versicherungsschaden (Schadenmeldung mit Versicherungsbezug)",
+    "version": 1,
+    "priority": 152,
+    "scope": {},
+    "when": {
+      "email_subject_regex": ["(?i)(schaden|schadens?meldung|wasserschaden|sturmschaden|schadennummer|schaden-?nr)"],
+      "text_regex": ["(?i)(versicher|schaden-?(nummer|nr)|regulierung|sachverst(ae|ä)ndige)"]
+    },
+    "then": {
+      "category": "02",
+      "confidence": 0.88,
+      "hard": false,
+      "subfolder": "13",
+      "document_type": "versicherungsschaden",
+      "scope": "object"
+    },
+    "examples": {
+      "positive": [
+        "Von: Musterversicherung AG <schaden@example.test>\nBetreff: Wasserschaden Musterstraße 49, Schadennummer 12-345\n\nwir haben die Schadenmeldung erhalten und leiten die Regulierung ein."
+      ],
+      "negative": [
+        "Von: Mieter <mieter@example.test>\nBetreff: Schaden Treppenhauslicht\n\ndas Licht im Treppenhaus ist ausgefallen, bitte um Reparatur."
+      ]
+    }
+  },
+  {
+    "id": "R-02-EMAIL-MANGEL-001",
+    "name": "E-Mail: Mangel- oder Schadenmeldung ohne Versicherungsbezug",
+    "version": 1,
+    "priority": 150,
+    "scope": {},
+    "when": {
+      "email_subject_regex": ["(?i)(schaden|mangel|m(ae|ä)ngel|defekt|st(oe|ö)rung|ausgefallen|undicht|reparatur)"],
+      "text_regex": ["(?i)(defekt|undicht|ausgefallen|reparatur|handwerker|st(oe|ö)rung|mangel|m(ae|ä)ngel|beheben|instand)"],
+      "not_text_regex": ["(?i)(versicher|schaden-?(nummer|nr))"]
+    },
+    "then": {
+      "category": "02",
+      "confidence": 0.85,
+      "hard": false,
+      "subfolder": "13",
+      "document_type": "maengelliste",
+      "scope": "object"
+    },
+    "examples": {
+      "positive": [
+        "Von: Bewohner <bewohner@example.test>\nBetreff: Störung Haustür, Schließanlage defekt\n\ndie Haustür schließt nicht mehr, bitte einen Handwerker zur Reparatur beauftragen."
+      ],
+      "negative": [
+        "Von: Musterversicherung AG <schaden@example.test>\nBetreff: Wasserschaden Schadennummer 12-345\n\nwir haben die Schadenmeldung erhalten, die Regulierung läuft über den Versicherer."
+      ]
+    }
+  },
+  {
+    "id": "R-02-EMAIL-VERSICHERUNG-001",
+    "name": "E-Mail: Versicherung (Police, Beitrag, Bedingungen)",
+    "version": 1,
+    "priority": 150,
+    "scope": {},
+    "when": {
+      "email_subject_regex": ["(?i)(versicherung|police|versicherungsschein|beitragsrechnung|nachtrag zur police)"],
+      "text_regex": ["(?i)(versicherungs-?(schein|nummer|nr|police|beitrag|bedingungen|summe)|police|versicherer|deckung|pr(ae|ä)mie)"],
+      "not_text_regex": ["(?i)(schaden-?(nummer|nr|meldung)|regulierung)"]
+    },
+    "then": {
+      "category": "02",
+      "confidence": 0.85,
+      "hard": false,
+      "subfolder": "08",
+      "document_type": "weitere_objektversicherung",
+      "scope": "object"
+    },
+    "examples": {
+      "positive": [
+        "Von: Musterversicherung AG <vertrag@example.test>\nBetreff: Nachtrag zur Police 98-7654 Haftpflichtversicherung\n\nanbei der Nachtrag zum Versicherungsschein, der Versicherungsbeitrag beträgt ab 01.01.2027 812,00 EUR."
+      ],
+      "negative": [
+        "Von: Musterversicherung AG <schaden@example.test>\nBetreff: Versicherung Schadennummer 12-345\n\nzur Schadenmeldung vom 03.09.2026 läuft die Regulierung."
+      ]
+    }
+  },
+  {
+    "id": "R-02-EMAIL-ZAEHLER-001",
+    "name": "E-Mail: Zählerstand oder Ablesung",
+    "version": 1,
+    "priority": 150,
+    "scope": {},
+    "when": {
+      "email_subject_regex": ["(?i)(z(ae|ä)hler-?(stand|st(ae|ä)nde|ablesung|nummer)|ablesung|ablese)"],
+      "text_regex": ["(?i)(z(ae|ä)hler-?(nummer|nr|stand)|abgelesen|ablese|kwh|m³|m3|kubikmeter|verbrauch)"]
+    },
+    "then": {
+      "category": "02",
+      "confidence": 0.85,
+      "hard": false,
+      "subfolder": "09",
+      "document_type": "zaehlerverzeichnis",
+      "scope": "object"
+    },
+    "examples": {
+      "positive": [
+        "Von: Hausmeister <hausmeister@example.test>\nBetreff: Zählerstände Heizung 31.12.2026\n\nanbei die Zählerstände: Zähler-Nr. 4711 Wärme 12.345 kWh, Kaltwasser 456 m³, abgelesen am 31.12.2026."
+      ],
+      "negative": [
+        "Von: Messdienst <service@example.test>\nBetreff: Heizkostenabrechnung 2025\n\nanbei die Heizkostenabrechnung für das Gesamtobjekt."
+      ]
+    }
+  },
+  {
+    "id": "R-05-EMAIL-ABRECHNUNG-001",
+    "name": "E-Mail: Hausgeld- oder Einzelabrechnung an einen Eigentümer",
+    "version": 1,
+    "priority": 150,
+    "scope": {"management_types": ["weg", "weg_with_se"]},
+    "when": {
+      "email_subject_regex": ["(?i)((hausgeld|jahres|einzel|wohngeld)-?abrechnung|abrechnung\\s+20\\d{2})"],
+      "text_regex": ["(?i)(abrechnungs-?(ergebnis|zeitraum|jahr|spitze)|nachzahlung|guthaben|einzelabrechnung|ihre einheit)"],
+      "entity_required": ["owner_candidate"],
+      "not_text_regex": ["(?i)(gesamt-?abrechnung|gesamtkosten|abrechnung der (weg|gemeinschaft))"]
+    },
+    "then": {
+      "category": "05",
+      "confidence": 0.88,
+      "hard": false,
+      "subfolder": "05",
+      "document_type": "einzelabrechnung",
+      "scope": "owner"
+    },
+    "examples": {
+      "positive": [
+        "Von: Hausverwaltung <info@example.test>\nBetreff: Hausgeldabrechnung 2025 WE 3\n\nSehr geehrter Herr Mustermann, anbei Ihre Einzelabrechnung 2025, Abrechnungsergebnis Nachzahlung 312,40 EUR."
+      ],
+      "negative": [
+        "Von: Hausverwaltung <info@example.test>\nBetreff: Jahresabrechnung 2025\n\nanbei die Gesamtabrechnung 2025 der WEG mit den Gesamtkosten je Kostenart."
+      ]
+    }
+  },
+  {
+    "id": "R-03-EMAIL-ABRECHNUNG-002",
+    "name": "E-Mail: Gesamtabrechnung der Gemeinschaft",
+    "version": 1,
+    "priority": 150,
+    "scope": {"management_types": ["weg", "weg_with_se"]},
+    "when": {
+      "email_subject_regex": ["(?i)((jahres|gesamt|hausgeld|wohngeld)-?abrechnung|abrechnung\\s+20\\d{2})"],
+      "text_regex": ["(?i)(gesamt-?abrechnung|gesamtkosten|abrechnung der (weg|gemeinschaft)|verteilungsschl(ue|ü)ssel)"],
+      "not_entity": ["unit"]
+    },
+    "then": {"category": "03", "confidence": 0.85, "hard": false, "document_type": "gesamtjahresabrechnung", "scope": "accounting"},
+    "examples": {
+      "positive": [
+        "Von: Hausverwaltung <info@example.test>\nBetreff: Jahresabrechnung 2025\n\nanbei die Gesamtabrechnung 2025 der WEG mit den Gesamtkosten je Kostenart und Verteilungsschlüssel."
+      ],
+      "negative": [
+        "Von: Hausverwaltung <info@example.test>\nBetreff: Hausgeldabrechnung 2025 WE 3\n\nanbei Ihre Einzelabrechnung 2025 mit Abrechnungsergebnis Nachzahlung 312,40 EUR."
+      ]
+    }
+  },
+  {
+    "id": "R-04-EMAIL-ABRECHNUNG-003",
+    "name": "E-Mail: Betriebskostenabrechnung an einen Mieter",
+    "version": 1,
+    "priority": 150,
+    "scope": {"management_types": ["rental", "weg_with_se"]},
+    "when": {
+      "email_subject_regex": ["(?i)(betriebskosten|nebenkosten|heizkosten)-?abrechnung"],
+      "text_regex": ["(?i)(mieter|mietverh(ae|ä)ltnis|nebenkosten|betriebskosten|umlage|vorauszahlung)"]
+    },
+    "then": {"category": "04", "confidence": 0.88, "hard": false, "document_type": "betriebskostenabrechnung", "scope": "tenant"},
+    "examples": {
+      "positive": [
+        "Von: Hausverwaltung <info@example.test>\nBetreff: Betriebskostenabrechnung 2025 Wohnung 4\n\nSehr geehrte Frau Mieterling, anbei die Betriebskostenabrechnung 2025; nach Abzug der Vorauszahlungen ergibt sich ein Guthaben."
+      ],
+      "negative": [
+        "Von: Hausverwaltung <info@example.test>\nBetreff: Hausgeldabrechnung 2025\n\nanbei Ihre Einzelabrechnung als Eigentümer mit Abrechnungsergebnis."
+      ]
+    }
+  }
+]

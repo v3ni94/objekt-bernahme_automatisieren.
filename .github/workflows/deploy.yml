@@ -16,9 +16,9 @@ on:
         required: true
         default: "check"
         type: choice
-        options: ["check", "pull", "befund", "env-init", "ps", "logs", "smoke", "cert-retry", "db-status", "db-reset", "first-run", "deploy", "rollback", "create-admin", "oauth-check", "deploy-tests", "doc-status", "config-set", "altbestand-import", "altbestand-objekte", "altbestand-aufarbeiten", "verarbeitung-alle", "paperless-feld-alle", "reconcile-all", "redis-status", "env-set", "jobs-bereinigen", "disk-status", "transit-bereinigen", "worker-drosseln", "work-bereinigen", "last-status", "worker-stop", "worker-start"]
+        options: ["check", "pull", "befund", "env-init", "ps", "logs", "smoke", "cert-retry", "db-status", "db-reset", "first-run", "deploy", "rollback", "create-admin", "oauth-check", "deploy-tests", "doc-status", "config-set", "altbestand-import", "altbestand-objekte", "altbestand-aufarbeiten", "verarbeitung-alle", "paperless-feld-alle", "reconcile-all", "zuordnung-stichprobe", "redis-status", "env-set", "jobs-bereinigen", "disk-status", "transit-bereinigen", "worker-drosseln", "work-bereinigen", "last-status", "worker-stop", "worker-start", "restart-probe", "restore-probe", "migrations-roundtrip", "oauth-proof", "perf-probe", "email-status", "faelle-sammelaktion"]
       argument:
-        description: "Nur fuer create-admin (E-Mail), logs (Dienstname, leer = alle Anwendungsdienste), config-set (schluessel=wert) sowie altbestand-objekte, altbestand-aufarbeiten, verarbeitung-alle und paperless-feld-alle (echt = ausfuehren, sonst Vorschau) sowie env-set (SCHLUESSEL=wert, mehrere mit + getrennt), jobs-bereinigen (echt) und reconcile-all (ohne-ordner)"
+        description: "Nur fuer create-admin (E-Mail), logs (Dienstname, leer = alle Anwendungsdienste), config-set (schluessel=wert) sowie altbestand-objekte, altbestand-aufarbeiten, verarbeitung-alle und paperless-feld-alle (echt = ausfuehren, sonst Vorschau) sowie env-set (SCHLUESSEL=wert, mehrere mit + getrennt), jobs-bereinigen (echt), reconcile-all (ohne-ordner), restart-probe (echt), oauth-proof (Tage), perf-probe (pages=N+procs=1,2) und zuordnung-stichprobe (je=N+seed=N+objekt=NR oder ergebnis=/data/exports/stichproben/<datei>.csv)"
         required: false
         default: ""
 
@@ -55,7 +55,9 @@ jobs:
           test -n "$DEPLOY_HOST" || { echo "Secret DEPLOY_HOST fehlt"; exit 1; }
           test -n "$DEPLOY_USER" || { echo "Secret DEPLOY_USER fehlt"; exit 1; }
           case "$BRANCH" in *[!A-Za-z0-9._/-]*) echo "unzulaessiger Branchname"; exit 1;; esac
-          case "$ARGUMENT" in *[!A-Za-z0-9@._+=-]*) echo "unzulaessiges Argument"; exit 1;; esac
+          # Komma fuer perf-probe (procs=1,2), Schraegstrich fuer zuordnung-stichprobe (ergebnis=/data/...); der
+          # Zeichenvorrat entspricht dem Filter in scripts/deploy_remote.sh
+          case "$ARGUMENT" in *[!A-Za-z0-9@._+=,/-]*) echo "unzulaessiges Argument"; exit 1;; esac
           # Der Verbindungsaufbau zum Server scheitert gelegentlich mit "Connection timed out" (Exit 255),
           # obwohl sshd laeuft; die Aktion selbst wurde dann nie gestartet. Nur dieser Fall wird bis zu
           # dreimal wiederholt. Ein anderer Exit-Code stammt vom Server und wird nicht wiederholt, damit

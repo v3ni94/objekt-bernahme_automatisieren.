@@ -29,6 +29,10 @@ Ergänzung zur Secret-Liste in docs/betrieb.md 3.8; Einrichtung und Betrieb in d
 | `paperless_token` | API-Token eines eigenen Paperless-Benutzers mit Rechten zum Anzeigen, Hinzufügen und Ändern von Dokumenten, Tags und benutzerdefinierten Feldern | Paperless | `web` (Verbindungstest), `worker-io` (Operationen) |
 | `paperless_webhook_token` | Gemeinsames Geheimnis des Webhooks, Kopfzeile `X-MHV-Webhook-Token` im Paperless-Workflow | `openssl rand -hex 32` | `web` (Endpunkt `/webhooks/paperless/`), Paperless-Workflow |
 
+## LibreOffice im Worker-Image (Office-Altformate, Stand 26.09.2026)
+
+Das Ziel `worker` in `docker/app.Dockerfile` enthält zusätzlich `libreoffice-writer`, `libreoffice-calc` (ohne empfohlene Pakete, also ohne Java) und `fonts-liberation`. Damit wandelt die Verarbeitungskette Office-Altformate (`.doc`, `.xls`, `.rtf`, `.odt`, `.ods`) im Arbeitsverzeichnis in eine PDF und liest diese wie eine hochgeladene PDF; abgelegt bleibt das Original. Präsentationen (`.ppt`, `.odp`) gehören nicht dazu, weil `libreoffice-impress` bewusst nicht installiert ist; für sie übernimmt die Paperless-Übernahme weiterhin die PDF-Archivfassung (`paperless-archivfassung` für Bestandsfälle). Bei Zeitüberschreitung beendet die Kette die ganze Prozessgruppe (`soffice`, `oosplash`, `soffice.bin`), es bleibt kein verwaister LibreOffice-Prozess zurück. Das Worker-Image wird dadurch um einige hundert MB größer (Wert nach dem Bau mit `docker image ls` prüfen), der Bau dauert entsprechend länger; das Ziel `web` bleibt unverändert. Die Binärdatei wird über die Umgebungsvariable `SOFFICE_BIN` gefunden (Standard `soffice` im PATH); fehlt sie, entsteht je Dokument der Fall „nicht unterstütztes Format" mit Notiz „Umwandlung nicht verfügbar", nichts bricht ab. Zeitlimit je Umwandlung: Konfigurationsschlüssel `processing.office_convert_timeout_s` (Standard 120 Sekunden). Bestandsfälle nach dem Deployment: `formate-wiederaufnehmen <branch> gruppe=office` (Vorschau), dann mit `+echt` und anschließend `verarbeitung-alle <branch> echt`.
+
 ## Container-Unterbefehle
 
 | Befehl | Wirkung |
