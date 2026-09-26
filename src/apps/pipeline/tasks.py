@@ -284,6 +284,17 @@ def _rename_by_content(job: ProcessingJob, doc: Document, original: Path, suffix
     return target
 
 
+def _crm_document_filed(doc) -> None:
+    """Webhook document.filed an das CRM (M29 Stufe 3), nur bei endgueltiger Ablage (Status filed; mit offenem Fall
+    folgt er nach der Entscheidung mit der erneuten Ablage). Ohne Rueckwirkung auf die Pipeline."""
+    try:
+        from apps.crm_api import webhooks
+
+        webhooks.document_filed(doc)
+    except Exception:  # Import- oder Konfigurationsfehler duerfen die Ablage nicht stoppen
+        logger.exception("CRM-Webhook fuer Dokument %s nicht ausfuehrbar", doc.pk)
+
+
 # ---------------------------------------------------------------- 3 analyze_pages
 @job_task(JobType.ANALYZE_PAGES)
 def analyze_pages(job: ProcessingJob) -> dict:
@@ -1252,6 +1263,7 @@ def file_to_drive(job: ProcessingJob) -> dict:
         last_verified_at=timezone.now(), status=NodeStatus.ACTIVE
     )
     _sync_hook("on_document_filed", doc)
+    _crm_document_filed(doc)
     return {"action": action, "target": target.drive_file_id, "target_name": target.drive_name}
 
 

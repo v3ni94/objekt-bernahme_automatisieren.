@@ -66,6 +66,7 @@ INSTALLED_APPS = [
     "apps.reporting",
     "apps.ai",
     "apps.sync",
+    "apps.crm_api",
 ]
 
 MIDDLEWARE = [
@@ -326,6 +327,13 @@ OBJEKTAKTE = {
         "SERVICES_WITH_HEARTBEAT", ["worker-ocr", "worker-nlp", "worker-io", "beat"]
     ),
 }
+
+# --- CRM-Schnittstelle (M29 Stufe 3, docs/betrieb/crm-schnittstelle.md) ------------------------------
+# Ausgehende Webhooks document.filed und object.taken_over; leere URL oder leeres Geheimnis bedeutet aus.
+# Das Geheimnis kommt als Secret (CRM_WEBHOOK_SECRET_FILE) oder, nur lokal, als Umgebungsvariable.
+CRM_WEBHOOK_URL = env_str("CRM_WEBHOOK_URL", "")
+CRM_WEBHOOK_SECRET = read_secret("CRM_WEBHOOK_SECRET", default="") or ""
+CRM_WEBHOOK_TIMEOUT_S = env_int("CRM_WEBHOOK_TIMEOUT_S", 10)
 
 # --- Verschluesselung (docs/architektur.md 9.6): je Zweck ein Schluessel als Secret ----------------
 FIELD_KEYS = {

@@ -72,8 +72,8 @@ WORKER_DELETE = {
     "drive_sync_actions",  # drive.reconcile, Aktionen eines verworfenen Plans
     "import_rows",  # imports.services, Neuaufbau einer Stapeldatei
 }
-# Tabellen mit Chiffraten: kein Lesezugriff fuer app_ro
-ENCRYPTED = {"oauth_tokens", "mfa_authenticator", "owners", "tenants", "users"}
+# Tabellen mit Chiffraten: kein Lesezugriff fuer app_ro; dazu die Token-Hashes der CRM-Schnittstelle (M29 Stufe 3)
+ENCRYPTED = {"oauth_tokens", "mfa_authenticator", "owners", "tenants", "users", "crm_api_tokens"}
 # Scratch-Datenbanken der Deployment-Tests (26.09.2026, docs/betrieb/deployment-test.md): T6 (restore_probe.sh im
 # Backup-Container) spielt den Dump als app_backup in <db>_restore_probe ein, T8 (Aktion migrations-roundtrip) migriert
 # als app_migrate in <db>_probe. Beide Konten brauchen CREATE und DROP auf genau diesen Namen; die Produktionsdatenbank

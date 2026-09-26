@@ -116,4 +116,6 @@ AUDIT_ACTIONS: dict[str, str] = {
     "inbox.reject": "Zuordnungsvorschlag verworfen",
     "inbox.rule_created": "Zuordnungsregel aus Bestätigungen entstanden",
     "inbox.rule_deactivated": "Zuordnungsregel deaktiviert",
+    "crm_token.create": "Token der CRM-Schnittstelle angelegt",
+    "crm_token.revoke": "Token der CRM-Schnittstelle gesperrt",
 }
