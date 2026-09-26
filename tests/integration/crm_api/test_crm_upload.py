@@ -184,3 +184,38 @@ def test_dublette_zeigt_original(client, objekt, an, no_run):
     body = client.get(f"{BASE}/documents/{doc_id}/", HTTP_AUTHORIZATION=f"Bearer {token}").json()
     assert body["status"] == "duplicate"
     assert body["duplicate_of"]["id"] == original.pk and body["duplicate_of"]["drive_file_id"] == "drive-1"
+
+
+def test_einheit_aus_hinweis_in_der_zuordnung(objekt):
+    """Ohne erkannte Einheit im Text gilt die im CRM gewaehlte Einheit, wenn das Objekt sie fuehrt."""
+    from apps.classification.context import build_context
+    from apps.objects.models import Unit
+
+    we1 = Unit.objects.create(
+        object=objekt, unit_label="WE 1", unit_label_normalized="WE1", unit_number="1", unit_type="apartment"
+    )
+    doc = Document.objects.create(
+        object=objekt,
+        original_name="scan.pdf",
+        current_name="scan.pdf",
+        source="upload",
+        status="ocr_done",
+        size_bytes=10,
+        first_seen_at=timezone.now(),
+    )
+    CrmUpload.objects.create(
+        document=doc, crm_document_id="crm-hint-1", hints={"unit_labels": ["we 1", "WE 99"]}
+    )
+    ctx = build_context(doc, entities=[])
+    assert ctx.unit_ids == [we1.pk]
+    assert ctx.unit_labels == ["WE 1"]
+    ohne = Document.objects.create(
+        object=objekt,
+        original_name="b.pdf",
+        current_name="b.pdf",
+        source="upload",
+        status="ocr_done",
+        size_bytes=10,
+        first_seen_at=timezone.now(),
+    )
+    assert build_context(ohne, entities=[]).unit_ids == []

@@ -178,6 +178,21 @@ def _selected_pages(page_count: int, first_pages: int) -> list[int]:
     return pages
 
 
+def _crm_hint_units(doc: Document) -> tuple[list[int], list[str]]:
+    from apps.crm_api.models import CrmUpload
+    from apps.objects.models import Unit
+    from apps.objects.units import normalize_label
+
+    upload = CrmUpload.objects.filter(document_id=doc.pk).only("hints").first()
+    labels = [str(x) for x in ((upload.hints or {}).get("unit_labels") or [])] if upload else []
+    if not labels:
+        return [], []
+    wanted = {normalize_label(label): label for label in labels if label.strip()}
+    units = Unit.active.filter(object_id=doc.object_id, unit_label_normalized__in=list(wanted)).order_by("pk")
+    found = [(u.pk, u.unit_label) for u in units]
+    return [pk for pk, _ in found], [label for _, label in found]
+
+
 def build_context(doc: Document, *, entities: list[DocumentEntity] | None = None) -> DocContext:
     obj = doc.object
     first_pages = int(store.get("classification.first_pages", 3))
@@ -242,6 +257,11 @@ def build_context(doc: Document, *, entities: list[DocumentEntity] | None = None
         if ref:
             ctx.entity_pages.setdefault(key, {}).setdefault(e.page_no, []).append(ref)
     ctx.unit_ids = seen_units
+    if not ctx.unit_ids:
+        # Upload aus dem CRM (26.09.2026): erkennt der Text keine Einheit, gilt die im CRM gewaehlte, sofern das
+        # Objekt sie fuehrt (Vergleich ueber den normalisierten Bezeichner, keine Anlage neuer Einheiten)
+        ctx.unit_ids, hinted_labels = _crm_hint_units(doc)
+        ctx.unit_labels.extend(hinted_labels)
     ctx.period = period_from_entities(entities)
     ctx.email = email_headers_for(doc, head)
     full_text = "\n".join(pages.values())
