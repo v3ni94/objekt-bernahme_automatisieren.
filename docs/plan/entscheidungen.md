@@ -162,3 +162,48 @@ Die folgenden Fragen werden mit dem Vorschlagswert gebaut und lassen sich späte
 | 12.09.2026 | Paperless P6 | Keine Löschspiegelung: Löschung oder Papierkorb in Paperless oder Drive setzt nur den Zustand der Verknüpfung (`missing`, `trashed`) und einen Konfliktfall (`deleted_remote`, `trashed_remote`, `drive_removed`, `drive_trashed`); erst die Entscheidung Löschung bestätigen setzt den Tombstone, der eine erneute Übernahme derselben externen Kennung verhindert; der Paperless-Client besitzt keine Löschfunktion | Grundsatz D 1 Nr. 6 (nichts wird physisch gelöscht) und die Vorgabe des Auftraggebers vom 11.09.2026 (nie aus Drive löschen) gelten auch über Systemgrenzen; eine versehentliche Löschung im DMS darf die Akte nicht antasten. Ohne Tombstone würde der Abgleich ein bewusst entferntes Dokument beim nächsten Lauf oder Bestandslauf erneut übernehmen. |
 | 12.09.2026 | Paperless P6 | Native Google-Dokumente gehen als gekennzeichnete Exportfassung (PDF, Rolle `snapshot`, Drive-Revision als Quellversion, neuer Export nur nach Änderung der Quelle, bei Serverunterstützung als neue Dokumentversion) nach Paperless; nicht übertragbare Dateien (Endung außerhalb `PAPERLESS_SUFFIXES` oder größer als `paperless.max_upload_mb`) erhalten einen einseitigen Indexbeleg (Rolle `index_stub`) mit Grund, Dateiname, Objekt, Dokument-UUID, Drive-ID und Drive-Link | Google-Dokumente sind über die Drive-API nicht als Datei ladbar und bleiben in Drive bearbeitbar; eine PDF aus Paperless darf das Original nie ersetzen. Der Indexbeleg macht jede Datei im DMS auffindbar, ohne Formate zu erzwingen, die Paperless nicht verarbeitet; er ersetzt weder Original noch Volltext. Beide Darstellungen tragen UUID-Feld und Rolle und werden beim Rückabgleich nie als eigenes Quelldokument übernommen. |
 | 12.09.2026 | Paperless P7 | Zuordnungsregeln entstehen erst aus mindestens `sync.rule_min_confirmations` (2, technisch nie unter 2) bestätigten Beispielen verschiedener Dokumente mit gleicher Merkmalskombination (Lieferant plus objektspezifische Vertrags-, Kunden-, Zähler-, Versicherungs- oder Liegenschaftsnummer) für genau ein Zielobjekt und ohne Gegenbeispiel; Regeln sind versioniert (`code`, `version`), abschaltbar und sortieren bestätigte Altdokumente nie um; automatische Zuordnungen sind keine Lernbeispiele; Ableitung nächtlich 01:15 Uhr in der Zeitzone der Anwendung, Vorgabe Europe/Berlin (ANNAHME) | Ein einzelner Beleg kann Zufall oder Fehler sein (Rechnung mit falscher Vertragsnummer); erst die Wiederholung durch Menschen macht die Kombination belastbar. Negative Beispiele (Verwerfen, Korrektur weg vom Ziel) bleiben erhalten und blockieren die Regel. Eine Regel wirkt als Beleg mit Gewicht 0,88 innerhalb der Schwellen `sync.assignment_auto_min` und `sync.assignment_gap_min`, nicht als Automatik an den Schwellen vorbei. |
+
+## Offene Entscheidungen aus dem Betrieb (Vorlagen des Umsetzers, Stand 26.09.2026)
+
+Die Vorlagen E-1 bis E-4 betreffen den Bestand nach dem Bestandslauf E-Mails vom 26.09.2026 (docs/plan/status.md). Bis zur Entscheidung wird nichts verschoben, gelöscht oder umgestellt; alle Zahlen stammen aus den Deploy-Aktionen `formate-wiederaufnehmen`, `paperless-archivfassung` und `review-status` und sind vor einer Sammelaktion mit `review-status` erneut zu messen.
+
+### E-1 Restformate: 2.007 Fälle „nicht unterstütztes Format"
+
+Sachverhalt: Nach der Wiederaufnahme der E-Mails blieben 2.007 Fälle mit Dokument, alle aus dem Drive-Bestand. 101 davon wurden am 26.09.2026 auf die PDF-Archivfassung von Paperless umgestellt; verbleiben rund 1.906 (667 mit Paperless-Verknüpfung, dort ohne Archivfassung; 1.239 ohne Verknüpfung). Endungen vor der Umstellung: .doc 800, .tmp 330, .indir 302, .herunterladen 130, .css 82, .hed 72, ohne Endung 58, .zip 57, .xls 53, .mp4 21, .mov 17, .html 15, übrige Endungen 70.
+
+| Gruppe | Anzahl | Optionen | Empfehlung | Aufwand und Kosten |
+|---|---|---|---|---|
+| Office-Altformate (.doc, .xls) | 853 | A: Umwandlung im Worker (LibreOffice ohne Oberfläche im Worker-Image, Umwandlung nach PDF, danach normale Kette mit Regel und KI). B: Ablage ohne Lesen nach 06/02 Manuelle Prüfung, Sichtung durch den Sachbearbeiter. C: Belassen in der Prüfung. | A. Word- und Excel-Dateien der Vorverwaltung enthalten erfahrungsgemäß Verträge, Protokolle und Abrechnungen; ohne Lesen bleibt jede der 853 Dateien Handarbeit. | A: Erweiterung Worker-Image und Formatweiche, Tests, Deploy; Stufe-3-Kosten rund 853 x 0,0023 EUR = 1,96 EUR. B: Sammelaktion, keine Entwicklung, 853 manuelle Sichtungen. |
+| Temporär und System (.tmp, .indir, .herunterladen, .css, .hed, ohne Endung) | 974 | A: Prüfung der Dateisignatur (PDF, Bild, Office sind an den ersten Bytes erkennbar): erkannte Dateien werden normal verarbeitet, der Rest gilt als Temporärdatei und geht per Sammelaktion in den Drive-Papierkorb (30 Tage wiederherstellbar). B: alle 974 nach 06/02 Manuelle Prüfung. C: alle ohne Prüfung in den Papierkorb. | A. Dateien ohne Endung und abgebrochene Downloads können vollständige PDFs sein; C ist deshalb nicht vertretbar, B erzeugt 974 Sichtungen ohne Nutzen. | A: kleine Erweiterung der Formatweiche, Vorschau der Papierkorb-Aktion vor der Ausführung, Freigabe GF für den Papierkorb. |
+| Archive und Medien (.zip, .mp4, .mov, .html) | 110 | HTML: als Textseite lesen (die HTML-Umwandlung aus der E-Mail-Auswertung ist vorhanden). ZIP und Video: keine automatische Verarbeitung vorgesehen (Entpacken wäre eine neue Funktion mit Prüfaufwand), Ablage nach 06/02 zur manuellen Sichtung; die 18 ZIP-Archive über 500 MB bleiben im Prüfcenter. | HTML lesen, ZIP und Video nach 06/02. | HTML: kleine Erweiterung. ZIP und Video: Sammelaktion, 95 Sichtungen. |
+| Übrige Endungen | 70 | Einzelfall im Prüfcenter. | Einzelfall. | keine Entwicklung. |
+
+Entscheidung erbeten: Freigabe der Empfehlung je Gruppe oder abweichende Wahl. Reihenfolge bei Freigabe: Signaturprüfung und HTML (klein), dann Office-Umwandlung (Image-Bau), zuletzt Sammelaktionen mit Vorschau.
+
+### E-2 Objekte 133 und 216: Sammelpfade oder Liegenschaften
+
+Sachverhalt: 133 (3.661 Dokumente, 80 Prozent ohne Objektbezug) und 216 (3.604 Dokumente, 89 Prozent ohne Objektbezug) waren in Paperless Sammelpfade; die Objektzuordnung hat Dokumente mit erkennbarem Objekt bereits von dort in andere Objekte umgehängt (Matrix der 948 Umhängungen vom 23.09.2026). Rund 6.100 Dokumente ohne jeden Objektbezug liegen noch dort. Beide Objekte sind seit dem 23.09.2026 von allen Massenläufen ausgenommen; ein Lauf ohne Ausnahme würde diese Dokumente als Dokumente der beiden WEGs in Drive ablegen.
+
+Vorfrage an die Geschäftsführung: Sind 133 und 216 reale Verwaltungsobjekte mit eigener Objektakte, oder reine Ablagepfade der Vorverwaltung ohne Liegenschaft?
+
+| Option | Wirkung | Kosten und Aufwand |
+|---|---|---|
+| A: Zuordnungslauf über den KI-Schiedsrichter für alle rund 7.265 Dokumente; Dokumente mit erkanntem Objekt werden umgehängt, der Rest bleibt im jeweiligen Objekt unter 06/04 Nicht objektbezogen | Verwertbare Dokumente landen in der richtigen Objektakte; der Rest ist gesammelt sichtbar und kann später gesichtet oder gelöscht werden | Klassifikation rund 7.265 x 0,0023 EUR = 16,71 EUR; Kosten der Zuordnungsaufrufe im Pilot messen (limit=300 je Objekt) |
+| B: Beide als reguläre Liegenschaften verarbeiten (Massenlauf ohne Ausnahme) | Rund 6.100 Dokumente ohne Bezug werden als Dokumente dieser WEGs abgelegt und verfälschen die beiden Objektakten | Keine Entwicklung, hohe Nacharbeit; nur vertretbar, wenn die Vorfrage mit „reale Objekte" beantwortet wird und der Anteil ohne Bezug erklärbar ist |
+| C: Beide als Sammelobjekte kennzeichnen, Dokumente ohne Bezug in einen Sammelordner der Hausverwaltung außerhalb der Objektakten | Objektakten bleiben sauber; der Sammelordner wird zur Restemenge für die Sichtung | Neue Funktion (Kennzeichen am Objekt, Zielordner, Ablageregel), Aufwand mittel; erst nach A sinnvoll |
+
+Empfehlung: Pilot nach A mit 300 Dokumenten je Objekt, Bewertung des Anteils mit klarem Objekt und der gemessenen Kosten, danach Entscheidung zwischen A und C. B nicht empfohlen. Freigabe GF vor dem Pilot (KI-Kosten, Umhängungen).
+
+### E-3 Stichprobe der Paperless-Zuordnung (Nachweis für Abnahmepunkt 3)
+
+Sachverhalt: Eine dokumentierte manuelle Kontrolle der aus Paperless übernommenen Dokumente gegen Objekt, Ordner und Dokumentart in Drive liegt nicht vor; 7.675 Dokumente tragen das Objekt allein aus dem Paperless-Speicherpfad (zuordnung-pruefen vom 22.09.2026).
+
+Vorschlag: lesendes Kommando, das je Hauptkategorie 30 bis 50 abgelegte Paperless-Dokumente zufällig zieht und als Prüfliste ausgibt (Objekt, Kategorie, Unterordner, Dokumentart, Drive-Pfad, Paperless-ID). Der Sachbearbeiter prüft und vermerkt richtig oder falsch; das Ergebnis dient als Nachweis für den Ordnerabgleich (Abnahmeprotokoll Punkt 3) und zeigt, ob eine Nachzuordnung nötig ist. Aufwand: klein, keine Kosten, keine Änderung an Daten.
+
+Entscheidung erbeten: Freigabe zum Bau und Umfang je Kategorie (Vorschlag 50).
+
+### E-4 Regel 06 Sonstiges für E-Mails
+
+Sachverhalt: Von den 4.510 wieder aufgenommenen E-Mails gingen 76 Prozent in die Prüfung, weil weder Regel noch KI eine Dokumentart mit Ablageort erkannten. Die Verteilung der E-Mail-Prüffälle (Fallart, bester Kandidat, Stufe-3-Status, Objekte) liefert `review-status` seit dem 26.09.2026 in einem eigenen Abschnitt.
+
+Vorlage folgt nach dem Lauf von `review-status` mit drei Wegen: automatische Ablage nach 06 mit Betreff als Titel, Zuordnung zu einer Eigentümer- oder Mieterakte über Absender und Betreff, Verbleib in der Prüfung. Bis dahin keine Sammelaktion.

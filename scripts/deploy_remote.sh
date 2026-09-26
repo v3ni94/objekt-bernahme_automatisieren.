@@ -41,7 +41,7 @@
 #   backup-voll <branch>      Volle Sicherung sofort (Datenbank und Fachverzeichnisse, rund 20 Minuten, nur in tmux); schreibt status.json
 #   altbestand-aufarbeiten <branch> [echt] Alle Altbestand-Ordner mit Objekt aufarbeiten (echt = Celery-Aufgabe, sonst Vorschau)
 #   verarbeitung-alle <branch> [echt][+ohne=133,216]  Verarbeitungslaeufe fuer alle Objekte mit offener Arbeit (echt = einreihen, sonst Vorschau; ohne = Objekte ausnehmen)
-#   review-status <branch> [<objekt>]   Offene Pruefcenter-Faelle je Art und Unterart, Vorschlaege, KI-Nachklassifizierbarkeit (keine Personendaten)
+#   review-status <branch> [<objekt>]   Offene Pruefcenter-Faelle je Art und Unterart, Vorschlaege, KI-Nachklassifizierbarkeit, E-Mail-Faelle und abgelegte E-Mails (keine Personendaten)
 #   sync-status <branch> [live]          Verbindung Drive, Anwendung, Paperless: Schalter, Verbindungstest, Cursor, Auffindbarkeit je Quelle, Operationen (lesend; live = echter Verbindungstest)
 #   classifier-status <branch> [list|train|train+force|deactivate]  Stufe 2: Kaltstartstatus, Modelle, Training (train+force auch waehrend laufender Verarbeitung), Modell abschalten
 #   sync-retry <branch> [echt|bestand+<id>]  Sync-Operationen mit Paperless-404 erneut einreihen (Vorschau ohne echt); Bestandslauf fortsetzen
@@ -597,6 +597,47 @@ for pa in offen.filter(proposed_action__isnull=False).values_list("proposed_acti
 print("Vorgeschlagene Aktionen: " + (", ".join(f"{k}={v}" for k, v in akt.most_common()) or "keine"))
 je_obj = offen.values("object__object_number").annotate(n=Count("id")).order_by("-n")[:15]
 print("Objekte mit den meisten offenen Faellen: " + ", ".join(f"{r['object__object_number']}={r['n']}" for r in je_obj))
+# E-Mails (.eml, .msg) in der Pruefung (26.09.2026): Fallart, bester Kandidat aus Regel oder KI (context.intended),
+# Stufe-3-Status, Konfidenz und Objekt; dazu die bereits abgelegten E-Mails nach Ziel und Entscheider. Grundlage fuer
+# die Regel 06 Sonstiges. Keine Betreffe, keine Absender, keine Dateinamen.
+from apps.documents.models import Document
+MAIL = r"\.(eml|msg)$"
+mail = offen.filter(document__isnull=False, document__original_name__iregex=MAIL)
+n_mail = mail.count()
+print(f"E-Mail-Faelle (.eml, .msg): {n_mail} von {gesamt}")
+if n_mail:
+    rows = mail.values("case_type", "case_subtype").annotate(n=Count("id")).order_by("-n")[:10]
+    print("  Art/Unterart: " + ", ".join(f"{r['case_type']}/{r['case_subtype'] or '-'}={r['n']}" for r in rows))
+    ziel, art, s3st, konf = Counter(), Counter(), Counter(), Counter()
+    for ctx in mail.values_list("context", flat=True).iterator(chunk_size=1000):
+        ctx = ctx or {}
+        z = ctx.get("intended") or {}
+        ziel[f"{z.get('category') or '-'}/{z.get('subfolder') or '-'}"] += 1
+        art[z.get("document_type") or "-"] += 1
+        s3st[ctx.get("stage3_status") or "nie aufgerufen"] += 1
+        try:
+            c = float(ctx.get("confidence"))
+            konf["<0,5" if c < 0.5 else "<0,7" if c < 0.7 else ">=0,7"] += 1
+        except (TypeError, ValueError):
+            konf["ohne"] += 1
+    print("  bester Kandidat Kategorie/Unterordner: " + ", ".join(f"{k}={v}" for k, v in ziel.most_common(10)))
+    print("  bester Kandidat Dokumentart: " + ", ".join(f"{k}={v}" for k, v in art.most_common(12)))
+    print("  Stufe-3-Status: " + ", ".join(f"{k}={v}" for k, v in s3st.most_common()))
+    print("  Konfidenz: " + ", ".join(f"{k}={v}" for k, v in konf.most_common()))
+    je_obj = mail.values("object__object_number").annotate(n=Count("id")).order_by("-n")[:10]
+    print("  Objekte: " + ", ".join(f"{r['object__object_number']}={r['n']}" for r in je_obj))
+abgelegt = Document.objects.filter(deleted_at__isnull=True, status="filed", original_name__iregex=MAIL)
+if os.environ.get("OBJ"):
+    abgelegt = abgelegt.filter(object__object_number=os.environ["OBJ"])
+n_abg = abgelegt.count()
+print(f"Abgelegte E-Mails: {n_abg}")
+if n_abg:
+    rows = abgelegt.values("category_id", "subfolder__code").annotate(n=Count("id")).order_by("-n")[:10]
+    print("  Kategorie/Unterordner: " + ", ".join(f"{r['category_id'] or '-'}/{r['subfolder__code'] or '-'}={r['n']}" for r in rows))
+    rows = abgelegt.values("document_type__code").annotate(n=Count("id")).order_by("-n")[:12]
+    print("  Dokumentart: " + ", ".join(f"{r['document_type__code'] or '-'}={r['n']}" for r in rows))
+    rows = abgelegt.values("final_decided_by").annotate(n=Count("id")).order_by("-n")
+    print("  entschieden durch: " + ", ".join(f"{r['final_decided_by'] or '-'}={r['n']}" for r in rows))
 PY
     ;;
   deploy-tests)
