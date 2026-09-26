@@ -20,4 +20,6 @@ urlpatterns = [
     path("verwaltung/", include("apps.config.urls")),
     path("verwaltung/", include("apps.audit.urls")),
     path("verwaltung/", include("apps.accounts.urls")),
+    # Lesende CRM-Schnittstelle (M29 Stufe 3), Bearer-Token mit Scopes, nur GET
+    path("api/crm/v1/", include("apps.crm_api.urls")),
 ]

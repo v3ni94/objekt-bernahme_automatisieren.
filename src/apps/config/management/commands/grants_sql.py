@@ -72,8 +72,8 @@ WORKER_DELETE = {
     "drive_sync_actions",  # drive.reconcile, Aktionen eines verworfenen Plans
     "import_rows",  # imports.services, Neuaufbau einer Stapeldatei
 }
-# Tabellen mit Chiffraten: kein Lesezugriff fuer app_ro
-ENCRYPTED = {"oauth_tokens", "mfa_authenticator", "owners", "tenants", "users"}
+# Tabellen mit Chiffraten: kein Lesezugriff fuer app_ro; dazu die Token-Hashes der CRM-Schnittstelle (M29 Stufe 3)
+ENCRYPTED = {"oauth_tokens", "mfa_authenticator", "owners", "tenants", "users", "crm_api_tokens"}
 
 
 class Command(BaseCommand):

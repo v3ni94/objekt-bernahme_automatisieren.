@@ -200,6 +200,14 @@ def object_edit(request, pk: int):
                 before=b,
                 after=a,
             )
+            if (
+                before.get("status") in (ObjectStatus.NEW, ObjectStatus.TAKEOVER)
+                and obj.status == ObjectStatus.ACTIVE
+            ):
+                # Uebernahme abgeschlossen: Webhook object.taken_over an das CRM nach dem Commit (M29 Stufe 3)
+                from apps.crm_api import webhooks
+
+                webhooks.object_taken_over(obj)
         from apps.requirements.tasks import trigger_evaluation
 
         trigger_evaluation(obj.pk, "object_update")  # H 3.5: Stammdatenaenderung
