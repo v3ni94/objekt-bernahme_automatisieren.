@@ -697,6 +697,10 @@ PY
     docker ps --format '  {{.Names}} {{.Ports}}' | grep '^  objektakte-' | grep -E '0\.0\.0\.0|:::' || echo "  keine"
     echo "  Veroeffentlichte Ports aller uebrigen Container (fremde Anwendungen, Traefik im Host-Netz erscheint nicht):"
     docker ps --format '  {{.Names}} {{.Ports}}' | grep -v '^  objektakte-' | grep -E '0\.0\.0\.0|:::' || echo "  keine"
+    # 27.09.2026: mariadb-fdcd bleibt auf 0.0.0.0:32771 fuer das IONOS-Webhosting, gefiltert ueber die Kette
+    # MARIADB-32771 (mariadb-32771-allowlist.service). Ohne Filterzeile ist der Port wieder offen.
+    echo "  Portfilter in DOCKER-USER (erwartet: je veroeffentlichtem Fremdport eine Zeile, derzeit 32771):"
+    iptables -S DOCKER-USER 2>/dev/null | grep -- '--ctorigdstport' | sed 's/^/    /' || echo "    keine (oder ohne Root-Rechte nicht lesbar)"
     echo "T3 Isolation des Netzes data (erwartet: BLOCKIERT):"
     docker compose exec -T db bash -c 'timeout 5 bash -c "exec 3<>/dev/tcp/1.1.1.1/443" 2>/dev/null && echo "  db: ERREICHBAR" || echo "  db: BLOCKIERT"'
     docker compose exec -T redis sh -c 'timeout 5 wget -q -T 5 -O /dev/null https://1.1.1.1 2>/dev/null && echo "  redis: ERREICHBAR" || echo "  redis: BLOCKIERT"'
