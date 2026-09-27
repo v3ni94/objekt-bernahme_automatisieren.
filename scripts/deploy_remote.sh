@@ -763,23 +763,35 @@ wieder = ProcessingJobEvent.objects.filter(
 # Drei Ursachen fuer running -> pending (apps.pipeline.jobs): Sweeper (Heartbeat veraltet), Defer (wartet N s: Grund)
 # und Wiederholung nach Fehler (erneut in N s: Fehler). Nur die erste ist ein Sweeper-Befund.
 from collections import Counter
-arten, gruende, sweeper_jobs = Counter(), Counter(), Counter()
-for msg, typ, job_id in wieder.values_list("message", "job__job_type", "job_id").iterator(chunk_size=5000):
+# Zusaetzlich die letzte Stunde (27.09.2026): die Wirkung einer Korrektur ist sofort nach dem Deployment
+# sichtbar und nicht erst, wenn die alten Ereignisse aus dem 7-Tage-Fenster gefallen sind
+stunde = timezone.now() - timedelta(hours=1)
+arten, gruende, gruende_1h, sweeper_jobs = Counter(), Counter(), Counter(), Counter()
+for msg, typ, job_id, ts in wieder.values_list("message", "job__job_type", "job_id", "created_at").iterator(
+    chunk_size=5000
+):
     msg = msg or ""
     if msg.startswith("Heartbeat veraltet"):
         arten["sweeper"] += 1
         sweeper_jobs[(typ, job_id)] += 1
-    elif msg.startswith("wartet "):
+        continue
+    if msg.startswith("wartet "):
         arten["defer"] += 1
-        gruende[f"{typ}: {msg.split(': ', 1)[-1][:70]}"] += 1
+        grund = f"{typ}: {msg.split(': ', 1)[-1][:70]}"
     else:
         arten["retry"] += 1
-        gruende[f"{typ}: Fehler {msg.split(': ', 1)[-1][:60]}"] += 1
+        grund = f"{typ}: Fehler {msg.split(': ', 1)[-1][:60]}"
+    gruende[grund] += 1
+    if ts >= stunde:
+        gruende_1h[grund] += 1
 print(f"  Wiedereinreihungen running -> pending (7 Tage): {sum(arten.values())}")
 print(f"    Sweeper (Heartbeat veraltet): {arten['sweeper']} bei {len(sweeper_jobs)} Jobs, je Jobart: "
       + (", ".join(f"{t}={n}" for t, n in Counter(t for (t, _j) in sweeper_jobs.elements()).most_common(6)) or "keine"))
 print(f"    Wartezustand (Defer): {arten['defer']}, Wiederholung nach Fehler: {arten['retry']}")
 for grund, n in gruende.most_common(8):
+    print(f"      {n:>7}  {grund}")
+print(f"    davon letzte Stunde: {sum(gruende_1h.values())}")
+for grund, n in gruende_1h.most_common(5):
     print(f"      {n:>7}  {grund}")
 ocr = ProcessingJob.objects.filter(job_type=JobType.OCR_CHUNK, updated_at__gte=seit)
 print(
@@ -1553,8 +1565,9 @@ PY
         *) echo "Unbekanntes Argument: $p (erlaubt: objekt=NR, limit=N, gruppe=bekannt|temporaer|html|office, echt)"; exit 2 ;;
       esac
     done
-    # Auditzeilen je Dokument nicht ausgeben (bis 27.09.2026 rund 1.900 Zeilen je Lauf); das Audit bleibt in der Datenbank
-    docker compose exec -T web python manage.py formate_wiederaufnehmen "${args[@]}" | { grep -v '"logger": "apps.audit.services"' || true; }
+    # Auditzeilen je Dokument nicht ausgeben (bis 27.09.2026 rund 1.900 Zeilen je Lauf); das Logging schreibt nach stderr,
+    # daher 2>&1 vor dem Filter. Das Audit bleibt in der Datenbank
+    docker compose exec -T web python manage.py formate_wiederaufnehmen "${args[@]}" 2>&1 | { grep -v '"logger": "apps.audit.services"' || true; }
     ;;
   restformate-bereinigen)
     # Restformate nach Entscheidungsvorlage E-1 (26.09.2026) bereinigen. gruppe=temporaer: offene Faelle "nicht
@@ -1576,7 +1589,7 @@ PY
         *) echo "Unbekanntes Argument: $p (erlaubt: gruppe=temporaer|archive-medien, objekt=NR, limit=N, echt)"; exit 2 ;;
       esac
     done
-    docker compose exec -T web python manage.py restformate_bereinigen "${args[@]}" | { grep -v '"logger": "apps.audit.services"' || true; }
+    docker compose exec -T web python manage.py restformate_bereinigen "${args[@]}" 2>&1 | { grep -v '"logger": "apps.audit.services"' || true; }
     ;;
   fehler-wiederaufnehmen)
     # Dokumente im Status Fehler gezielt wieder in die Kette nehmen, auch jenseits der drei automatischen
