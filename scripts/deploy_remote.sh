@@ -714,25 +714,73 @@ PY
     echo "T4/T5 Wiederaufnahme (erwartet: 0 Doppelte, erneut eingereihte Jobs enden fertig, Sweeper im Log):"
     docker compose exec -T web python manage.py shell <<'PY'
 from datetime import timedelta
-from django.db.models import Count
+from django.db.models import Count, Q
 from django.utils import timezone
 from apps.documents.models import Document
 from apps.pipeline.models import JobStatus, JobType, ProcessingJob, ProcessingJobEvent
 
 # Pruefabfrage T4/T5: keine Doppelverarbeitung je (object_id, sha256) unter den nicht geloeschten Dokumenten
+# Ohne Pruefsumme (sha256 leer oder NULL) faellt alles eines Objekts in eine Gruppe; das sind keine Dubletten,
+# sondern Dokumente vor dem Hash oder mit Fehler (getrennt ausgewiesen, Korrektur 27.09.2026)
 dubletten = (
-    Document.objects.filter(deleted_at__isnull=True)
+    Document.objects.filter(deleted_at__isnull=True).exclude(sha256__isnull=True).exclude(sha256="")
     .values("object_id", "sha256")
     .annotate(c=Count("id"))
     .filter(c__gt=1)
     .count()
 )
+ohne_hash = Document.objects.filter(deleted_at__isnull=True).filter(Q(sha256__isnull=True) | Q(sha256="")).count()
 print(f"  Doppelte (object_id, sha256) unter nicht geloeschten Dokumenten: {dubletten} (erwartet 0)")
+print(f"  Dokumente ohne Pruefsumme (noch nicht gehasht oder Fehler, keine Dubletten): {ohne_hash}")
+if dubletten:
+    # Aufstellung je Paar (lesend): Status, Quelle und Drive-Datei zeigen, ob eine Dublettenpruefung verpasst wurde
+    # (zwei abgelegte Dateien) oder nur ein Zwischenstand vorliegt (eine Zeile noch in Verarbeitung)
+    from collections import Counter
+    paare = (
+        Document.objects.filter(deleted_at__isnull=True).exclude(sha256__isnull=True).exclude(sha256="")
+        .values("object_id", "sha256").annotate(c=Count("id")).filter(c__gt=1)
+    )
+    muster = Counter()
+    beispiele = []
+    for p in paare:
+        docs = list(
+            Document.objects.filter(deleted_at__isnull=True, object_id=p["object_id"], sha256=p["sha256"])
+            .order_by("pk").values("pk", "status", "source", "drive_file_id")
+        )
+        key = " + ".join(sorted(f"{d['status']}/{d['source']}{'/drive' if d['drive_file_id'] else ''}" for d in docs))
+        muster[key] += 1
+        if len(beispiele) < 5:
+            beispiele.append(f"Objekt-ID {p['object_id']}: Dokumente {', '.join(str(d['pk']) for d in docs)}")
+    print("    Muster (Status/Quelle je Dokument des Paars):")
+    for key, n in muster.most_common(8):
+        print(f"      {n:>4}  {key}")
+    for b in beispiele:
+        print(f"    Beispiel {b}")
 seit = timezone.now() - timedelta(days=7)
 wieder = ProcessingJobEvent.objects.filter(
     created_at__gte=seit, from_status=JobStatus.RUNNING, to_status=JobStatus.PENDING
-).count()
-print(f"  Vom Sweeper erneut eingereihte Jobs (7 Tage): {wieder}")
+)
+# Drei Ursachen fuer running -> pending (apps.pipeline.jobs): Sweeper (Heartbeat veraltet), Defer (wartet N s: Grund)
+# und Wiederholung nach Fehler (erneut in N s: Fehler). Nur die erste ist ein Sweeper-Befund.
+from collections import Counter
+arten, gruende, sweeper_jobs = Counter(), Counter(), Counter()
+for msg, typ, job_id in wieder.values_list("message", "job__job_type", "job_id").iterator(chunk_size=5000):
+    msg = msg or ""
+    if msg.startswith("Heartbeat veraltet"):
+        arten["sweeper"] += 1
+        sweeper_jobs[(typ, job_id)] += 1
+    elif msg.startswith("wartet "):
+        arten["defer"] += 1
+        gruende[f"{typ}: {msg.split(': ', 1)[-1][:70]}"] += 1
+    else:
+        arten["retry"] += 1
+        gruende[f"{typ}: Fehler {msg.split(': ', 1)[-1][:60]}"] += 1
+print(f"  Wiedereinreihungen running -> pending (7 Tage): {sum(arten.values())}")
+print(f"    Sweeper (Heartbeat veraltet): {arten['sweeper']} bei {len(sweeper_jobs)} Jobs, je Jobart: "
+      + (", ".join(f"{t}={n}" for t, n in Counter(t for (t, _j) in sweeper_jobs.elements()).most_common(6)) or "keine"))
+print(f"    Wartezustand (Defer): {arten['defer']}, Wiederholung nach Fehler: {arten['retry']}")
+for grund, n in gruende.most_common(8):
+    print(f"      {n:>7}  {grund}")
 ocr = ProcessingJob.objects.filter(job_type=JobType.OCR_CHUNK, updated_at__gte=seit)
 print(
     f"  OCR-Bloecke (7 Tage): {ocr.filter(status=JobStatus.DONE, attempt_count__gt=1).count()} nach Wiederholung fertig, "
@@ -818,7 +866,8 @@ print("  offene Jobs je Art: " + (", ".join(f"{r['job_type']}/{r['status']}={r['
 runs = {r["status"]: r["c"] for r in ProcessingRun.objects.values("status").annotate(c=Count("id"))}
 print("  Laeufe: " + ", ".join(f"{s}={runs.get(s, 0)}" for s in RunStatus.values))
 dubletten = (
-    Document.objects.filter(deleted_at__isnull=True).values("object_id", "sha256").annotate(c=Count("id")).filter(c__gt=1).count()
+    Document.objects.filter(deleted_at__isnull=True).exclude(sha256__isnull=True).exclude(sha256="")
+    .values("object_id", "sha256").annotate(c=Count("id")).filter(c__gt=1).count()
 )
 print(f"  Doppelte (object_id, sha256): {dubletten}, Dokumente im Status error: {Document.objects.filter(deleted_at__isnull=True, status='error').count()}")
 PY
