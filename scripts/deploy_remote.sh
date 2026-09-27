@@ -1565,9 +1565,10 @@ PY
         *) echo "Unbekanntes Argument: $p (erlaubt: objekt=NR, limit=N, gruppe=bekannt|temporaer|html|office, echt)"; exit 2 ;;
       esac
     done
-    # Auditzeilen je Dokument nicht ausgeben (bis 27.09.2026 rund 1.900 Zeilen je Lauf); das Logging schreibt nach stderr,
-    # daher 2>&1 vor dem Filter. Das Audit bleibt in der Datenbank
-    docker compose exec -T web python manage.py formate_wiederaufnehmen "${args[@]}" 2>&1 | { grep -v '"logger": "apps.audit.services"' || true; }
+    # Auditzeilen je Dokument und INFO-Zeilen je Drive-Aufruf nicht ausgeben (bis 27.09.2026 rund 1.900 Zeilen je
+    # Lauf); das Logging schreibt nach stderr, daher 2>&1 vor dem Filter. Das Audit bleibt in der Datenbank, Warnungen
+    # und Fehler des Drive-Adapters bleiben sichtbar
+    docker compose exec -T web python manage.py formate_wiederaufnehmen "${args[@]}" 2>&1 | { grep -v -e '"logger": "apps.audit.services"' -e '"level": "INFO", "logger": "apps.drive.google_adapter"' || true; }
     ;;
   restformate-bereinigen)
     # Restformate nach Entscheidungsvorlage E-1 (26.09.2026) bereinigen. gruppe=temporaer: offene Faelle "nicht
@@ -1576,7 +1577,9 @@ PY
     # geloescht markiert, Fall erledigt. gruppe=archive-medien: .zip, .mp4, .mov, .avi, .mkv, .mp3, .wav ungelesen
     # nach 06/02 Manuelle Pruefung ueber den Ablagejob. Argumente mit + getrennt: gruppe=temporaer|archive-medien
     # (Pflicht), objekt=NR, limit=N, echt. Ohne echt Vorschau (Zaehler je Objekt und Endung, keine Dateinamen).
-    # Freigabe GF vor echt (Papierkorb-Aktion).
+    # Freigabe GF vor echt (Papierkorb-Aktion). Die Auswahl erfolgt bei echt neu nach denselben Kriterien: Faelle,
+    # deren Inhaltspruefung zwischen Vorschau und echt abgeschlossen wurde, kommen hinzu (27.09.2026: Vorschau 511,
+    # echt 568). Vorschau daher unmittelbar vor echt ausfuehren. Ausgabefilter wie bei formate-wiederaufnehmen.
     args=()
     IFS='+' read -r -a parts <<< "${ARG:-}"
     for p in "${parts[@]}"; do
@@ -1589,7 +1592,7 @@ PY
         *) echo "Unbekanntes Argument: $p (erlaubt: gruppe=temporaer|archive-medien, objekt=NR, limit=N, echt)"; exit 2 ;;
       esac
     done
-    docker compose exec -T web python manage.py restformate_bereinigen "${args[@]}" 2>&1 | { grep -v '"logger": "apps.audit.services"' || true; }
+    docker compose exec -T web python manage.py restformate_bereinigen "${args[@]}" 2>&1 | { grep -v -e '"logger": "apps.audit.services"' -e '"level": "INFO", "logger": "apps.drive.google_adapter"' || true; }
     ;;
   fehler-wiederaufnehmen)
     # Dokumente im Status Fehler gezielt wieder in die Kette nehmen, auch jenseits der drei automatischen
