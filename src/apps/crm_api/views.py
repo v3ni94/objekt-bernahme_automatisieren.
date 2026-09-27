@@ -13,9 +13,20 @@ from django.utils import timezone
 from django.utils.dateparse import parse_date, parse_datetime
 from django.views.decorators.csrf import csrf_exempt
 
+from apps.audit.services import record
+from apps.config import store
 from apps.crm_api import data, uploads
 from apps.crm_api.auth import error, json_response, require_scope
-from apps.crm_api.models import SCOPE_DOCUMENTS, SCOPE_DOCUMENTS_WRITE, SCOPE_OBJECTS, SCOPE_PERSONS
+from apps.crm_api.models import (
+    SCOPE_DOCUMENTS,
+    SCOPE_DOCUMENTS_WRITE,
+    SCOPE_OBJECTS,
+    SCOPE_PERSONS,
+    SCOPE_PERSONS_WRITE,
+)
+from apps.imports import services as import_services
+from apps.imports.models import ImportKind
+from apps.imports.tasks import parse_batch_task
 
 DEFAULT_PAGE_SIZE = 100
 MAX_PAGE_SIZE = 500
@@ -181,3 +192,52 @@ def document_detail(request, pk: int):
     if doc is None:
         return error(404, "Dokument nicht gefunden")
     return json_response(data.document_status(doc))
+
+
+@require_scope(SCOPE_PERSONS_WRITE, methods=("POST",))
+def object_imports(request, number: str):
+    """Einheitenliste aus dem CRM (Format Immoware24-Einheitenliste) als Import des Objekts. Der Import laeuft
+    durch die Importkette (Einlesen, Zuordnung, Pruefung, Uebernahme erst nach Freigabe in der Anwendung)."""
+    if not bool(store.get("sync.crm_persons_enabled", False)):
+        resp = error(
+            503, "Personenliste über die CRM-Schnittstelle ist ausgeschaltet (sync.crm_persons_enabled)"
+        )
+        resp["Retry-After"] = "900"
+        return resp
+    obj = data.find_object(number)
+    if obj is None:
+        return _not_found()
+    if obj.deleted_at is not None:
+        return error(409, "Objekt ist archiviert")
+    file = request.FILES.get("file")
+    if file is None:
+        return error(400, "Datei fehlt (Feld file)")
+    name = (file.name or "").lower()
+    if not name.endswith((".csv", ".xlsx")):
+        return error(400, "Nur CSV oder XLSX im Format der Immoware24-Einheitenliste")
+    try:
+        batch, created = import_services.create_batch(
+            obj, filename=file.name, data=file.read(), import_kind=ImportKind.MIXED
+        )
+    except import_services.ImportError_ as exc:
+        return error(400, str(exc))
+    if created:
+        parse_batch_task.delay(batch.pk)
+    record(
+        "crm_api.person_import",
+        entity_type="import_batch",
+        entity_id=batch.pk,
+        object_id=obj.pk,
+        request=request,
+        after={"created": created, "token_id": request.crm_token.pk, "file_name": batch.source_file_name},
+    )
+    return json_response(
+        {
+            "batch_id": batch.pk,
+            "created": created,
+            "status": batch.status,
+            "object_number": obj.object_number,
+            "review_path": f"/importe/{batch.pk}/",
+        },
+        status=202 if created else 200,
+    )

@@ -2049,6 +2049,16 @@
       "schema": {
         "type": "boolean"
       }
+    },
+    {
+      "key": "sync.crm_persons_enabled",
+      "category": "sync",
+      "value_type": "boolean",
+      "description": "Einheiten- und Personenliste aus dem CRM über /api/crm/v1/objects/{nr}/imports/ als Import annehmen (Scope persons:write, Format Immoware24-Einheitenliste). Übernahme erst nach Prüfung und Freigabe im Importassistenten. Aus: 503",
+      "source": "Entscheidung Vorstand 27.09.2026 (Personenabgleich CRM nach objektakte)",
+      "schema": {
+        "type": "boolean"
+      }
     }
   ]
 }

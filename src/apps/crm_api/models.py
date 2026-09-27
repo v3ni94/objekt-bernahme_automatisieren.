@@ -15,14 +15,17 @@ SCOPE_DOCUMENTS = "documents:read"
 SCOPE_PERSONS = "persons:read"
 # Upload aus dem CRM in die Verarbeitung (26.09.2026); nur mit Schalter sync.crm_uploads_enabled
 SCOPE_DOCUMENTS_WRITE = "documents:write"
-SCOPES = (SCOPE_OBJECTS, SCOPE_DOCUMENTS, SCOPE_PERSONS, SCOPE_DOCUMENTS_WRITE)
+# Einheiten- und Personenliste aus dem CRM als Importvorschlag (27.09.2026); nur mit Schalter sync.crm_persons_enabled
+SCOPE_PERSONS_WRITE = "persons:write"
+SCOPES = (SCOPE_OBJECTS, SCOPE_DOCUMENTS, SCOPE_PERSONS, SCOPE_DOCUMENTS_WRITE, SCOPE_PERSONS_WRITE)
 
 
 class CrmApiToken(TimestampedModel):
     name = models.CharField(max_length=80, help_text="Bezeichnung des Abnehmers, z. B. crm")
     token_hash = models.CharField(max_length=64, unique=True, help_text="SHA-256 hex des Klartexts")
     scopes = models.JSONField(
-        default=list, help_text="Liste aus objects:read, documents:read, persons:read, documents:write"
+        default=list,
+        help_text="Liste aus objects:read, documents:read, persons:read, documents:write, persons:write",
     )
     is_active = models.BooleanField(default=True)
     last_used_at = models.DateTimeField(null=True, blank=True)

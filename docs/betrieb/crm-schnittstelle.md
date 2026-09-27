@@ -20,7 +20,7 @@ docker compose exec -T web python manage.py crm_token sperren --id 3
 docker compose exec -T web python manage.py crm_token sperren --name crm
 ```
 
-- Scopes: `objects:read` (Endpunkte 1 und 2), `documents:read` (3 und Statusabfrage 7), `persons:read` (4 und 5), `documents:write` (Upload 6). Mehrere Scopes durch Leerzeichen oder Komma getrennt. Für den Upload das vorhandene Token nicht erweitern, sondern ein neues mit allen vier Scopes anlegen und das alte sperren.
+- Scopes: `objects:read` (Endpunkte 1 und 2), `documents:read` (3 und Statusabfrage 7), `persons:read` (4 und 5), `documents:write` (Upload 6), `persons:write` (Personenliste, Abschnitt 3b). Mehrere Scopes durch Leerzeichen oder Komma getrennt. Für den Upload das vorhandene Token nicht erweitern, sondern ein neues mit allen vier Scopes anlegen und das alte sperren.
 - Die letzte Ausgabezeile von `anlegen` ist der Klartext (Beginn `oak_`). Er wird direkt in die Secret-Verwaltung des CRM übertragen, nicht per E-Mail oder Chat.
 - Rotation: neues Token anlegen, im CRM eintragen, altes Token mit `sperren --id` sperren. Gesperrte Tokens bleiben als Nachweis in der Tabelle.
 - Anlage und Sperre stehen im Protokoll (`crm_token.create`, `crm_token.revoke`), abgewiesene Abrufe als `auth.denied` mit Objektart `crm_api`.
@@ -69,6 +69,12 @@ Endpunkt 7 liefert die Dokumentzeile wie Endpunkt 3 und zusätzlich `object_numb
 Neu in jeder Dokumentzeile (Endpunkt 3, 7 und Webhook): `crm_document_id` (Kennung aus dem Upload, sonst null) und `paperless_id` (Dokument-ID in Paperless, sonst null). Beides ist eine Erweiterung des Vertrags; ältere Abnehmer ignorieren die Felder.
 
 Einschalten: in der Anwendung unter Konfiguration, Gruppe sync, Schlüssel `sync.crm_uploads_enabled` (Rolle Administrator, mit Begründung im Änderungsprotokoll). Protokoll: jeder Upload als `crm_api.upload` mit Kennung, Token und den Schlüsseln der Hinweise.
+
+## 3b Einheiten- und Personenliste aus dem CRM (Ergänzung 27.09.2026)
+
+`POST objects/{number}/imports/` (Scope `persons:write`, Schalter `sync.crm_persons_enabled`, Vorgabe aus): `multipart/form-data` mit `file`, einer CSV oder XLSX im Format der Immoware24-Einheitenliste (Spalten `Objekt-Nr`, `Status`, `Objekt`, `Verwaltungsart`, `Gebaeude`, `VE-Nr`, `VE-Beschreibung`, `Lage`, `Eigentuemer`, `Hausgeld_EUR_mtl`, `Mieter`, `Miete_EUR_mtl`). Die Datei wird ein Import des Objekts (Art gemischt) und läuft durch die Importkette: Einlesen im Hintergrund, Spaltenzuordnung, Normalisierung, Prüfung der Zeilen und Übernahme erst nach Freigabe im Importassistenten (`/importe/<id>/`). Erst die Übernahme legt Einheiten, Eigentümer, Mieter und Zuordnungen an; daraus entstehen die Eigentümer- und Mieterakten mit Namen. Das CRM überträgt nur Namen und Einheiten, keine Kontaktdaten und keine Beträge.
+
+Antworten: 202 mit `batch_id`, `status`, `review_path` bei neuer Datei; 200 mit demselben Import, wenn dieselbe Datei schon angenommen wurde (Prüfsumme); 400 ohne Datei oder bei anderem Dateityp; 404 bei unbekannter Objektnummer; 409 bei archiviertem Objekt; 503 mit `Retry-After`, solange der Schalter aus ist. Protokoll: `crm_api.person_import`.
 
 ## 4 Webhooks
 

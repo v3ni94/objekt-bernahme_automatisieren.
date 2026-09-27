@@ -219,3 +219,56 @@ def test_einheit_aus_hinweis_in_der_zuordnung(objekt):
         first_seen_at=timezone.now(),
     )
     assert build_context(ohne, entities=[]).unit_ids == []
+
+
+# ---------------------------------------------------------------- Personenliste als Import (27.09.2026)
+EINHEITENLISTE = (
+    "Objekt-Nr;Status;Objekt;Verwaltungsart;Gebaeude;VE-Nr;VE-Beschreibung;Lage;Eigentuemer;Hausgeld_EUR_mtl;"
+    "Mieter;Miete_EUR_mtl\n523;aktiv;Musterstraße 49;WEG;Haus;1;WE 1;EG links;Erika Mustermann;;Max Beispiel;\n"
+)
+
+
+def importieren(client, token, number="523", name="einheitenliste.csv", body=EINHEITENLISTE):
+    upload = SimpleUploadedFile(name, body.encode("utf-8"), content_type="text/csv")
+    return client.post(
+        f"{BASE}/objects/{number}/imports/", {"file": upload}, HTTP_AUTHORIZATION=f"Bearer {token}"
+    )
+
+
+def test_personenliste_schalter_scope_und_import(client, objekt, admin_user, monkeypatch):
+    from apps.imports.models import ImportBatch
+
+    started = []
+    monkeypatch.setattr("apps.crm_api.views.parse_batch_task.delay", lambda pk: started.append(pk))
+    token = make_token("persons:write")
+    assert importieren(client, token).status_code == 503
+    store.set("sync.crm_persons_enabled", True, user=admin_user)
+    assert importieren(client, make_token("persons:read")).status_code == 403
+    assert importieren(client, token, name="liste.pdf").status_code == 400
+    assert importieren(client, token, number="999").status_code == 404
+    first = importieren(client, token)
+    assert first.status_code == 202, first.content
+    body = first.json()
+    batch = ImportBatch.objects.get(pk=body["batch_id"])
+    assert batch.object_id == objekt.pk
+    assert batch.import_kind == "mixed"
+    assert body["review_path"] == f"/importe/{batch.pk}/"
+    assert started == [batch.pk]
+    again = importieren(client, token)
+    assert again.status_code == 200
+    assert again.json()["batch_id"] == batch.pk
+    assert started == [batch.pk]
+    assert AuditEvent.objects.filter(action="crm_api.person_import").count() == 2
+
+
+def test_personenliste_wird_als_immoware24_liste_eingelesen(client, objekt, admin_user):
+    from apps.imports import services as import_services
+    from apps.imports.models import ImportBatch
+
+    store.set("sync.crm_persons_enabled", True, user=admin_user)
+    resp = importieren(client, make_token("persons:write"))
+    batch = ImportBatch.objects.get(pk=resp.json()["batch_id"])
+    import_services.parse_batch(batch)
+    batch.refresh_from_db()
+    assert batch.rows_total == 1
+    assert "immoware24" in (batch.parser_profile or "")

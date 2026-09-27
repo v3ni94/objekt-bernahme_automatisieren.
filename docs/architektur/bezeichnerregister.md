@@ -1878,6 +1878,7 @@ Celery-Queues aus den Settings: `ai`, `classify`, `io`, `lists`, `ocr`
 | sync.assignment_ai_min | sync | decimal | `0.85` |
 | sync.assignment_auto_min | sync | decimal | `0.85` |
 | sync.assignment_gap_min | sync | decimal | `0.25` |
+| sync.crm_persons_enabled | sync | boolean | `false` |
 | sync.crm_uploads_enabled | sync | boolean | `false` |
 | sync.drive_changes_enabled | sync | boolean | `false` |
 | sync.drive_changes_interval_minutes | sync | integer | `5` |

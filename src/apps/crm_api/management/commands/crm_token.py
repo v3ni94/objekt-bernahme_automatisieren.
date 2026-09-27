@@ -42,7 +42,7 @@ class Command(BaseCommand):
             "--scopes",
             nargs="+",
             required=True,
-            help="objects:read, documents:read, persons:read, documents:write",
+            help="objects:read, documents:read, persons:read, documents:write, persons:write",
         )
         sub.add_parser("liste", help="Tokens mit Status und letzter Nutzung (ohne Klartext)")
         sperren = sub.add_parser("sperren", help="Token sperren")

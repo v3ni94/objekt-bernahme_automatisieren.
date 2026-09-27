@@ -9,4 +9,5 @@ urlpatterns = [
     path("objects/<str:number>/owners/", views.object_owners, name="crm_api_object_owners"),
     path("objects/<str:number>/tenants/", views.object_tenants, name="crm_api_object_tenants"),
     path("documents/<int:pk>/", views.document_detail, name="crm_api_document"),
+    path("objects/<str:number>/imports/", views.object_imports, name="crm_api_object_imports"),
 ]
