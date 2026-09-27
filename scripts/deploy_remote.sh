@@ -265,7 +265,7 @@ with urllib.request.urlopen(req, timeout=10) as r:
     # Konfiguration der Google-Verbindung pruefen, ohne Geheimnisse auszugeben, und die Client-Zugangsdaten
     # gegen den Token-Endpunkt proben: invalid_client heisst Client-ID und Secret passen nicht zusammen,
     # invalid_grant heisst die Zugangsdaten sind in Ordnung (nur der absichtlich ungueltige Probe-Token wird abgelehnt).
-    docker compose exec -T web python manage.py shell <<'PY'
+    docker compose exec -T web python manage.py shell --no-imports <<'PY'
 import json, urllib.error, urllib.parse, urllib.request
 from apps.config import store
 from apps.drive import oauth
@@ -303,7 +303,7 @@ PY
     # Preisliste, Modell beim Anbieter abrufbar (kein Token verbraucht). Mit Argument "probe" eine echte Klassifikation
     # eines synthetischen Textes ohne Personenbezug ueber die Provider-Klasse (Maskierungspruefung, Schema), Kosten nach
     # Preisliste; der Aufruf wird nicht in ai_calls protokolliert. Laeuft im worker-io, weil dort die Stufe 3 arbeitet.
-    docker compose exec -T -e AI_PROBE="${ARG:-}" worker-io python manage.py shell <<'PY'
+    docker compose exec -T -e AI_PROBE="${ARG:-}" worker-io python manage.py shell --no-imports <<'PY'
 import os, time
 from decimal import Decimal
 from apps.config import store
@@ -427,7 +427,7 @@ PY
       status|list) docker compose exec -T worker-nlp python manage.py classifier "${ARG:-status}" ;;
       train)       docker compose exec -T worker-nlp python manage.py classifier train ;;
       train+force) docker compose exec -T worker-nlp python manage.py classifier train --force ;;
-      deactivate)  docker compose exec -T worker-nlp python manage.py shell -c "from apps.documents.models import ClassifierModel; n = ClassifierModel.objects.filter(is_active=True).update(is_active=False); print(f'{n} Modell(e) deaktiviert; Stufe 2 arbeitet wieder in der Kaltstartphase (kein Neustart noetig, das aktive Modell wird je Aufruf aus der Datenbank gelesen)')" ;;
+      deactivate)  docker compose exec -T worker-nlp python manage.py shell --no-imports -c "from apps.documents.models import ClassifierModel; n = ClassifierModel.objects.filter(is_active=True).update(is_active=False); print(f'{n} Modell(e) deaktiviert; Stufe 2 arbeitet wieder in der Kaltstartphase (kein Neustart noetig, das aktive Modell wird je Aufruf aus der Datenbank gelesen)')" ;;
       *) echo "Argument unzulaessig (status, list, train, train+force, deactivate)"; exit 2 ;;
     esac
     ;;
@@ -439,7 +439,7 @@ PY
     # Ohne Argument nur Vorschau; "echt" fuehrt aus. "push400" zeigt fehlgeschlagene Uebertragungen nach Paperless
     # mit HTTP 400, "push400+echt" reiht sie einmal erneut ein (nach dem Deploy vom 20.09.2026 nennt der Fehlertext
     # dann den Grund des Servers, etwa den nicht unterstuetzten Dateityp).
-    docker compose exec -T -e SYNC_ARG="${ARG:-}" web python manage.py shell <<'PY'
+    docker compose exec -T -e SYNC_ARG="${ARG:-}" web python manage.py shell --no-imports <<'PY'
 import os
 from collections import Counter
 from django.db.models import Q
@@ -482,7 +482,7 @@ PY
     # Drive, in Paperless oder in beiden auffindbar sind, Verknuepfungen, Operationen je Art und Status mit maskierten
     # Fehlertexten, Bestandslaeufe. Mit Argument "live" wird die Paperless-Verbindung tatsaechlich getestet (nur lesend,
     # legt nichts an). Keine Personendaten, kein Token in der Ausgabe.
-    docker compose exec -T -e SYNC_LIVE="${ARG:-}" web python manage.py shell <<'PY'
+    docker compose exec -T -e SYNC_LIVE="${ARG:-}" web python manage.py shell --no-imports <<'PY'
 import os, re
 from collections import Counter
 from django.db.models import Count, Exists, OuterRef, Q
@@ -583,7 +583,7 @@ PY
   review-status)
     # Pruefcenter-Bestand: offene Faelle je Art/Unterart, wie viele einen maschinellen Vorschlag tragen, wie viele die
     # KI nachklassifizieren kann (below_threshold mit Dokument im Status review), Stufe-3-Status; optional je Objekt.
-    docker compose exec -T -e OBJ="${ARG:-}" web python manage.py shell <<'PY'
+    docker compose exec -T -e OBJ="${ARG:-}" web python manage.py shell --no-imports <<'PY'
 import os
 from collections import Counter
 from django.db.models import Count, Q
@@ -712,7 +712,7 @@ PY
     # T4/T5 (26.09.2026): Pruefabfragen aus docs/betrieb/deployment-test.md lesend; der Neustart selbst laeuft ueber
     # restart-probe (worker) oder von Hand (Server, Zeitfenster F27). Keine Dateinamen, keine Personendaten.
     echo "T4/T5 Wiederaufnahme (erwartet: 0 Doppelte, erneut eingereihte Jobs enden fertig, Sweeper im Log):"
-    docker compose exec -T web python manage.py shell <<'PY'
+    docker compose exec -T web python manage.py shell --no-imports <<'PY'
 from datetime import timedelta
 from django.db.models import Count, Q
 from django.utils import timezone
@@ -817,7 +817,7 @@ PY
     echo "  Zeitzone: $(timedatectl show -p Timezone --value 2>/dev/null || cat /etc/timezone 2>/dev/null || echo unbekannt), NTP synchron: $(timedatectl show -p NTPSynchronized --value 2>/dev/null || echo unbekannt)"
     # T13 (26.09.2026): TOTP-Pflicht aus dem Katalog, Verweigerungen der letzten 30 Tage, Nutzer je Rolle ohne Namen
     echo "T13 Login und Rollen (erwartet: admin in den Pflichtrollen, auth.denied bei verweigertem Zugriff):"
-    docker compose exec -T web python manage.py shell <<'PY'
+    docker compose exec -T web python manage.py shell --no-imports <<'PY'
 from collections import Counter
 from datetime import timedelta
 from allauth.mfa.models import Authenticator
@@ -854,7 +854,7 @@ PY
     # abgebrochen und vom Sweeper erneut eingereiht; deshalb nur mit Freigabe und ausserhalb grosser Laeufe.
     case "${ARG:-}" in ""|echt) ;; *) echo "Argument unbekannt: $ARG (erlaubt: echt)"; exit 2 ;; esac
     zaehler() {
-      docker compose exec -T web python manage.py shell <<'PY'
+      docker compose exec -T web python manage.py shell --no-imports <<'PY'
 from django.db.models import Count
 from apps.documents.models import Document
 from apps.pipeline.models import JobStatus, ProcessingJob, ProcessingRun, RunStatus
@@ -959,7 +959,7 @@ PY
       esac
     done
     [ "$PAGES" -le 200 ] || { echo "pages hoechstens 200 (kleine Messung neben dem Betrieb)"; exit 2; }
-    AKTIV="$(docker compose exec -T web python manage.py shell <<'PY'
+    AKTIV="$(docker compose exec -T web python manage.py shell --no-imports <<'PY'
 from apps.pipeline.models import JobStatus, ProcessingJob, ProcessingRun, RunStatus
 
 print(
@@ -982,7 +982,7 @@ PY
     ;;
   doc-status)
     # Dokumente je Objekt und Status, offene und fehlgeschlagene Jobs; keine Dateinamen, keine Personendaten
-    docker compose exec -T web python manage.py shell <<'PY'
+    docker compose exec -T web python manage.py shell --no-imports <<'PY'
 from django.db.models import Count, Q
 from django.utils import timezone
 from apps.documents.models import Document
@@ -1060,7 +1060,7 @@ PY
     # Mit Objektnummer als Argument: je Dokument Klassifikation, Stufen, Entitaeten (nur Zaehler) und Faelle.
     # Keine Dateinamen, keine Personennamen (Protokoll liegt bei GitHub).
     if [ -n "${ARG:-}" ]; then
-      docker compose exec -T -e OBJ_NR="$ARG" web python manage.py shell <<'PY'
+      docker compose exec -T -e OBJ_NR="$ARG" web python manage.py shell --no-imports <<'PY'
 import os
 from collections import Counter
 from apps.documents.models import Document, DocumentClassification, DocumentEntity
@@ -1098,7 +1098,7 @@ PY
     # Laeuft im worker-io (Warteschlange io, /data/exports beschreibbar); der Web-Container ist schreibgeschuetzt.
     # Argument "ohne-ordner": nur Objekte ohne registrierten Objektordner (schnell, kein Durchlauf aller Baeume).
     if [ "${ARG:-}" = "ohne-ordner" ]; then
-      docker compose exec -T worker-io python manage.py shell <<'PY'
+      docker compose exec -T worker-io python manage.py shell --no-imports <<'PY'
 from apps.drive.models import DriveNode, NodeKind, NodeStatus
 from apps.drive.tasks import reconcile_object_task
 from apps.objects.models import ManagedObject
@@ -1110,7 +1110,7 @@ for o in objs:
     print(o.object_number, r.get("status"), r.get("error") or "")
 PY
     else
-      docker compose exec -T worker-io python manage.py shell <<'PY'
+      docker compose exec -T worker-io python manage.py shell --no-imports <<'PY'
 from apps.drive.tasks import reconcile_all_task
 result = reconcile_all_task(dry_run=False)
 print(result)
@@ -1121,7 +1121,7 @@ PY
     # Konfigurationswert aus dem Katalog setzen, Argument schluessel=wert; der Wert wird als JSON gelesen
     # (true, false, 5, "text"), sonst als Zeichenkette. Validierung und Audit (setting.update) wie im Admin-Formular.
     case "${ARG:-}" in *=*) ;; *) echo "Argument schluessel=wert fehlt"; exit 2 ;; esac
-    docker compose exec -T -e CFG_ARG="$ARG" web python manage.py shell <<'PY'
+    docker compose exec -T -e CFG_ARG="$ARG" web python manage.py shell --no-imports <<'PY'
 import json, os
 from apps.config import store
 key, _, raw = os.environ["CFG_ARG"].partition("=")
@@ -1460,7 +1460,7 @@ PY
     # Stunde, dessen Dokument nicht mehr hashed ist und keinen offenen Job hat; ein DB-Abgleich statt zwei Abfragen je
     # Verzeichnis wie im Minuten-Sweep. Laeuft im Worker-Container (work/ beschreibbar). "echt" loescht, sonst Vorschau.
     WB=0; [ "${ARG:-}" = "echt" ] && WB=1
-    docker compose exec -T -e WB_ECHT="$WB" worker python manage.py shell <<'PY'
+    docker compose exec -T -e WB_ECHT="$WB" worker python manage.py shell --no-imports <<'PY'
 import os, shutil, time
 from apps.documents.models import Document
 from apps.pipeline import storage
@@ -1553,7 +1553,8 @@ PY
         *) echo "Unbekanntes Argument: $p (erlaubt: objekt=NR, limit=N, gruppe=bekannt|temporaer|html|office, echt)"; exit 2 ;;
       esac
     done
-    docker compose exec -T web python manage.py formate_wiederaufnehmen "${args[@]}"
+    # Auditzeilen je Dokument nicht ausgeben (bis 27.09.2026 rund 1.900 Zeilen je Lauf); das Audit bleibt in der Datenbank
+    docker compose exec -T web python manage.py formate_wiederaufnehmen "${args[@]}" | { grep -v '"logger": "apps.audit.services"' || true; }
     ;;
   restformate-bereinigen)
     # Restformate nach Entscheidungsvorlage E-1 (26.09.2026) bereinigen. gruppe=temporaer: offene Faelle "nicht
@@ -1575,7 +1576,7 @@ PY
         *) echo "Unbekanntes Argument: $p (erlaubt: gruppe=temporaer|archive-medien, objekt=NR, limit=N, echt)"; exit 2 ;;
       esac
     done
-    docker compose exec -T web python manage.py restformate_bereinigen "${args[@]}"
+    docker compose exec -T web python manage.py restformate_bereinigen "${args[@]}" | { grep -v '"logger": "apps.audit.services"' || true; }
     ;;
   fehler-wiederaufnehmen)
     # Dokumente im Status Fehler gezielt wieder in die Kette nehmen, auch jenseits der drei automatischen
@@ -1621,7 +1622,7 @@ PY
     # Dateinamen). Endet von selbst, wenn nichts mehr offen ist; Strg+C beendet nur den Monitor, nie die Verarbeitung.
     SEK="${ARG:-10}"
     case "$SEK" in ''|*[!0-9]*) echo "Intervall muss aus Ziffern bestehen (Sekunden)"; exit 2 ;; esac
-    docker compose exec -T -e MON_SEK="$SEK" web python manage.py shell <<'PY'
+    docker compose exec -T -e MON_SEK="$SEK" web python manage.py shell --no-imports <<'PY'
 import os, re, time
 from collections import Counter
 from datetime import timedelta

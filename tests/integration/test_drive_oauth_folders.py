@@ -167,7 +167,13 @@ def test_eigentuemerakte_ordner(seeded):
     with pytest.raises(FolderError):
         ensure_owner_folder(akte, drive=drive)
     reconcile_object(obj, drive=drive, dry_run=False, cfg=cfg)
+    # Hauptordner 05 nicht registriert (27.09.2026): die Ablage registriert den vorhandenen Drive-Ordner selbst
+    # statt auf einen Ordnerabgleich zu warten, ohne einen zweiten Ordner 05 anzulegen
+    DriveNode.objects.filter(object=obj, node_kind="main_folder", category_id="05").update(status="missing")
     rows = ensure_owner_folder(akte, drive=drive)
+    root = DriveNode.objects.get(object=obj, node_kind="object_root", status="active")
+    namen = [n.name for n in drive.list_children(root.drive_file_id)]
+    assert len([n for n in namen if n.startswith("05")]) == 1
     assert len(rows) == 12 and rows[0].node_kind == "owner_file_folder" and rows[0].created_by_app
     main05 = DriveNode.objects.get(object=obj, node_kind="main_folder", category_id="05")
     assert [n.name for n in drive.list_children(main05.drive_file_id)] == ["WE03_Mustermann"]

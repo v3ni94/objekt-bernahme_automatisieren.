@@ -125,9 +125,10 @@ def ensure_owner_folder(owner_file: OwnerFile, *, drive: DriveAdapter, user=None
         object=owner_file.object, node_kind=NodeKind.MAIN_FOLDER, category_id="05", status=NodeStatus.ACTIVE
     ).first()
     if main is None:
-        raise FolderError(
-            "Hauptordner der Eigentümerakte ist nicht registriert; zuerst Ordnerabgleich ausführen"
-        )
+        # Wie die Hauptordner 01 bis 06 bei der Ablage anlegen oder den vorhandenen Drive-Ordner gleichen Namens
+        # registrieren; nur ohne Objektordner bleibt FolderError. Bis 27.09.2026 wartete die Ablage hier auf einen
+        # manuellen Ordnerabgleich (6.661 Zurueckstellungen in 7 Tagen, deploy-tests T4/T5).
+        main = ensure_category_folder(owner_file.object, "05", None, drive=drive, user=user)
     subs = owner_file_subfolders()
     cache_key = f"drive:node:{owner_file.pk}"
     cached = cache.get(cache_key)

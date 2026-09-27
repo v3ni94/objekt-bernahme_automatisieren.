@@ -7,6 +7,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import random
 import shutil
 import time
 from datetime import timedelta
@@ -1111,7 +1112,9 @@ def file_to_drive(job: ProcessingJob) -> dict:
         # Ein anderes Dokument desselben Objekts wird gerade abgelegt. Das ist Reihenfolge, kein Fehler: kurz
         # warten, ohne einen Versuch zu verbrauchen. Mit RetryableError standen bei acht gleichzeitigen Uploads
         # fuenf Dokumente nach drei schnellen Fehlversuchen auf error (Befund 11.09.2026).
-        raise DeferJob("Drive-Schreibsperre des Objekts belegt", seconds=20)
+        # Gestreute Wartezeit (27.09.2026): mit festen 20 s trafen zurueckgestellte Ablagen desselben Objekts im
+        # Gleichtakt wieder auf die Sperre (52.983 Zurueckstellungen in 7 Tagen, deploy-tests T4/T5).
+        raise DeferJob("Drive-Schreibsperre des Objekts belegt", seconds=random.randint(15, 60))
     # Die Sperre schuetzt nur das Anlegen und Nachlesen der Zielordner: zwei Ablagen desselben Objekts duerfen einen
     # fehlenden Ordner nicht doppelt anlegen. Verschieben, Upload und Pruefung laufen danach ohne Sperre parallel;
     # jede Datei ist ueber Hash, Kennzeichen und die Idempotenzpruefung im Zielordner eindeutig. Bis 20.09.2026 hielt
